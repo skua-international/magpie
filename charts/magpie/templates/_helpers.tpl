@@ -32,6 +32,19 @@ override to the chart-wide default. Called as:
 {{- end -}}
 
 {{/*
+imagePullSecrets block for a pod spec, or nothing at all if none are
+configured. Called as: {{- include "magpie.imagePullSecrets" . | nindent 6 }}
+*/}}
+{{- define "magpie.imagePullSecrets" -}}
+{{- if .Values.imagePullSecrets }}
+imagePullSecrets:
+{{- range .Values.imagePullSecrets }}
+  - name: {{ . }}
+{{- end }}
+{{- end }}
+{{- end -}}
+
+{{/*
 DATABASE_URL for the shared cluster Postgres, as a container env entry
 list (PGPASSWORD sourced from a Secret, DATABASE_URL composed from it via
 Kubernetes' $(VAR) dependent-env-var expansion -- so the password itself

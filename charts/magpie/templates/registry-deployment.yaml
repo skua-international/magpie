@@ -18,6 +18,7 @@ spec:
         {{- include "magpie.labels" . | nindent 8 }}
         app.kubernetes.io/component: registry
     spec:
+      {{- include "magpie.imagePullSecrets" . | nindent 6 }}
       # No ServiceAccount token needed -- this service never talks to the
       # Kubernetes API, only Postgres and the localContent volume.
       automountServiceAccountToken: false

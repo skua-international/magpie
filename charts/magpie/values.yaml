@@ -9,6 +9,14 @@ image:
   tag: latest
   pullPolicy: IfNotPresent
 
+# Names of existing docker-registry Secrets granting pull access, e.g. to
+# GHCR if the images live in a private repo/package (the default,
+# ghcr.io/skua-international/magpie/*, does). Not created by this chart --
+# kubectl create secret docker-registry <name> --docker-server=ghcr.io
+# --docker-username=<user> --docker-password=<a token with read:packages>
+# ahead of `helm install`.
+imagePullSecrets: []
+
 # Image the controller's reconciler tells k8s to run for each ArmaServer's
 # launcher Pod. Not deployed by this chart itself -- just referenced.
 launcherImage: ghcr.io/skua-international/magpie/launcher:latest

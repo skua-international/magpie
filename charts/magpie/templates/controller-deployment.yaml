@@ -22,6 +22,7 @@ spec:
         {{- include "magpie.labels" . | nindent 8 }}
         app.kubernetes.io/component: controller
     spec:
+      {{- include "magpie.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "magpie.fullname" . }}-controller
       securityContext:
         runAsNonRoot: true
