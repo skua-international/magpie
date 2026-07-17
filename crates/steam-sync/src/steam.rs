@@ -1232,6 +1232,17 @@ pub(crate) async fn download_one_depot(
         .await
         .with_context(|| format!("failed to lowercase filenames under {}", install_dir.display()))?;
 
+    // The dedicated server depot's manifest doesn't set FLAG_EXECUTABLE on
+    // its own server binaries (confirmed live: steamdepot's download.rs
+    // does chmod +x when that flag is set, and it wasn't -- the binary
+    // landed 0o644, "Permission denied" on exec). A Windows-authored
+    // depot's Linux-executable metadata apparently can't be trusted here,
+    // so fix up the known binary names explicitly, same fixup-after-sync
+    // pattern as lowercase_synced_tree above.
+    fix_executable_bits(&install_dir)
+        .await
+        .with_context(|| format!("failed to set executable bits under {}", install_dir.display()))?;
+
     sync_state.mark_synced(&sync_key, manifest_id);
 
     Ok(())
@@ -1262,6 +1273,32 @@ fn lowercase_tree_blocking(dir: &std::path::Path) -> Result<()> {
             continue;
         }
         std::fs::rename(path, &dest).with_context(|| format!("failed to rename {} to {lower}", path.display()))?;
+    }
+    Ok(())
+}
+
+/// Known Linux server binary names Arma 3's dedicated server depot
+/// ships (lowercased -- runs after `lowercase_synced_tree`), whose
+/// executable bit needs setting explicitly. See the caller's comment for
+/// why this can't just rely on the manifest's own executable flag.
+const KNOWN_SERVER_BINARIES: &[&str] = &["arma3server", "arma3server_x64"];
+
+async fn fix_executable_bits(dir: &std::path::Path) -> Result<()> {
+    let dir = dir.to_path_buf();
+    tokio::task::spawn_blocking(move || fix_executable_bits_blocking(&dir)).await.context("chmod task panicked")?
+}
+
+fn fix_executable_bits_blocking(dir: &std::path::Path) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    for entry in walkdir::WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+        let path = entry.path();
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else { continue };
+        if !KNOWN_SERVER_BINARIES.contains(&name) {
+            continue;
+        }
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755))
+            .with_context(|| format!("failed to chmod +x {}", path.display()))?;
     }
     Ok(())
 }
