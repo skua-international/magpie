@@ -70,7 +70,7 @@ jobs:
           go install connectrpc.com/connect/cmd/protoc-gen-connect-go@latest
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
 
