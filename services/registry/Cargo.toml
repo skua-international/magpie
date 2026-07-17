@@ -1,22 +1,22 @@
 [package]
 name = "registry"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 
 [dependencies]
 anyhow = "1.0.103"
-authn = { version = "0.1.0", path = "../../crates/authn" }
+authn = { path = "../../crates/authn" }
 axum = "0.8.9"
 buffa = "0.8.1"
 connectrpc = { version = "0.8.1", features = ["axum"] }
-protocol = { version = "0.1.0", path = "../../crates/protocol" }
-registry-db = { version = "0.1.0", path = "../../crates/registry-db" }
+protocol = { path = "../../crates/protocol" }
+registry-db = { path = "../../crates/registry-db" }
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "chrono", "macros"] }
-sync-client = { version = "0.1.0", path = "../../crates/sync-client" }
-tokio = { version = "1.53.0", features = ["full"] }
+sync-client = { path = "../../crates/sync-client" }
+tokio = { version = "1.53.0", features = ["rt-multi-thread", "macros", "net"] }
 tower = "0.5.3"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 uuid = { version = "1.24.0", features = ["v7"] }
-workshop-parse = { version = "0.1.0", path = "../../crates/workshop-parse" }
+workshop-parse = { path = "../../crates/workshop-parse" }
 zip = "8.6.0"

@@ -179,10 +179,10 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
 name = "authn"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
- "axum 0.8.9",
+ "axum",
  "jsonwebtoken",
  "registry-db",
  "reqwest 0.13.4",
@@ -222,45 +222,11 @@ dependencies = [
 
 [[package]]
 name = "axum"
-version = "0.7.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edca88bc138befd0323b20752846e6587272d3b03b0343c8ea28a6f819e6e71f"
-dependencies = [
- "async-trait",
- "axum-core 0.4.5",
- "bytes",
- "futures-util",
- "http",
- "http-body",
- "http-body-util",
- "hyper",
- "hyper-util",
- "itoa",
- "matchit 0.7.3",
- "memchr",
- "mime",
- "percent-encoding",
- "pin-project-lite",
- "rustversion",
- "serde",
- "serde_json",
- "serde_path_to_error",
- "serde_urlencoded",
- "sync_wrapper",
- "tokio",
- "tower",
- "tower-layer",
- "tower-service",
- "tracing",
-]
-
-[[package]]
-name = "axum"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "31b698c5f9a010f6573133b09e0de5408834d0c82f8d7475a89fc1867a71cd90"
 dependencies = [
- "axum-core 0.5.6",
+ "axum-core",
  "bytes",
  "form_urlencoded",
  "futures-util",
@@ -270,7 +236,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "itoa",
- "matchit 0.8.4",
+ "matchit",
  "memchr",
  "mime",
  "percent-encoding",
@@ -282,27 +248,6 @@ dependencies = [
  "sync_wrapper",
  "tokio",
  "tower",
- "tower-layer",
- "tower-service",
- "tracing",
-]
-
-[[package]]
-name = "axum-core"
-version = "0.4.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09f2bd6146b97ae3359fa0cc6d6b376d9539582c7b4220f041a33ec24c226199"
-dependencies = [
- "async-trait",
- "bytes",
- "futures-util",
- "http",
- "http-body",
- "http-body-util",
- "mime",
- "pin-project-lite",
- "rustversion",
- "sync_wrapper",
  "tower-layer",
  "tower-service",
  "tracing",
@@ -622,7 +567,7 @@ checksum = "e4d1bbfc95ed1f4f31a027f5b97ff981be2617bc8a5c800fd6fcc701867bb97f"
 dependencies = [
  "async-compression",
  "async-trait",
- "axum 0.8.9",
+ "axum",
  "base64 0.22.1",
  "buffa",
  "bytes",
@@ -695,7 +640,7 @@ checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 
 [[package]]
 name = "controller"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -782,7 +727,7 @@ dependencies = [
 
 [[package]]
 name = "crd"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "k8s-openapi",
  "kube",
@@ -1390,9 +1335,9 @@ dependencies = [
 
 [[package]]
 name = "h2"
-version = "0.4.14"
+version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "171fefbc92fe4a4de27e0698d6a5b392d6a0e333506bc49133760b3bcf948733"
+checksum = "6cb093c84e8bd9b188d4c4a8cb6579fc016968d14c99882163cd3ff402a4f155"
 dependencies = [
  "atomic-waker",
  "bytes",
@@ -1756,11 +1701,11 @@ checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
 
 [[package]]
 name = "identity"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "authn",
- "axum 0.8.9",
+ "axum",
  "base64 0.22.1",
  "chrono",
  "jsonwebtoken",
@@ -2119,7 +2064,7 @@ dependencies = [
 
 [[package]]
 name = "launcher"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "regex",
@@ -2239,12 +2184,6 @@ checksum = "d1525a2a28c7f4fa0fc98bb91ae755d1e2d1505079e05539e35bc876b5d65ae9"
 dependencies = [
  "regex-automata",
 ]
-
-[[package]]
-name = "matchit"
-version = "0.7.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e7465ac9959cc2b1404e8e2367b43684a6d13790fe23056cc8c6c5a6b7bcb94"
 
 [[package]]
 name = "matchit"
@@ -2733,7 +2672,7 @@ dependencies = [
 
 [[package]]
 name = "protocol"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "buffa",
  "connectrpc",
@@ -2973,11 +2912,11 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "registry"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "authn",
- "axum 0.8.9",
+ "axum",
  "buffa",
  "connectrpc",
  "protocol",
@@ -2995,7 +2934,7 @@ dependencies = [
 
 [[package]]
 name = "registry-db"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3500,11 +3439,11 @@ dependencies = [
 
 [[package]]
 name = "server-api"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "authn",
- "axum 0.8.9",
+ "axum",
  "buffa",
  "connectrpc",
  "crd",
@@ -3917,7 +3856,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "steam-sync"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "bincode",
@@ -3995,7 +3934,7 @@ dependencies = [
 
 [[package]]
 name = "sync-client"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "buffa",
@@ -4006,10 +3945,10 @@ dependencies = [
 
 [[package]]
 name = "sync-daemon"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
- "axum 0.7.9",
+ "axum",
  "buffa",
  "connectrpc",
  "protocol",
@@ -4177,9 +4116,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-macros"
-version = "2.7.0"
+version = "2.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "385a6cb71ab9ab790c5fe8d67f1645e6c450a7ce006a33de03daa956cf70a496"
+checksum = "6328af13490e73a9b4694030fafd93f8c8c6a9dede33e821c3fc63eddf8042ba"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4890,7 +4829,7 @@ checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
 
 [[package]]
 name = "workshop-parse"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "once_cell",

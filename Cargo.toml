@@ -4,3 +4,9 @@ members = ["crates/authn", "crates/crd", "crates/protocol", "crates/registry-db"
 
 [workspace.package]
 edition = "2024"
+# Bumped by .github/workflows/release.yml (semantic-release, driven off
+# conventional commit messages) via scripts/bump-version.sh -- every
+# member below inherits this through `version.workspace = true` rather
+# than carrying its own version, so one release version covers the whole
+# platform. Not meaningful on its own between releases; don't hand-edit.
+version = "0.0.0"

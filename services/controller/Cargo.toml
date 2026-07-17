@@ -1,23 +1,23 @@
 [package]
 name = "controller"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 
 [dependencies]
 anyhow = "1.0.103"
 chrono = { version = "0.4.45", features = ["serde"] }
-crd = { version = "0.1.0", path = "../../crates/crd" }
+crd = { path = "../../crates/crd" }
 futures = "0.3.32"
 k8s-openapi = { version = "0.28.0", features = ["latest"] }
 kube = { version = "4.0.0", features = ["runtime", "derive"] }
-registry-db = { version = "0.1.0", path = "../../crates/registry-db" }
+registry-db = { path = "../../crates/registry-db" }
 schemars = "1.2.1"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "chrono", "macros"] }
-sync-client = { version = "0.1.0", path = "../../crates/sync-client" }
+sync-client = { path = "../../crates/sync-client" }
 thiserror = "2.0.18"
-tokio = { version = "1.52.4", features = ["full"] }
+tokio = { version = "1.52.4", features = ["rt-multi-thread", "macros"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 uuid = { version = "1.24.0", features = ["v7"] }

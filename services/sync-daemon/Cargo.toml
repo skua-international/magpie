@@ -1,6 +1,6 @@
 [package]
 name = "sync-daemon"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 
 [dependencies]
@@ -8,8 +8,8 @@ steam-sync = { path = "../../crates/steam-sync" }
 protocol = { path = "../../crates/protocol" }
 connectrpc = { version = "0.8", features = ["axum"] }
 buffa = "0.8"
-axum = "0.7"
-tokio = { version = "1", features = ["full"] }
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "time"] }
 anyhow = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

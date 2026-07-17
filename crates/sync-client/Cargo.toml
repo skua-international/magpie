@@ -1,6 +1,6 @@
 [package]
 name = "sync-client"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 
 [dependencies]
@@ -8,4 +8,4 @@ anyhow = "1.0.103"
 buffa = "0.8.1"
 connectrpc = { version = "0.8.1", features = ["client"] }
 http = "1.4.2"
-protocol = { version = "0.1.0", path = "../protocol" }
+protocol = { path = "../protocol" }

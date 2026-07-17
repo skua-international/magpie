@@ -1,23 +1,23 @@
 [package]
 name = "identity"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 
 [dependencies]
 anyhow = "1.0.103"
-authn = { version = "0.1.0", path = "../../crates/authn" }
+authn = { path = "../../crates/authn" }
 axum = { version = "0.8.9", features = ["query"] }
 base64 = "0.22.1"
 chrono = { version = "0.4.45", features = ["serde"] }
 jsonwebtoken = "10.4.0"
 oauth2 = "5.0.0"
-registry-db = { version = "0.1.0", path = "../../crates/registry-db" }
+registry-db = { path = "../../crates/registry-db" }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 ring = "0.17.14"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "chrono", "macros"] }
-tokio = { version = "1.53.0", features = ["full"] }
+tokio = { version = "1.53.0", features = ["rt-multi-thread", "macros", "net"] }
 tower = "0.5.3"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
