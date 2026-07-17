@@ -1310,6 +1310,9 @@ fn fix_executable_bits_blocking(dir: &std::path::Path) -> Result<()> {
 /// rather than trusting Steam's data to be well-formed.
 const MAX_COLLECTION_DEPTH: u32 = 8;
 
+/// Steamworks SDK's `EWorkshopFileType::k_EWorkshopFileTypeCollection`.
+const WORKSHOP_FILE_TYPE_COLLECTION: u32 = 2;
+
 /// Resolve a batch of candidate Steam Workshop IDs -- each may be an
 /// individual mod or a collection, indistinguishable without asking Steam
 /// -- into a flat list of individual mod IDs, expanding any collections
@@ -1324,11 +1327,17 @@ const MAX_COLLECTION_DEPTH: u32 = 8;
 /// call only sees what's publicly visible, but this sees whatever the
 /// logged-in account itself has access to.
 ///
-/// Whether a given ID is a collection is inferred from whether Steam
-/// returned any `children` for it, not from `file_type` -- the exact
-/// `EWorkshopFileType` enum value for "collection" isn't in the vendored
-/// proto, and children-non-empty is functionally equivalent for this
-/// purpose without risking a guessed magic number.
+/// Whether a given ID is a *pure* collection (no depot content of its
+/// own, only expand its members) is decided by `file_type ==
+/// WORKSHOP_FILE_TYPE_COLLECTION`, not by whether `children` is
+/// non-empty -- confirmed live: a plain Mod with required items (e.g. one
+/// depending on CBA_A3) also populates `children` with those
+/// dependencies, and treating that as "this is a collection, don't
+/// include the item itself" silently dropped the mod itself from the
+/// resolved list, keeping only its dependency. Every resolved item's own
+/// children (a collection's members, or a mod's required items) are
+/// still expanded into the next frontier either way -- the only
+/// difference is whether the item itself also gets added to `resolved`.
 pub async fn resolve_source_ids(conn: &mut CmConnection, candidate_ids: &[u64]) -> Result<ResolveOutcome> {
     let mut resolved: std::collections::HashMap<u64, String> = std::collections::HashMap::new();
     // The originally-requested candidates' own titles (a mod's own title,
@@ -1386,13 +1395,13 @@ pub async fn resolve_source_ids(conn: &mut CmConnection, candidate_ids: &[u64]) 
             if depth == 1 {
                 candidate_titles.insert(id, title.clone());
             }
-            if details.children.is_empty() {
+            let file_type = details.file_type.unwrap_or(0);
+            if file_type != WORKSHOP_FILE_TYPE_COLLECTION {
                 resolved.insert(id, title);
-            } else {
-                for child in details.children {
-                    if let Some(child_id) = child.publishedfileid {
-                        next_frontier.push(child_id);
-                    }
+            }
+            for child in details.children {
+                if let Some(child_id) = child.publishedfileid {
+                    next_frontier.push(child_id);
                 }
             }
         }
