@@ -1,9 +1,23 @@
 name: Build and push images
 
+# Triggered off release.yml's completion, not its own push/tag triggers --
+# release.yml runs on every push to main and, if semantic-release decides
+# to cut a release, pushes a second (version-bump) commit itself. That
+# second push is App-authored, so it *does* re-trigger workflows -- if
+# this workflow also listened on push/tags directly, both the original
+# push and the version-bump push would independently start a build here,
+# with no ordering guarantee between the two. Whichever finished pushing
+# `latest` last would win, possibly leaving `latest` built from the
+# pre-bump commit even though a newer tagged release exists. Building
+# only after release.yml fully completes -- checked out at its exact
+# final head_sha -- makes this race impossible: exactly one build run per
+# push to main, always against whatever main looks like once any version
+# bump has already landed. Same fix shape as folding proto-stub
+# regeneration into release.yml itself (see that workflow's own comment).
 on:
-  push:
-    branches: [main]
-    tags: ["v*"]
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
   workflow_dispatch: {}
 
 env:
@@ -13,6 +27,10 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # workflow_run fires for a failed release.yml run too -- only build if
+    # it actually succeeded (or this was a manual workflow_dispatch, which
+    # has no workflow_run event at all).
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     permissions:
       contents: read
       packages: write
@@ -34,6 +52,15 @@ jobs:
             dockerfile: services/identity/Dockerfile
     steps:
       - uses: actions/checkout@v4
+        with:
+          # release.yml's own head_sha -- the version-bump commit (if
+          # semantic-release cut one) and its tag both already exist there
+          # by the time it completes. A plain checkout of `main` would
+          # usually land on the same commit, but pinning explicitly avoids
+          # any window where another push has already landed on main
+          # between release.yml finishing and this job starting.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-tags: true
 
       - uses: docker/setup-buildx-action@v3
 
