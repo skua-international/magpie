@@ -1,6 +1,8 @@
 syntax = "proto3";
 package sync.v1;
 
+option go_package = "github.com/skua-international/magpie/generated/go/sync/v1;syncv1";
+
 // Mod/collection sync registry and content-claim service. Owns all Steam
 // depot/workshop mechanics -- callers (the controller) never talk to Steam
 // directly, only in terms of candidate IDs and resolved mod IDs.

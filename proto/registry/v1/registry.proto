@@ -1,6 +1,8 @@
 syntax = "proto3";
 package registry.v1;
 
+option go_package = "github.com/skua-international/magpie/generated/go/registry/v1;registryv1";
+
 // Every RPC in this file requires a `Bearer <JWT>` verified against a
 // configured JWKS endpoint; authorization is scope + subject based against
 // a Postgres-backed grant table shared with services/controller (see
