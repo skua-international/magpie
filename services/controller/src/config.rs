@@ -40,6 +40,14 @@ pub struct Config {
     /// Shares the cluster's single Postgres instance with
     /// services/registry and services/server-api.
     pub database_url: String,
+    /// Names of existing docker-registry Secrets to attach to every
+    /// launcher Pod this reconciler creates, so it can pull
+    /// `launcher_image` from a private registry -- separate from the
+    /// chart's own `imagePullSecrets` support (which only covers the
+    /// Deployments Helm templates directly; this reconciler builds the
+    /// launcher Pod spec itself, in Rust, bypassing those templates
+    /// entirely, so it needs the same list wired in here too).
+    pub image_pull_secrets: Vec<String>,
 }
 
 impl Config {
@@ -55,6 +63,10 @@ impl Config {
             local_content_host_path: env::var("LOCAL_CONTENT_HOST_PATH")
                 .unwrap_or_else(|_| "/var/lib/magpie/local-content".into()),
             database_url: require_env("DATABASE_URL")?,
+            image_pull_secrets: env::var("IMAGE_PULL_SECRETS")
+                .ok()
+                .map(|v| v.split(',').map(str::trim).filter(|s| !s.is_empty()).map(String::from).collect())
+                .unwrap_or_default(),
         })
     }
 }

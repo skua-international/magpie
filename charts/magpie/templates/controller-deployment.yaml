@@ -40,6 +40,8 @@ spec:
               value: {{ include "magpie.controllerNamespace" . }}
             - name: LAUNCHER_IMAGE
               value: {{ .Values.launcherImage | quote }}
+            - name: IMAGE_PULL_SECRETS
+              value: {{ join "," .Values.imagePullSecrets | quote }}
             - name: SYNC_DAEMON_URL
               value: "http://{{ include "magpie.fullname" . }}-sync-daemon:8080"
             - name: CLAIMS_HOST_PATH

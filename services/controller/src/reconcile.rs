@@ -23,7 +23,7 @@ use crd::{ArmaServer, ArmaServerPhase, ArmaServerStatus, DesiredState};
 use futures::StreamExt;
 use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec};
 use k8s_openapi::api::core::v1::{
-    Container, EnvVar, HostPathVolumeSource, PodSpec, PodTemplateSpec, Volume, VolumeMount,
+    Container, EnvVar, HostPathVolumeSource, LocalObjectReference, PodSpec, PodTemplateSpec, Volume, VolumeMount,
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
 use kube::api::{Api, DeleteParams, Patch, PatchParams};
@@ -250,9 +250,26 @@ async fn ensure_deployment(ctx: &Ctx, obj: &ArmaServer, claim_path: &str, mod_pa
                 metadata: Some(ObjectMeta { labels: Some(labels), ..Default::default() }),
                 spec: Some(PodSpec {
                     host_network: Some(true),
+                    image_pull_secrets: (!ctx.cfg.image_pull_secrets.is_empty()).then(|| {
+                        ctx.cfg
+                            .image_pull_secrets
+                            .iter()
+                            .map(|name| LocalObjectReference { name: name.clone() })
+                            .collect()
+                    }),
                     containers: vec![Container {
                         name: "launcher".into(),
                         image: Some(ctx.cfg.launcher_image.clone()),
+                        // Explicit, not left to Kubernetes' default: a
+                        // `:latest`-tagged image (this project's own
+                        // convention -- see LAUNCHER_IMAGE) defaults to
+                        // `Always` otherwise, which forces a real registry
+                        // pull on every single server create/restart even
+                        // when the exact same image digest is already
+                        // present on the node (e.g. imported directly via
+                        // `ctr images import` during local testing, or
+                        // just already cached from the last pull).
+                        image_pull_policy: Some("IfNotPresent".into()),
                         env: Some(env),
                         volume_mounts: Some(vec![
                             VolumeMount {
