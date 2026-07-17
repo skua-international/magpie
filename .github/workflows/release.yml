@@ -49,6 +49,15 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
+      # crates/protocol's build.rs shells out to a real protoc binary (via
+      # connectrpc-build) -- needed because scripts/bump-version.sh runs
+      # `cargo check --workspace` to resync Cargo.lock after the version
+      # bump, which builds crates/protocol like any other workspace
+      # member. Every service Dockerfile already apt-get installs this for
+      # its own build, but this job builds outside Docker entirely.
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends protobuf-compiler
+
       - uses: bufbuild/buf-setup-action@v1
         with:
           version: "1.71.0"
