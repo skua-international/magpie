@@ -29,6 +29,17 @@ on:
   push:
     branches: [main]
 
+# Rapid-fire pushes to main (e.g. several fix commits in a row) would
+# otherwise each start their own independent release.yml run -- wasteful,
+# and since semantic-release only cares about the current state of main
+# anyway, an in-progress run for an older commit is already stale the
+# moment a newer push lands. Cancelling it and letting only the run for
+# the latest push actually complete means a burst of pushes produces at
+# most one release, not one per commit.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   release:
     runs-on: ubuntu-latest
