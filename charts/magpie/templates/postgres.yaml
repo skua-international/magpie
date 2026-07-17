@@ -1,0 +1,97 @@
+{{- if .Values.postgres.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "magpie.fullname" . }}-postgres
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  # A single shared instance for the whole cluster (mod sources, missions,
+  # ACL grants) -- not meant to scale horizontally.
+  replicas: 1
+  serviceName: {{ include "magpie.fullname" . }}-postgres
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "magpie.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: postgres
+  template:
+    metadata:
+      labels:
+        {{- include "magpie.labels" . | nindent 8 }}
+        app.kubernetes.io/component: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: {{ .Values.postgres.image }}
+          ports:
+            - name: postgres
+              containerPort: {{ .Values.postgres.port }}
+              {{- if .Values.postgres.exposeOnHost }}
+              # Bound to loopback only: reachable from the node itself (an
+              # admin's psql/backup job/Cockpit running directly on the
+              # host), never from the network -- a NodePort/LoadBalancer
+              # Service would expose this on every node interface instead
+              # of just localhost, which is specifically not wanted here.
+              hostIP: 127.0.0.1
+              hostPort: {{ .Values.postgres.port }}
+              {{- end }}
+          env:
+            - name: POSTGRES_USER
+              value: {{ .Values.postgres.user | quote }}
+            - name: POSTGRES_DB
+              value: {{ .Values.postgres.database | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "postgres.existingSecret is required when postgres.enabled is true" .Values.postgres.existingSecret }}
+                  key: POSTGRES_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+            # The official image's entrypoint has no POSTGRES_PORT knob --
+            # PGPORT is the server's own recognized default for -p, so this
+            # is what actually moves it off 5432.
+            - name: PGPORT
+              value: {{ .Values.postgres.port | quote }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", {{ .Values.postgres.user | quote }}, "-p", {{ .Values.postgres.port | quote }}]
+            initialDelaySeconds: 5
+          {{- with .Values.postgres.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with .Values.postgres.storage.className }}
+        storageClassName: {{ . }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.postgres.storage.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "magpie.fullname" . }}-postgres
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: {{ include "magpie.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: postgres
+  ports:
+    - name: postgres
+      port: {{ .Values.postgres.port }}
+{{- end }}

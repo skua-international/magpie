@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "magpie.fullname" . }}-controller
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
+spec:
+  # A single reconciler instance -- kube-runtime's Controller loop isn't
+  # leader-elected here, so running more than one would mean two processes
+  # racing to reconcile the same ArmaServer objects.
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "magpie.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: controller
+  template:
+    metadata:
+      labels:
+        {{- include "magpie.labels" . | nindent 8 }}
+        app.kubernetes.io/component: controller
+    spec:
+      serviceAccountName: {{ include "magpie.fullname" . }}-controller
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: controller
+          image: {{ include "magpie.image" (dict "root" $ "override" .Values.controller.image) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: NAMESPACE
+              value: {{ include "magpie.controllerNamespace" . }}
+            - name: LAUNCHER_IMAGE
+              value: {{ .Values.launcherImage | quote }}
+            - name: SYNC_DAEMON_URL
+              value: "http://{{ include "magpie.fullname" . }}-sync-daemon:8080"
+            - name: CLAIMS_HOST_PATH
+              value: {{ .Values.hostPaths.claimsPath | quote }}
+            - name: CLAIMS_ROOT
+              value: /claims
+            - name: SERVER_ROOT_BASE
+              value: {{ .Values.controller.serverRootBase | quote }}
+            - name: LOCAL_CONTENT_ROOT
+              value: /local-content
+            - name: LOCAL_CONTENT_HOST_PATH
+              value: {{ .Values.hostPaths.localContentPath | quote }}
+            {{- include "magpie.postgresEnv" . | nindent 12 }}
+          {{- with .Values.controller.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}

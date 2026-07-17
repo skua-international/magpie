@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "magpie.fullname" . }}-sync-daemon
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sync-daemon
+spec:
+  # SQLite is a single-writer store -- never scale this beyond 1.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "magpie.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: sync-daemon
+  template:
+    metadata:
+      labels:
+        {{- include "magpie.labels" . | nindent 8 }}
+        app.kubernetes.io/component: sync-daemon
+    spec:
+      containers:
+        - name: sync-daemon
+          image: {{ include "magpie.image" (dict "root" $ "override" .Values.syncDaemon.image) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: LISTEN_ADDR
+              value: "0.0.0.0:8080"
+            - name: CONTENT_ROOT
+              value: /content
+            - name: CLAIMS_ROOT
+              value: /claims
+            - name: POOL_SIZE
+              value: {{ .Values.syncDaemon.poolSize | quote }}
+            - name: POLL_INTERVAL_SECS
+              value: {{ .Values.syncDaemon.pollIntervalSecs | quote }}
+            {{- if .Values.syncDaemon.steamAuth.anonymous }}
+            - name: ANONYMOUS_LOGIN
+              value: "true"
+            {{- else }}
+            - name: STEAM_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "syncDaemon.steamAuth.existingSecret is required when steamAuth.anonymous is false" .Values.syncDaemon.steamAuth.existingSecret }}
+                  key: STEAM_USER
+            - name: STEAM_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "syncDaemon.steamAuth.existingSecret is required when steamAuth.anonymous is false" .Values.syncDaemon.steamAuth.existingSecret }}
+                  key: STEAM_PASSWORD
+            {{- end }}
+          volumeMounts:
+            - name: content
+              mountPath: /content
+            - name: claims
+              mountPath: /claims
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+          {{- with .Values.syncDaemon.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        # hostPath, not a PVC: content and claims must be on the very same
+        # real filesystem for reflink claims to work at all (cp
+        # --reflink=always can't CoW across filesystems) -- both live
+        # under one parent directory by default so that's true without
+        # the operator having to think about it. See crates/steam-sync's
+        # claim() doc comment and services/controller's Config for more.
+        - name: content
+          hostPath:
+            path: {{ .Values.hostPaths.contentPath }}
+            type: DirectoryOrCreate
+        - name: claims
+          hostPath:
+            path: {{ .Values.hostPaths.claimsPath }}
+            type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "magpie.fullname" . }}-sync-daemon
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sync-daemon
+spec:
+  # Internal only -- the controller is sync-daemon's sole caller.
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: {{ include "magpie.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: sync-daemon
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

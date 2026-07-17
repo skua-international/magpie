@@ -1,0 +1,48 @@
+{{- if .Values.rbac.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "magpie.fullname" . }}-controller
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "magpie.fullname" . }}-controller
+  namespace: {{ include "magpie.controllerNamespace" . }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+rules:
+  # The reconciler needs full ArmaServer access (read the spec, patch
+  # status) and full Deployment access (create/update/delete the launcher
+  # workload) -- this is the one process in the chart that actually
+  # mutates cluster workloads, which is exactly why serverApi's RBAC below
+  # is scoped to *not* include Deployments at all.
+  - apiGroups: ["arma.skua.io"]
+    resources: ["armaservers"]
+    verbs: ["get", "list", "watch", "patch"]
+  - apiGroups: ["arma.skua.io"]
+    resources: ["armaservers/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "magpie.fullname" . }}-controller
+  namespace: {{ include "magpie.controllerNamespace" . }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "magpie.fullname" . }}-controller
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "magpie.fullname" . }}-controller
+    namespace: {{ .Release.Namespace }}
+{{- end }}

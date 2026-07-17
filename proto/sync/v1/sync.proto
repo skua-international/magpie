@@ -1,0 +1,119 @@
+syntax = "proto3";
+package sync.v1;
+
+// Mod/collection sync registry and content-claim service. Owns all Steam
+// depot/workshop mechanics -- callers (the controller) never talk to Steam
+// directly, only in terms of candidate IDs and resolved mod IDs.
+service SyncService {
+  // Resolve `candidate_ids` (each may be an individual mod or a collection
+  // -- the caller doesn't need to know which) and register them as a named
+  // source in the persistent sync registry. Registering an existing
+  // source_id again refreshes its membership (diffed against what was
+  // previously registered) rather than erroring -- this is also how a
+  // source is first created, there is no separate "create" call.
+  rpc RegisterSource(RegisterSourceRequest) returns (RegisterSourceResponse);
+
+  // Explicitly stop tracking a source. Deliberately not tied to any
+  // consumer's lifecycle (e.g. a game server being deleted) -- content may
+  // be worth keeping synced ("chambered") even with nothing currently
+  // using it. Only removes this source_id's membership; a mod still
+  // referenced by another source keeps syncing.
+  rpc DeregisterSource(DeregisterSourceRequest) returns (DeregisterSourceResponse);
+
+  // Start a background job that syncs every mod/depot currently desired
+  // (the union of every registered source's resolved membership, plus
+  // server/CDLC depots) and issues a reflink claim of the result. Returns
+  // immediately with a job ID -- this does not block for the sync duration,
+  // which can range from instant (warm cache) to minutes (cold).
+  rpc Claim(ClaimRequest) returns (ClaimResponse);
+
+  // Poll a job started by Claim.
+  rpc GetClaimStatus(GetClaimStatusRequest) returns (GetClaimStatusResponse);
+
+  // Read a previously-registered source's current resolved mod list
+  // without re-registering it (no candidate IDs needed, no Steam calls --
+  // a plain read of what RegisterSource/the background poller last
+  // resolved). Used by the controller's reconciler to build a server's
+  // own -mod= args from the source IDs its spec references.
+  rpc GetSourceMods(GetSourceModsRequest) returns (GetSourceModsResponse);
+
+  // Re-resolve a single already-registered source against its
+  // originally-registered candidate IDs (stored from the last
+  // RegisterSource call) -- the same work the background poller does
+  // periodically for every source, triggered on demand for one source
+  // instead of waiting for the next poll tick. Used by the controller's
+  // UpdateServer/StartServer RPCs ("force resync this server's mod
+  // sources") -- callers don't need to remember/resupply candidate IDs.
+  rpc RefreshSource(RefreshSourceRequest) returns (RefreshSourceResponse);
+}
+
+message RefreshSourceRequest {
+  string source_id = 1;
+}
+
+message RefreshSourceResponse {
+  repeated ResolvedMod mods = 1;
+}
+
+message GetSourceModsRequest {
+  string source_id = 1;
+}
+
+message GetSourceModsResponse {
+  repeated uint64 mod_ids = 1;
+}
+
+message RegisterSourceRequest {
+  repeated uint64 candidate_ids = 1;
+  string source_id = 2;
+}
+
+// A single resolved workshop item (a collection's candidate ID never
+// appears here directly -- only what it expands to).
+message ResolvedMod {
+  uint64 mod_id = 1;
+  string title = 2;
+}
+
+message RegisterSourceResponse {
+  // The fully-resolved, flat mod list for this source specifically
+  // (collections expanded) -- for the caller to build e.g. a game
+  // server's own -mod= launch args.
+  repeated ResolvedMod mods = 1;
+  // The originally-requested candidate's own Workshop title (a single
+  // mod's title, or a collection's title -- collections carry their own
+  // `title` even though `children` is what actually gets expanded into
+  // `mods`). Only populated when `candidate_ids` had exactly one entry;
+  // empty for multi-candidate sources (e.g. a preset HTML export), where
+  // no single title makes sense.
+  string root_title = 2;
+}
+
+message DeregisterSourceRequest {
+  string source_id = 1;
+}
+
+message DeregisterSourceResponse {}
+
+message ClaimRequest {}
+
+message ClaimResponse {
+  string job_id = 1;
+}
+
+message GetClaimStatusRequest {
+  string job_id = 1;
+}
+
+enum ClaimJobState {
+  CLAIM_JOB_STATE_UNSPECIFIED = 0;
+  CLAIM_JOB_STATE_RUNNING = 1;
+  CLAIM_JOB_STATE_DONE = 2;
+  CLAIM_JOB_STATE_FAILED = 3;
+}
+
+message GetClaimStatusResponse {
+  ClaimJobState state = 1;
+  string claim_path = 2; // set when state == DONE
+  string error = 3;      // set when state == FAILED
+}

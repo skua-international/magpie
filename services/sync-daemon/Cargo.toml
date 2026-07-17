@@ -1,0 +1,16 @@
+[package]
+name = "sync-daemon"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+steam-sync = { path = "../../crates/steam-sync" }
+protocol = { path = "../../crates/protocol" }
+connectrpc = { version = "0.8", features = ["axum"] }
+buffa = "0.8"
+axum = "0.7"
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1", features = ["v7"] }

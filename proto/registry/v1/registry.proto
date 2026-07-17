@@ -1,0 +1,132 @@
+syntax = "proto3";
+package registry.v1;
+
+// Every RPC in this file requires a `Bearer <JWT>` verified against a
+// configured JWKS endpoint; authorization is scope + subject based against
+// a Postgres-backed grant table shared with services/controller (see
+// crates/authn) -- there is no unauthenticated path. JWTs are issued by a
+// separate identity service (OpenID-linked-to-OAuth2), not by this API.
+
+// Registers and tracks *sources* of mods -- a single Workshop mod, a
+// Workshop collection, or a locally-uploaded zip -- independent of any
+// server's lifecycle. A server references zero or more mod sources by ID;
+// deleting a server does not delete the sources it referenced (content may
+// be worth keeping synced/stored with nothing currently using it).
+service ModSourceService {
+  rpc AddModSource(AddModSourceRequest) returns (AddModSourceResponse);
+  rpc DeleteModSource(DeleteModSourceRequest) returns (DeleteModSourceResponse);
+  rpc ListModSources(ListModSourcesRequest) returns (ListModSourcesResponse);
+}
+
+message AddModSourceRequest {
+  oneof source {
+    // A URL to a preset HTML export -- fetched and scanned for
+    // `filedetails/?id=` links.
+    string html_url = 1;
+    // The preset HTML export's content itself, already in hand -- scanned
+    // directly, no fetch.
+    string html_content = 2;
+    // A single raw Steam Workshop URL -- a mod or a collection,
+    // indistinguishable by shape alone. sync-daemon resolves the actual
+    // type via its authenticated Steam session.
+    string steam_url = 3;
+    LocalModUpload local_mod = 4;
+  }
+}
+
+message LocalModUpload {
+  // Caller-assigned identifier for this local mod, unique among all local
+  // mods -- used as its on-disk directory name and its stable reference in
+  // ListModSources, since local mods have no Steam ID of their own.
+  string unique_id = 1;
+  // A .zip archive containing the mod, with mod.cpp (or mod.cpp inside a
+  // single top-level folder) at its root.
+  bytes zip_content = 2;
+}
+
+message AddModSourceResponse {
+  string id = 1;
+}
+
+message DeleteModSourceRequest {
+  string id = 1;
+}
+
+message DeleteModSourceResponse {}
+
+enum ModSourceKind {
+  MOD_SOURCE_KIND_UNSPECIFIED = 0;
+  MOD_SOURCE_KIND_MOD = 1;
+  MOD_SOURCE_KIND_COLLECTION = 2;
+  MOD_SOURCE_KIND_LOCAL = 3;
+  // Registered from a preset HTML export (URL or inline content) --
+  // resolves to however many mod IDs the preset listed, with no single
+  // Workshop item/collection identity of its own.
+  MOD_SOURCE_KIND_PRESET = 4;
+}
+
+message ModSourceInfo {
+  string id = 1;
+  ModSourceKind kind = 2;
+  // The Steam Workshop URL (mod/collection kinds) or unique_id (local
+  // kind) this source was registered with.
+  string reference = 3;
+  // Workshop display name for mod/collection kinds, captured once at
+  // registration time (not kept fresh against later Workshop edits).
+  // Empty for local kind and for multi-mod HTML-preset sources, where no
+  // single title applies.
+  string display_name = 4;
+  int64 created_at_unix_ms = 5;
+}
+
+message ListModSourcesRequest {}
+
+message ListModSourcesResponse {
+  repeated ModSourceInfo sources = 1;
+}
+
+// Mission (.pbo) storage. Missions are not server-scoped -- every uploaded
+// mission is mounted read-only into every server Pod, same as a shared
+// mod source but for mission files instead of addons.
+service MissionService {
+  rpc UploadMission(UploadMissionRequest) returns (MissionInfo);
+  rpc GetMission(GetMissionRequest) returns (MissionInfo);
+  rpc ListMissions(ListMissionsRequest) returns (ListMissionsResponse);
+  rpc DeleteMission(DeleteMissionRequest) returns (DeleteMissionResponse);
+}
+
+message UploadMissionRequest {
+  // Original filename, e.g. "my_mission.altis.pbo".
+  string name = 1;
+  bytes pbo_content = 2;
+  // If set, overwrite the existing mission with this ID in place instead
+  // of creating a new one -- `name`/`pbo_content` replace the stored
+  // values, `id`/`created_at`/`created_by` are unchanged.
+  optional string id = 3;
+}
+
+message MissionInfo {
+  string id = 1;
+  string name = 2;
+  uint64 filesize = 3;
+  int64 created_at_unix_ms = 4;
+  // Subject (JWT `sub` claim) of whoever uploaded (or last overwrote) this
+  // mission.
+  string created_by = 5;
+}
+
+message GetMissionRequest {
+  string id = 1;
+}
+
+message ListMissionsRequest {}
+
+message ListMissionsResponse {
+  repeated MissionInfo missions = 1;
+}
+
+message DeleteMissionRequest {
+  string id = 1;
+}
+
+message DeleteMissionResponse {}

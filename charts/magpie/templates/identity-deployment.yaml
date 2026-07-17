@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "magpie.fullname" . }}-identity
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+    app.kubernetes.io/component: identity
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "magpie.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: identity
+  template:
+    metadata:
+      labels:
+        {{- include "magpie.labels" . | nindent 8 }}
+        app.kubernetes.io/component: identity
+    spec:
+      # No ServiceAccount token needed -- this service never talks to the
+      # Kubernetes API, only Postgres.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: identity
+          image: {{ include "magpie.image" (dict "root" $ "override" .Values.identity.image) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.identity.service.port }}
+              {{- if .Values.loopbackOnly }}
+              hostIP: 127.0.0.1
+              hostPort: {{ .Values.identity.service.port }}
+              {{- end }}
+          env:
+            - name: LISTEN_ADDR
+              value: "0.0.0.0:{{ .Values.identity.service.port }}"
+            - name: BASE_URL
+              value: {{ required "identity.baseUrl is required" .Values.identity.baseUrl | quote }}
+            - name: JWT_ISSUER
+              value: {{ required "jwt.issuer is required" .Values.jwt.issuer | quote }}
+            - name: JWT_AUDIENCE
+              value: {{ required "jwt.audience is required" .Values.jwt.audience | quote }}
+            {{- include "magpie.postgresEnv" . | nindent 12 }}
+            {{- if .Values.identity.oauthSecret }}
+            {{- range list "DISCORD" "GITHUB" "GOOGLE" }}
+            - name: {{ . }}_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.identity.oauthSecret }}
+                  key: {{ . }}_CLIENT_ID
+                  optional: true
+            - name: {{ . }}_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.identity.oauthSecret }}
+                  key: {{ . }}_CLIENT_SECRET
+                  optional: true
+            {{- end }}
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+          {{- with .Values.identity.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "magpie.fullname" . }}-identity
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+    app.kubernetes.io/component: identity
+spec:
+  type: {{ .Values.identity.service.type }}
+  selector:
+    app.kubernetes.io/name: {{ include "magpie.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: identity
+  ports:
+    - name: http
+      port: {{ .Values.identity.service.port }}
+      targetPort: http

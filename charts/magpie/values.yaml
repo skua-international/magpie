@@ -1,0 +1,187 @@
+# image.tag is the shared default tag for every service unless overridden
+# per-service; image.repository is only a fallback base (each service is a
+# genuinely different image, not a different tag of one image -- see each
+# section's own image.repository default below, which is what actually
+# gets used unless you override it). Images are built and pushed to GHCR
+# by .github/workflows/build-images.yml on push to main / version tags.
+image:
+  repository: ""
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Image the controller's reconciler tells k8s to run for each ArmaServer's
+# launcher Pod. Not deployed by this chart itself -- just referenced.
+launcherImage: ghcr.io/skua-international/magpie/launcher:latest
+
+# When true, binds services/server-api and services/registry to
+# 127.0.0.1 on the node (hostPort, loopback only) instead of leaving them
+# reachable only via their in-cluster ClusterIP Service -- for operators
+# who want to front them with their own reverse proxy (nginx, Envoy, ...)
+# running directly on the host rather than a Kubernetes Ingress. The
+# ClusterIP Services are still created either way (harmless, and other
+# in-cluster tooling may still want them); this only adds the loopback
+# bind alongside them. Game servers are unaffected -- ArmaServer launcher
+# Pods already use hostNetwork with their own real game ports, which are
+# meant to be reachable, not loopback-only.
+loopbackOnly: false
+
+# Node-local directories backing every shared volume in this chart --
+# hostPath, deliberately not PVCs. This whole chart targets single-node
+# k3s (see deploy/k3s-bootstrap.sh); on one node, "multiple pods need to
+# read/write the same volume concurrently" doesn't require a real
+# RWX-capable storage class (NFS, Longhorn, ...) at all, since every pod
+# is already on that one node -- hostPath already allows unlimited
+# concurrent mounts with zero extra infrastructure. It's also the
+# *correct* choice, not just the simplest one: contentPath and claimsPath
+# must be on the very same real filesystem for sync-daemon's reflink
+# claims to work (`cp --reflink=always` can't CoW across filesystems) --
+# an NFS-backed RWX PVC would silently degrade every claim to a slow real
+# copy instead. All three default under one parent directory so that's
+# true without the operator having to think about it; if you move any of
+# these, keep contentPath and claimsPath together on one filesystem.
+hostPaths:
+  contentPath: /var/lib/magpie/content
+  claimsPath: /var/lib/magpie/claims
+  localContentPath: /var/lib/magpie/local-content
+
+# JWT verification config, shared by services/registry and
+# services/server-api (which verify tokens) and services/identity (which
+# issues them) -- all three need to agree on issuer/audience for anything
+# to work. jwksUrl defaults to this chart's own services/identity if left
+# empty; only set it if you're pointing at a different issuer than the one
+# this chart deploys.
+jwt:
+  jwksUrl: ""
+  issuer: "magpie"
+  audience: "magpie"
+
+# OAuth2/OpenID identity broker: Discord/GitHub/Google login (OAuth2) and
+# Steam login (OpenID 2.0 -- Valve never adopted OIDC), linkable to one
+# internal identity, issuing the JWTs everything else in this chart
+# verifies. The very first person to ever sign in is automatically granted
+# every scope (acl_grants: ['*']) -- there's no admin UI to hand out
+# permissions any other way yet, so the first login becomes the operator
+# by convention. Holds the cluster's only JWT signing key (generated on
+# first boot, persisted in Postgres) and every OAuth2 client secret --
+# treat its RBAC/network exposure with the most care of anything here (it
+# has none of the former: never touches the Kubernetes API at all).
+identity:
+  image:
+    repository: "ghcr.io/skua-international/magpie/identity"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8445
+  # This service's externally-reachable base URL, no trailing slash --
+  # used to build OAuth2 redirect_uri values and Steam's OpenID realm.
+  # Unlike everything else in this chart, whoever's browser completes a
+  # login needs to reach this, so it generally can't just be an in-cluster
+  # DNS name -- required.
+  baseUrl: ""
+  # Name of an existing Secret holding OAuth2 app credentials as
+  # <PROVIDER>_CLIENT_ID / <PROVIDER>_CLIENT_SECRET keys (e.g.
+  # DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, GITHUB_CLIENT_ID, ...). A
+  # provider is enabled only if both its keys are present -- none are
+  # required, since Steam login needs no app registration/credentials at
+  # all (OpenID 2.0). Not created by this chart. Optional: leave empty to
+  # run with Steam-only login.
+  oauthSecret: ""
+  resources: {}
+
+# The cluster's single shared Postgres instance -- mod sources, missions,
+# and the ACL grant table (see crates/registry-db) all live in one
+# database, read/written by services/registry, services/server-api, and
+# services/controller (read-only, for resolving mod source kind/reference).
+postgres:
+  # Chart-managed: a single-replica StatefulSet + PVC, bundled here like
+  # every other component. Set enabled: false and fill in externalUrl to
+  # point at a Postgres you already run instead.
+  enabled: true
+  image: postgres:16-alpine
+  port: 56275
+  database: arma
+  user: arma
+  # Name of an existing Secret with a POSTGRES_PASSWORD key. Not created by
+  # this chart -- `kubectl create secret generic <name>
+  # --from-literal=POSTGRES_PASSWORD=...` ahead of `helm install`, so the
+  # password never lives in values.yaml.
+  existingSecret: ""
+  storage:
+    className: ""
+    size: 10Gi
+  # Binds Postgres to 127.0.0.1:5432 on the node itself (hostPort, loopback
+  # only) -- reachable from the host for admin tools/backups, never from
+  # the network. Only meaningful with postgres.enabled: true.
+  exposeOnHost: true
+  # Used instead of the chart-managed StatefulSet when postgres.enabled is
+  # false. Full connection string, e.g.
+  # postgres://user:pass@host:5432/dbname.
+  externalUrl: ""
+  resources: {}
+
+syncDaemon:
+  # SQLite is a single-writer store -- never raise this.
+  replicas: 1
+  pollIntervalSecs: 1800
+  poolSize: 4
+  image:
+    repository: "ghcr.io/skua-international/magpie/sync-daemon"
+    tag: ""
+  steamAuth:
+    # Anonymous Steam login (no credentials) -- fine for public workshop
+    # content, not for private/unlisted mods or collections.
+    anonymous: false
+    # Name of an existing Secret with STEAM_USER/STEAM_PASSWORD keys.
+    # Required when steamAuth.anonymous is false. Not created by this
+    # chart -- `kubectl create secret generic <name> --from-literal=...`
+    # ahead of `helm install`, so credentials never live in values.yaml.
+    existingSecret: ""
+  resources: {}
+
+# Reconciler only -- watches ArmaServer, creates/deletes launcher
+# Deployments. No external listener, no auth surface; the only thing that
+# talks to it is the Kubernetes API itself (services/server-api writes
+# ArmaServer objects, this reads them).
+controller:
+  image:
+    repository: "ghcr.io/skua-international/magpie/controller"
+    tag: ""
+  # Namespace ArmaServer resources and their Deployments are managed in.
+  # Defaults to the release namespace when empty. Must match
+  # serverApi.namespace.
+  namespace: ""
+  # Host directory (hostPath-mounted per-ArmaServer as
+  # <serverRootBase>/<name>) holding each server's own operator-provided
+  # content -- configs/profiles/keys. Not Steam-synced, not tied to any
+  # claim's lifecycle.
+  serverRootBase: /srv/arma-servers
+  resources: {}
+
+# JWT-authenticated ArmaServer CRUD + lifecycle (Create/Start/Stop/Update).
+# Deliberately carries the least Kubernetes RBAC of anything in this chart
+# (ArmaServer read/write only, no Deployment access) -- this is the one
+# process a compromised bearer token gets to talk to directly.
+serverApi:
+  image:
+    repository: "ghcr.io/skua-international/magpie/server-api"
+    tag: ""
+  namespace: ""
+  service:
+    type: ClusterIP
+    port: 8443
+  resources: {}
+
+# JWT-authenticated mod source registry (ModSourceService) + mission
+# storage (MissionService). No Kubernetes RBAC at all -- doesn't touch the
+# k8s API, only Postgres and the localContent volume.
+registry:
+  image:
+    repository: "ghcr.io/skua-international/magpie/registry"
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8444
+  resources: {}
+
+rbac:
+  create: true

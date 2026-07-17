@@ -1,0 +1,6 @@
+apiVersion: v2
+name: magpie
+description: MAGPIE -- Managed Arma General Pile of Intricate Engineering. Kubernetes-native orchestration for Arma 3 dedicated servers.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

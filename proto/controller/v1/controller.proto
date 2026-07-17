@@ -1,0 +1,121 @@
+syntax = "proto3";
+package controller.v1;
+
+// Every RPC in this file requires a `Bearer <JWT>` verified against a
+// configured JWKS endpoint; authorization is scope + subject based against
+// a Postgres-backed grant table shared with services/registry (see
+// crates/authn) -- there is no unauthenticated path. JWTs are issued by a
+// separate identity service (OpenID-linked-to-OAuth2), not by this API.
+
+// Provisioning API for game servers. Every server is backed by a
+// Kubernetes `ArmaServer` custom resource -- this service is a thin,
+// authenticated translation to CRUD on those objects, reconciled by a
+// separate process (services/controller's reconciler binary) that watches
+// the same objects -- this service and the reconciler share no in-process
+// state, only the Kubernetes API.
+service ServerService {
+  // Creates and starts the server (desired_state defaults to RUNNING --
+  // servers are deployment-like: created means "should be up").
+  rpc CreateServer(CreateServerRequest) returns (ServerInfo);
+  rpc ListServers(ListServersRequest) returns (ListServersResponse);
+  rpc GetServer(GetServerRequest) returns (ServerInfo);
+  rpc DeleteServer(DeleteServerRequest) returns (DeleteServerResponse);
+
+  // Force a resync of every Steam-backed mod source this server
+  // references (local/zip sources have no Steam content to resync), then
+  // -- if the server is currently running -- roll it onto the freshly
+  // synced content once syncing completes. The currently-running instance
+  // (if any) keeps serving until the new content is actually ready; this
+  // never tears it down speculatively.
+  rpc UpdateServer(UpdateServerRequest) returns (ServerInfo);
+
+  // Force a resync (like UpdateServer) and set desired_state to RUNNING,
+  // starting a stopped server (or restarting a running one onto fresh
+  // content).
+  rpc StartServer(StartServerRequest) returns (ServerInfo);
+
+  // Set desired_state to STOPPED. The running instance is torn down via
+  // normal Kubernetes graceful termination (no pre-shutdown hook support
+  // yet -- planned, not built).
+  rpc StopServer(StopServerRequest) returns (ServerInfo);
+}
+
+message CreateServerRequest {
+  // Human identifier, e.g. "ops", "training", "test" -- not required to be
+  // globally unique across all Kubernetes namespaces, only within the
+  // controller's managed namespace.
+  string name = 1;
+  // Base game port -- Arma binds a 5-port range starting here
+  // (port..=port+4). Rejected with INVALID_ARGUMENT if that range
+  // overlaps any other server that's running or intends to be.
+  uint32 port = 2;
+  // Zero or more previously-registered mod source IDs (from
+  // registry.v1.ModSourceService). Their resolved mod lists are unioned
+  // for this server's own -mod= launch args.
+  repeated string mod_source_ids = 3;
+  // Filename under this server's operator-provided configs/ directory,
+  // passed as -config= (mission-cycle/security config). Defaults to
+  // "main.cfg" if unset.
+  optional string arma_config = 4;
+  // Filename under this server's operator-provided configs/ directory,
+  // passed as -cfg= (network performance config). Defaults to "basic.cfg"
+  // if unset.
+  optional string network_config = 5;
+}
+
+enum ServerPhase {
+  SERVER_PHASE_UNSPECIFIED = 0;
+  // desired_state is STOPPED and no instance is running.
+  SERVER_PHASE_STOPPED = 1;
+  SERVER_PHASE_PENDING = 2;
+  SERVER_PHASE_CLAIMING = 3;
+  SERVER_PHASE_RUNNING = 4;
+  SERVER_PHASE_FAILED = 5;
+}
+
+enum DesiredState {
+  DESIRED_STATE_UNSPECIFIED = 0;
+  DESIRED_STATE_RUNNING = 1;
+  DESIRED_STATE_STOPPED = 2;
+}
+
+message ServerInfo {
+  string id = 1;
+  string name = 2;
+  uint32 port = 3;
+  repeated string mod_source_ids = 4;
+  ServerPhase phase = 5;
+  string claim_path = 6;
+  string message = 7;
+  DesiredState desired_state = 8;
+  string arma_config = 9;
+  string network_config = 10;
+}
+
+message ListServersRequest {}
+
+message ListServersResponse {
+  repeated ServerInfo servers = 1;
+}
+
+message GetServerRequest {
+  string id = 1;
+}
+
+message DeleteServerRequest {
+  string id = 1;
+}
+
+message DeleteServerResponse {}
+
+message UpdateServerRequest {
+  string id = 1;
+}
+
+message StartServerRequest {
+  string id = 1;
+}
+
+message StopServerRequest {
+  string id = 1;
+}

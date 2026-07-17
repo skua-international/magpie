@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "magpie.fullname" . }}-registry
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+    app.kubernetes.io/component: registry
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "magpie.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: registry
+  template:
+    metadata:
+      labels:
+        {{- include "magpie.labels" . | nindent 8 }}
+        app.kubernetes.io/component: registry
+    spec:
+      # No ServiceAccount token needed -- this service never talks to the
+      # Kubernetes API, only Postgres and the localContent volume.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: registry
+          image: {{ include "magpie.image" (dict "root" $ "override" .Values.registry.image) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.registry.service.port }}
+              {{- if .Values.loopbackOnly }}
+              hostIP: 127.0.0.1
+              hostPort: {{ .Values.registry.service.port }}
+              {{- end }}
+          env:
+            - name: LISTEN_ADDR
+              value: "0.0.0.0:{{ .Values.registry.service.port }}"
+            - name: LOCAL_CONTENT_ROOT
+              value: /local-content
+            - name: SYNC_DAEMON_URL
+              value: "http://{{ include "magpie.fullname" . }}-sync-daemon:8080"
+            {{- include "magpie.postgresEnv" . | nindent 12 }}
+            {{- include "magpie.jwtEnv" . | nindent 12 }}
+          volumeMounts:
+            - name: local-content
+              mountPath: /local-content
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+          {{- with .Values.registry.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: local-content
+          hostPath:
+            path: {{ .Values.hostPaths.localContentPath }}
+            type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "magpie.fullname" . }}-registry
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+    app.kubernetes.io/component: registry
+spec:
+  type: {{ .Values.registry.service.type }}
+  selector:
+    app.kubernetes.io/name: {{ include "magpie.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: registry
+  ports:
+    - name: http
+      port: {{ .Values.registry.service.port }}
+      targetPort: http

@@ -1,0 +1,4 @@
+.git
+target
+crates/*/target
+services/*/target

@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "magpie.fullname" . }}-server-api
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "magpie.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: server-api
+  template:
+    metadata:
+      labels:
+        {{- include "magpie.labels" . | nindent 8 }}
+        app.kubernetes.io/component: server-api
+    spec:
+      serviceAccountName: {{ include "magpie.fullname" . }}-server-api
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: server-api
+          image: {{ include "magpie.image" (dict "root" $ "override" .Values.serverApi.image) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.serverApi.service.port }}
+              {{- if .Values.loopbackOnly }}
+              hostIP: 127.0.0.1
+              hostPort: {{ .Values.serverApi.service.port }}
+              {{- end }}
+          env:
+            - name: NAMESPACE
+              value: {{ include "magpie.serverApiNamespace" . }}
+            - name: LISTEN_ADDR
+              value: "0.0.0.0:{{ .Values.serverApi.service.port }}"
+            - name: SYNC_DAEMON_URL
+              value: "http://{{ include "magpie.fullname" . }}-sync-daemon:8080"
+            {{- include "magpie.postgresEnv" . | nindent 12 }}
+            {{- include "magpie.jwtEnv" . | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+          {{- with .Values.serverApi.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "magpie.fullname" . }}-server-api
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server-api
+spec:
+  type: {{ .Values.serverApi.service.type }}
+  selector:
+    app.kubernetes.io/name: {{ include "magpie.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: server-api
+  ports:
+    - name: http
+      port: {{ .Values.serverApi.service.port }}
+      targetPort: http

@@ -1,0 +1,45 @@
+{{- if .Values.rbac.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "magpie.fullname" . }}-server-api
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "magpie.fullname" . }}-server-api
+  namespace: {{ include "magpie.serverApiNamespace" . }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+rules:
+  # Deliberately no apps/Deployments access at all -- this is the one
+  # process a compromised bearer token gets to talk to directly, so it
+  # only ever needs to read/write ArmaServer objects. Actually creating or
+  # deleting the launcher Deployment is services/controller's reconciler's
+  # job, running under a completely separate ServiceAccount.
+  - apiGroups: ["arma.skua.io"]
+    resources: ["armaservers"]
+    verbs: ["get", "list", "watch", "create", "patch", "delete"]
+  - apiGroups: ["arma.skua.io"]
+    resources: ["armaservers/status"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "magpie.fullname" . }}-server-api
+  namespace: {{ include "magpie.serverApiNamespace" . }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "magpie.fullname" . }}-server-api
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "magpie.fullname" . }}-server-api
+    namespace: {{ .Release.Namespace }}
+{{- end }}
