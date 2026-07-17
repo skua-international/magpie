@@ -14,8 +14,22 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 pub async fn connect(database_url: &str) -> anyhow::Result<PgPool> {
+    // rustls 0.23 (pulled in transitively by kube/reqwest, a separate
+    // dependency line from sqlx's own bundled rustls 0.21) needs a
+    // process-level CryptoProvider installed before its first use, or any
+    // TLS handshake through it panics. Every service calls this connect()
+    // on startup before touching kube::Client or reqwest, so installing it
+    // here covers all of them from one place.
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     let pool = sqlx::postgres::PgPoolOptions::new().max_connections(10).connect(database_url).await?;
-    sqlx::query(
+    // raw_sql, not query(): the schema block below is several
+    // semicolon-separated statements in one string, which Postgres's
+    // extended query protocol (what query()/prepared statements use)
+    // rejects outright ("cannot insert multiple commands into a prepared
+    // statement"). raw_sql uses the simple query protocol instead, which
+    // supports exactly this multi-statement-string shape.
+    sqlx::raw_sql(
         r#"
         CREATE TABLE IF NOT EXISTS mod_sources (
             id UUID PRIMARY KEY,
