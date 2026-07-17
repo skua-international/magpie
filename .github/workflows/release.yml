@@ -61,6 +61,12 @@ jobs:
       - uses: bufbuild/buf-setup-action@v1
         with:
           version: "1.71.0"
+          # Unauthenticated: buf-setup-action's own GitHub API calls (to
+          # fetch the release asset) hit the anonymous, much lower rate
+          # limit otherwise. The default GITHUB_TOKEN is enough for this
+          # -- it's just downloading a public release, not touching this
+          # repo -- no need for the App token here.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       # Skipped on the first push to a new branch (github.event.before is
       # the all-zero SHA then, nothing to diff against). A failure here
