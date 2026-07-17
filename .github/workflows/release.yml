@@ -1,0 +1,91 @@
+name: Release
+
+# Every push to main is analyzed (conventional commit messages since the
+# last release) by semantic-release; if it warrants one, a new semver tag
+# + GitHub Release is created directly -- no release-PR gate, matching
+# this repo's small size and single-team ownership.
+#
+# Regenerating generated/go + generated/ts happens *in this same job*,
+# before semantic-release runs, rather than in a separately-triggered
+# workflow: both this workflow and a proto-triggered one fire off the same
+# push, and if the release job won the race it would tag a commit with
+# stale stubs. Doing it here means whatever semantic-release commits (via
+# @semantic-release/git, see release.config.js's `assets`) always includes
+# up-to-date stubs for whatever proto/ looks like at release time, no race
+# possible. See .github/workflows/generate-stubs.yml for the
+# workflow_dispatch-only manual-regen version of this (e.g. to check in a
+# regen without cutting a release).
+#
+# Requires the Skua International GitHub App to be installed on this repo
+# with Contents: Read & Write, and its APP_ID/APP_PRIVATE_KEY set as repo
+# secrets (see skua-armory's .github/RELEASING.md for how the App itself
+# was registered -- it's already installed org-wide, this repo just needs
+# the secrets). The App token matters, not just convenience: a tag/release
+# created with the default GITHUB_TOKEN does NOT trigger other workflows'
+# `on: push: tags` triggers, which is exactly what needs to happen here to
+# get build-images.yml to actually build and push the release's images.
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Mint app token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v4
+        with:
+          # semantic-release walks commit history back to the last tag;
+          # buf breaking (below) diffs against the commit before this push.
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: "1.71.0"
+
+      # Skipped on the first push to a new branch (github.event.before is
+      # the all-zero SHA then, nothing to diff against). A failure here
+      # stops the job before anything is regenerated or released.
+      - name: Check for breaking proto changes
+        if: github.event.before != '0000000000000000000000000000000000000000'
+        run: buf breaking proto --against ".git#ref=${{ github.event.before }},subdir=proto"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Install Go plugins
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install connectrpc.com/connect/cmd/protoc-gen-connect-go@latest
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install TypeScript plugin
+        run: |
+          mkdir -p /tmp/ts-plugin
+          npm install --prefix /tmp/ts-plugin @bufbuild/protoc-gen-es@latest
+          echo "/tmp/ts-plugin/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - name: Regenerate proto stubs
+        run: buf generate proto
+
+      - run: npm ci
+
+      - name: Release
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: npx semantic-release

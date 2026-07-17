@@ -57,6 +57,13 @@ jobs:
       # service needs the whole workspace's Cargo.lock/manifests to
       # resolve via cargo-chef, see each Dockerfile's own comments), not
       # from their own service directory.
+      #
+      # One shared cache scope across the whole matrix, not one per
+      # service: most of these share a large chunk of their cargo-chef
+      # dependency layer (tokio, serde, sqlx, connectrpc, ...), so a
+      # per-service scope would rebuild that overlap redundantly in every
+      # job. The gha cache backend is content-addressed, so parallel jobs
+      # writing to the same scope dedupe safely rather than race.
       - uses: docker/build-push-action@v6
         with:
           context: .
@@ -64,5 +71,5 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.service.name }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.service.name }}
+          cache-from: type=gha,scope=cargo
+          cache-to: type=gha,mode=max,scope=cargo

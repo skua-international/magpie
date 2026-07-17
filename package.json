@@ -1,0 +1,13 @@
+{
+  "name": "magpie-release-tooling",
+  "private": true,
+  "description": "Root Node tooling for release automation (semantic-release) -- not an npm package, the rest of this repo is Rust. See release.config.js and .github/workflows/release.yml.",
+  "devDependencies": {
+    "semantic-release": "^25.0.7",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/release-notes-generator": "^14.1.1",
+    "@semantic-release/exec": "^7.1.0",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^12.0.9"
+  }
+}
