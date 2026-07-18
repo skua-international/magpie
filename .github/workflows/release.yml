@@ -5,16 +5,10 @@ name: Release
 # + GitHub Release is created directly -- no release-PR gate, matching
 # this repo's small size and single-team ownership.
 #
-# Regenerating generated/go + generated/ts happens *in this same job*,
-# before semantic-release runs, rather than in a separately-triggered
-# workflow: both this workflow and a proto-triggered one fire off the same
-# push, and if the release job won the race it would tag a commit with
-# stale stubs. Doing it here means whatever semantic-release commits (via
-# @semantic-release/git, see release.config.js's `assets`) always includes
-# up-to-date stubs for whatever proto/ looks like at release time, no race
-# possible. See .github/workflows/generate-stubs.yml for the
-# workflow_dispatch-only manual-regen version of this (e.g. to check in a
-# regen without cutting a release).
+# Regenerating generated/go + generated/ts still happens *in this same job*
+# so we can reject a release if the checked-in stubs are stale, but nothing
+# is committed here anymore. The tag itself is the release boundary;
+# downstream image and binary workflows run off the tag push.
 #
 # Requires the Skua International GitHub App to be installed on this repo
 # with Contents: Read & Write, and its APP_ID/APP_PRIVATE_KEY set as repo
@@ -43,18 +37,6 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
-    # semantic-release's own version-bump commit (App-authored, so it does
-    # re-trigger push workflows -- see the App-token comment above) would
-    # otherwise start a second release.yml run against a commit that has
-    # nothing new to release, which is at best wasted work and at worst a
-    # race with the run that's still finishing. Guarding on the commit
-    # message prefix (release.config.js's @semantic-release/git message,
-    # kept in sync with this string) rather than GitHub's blanket
-    # `[skip ci]` convention is deliberate: `[skip ci]` skips *every*
-    # push-triggered workflow for that commit repo-wide, and
-    # build-images.yml specifically needs to fire on exactly this commit
-    # -- it's the one carrying the real version tag.
-    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     permissions:
       contents: write
     steps:
@@ -120,6 +102,9 @@ jobs:
 
       - name: Regenerate proto stubs
         run: buf generate proto
+
+      - name: Verify generated stubs are current
+        run: git diff --exit-code -- generated/go generated/ts
 
       - run: npm ci
 
