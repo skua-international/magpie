@@ -34,7 +34,11 @@ impl Config {
             let id_key = format!("{prefix}_CLIENT_ID");
             let secret_key = format!("{prefix}_CLIENT_SECRET");
             if let (Ok(client_id), Ok(client_secret)) = (env::var(&id_key), env::var(&secret_key)) {
-                providers.push(ProviderConfig { kind, client_id, client_secret });
+                providers.push(ProviderConfig {
+                    kind,
+                    client_id,
+                    client_secret,
+                });
             }
         }
 

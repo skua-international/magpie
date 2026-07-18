@@ -4,9 +4,10 @@
 
 use connectrpc::client::{ClientConfig, HttpClient};
 use protocol::proto::sync::v1::{
-    ClaimJobState, ClaimRequest, DeregisterSourceRequest, GetClaimStatusRequest, GetSourceModsRequest, GetSyncStatsRequest,
-    GetSyncedModRequest, InvalidateModRequest, ListSyncedModsRequest, RefreshSourceRequest, RefreshSteamAuthRequest,
-    RegisterSourceRequest, SyncServiceClient,
+    ClaimJobState, ClaimRequest, DeregisterSourceRequest, GetClaimStatusRequest,
+    GetSourceModsRequest, GetSyncStatsRequest, GetSyncedModRequest, InvalidateModRequest,
+    ListSyncedModsRequest, RefreshSourceRequest, RefreshSteamAuthRequest, RegisterSourceRequest,
+    SyncServiceClient,
 };
 
 pub struct SyncClient {
@@ -49,11 +50,17 @@ impl SyncClient {
         let uri: http::Uri = base_url.parse()?;
         let transport = HttpClient::plaintext();
         let config = ClientConfig::new(uri);
-        Ok(Self { inner: SyncServiceClient::new(transport, config) })
+        Ok(Self {
+            inner: SyncServiceClient::new(transport, config),
+        })
     }
 
     /// Resolve `candidate_ids` and register/refresh them as `source_id`.
-    pub async fn register_source(&self, source_id: &str, candidate_ids: &[u64]) -> anyhow::Result<RegisterSourceResult> {
+    pub async fn register_source(
+        &self,
+        source_id: &str,
+        candidate_ids: &[u64],
+    ) -> anyhow::Result<RegisterSourceResult> {
         let response = self
             .inner
             .register_source(RegisterSourceRequest {
@@ -76,7 +83,10 @@ impl SyncClient {
     pub async fn get_source_mods(&self, source_id: &str) -> anyhow::Result<Vec<u64>> {
         let response = self
             .inner
-            .get_source_mods(GetSourceModsRequest { source_id: source_id.to_string(), ..Default::default() })
+            .get_source_mods(GetSourceModsRequest {
+                source_id: source_id.to_string(),
+                ..Default::default()
+            })
             .await
             .map_err(|e| anyhow::anyhow!("GetSourceMods failed: {e}"))?;
         Ok(response.view().mod_ids.to_vec())
@@ -86,7 +96,10 @@ impl SyncClient {
     /// candidate IDs -- used by `ServerService::UpdateServer`/`StartServer`.
     pub async fn refresh_source(&self, source_id: &str) -> anyhow::Result<()> {
         self.inner
-            .refresh_source(RefreshSourceRequest { source_id: source_id.to_string(), ..Default::default() })
+            .refresh_source(RefreshSourceRequest {
+                source_id: source_id.to_string(),
+                ..Default::default()
+            })
             .await
             .map_err(|e| anyhow::anyhow!("RefreshSource failed: {e}"))?;
         Ok(())
@@ -98,7 +111,10 @@ impl SyncClient {
     /// syncing mods someone may want kept warm).
     pub async fn deregister_source(&self, source_id: &str) -> anyhow::Result<()> {
         self.inner
-            .deregister_source(DeregisterSourceRequest { source_id: source_id.to_string(), ..Default::default() })
+            .deregister_source(DeregisterSourceRequest {
+                source_id: source_id.to_string(),
+                ..Default::default()
+            })
             .await
             .map_err(|e| anyhow::anyhow!("DeregisterSource failed: {e}"))?;
         Ok(())
@@ -107,7 +123,11 @@ impl SyncClient {
     /// Kick off a claim job covering the full current desired state (every
     /// registered source, not just this one) and return its job ID.
     pub async fn claim(&self) -> anyhow::Result<String> {
-        let response = self.inner.claim(ClaimRequest::default()).await.map_err(|e| anyhow::anyhow!("Claim failed: {e}"))?;
+        let response = self
+            .inner
+            .claim(ClaimRequest::default())
+            .await
+            .map_err(|e| anyhow::anyhow!("Claim failed: {e}"))?;
         Ok(response.view().job_id.to_string())
     }
 
@@ -123,16 +143,27 @@ impl SyncClient {
             .view()
             .mods
             .iter()
-            .map(|m| SyncedMod { mod_id: m.mod_id, manifest_id: m.manifest_id, size_bytes: m.size_bytes, title: m.title.to_string() })
+            .map(|m| SyncedMod {
+                mod_id: m.mod_id,
+                manifest_id: m.manifest_id,
+                size_bytes: m.size_bytes,
+                title: m.title.to_string(),
+            })
             .collect())
     }
 
     /// A single mod's synced state (`None` if not currently tracked as
     /// synced) plus every source_id currently referencing it.
-    pub async fn get_synced_mod(&self, mod_id: u64) -> anyhow::Result<(Option<SyncedMod>, Vec<String>)> {
+    pub async fn get_synced_mod(
+        &self,
+        mod_id: u64,
+    ) -> anyhow::Result<(Option<SyncedMod>, Vec<String>)> {
         let response = self
             .inner
-            .get_synced_mod(GetSyncedModRequest { mod_id, ..Default::default() })
+            .get_synced_mod(GetSyncedModRequest {
+                mod_id,
+                ..Default::default()
+            })
             .await
             .map_err(|e| anyhow::anyhow!("GetSyncedMod failed: {e}"))?;
         let view = response.view();
@@ -150,7 +181,10 @@ impl SyncClient {
     /// current manifest, redownloading only whatever's missing/divergent.
     pub async fn invalidate_mod(&self, mod_id: u64) -> anyhow::Result<()> {
         self.inner
-            .invalidate_mod(InvalidateModRequest { mod_id, ..Default::default() })
+            .invalidate_mod(InvalidateModRequest {
+                mod_id,
+                ..Default::default()
+            })
             .await
             .map_err(|e| anyhow::anyhow!("InvalidateMod failed: {e}"))?;
         Ok(())
@@ -165,7 +199,10 @@ impl SyncClient {
             .await
             .map_err(|e| anyhow::anyhow!("GetSyncStats failed: {e}"))?;
         let view = response.view();
-        Ok(SyncStats { mods_bytes: view.mods_bytes, game_files_bytes: view.game_files_bytes })
+        Ok(SyncStats {
+            mods_bytes: view.mods_bytes,
+            game_files_bytes: view.game_files_bytes,
+        })
     }
 
     /// Establish (or replace) the Steam session interactively -- proxies
@@ -188,7 +225,9 @@ impl SyncClient {
             .map_err(|e| anyhow::anyhow!("RefreshSteamAuth failed: {e}"))?;
         let view = response.view();
         Ok(if view.needs_guard {
-            RefreshSteamAuthResult::NeedsGuard { guard_type: view.guard_type.to_string() }
+            RefreshSteamAuthResult::NeedsGuard {
+                guard_type: view.guard_type.to_string(),
+            }
         } else {
             RefreshSteamAuthResult::Success
         })
@@ -197,15 +236,20 @@ impl SyncClient {
     pub async fn claim_status(&self, job_id: &str) -> anyhow::Result<ClaimStatus> {
         let response = self
             .inner
-            .get_claim_status(GetClaimStatusRequest { job_id: job_id.to_string(), ..Default::default() })
+            .get_claim_status(GetClaimStatusRequest {
+                job_id: job_id.to_string(),
+                ..Default::default()
+            })
             .await
             .map_err(|e| anyhow::anyhow!("GetClaimStatus failed: {e}"))?;
         let view = response.view();
         let status = match view.state {
-            buffa::enumeration::EnumValue::Known(ClaimJobState::Done) => {
-                ClaimStatus::Done { claim_path: view.claim_path.to_string() }
-            }
-            buffa::enumeration::EnumValue::Known(ClaimJobState::Failed) => ClaimStatus::Failed { error: view.error.to_string() },
+            buffa::enumeration::EnumValue::Known(ClaimJobState::Done) => ClaimStatus::Done {
+                claim_path: view.claim_path.to_string(),
+            },
+            buffa::enumeration::EnumValue::Known(ClaimJobState::Failed) => ClaimStatus::Failed {
+                error: view.error.to_string(),
+            },
             _ => ClaimStatus::Running,
         };
         Ok(status)

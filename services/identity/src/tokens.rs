@@ -54,15 +54,29 @@ impl<'a> TokenIssuer<'a> {
 
         let raw_refresh = random_token();
         let hash = hash_token(&raw_refresh);
-        registry_db::insert_refresh_token(pool, &hash, user_id, now + Duration::days(REFRESH_TOKEN_TTL_DAYS)).await?;
+        registry_db::insert_refresh_token(
+            pool,
+            &hash,
+            user_id,
+            now + Duration::days(REFRESH_TOKEN_TTL_DAYS),
+        )
+        .await?;
 
-        Ok(TokenPair { access_token, refresh_token: raw_refresh, expires_in: ACCESS_TOKEN_TTL_SECS })
+        Ok(TokenPair {
+            access_token,
+            refresh_token: raw_refresh,
+            expires_in: ACCESS_TOKEN_TTL_SECS,
+        })
     }
 
     /// Consumes `raw_refresh_token` (rotation: it's revoked here
     /// regardless of what happens next) and, if it was valid, issues a
     /// fresh pair for its owning user.
-    pub async fn refresh(&self, pool: &PgPool, raw_refresh_token: &str) -> anyhow::Result<TokenPair> {
+    pub async fn refresh(
+        &self,
+        pool: &PgPool,
+        raw_refresh_token: &str,
+    ) -> anyhow::Result<TokenPair> {
         let hash = hash_token(raw_refresh_token);
         let user_id = registry_db::valid_refresh_token_user(pool, &hash)
             .await?
@@ -74,18 +88,20 @@ impl<'a> TokenIssuer<'a> {
 
 fn random_token() -> String {
     let mut bytes = [0u8; 32];
-    SystemRandom::new().fill(&mut bytes).expect("OS RNG must be available");
+    SystemRandom::new()
+        .fill(&mut bytes)
+        .expect("OS RNG must be available");
     base64_url_encode(&bytes)
 }
 
 fn hash_token(token: &str) -> String {
-    use ring::digest::{digest, SHA256};
+    use ring::digest::{SHA256, digest};
     let hash = digest(&SHA256, token.as_bytes());
     hash.as_ref().iter().map(|b| format!("{b:02x}")).collect()
 }
 
 fn base64_url_encode(bytes: &[u8]) -> String {
-    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
     use base64::Engine;
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
     URL_SAFE_NO_PAD.encode(bytes)
 }

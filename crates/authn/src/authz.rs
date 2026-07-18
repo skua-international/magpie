@@ -42,7 +42,11 @@ pub struct AuthState {
     pub required_scope: fn(&str) -> Option<&'static str>,
 }
 
-pub async fn require_auth(State(state): State<Arc<AuthState>>, mut request: Request, next: Next) -> Response {
+pub async fn require_auth(
+    State(state): State<Arc<AuthState>>,
+    mut request: Request,
+    next: Next,
+) -> Response {
     let Some(required) = (state.required_scope)(request.uri().path()) else {
         return (StatusCode::NOT_FOUND, "unknown procedure").into_response();
     };
@@ -65,13 +69,21 @@ pub async fn require_auth(State(state): State<Arc<AuthState>>, mut request: Requ
         Ok(scopes) => scopes,
         Err(e) => {
             tracing::error!("failed to look up scopes for {subject}: {e:#}");
-            return (StatusCode::INTERNAL_SERVER_ERROR, "authorization check failed").into_response();
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "authorization check failed",
+            )
+                .into_response();
         }
     };
 
     let identity = AuthIdentity { subject, scopes };
     if !identity.has_scope(required) {
-        return (StatusCode::FORBIDDEN, format!("missing required scope: {required}")).into_response();
+        return (
+            StatusCode::FORBIDDEN,
+            format!("missing required scope: {required}"),
+        )
+            .into_response();
     }
 
     request.extensions_mut().insert(identity);

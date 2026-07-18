@@ -10,7 +10,10 @@ use anyhow::Result;
 /// priority over these when both are present.
 pub enum SteamAuthConfig {
     Anonymous,
-    Credentials { user: String, password: String },
+    Credentials {
+        user: String,
+        password: String,
+    },
     /// Neither anonymous login nor STEAM_USER/STEAM_PASSWORD were
     /// configured -- fine as long as the session Secret already has a
     /// valid refresh token (established via a prior RefreshSteamAuth
@@ -57,13 +60,24 @@ impl Config {
 
         Ok(Self {
             steam_auth,
-            content_root: env::var("CONTENT_ROOT").unwrap_or_else(|_| "/content".into()).into(),
-            claims_root: env::var("CLAIMS_ROOT").unwrap_or_else(|_| "/claims".into()).into(),
+            content_root: env::var("CONTENT_ROOT")
+                .unwrap_or_else(|_| "/content".into())
+                .into(),
+            claims_root: env::var("CLAIMS_ROOT")
+                .unwrap_or_else(|_| "/claims".into())
+                .into(),
             listen_addr: env::var("LISTEN_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".into()),
-            pool_size: env::var("POOL_SIZE").ok().and_then(|v| v.parse().ok()).unwrap_or(4),
-            poll_interval_secs: env::var("POLL_INTERVAL_SECS").ok().and_then(|v| v.parse().ok()).unwrap_or(1800),
+            pool_size: env::var("POOL_SIZE")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(4),
+            poll_interval_secs: env::var("POLL_INTERVAL_SECS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(1800),
             namespace: env::var("NAMESPACE").unwrap_or_else(|_| "default".into()),
-            steam_session_secret_name: env::var("STEAM_SESSION_SECRET_NAME").unwrap_or_else(|_| "arma-steam-session".into()),
+            steam_session_secret_name: env::var("STEAM_SESSION_SECRET_NAME")
+                .unwrap_or_else(|_| "arma-steam-session".into()),
         })
     }
 }

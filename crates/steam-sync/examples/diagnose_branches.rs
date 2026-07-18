@@ -23,7 +23,10 @@ async fn main() -> anyhow::Result<()> {
         let mut sorted = depots.clone();
         sorted.sort_by_key(|d| d.depot_id);
         for d in &sorted {
-            println!("  depot {:>7}  manifest_id {:<25} from_app {:?}", d.depot_id, d.manifest_id, d.depot_from_app);
+            println!(
+                "  depot {:>7}  manifest_id {:<25} from_app {:?}",
+                d.depot_id, d.manifest_id, d.depot_from_app
+            );
         }
         println!("  ({} depots total)", sorted.len());
     }

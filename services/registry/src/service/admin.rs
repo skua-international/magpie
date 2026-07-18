@@ -29,9 +29,15 @@ impl protocol::proto::registry::v1::AdminService for AdminServiceImpl {
         _ctx: RequestContext,
         _request: ServiceRequest<'_, GetDiskUsageRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<GetDiskUsageResponse> + Send + use<'a>> {
-        let stats = self.sync_client.sync_stats().await.map_err(|e| ConnectError::internal(format!("{e:#}")))?;
+        let stats = self
+            .sync_client
+            .sync_stats()
+            .await
+            .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
 
-        let missions = registry_db::list_missions(&self.pool).await.map_err(|e| ConnectError::internal(format!("{e:#}")))?;
+        let missions = registry_db::list_missions(&self.pool)
+            .await
+            .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
         let missions_bytes: u64 = missions.iter().map(|m| m.filesize as u64).sum();
 
         // Local mod content isn't currently included -- it's registry's
@@ -44,7 +50,13 @@ impl protocol::proto::registry::v1::AdminService for AdminServiceImpl {
         let game_files_bytes = stats.game_files_bytes;
         let total_bytes = mods_bytes + missions_bytes + game_files_bytes;
 
-        Response::ok(GetDiskUsageResponse { mods_bytes, missions_bytes, game_files_bytes, total_bytes, ..Default::default() })
+        Response::ok(GetDiskUsageResponse {
+            mods_bytes,
+            missions_bytes,
+            game_files_bytes,
+            total_bytes,
+            ..Default::default()
+        })
     }
 
     async fn refresh_steam_auth<'a>(
@@ -54,14 +66,20 @@ impl protocol::proto::registry::v1::AdminService for AdminServiceImpl {
     ) -> ServiceResult<impl connectrpc::Encodable<RefreshSteamAuthResponse> + Send + use<'a>> {
         let result = self
             .sync_client
-            .refresh_steam_auth(request.username, request.password, request.guard_code.as_deref())
+            .refresh_steam_auth(
+                request.username,
+                request.password,
+                request.guard_code.as_deref(),
+            )
             .await
             .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
 
         let response = match result {
-            RefreshSteamAuthResult::NeedsGuard { guard_type } => {
-                RefreshSteamAuthResponse { needs_guard: true, guard_type, ..Default::default() }
-            }
+            RefreshSteamAuthResult::NeedsGuard { guard_type } => RefreshSteamAuthResponse {
+                needs_guard: true,
+                guard_type,
+                ..Default::default()
+            },
             RefreshSteamAuthResult::Success => RefreshSteamAuthResponse::default(),
         };
         Response::ok(response)

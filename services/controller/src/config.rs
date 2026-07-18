@@ -49,17 +49,28 @@ impl Config {
     pub fn from_env() -> anyhow::Result<Self> {
         Ok(Self {
             namespace: env::var("NAMESPACE").unwrap_or_else(|_| "default".into()),
-            launcher_image: env::var("LAUNCHER_IMAGE").unwrap_or_else(|_| "arma3-launcher:latest".into()),
-            sync_daemon_url: env::var("SYNC_DAEMON_URL").unwrap_or_else(|_| "http://sync-daemon:8080".into()),
-            claims_host_path: env::var("CLAIMS_HOST_PATH").unwrap_or_else(|_| "/var/lib/magpie/claims".into()),
+            launcher_image: env::var("LAUNCHER_IMAGE")
+                .unwrap_or_else(|_| "arma3-launcher:latest".into()),
+            sync_daemon_url: env::var("SYNC_DAEMON_URL")
+                .unwrap_or_else(|_| "http://sync-daemon:8080".into()),
+            claims_host_path: env::var("CLAIMS_HOST_PATH")
+                .unwrap_or_else(|_| "/var/lib/magpie/claims".into()),
             claims_root: env::var("CLAIMS_ROOT").unwrap_or_else(|_| "/claims".into()),
-            server_root_base: env::var("SERVER_ROOT_BASE").unwrap_or_else(|_| "/srv/arma-servers".into()),
-            local_content_root: env::var("LOCAL_CONTENT_ROOT").unwrap_or_else(|_| "/local-content".into()),
+            server_root_base: env::var("SERVER_ROOT_BASE")
+                .unwrap_or_else(|_| "/srv/arma-servers".into()),
+            local_content_root: env::var("LOCAL_CONTENT_ROOT")
+                .unwrap_or_else(|_| "/local-content".into()),
             local_content_host_path: env::var("LOCAL_CONTENT_HOST_PATH")
                 .unwrap_or_else(|_| "/var/lib/magpie/local-content".into()),
             image_pull_secrets: env::var("IMAGE_PULL_SECRETS")
                 .ok()
-                .map(|v| v.split(',').map(str::trim).filter(|s| !s.is_empty()).map(String::from).collect())
+                .map(|v| {
+                    v.split(',')
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .map(String::from)
+                        .collect()
+                })
                 .unwrap_or_default(),
         })
     }

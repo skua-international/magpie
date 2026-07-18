@@ -4,8 +4,8 @@ mod secrets;
 mod service;
 
 use anyhow::Result;
-use axum::routing::get;
 use axum::Router;
+use axum::routing::get;
 use config::{Config, SteamAuthConfig};
 use connectrpc::Router as ConnectRouter;
 use kube::Client;
@@ -18,7 +18,9 @@ use tracing::{error, info, warn};
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
+        )
         .with_target(false)
         .init();
 
@@ -36,13 +38,18 @@ async fn main() -> Result<()> {
     // established (at startup or via a later RefreshSteamAuth call), the
     // Secret is the source of truth, so a redeploy never re-negotiates
     // against Steam (or needs credentials at all) as long as it's valid.
-    let stored_session = secrets::read_session(&client, &cfg.namespace, &cfg.steam_session_secret_name).await;
+    let stored_session =
+        secrets::read_session(&client, &cfg.namespace, &cfg.steam_session_secret_name).await;
     let auth = match (&stored_session, &cfg.steam_auth) {
-        (Some(session), _) => Some(SteamAuth::Session { user: session.user.clone(), refresh_token: session.refresh_token.clone() }),
+        (Some(session), _) => Some(SteamAuth::Session {
+            user: session.user.clone(),
+            refresh_token: session.refresh_token.clone(),
+        }),
         (None, SteamAuthConfig::Anonymous) => Some(SteamAuth::Anonymous),
-        (None, SteamAuthConfig::Credentials { user, password }) => {
-            Some(SteamAuth::Credentials { user: user.clone(), password: password.clone() })
-        }
+        (None, SteamAuthConfig::Credentials { user, password }) => Some(SteamAuth::Credentials {
+            user: user.clone(),
+            password: password.clone(),
+        }),
         (None, SteamAuthConfig::None) => None,
     };
 
@@ -55,7 +62,9 @@ async fn main() -> Result<()> {
     // same way rather than crash-looping the whole process.
     let pool = match auth {
         None => {
-            warn!("no Steam session established and no credentials configured -- starting with no Steam connection pool. Call RefreshSteamAuth to establish one.");
+            warn!(
+                "no Steam session established and no credentials configured -- starting with no Steam connection pool. Call RefreshSteamAuth to establish one."
+            );
             None
         }
         Some(auth) => {
@@ -64,29 +73,56 @@ async fn main() -> Result<()> {
                 Ok(pool) => {
                     info!("Logged in to Steam");
                     if let Some((user, refresh_token)) = pool.session() {
-                        let session = Session { user: user.to_string(), refresh_token: refresh_token.to_string() };
-                        if let Err(e) = secrets::write_session(&client, &cfg.namespace, &cfg.steam_session_secret_name, &session).await {
+                        let session = Session {
+                            user: user.to_string(),
+                            refresh_token: refresh_token.to_string(),
+                        };
+                        if let Err(e) = secrets::write_session(
+                            &client,
+                            &cfg.namespace,
+                            &cfg.steam_session_secret_name,
+                            &session,
+                        )
+                        .await
+                        {
                             warn!("failed to persist Steam session to Secret: {e:#}");
                         }
                     }
                     Some(pool)
                 }
                 Err(e) => {
-                    error!("failed to start Steam connection pool, starting in degraded mode with none: {e:#}");
+                    error!(
+                        "failed to start Steam connection pool, starting in degraded mode with none: {e:#}"
+                    );
                     None
                 }
             }
         }
     };
 
-    let shared = Shared::new(pool, sync_state, cfg.content_root, cfg.claims_root, client.clone(), cfg.namespace.clone(), cfg.steam_session_secret_name.clone());
+    let shared = Shared::new(
+        pool,
+        sync_state,
+        cfg.content_root,
+        cfg.claims_root,
+        client.clone(),
+        cfg.namespace.clone(),
+        cfg.steam_session_secret_name.clone(),
+    );
 
-    reconcile::spawn(client, cfg.namespace.clone(), std::time::Duration::from_secs(cfg.poll_interval_secs), shared.clone());
+    reconcile::spawn(
+        client,
+        cfg.namespace.clone(),
+        std::time::Duration::from_secs(cfg.poll_interval_secs),
+        shared.clone(),
+    );
 
     let sync_service = SyncServiceImpl::new(shared);
     let connect = ConnectRouter::new().add_service(sync_service);
 
-    let app = Router::new().route("/healthz", get(|| async { "ok" })).fallback_service(connect.into_axum_service());
+    let app = Router::new()
+        .route("/healthz", get(|| async { "ok" }))
+        .fallback_service(connect.into_axum_service());
 
     let listener = tokio::net::TcpListener::bind(&cfg.listen_addr).await?;
     info!("Listening on {}", cfg.listen_addr);

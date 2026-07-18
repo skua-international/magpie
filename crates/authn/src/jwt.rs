@@ -7,7 +7,7 @@
 //! claims of its own. The issuer only needs to assert identity.
 
 use jsonwebtoken::jwk::JwkSet;
-use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
 use serde::Deserialize;
 
 pub struct JwtConfig {
@@ -33,8 +33,16 @@ impl JwtVerifier {
     /// revisiting (periodic refresh) once a real issuer exists and rotates
     /// keys in practice.
     pub async fn fetch(cfg: &JwtConfig) -> anyhow::Result<Self> {
-        let jwks = reqwest::get(&cfg.jwks_url).await?.error_for_status()?.json::<JwkSet>().await?;
-        Ok(Self { issuer: cfg.issuer.clone(), audience: cfg.audience.clone(), jwks })
+        let jwks = reqwest::get(&cfg.jwks_url)
+            .await?
+            .error_for_status()?
+            .json::<JwkSet>()
+            .await?;
+        Ok(Self {
+            issuer: cfg.issuer.clone(),
+            audience: cfg.audience.clone(),
+            jwks,
+        })
     }
 
     /// Returns the verified token's subject on success.
@@ -53,7 +61,8 @@ impl JwtVerifier {
         validation.set_issuer(&[&self.issuer]);
         validation.set_audience(&[&self.audience]);
 
-        let data = decode::<Claims>(token, &key, &validation).map_err(|_| "token verification failed")?;
+        let data =
+            decode::<Claims>(token, &key, &validation).map_err(|_| "token verification failed")?;
         Ok(data.claims.sub)
     }
 }

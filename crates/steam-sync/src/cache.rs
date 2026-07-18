@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
-use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
+use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 use steamdepot::cdn::DepotManifest;
 
 /// One workshop mod's synced state, as returned by
@@ -90,7 +90,8 @@ pub fn load_keys(install_dir: &Path) -> HashMap<u32, Vec<u8>> {
 pub fn save_keys(install_dir: &Path, keys: &HashMap<u32, Vec<u8>>) -> Result<()> {
     std::fs::create_dir_all(cache_dir(install_dir)).context("failed to create cache dir")?;
     let hex_map: HashMap<u32, String> = keys.iter().map(|(id, k)| (*id, bytes_to_hex(k))).collect();
-    let data = serde_json::to_string_pretty(&hex_map).context("failed to serialize depot key cache")?;
+    let data =
+        serde_json::to_string_pretty(&hex_map).context("failed to serialize depot key cache")?;
     std::fs::write(keys_file(install_dir), data).context("failed to write depot key cache")?;
     Ok(())
 }
@@ -124,7 +125,12 @@ pub fn load_manifest(install_dir: &Path, depot_id: u32, manifest_id: u64) -> Opt
     bincode::deserialize(&data).ok()
 }
 
-pub fn save_manifest(install_dir: &Path, depot_id: u32, manifest_id: u64, manifest: &DepotManifest) -> Result<()> {
+pub fn save_manifest(
+    install_dir: &Path,
+    depot_id: u32,
+    manifest_id: u64,
+    manifest: &DepotManifest,
+) -> Result<()> {
     let path = manifest_path(install_dir, depot_id, manifest_id);
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).context("failed to create manifest cache dir")?;
@@ -141,7 +147,10 @@ pub fn save_manifest(install_dir: &Path, depot_id: u32, manifest_id: u64, manife
 /// a server/CDLC depot -- same disambiguation the log `tag` in
 /// `download_one_depot` already uses).
 pub fn sync_key(depot_id: u32, install_dir: &Path) -> String {
-    let leaf = install_dir.file_name().and_then(|n| n.to_str()).unwrap_or("?");
+    let leaf = install_dir
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("?");
     format!("{depot_id}/{leaf}")
 }
 
@@ -154,7 +163,10 @@ const STALE_LOCK_SECS: i64 = 30 * 60;
 const LOCK_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(500);
 
 fn now_unix() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() as i64
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64
 }
 
 /// Identifies which process holds a lock, for logging only (not itself part
@@ -184,7 +196,8 @@ impl SyncState {
     pub fn open(root: &Path) -> Result<Arc<Self>> {
         let dir = cache_dir(root);
         std::fs::create_dir_all(&dir).context("failed to create cache dir")?;
-        let conn = Connection::open(dir.join("sync.db")).context("failed to open sync state database")?;
+        let conn =
+            Connection::open(dir.join("sync.db")).context("failed to open sync state database")?;
         conn.pragma_update(None, "journal_mode", "WAL")
             .context("failed to set sync state database to WAL mode")?;
         conn.pragma_update(None, "busy_timeout", 5000u32)
@@ -215,7 +228,9 @@ impl SyncState {
             );",
         )
         .context("failed to initialize sync state schema")?;
-        Ok(Arc::new(Self { conn: Mutex::new(conn) }))
+        Ok(Arc::new(Self {
+            conn: Mutex::new(conn),
+        }))
     }
 
     /// Record `source_id`'s originally-registered candidate IDs (the raw
@@ -224,7 +239,8 @@ impl SyncState {
     /// re-registering the same `source_id` just overwrites its candidates.
     pub fn upsert_source(&self, source_id: &str, candidate_ids: &[u64]) -> Result<()> {
         let conn = self.conn.lock().unwrap();
-        let json = serde_json::to_string(candidate_ids).context("failed to serialize candidate_ids")?;
+        let json =
+            serde_json::to_string(candidate_ids).context("failed to serialize candidate_ids")?;
         conn.execute(
             "INSERT INTO sources (source_id, candidate_ids) VALUES (?1, ?2)
              ON CONFLICT(source_id) DO UPDATE SET candidate_ids = excluded.candidate_ids",
@@ -242,7 +258,9 @@ impl SyncState {
     /// every source.
     pub fn set_source_mods(&self, source_id: &str, mod_ids: &[u64]) -> Result<()> {
         let mut conn = self.conn.lock().unwrap();
-        let tx = conn.transaction().context("failed to begin source_mods update transaction")?;
+        let tx = conn
+            .transaction()
+            .context("failed to begin source_mods update transaction")?;
         let existing: std::collections::HashSet<u64> = {
             let mut stmt = tx.prepare("SELECT mod_id FROM source_mods WHERE source_id = ?1")?;
             stmt.query_map([source_id], |r| r.get::<_, i64>(0))?
@@ -299,8 +317,13 @@ impl SyncState {
     /// was since deregistered).
     pub fn candidate_ids_for_source(&self, source_id: &str) -> Result<Option<Vec<u64>>> {
         let conn = self.conn.lock().unwrap();
-        let json: Option<String> =
-            conn.query_row("SELECT candidate_ids FROM sources WHERE source_id = ?1", [source_id], |r| r.get(0)).optional()?;
+        let json: Option<String> = conn
+            .query_row(
+                "SELECT candidate_ids FROM sources WHERE source_id = ?1",
+                [source_id],
+                |r| r.get(0),
+            )
+            .optional()?;
         Ok(json.map(|json| serde_json::from_str(&json).unwrap_or_default()))
     }
 
@@ -310,7 +333,11 @@ impl SyncState {
     pub fn mod_ids_for_source(&self, source_id: &str) -> Result<Vec<u64>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare("SELECT mod_id FROM source_mods WHERE source_id = ?1")?;
-        let ids = stmt.query_map([source_id], |r| r.get::<_, i64>(0))?.filter_map(|r| r.ok()).map(|v| v as u64).collect();
+        let ids = stmt
+            .query_map([source_id], |r| r.get::<_, i64>(0))?
+            .filter_map(|r| r.ok())
+            .map(|v| v as u64)
+            .collect();
         Ok(ids)
     }
 
@@ -347,11 +374,15 @@ impl SyncState {
     /// The manifest_id `key` was last verified at, if any.
     pub fn last_manifest_id(&self, key: &str) -> Option<u64> {
         let conn = self.conn.lock().unwrap();
-        conn.query_row("SELECT manifest_id FROM synced WHERE key = ?1", [key], |r| r.get::<_, i64>(0))
-            .optional()
-            .ok()
-            .flatten()
-            .map(|v| v as u64)
+        conn.query_row(
+            "SELECT manifest_id FROM synced WHERE key = ?1",
+            [key],
+            |r| r.get::<_, i64>(0),
+        )
+        .optional()
+        .ok()
+        .flatten()
+        .map(|v| v as u64)
     }
 
     /// The entire `synced` table as an in-memory snapshot, for resolution
@@ -375,7 +406,9 @@ impl SyncState {
                 return HashMap::new();
             }
         };
-        let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)? as u64)));
+        let rows = stmt.query_map([], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)? as u64))
+        });
         match rows {
             Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
             Err(e) => {
@@ -423,7 +456,12 @@ impl SyncState {
             }
         };
         let rows = stmt.query_map([], |r| {
-            Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)? as u64, r.get::<_, i64>(2)? as u64, r.get::<_, String>(3)?))
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, i64>(1)? as u64,
+                r.get::<_, i64>(2)? as u64,
+                r.get::<_, String>(3)?,
+            ))
         });
         match rows {
             Ok(rows) => rows
@@ -433,7 +471,12 @@ impl SyncState {
                     if depot != WORKSHOP_CONSUMER_APP_ID {
                         return None;
                     }
-                    leaf.parse::<u64>().ok().map(|mod_id| SyncedModRow { mod_id, manifest_id, size_bytes, title })
+                    leaf.parse::<u64>().ok().map(|mod_id| SyncedModRow {
+                        mod_id,
+                        manifest_id,
+                        size_bytes,
+                        title,
+                    })
                 })
                 .collect(),
             Err(e) => {
@@ -446,7 +489,9 @@ impl SyncState {
     /// A single workshop mod's synced state, or `None` if it isn't
     /// currently tracked as synced at all.
     pub fn get_synced_mod(&self, mod_id: u64) -> Option<SyncedModRow> {
-        self.list_synced_mods().into_iter().find(|m| m.mod_id == mod_id)
+        self.list_synced_mods()
+            .into_iter()
+            .find(|m| m.mod_id == mod_id)
     }
 
     /// Every source_id currently referencing `mod_id` -- a mod can be
@@ -494,7 +539,9 @@ impl SyncState {
                 return Vec::new();
             }
         };
-        let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)? as u64)));
+        let rows = stmt.query_map([], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)? as u64))
+        });
         match rows {
             Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
             Err(e) => {
@@ -562,7 +609,8 @@ impl SyncState {
             params![key, holder, now],
         ) {
             Ok(_) => return Ok(true),
-            Err(rusqlite::Error::SqliteFailure(e, _)) if e.code == rusqlite::ErrorCode::ConstraintViolation => {}
+            Err(rusqlite::Error::SqliteFailure(e, _))
+                if e.code == rusqlite::ErrorCode::ConstraintViolation => {}
             Err(e) => return Err(e).context("failed to insert lock row"),
         }
 
@@ -574,7 +622,9 @@ impl SyncState {
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .context("failed to begin lock-steal transaction")?;
         let existing: Option<i64> = tx
-            .query_row("SELECT acquired_at FROM locks WHERE key = ?1", [key], |r| r.get(0))
+            .query_row("SELECT acquired_at FROM locks WHERE key = ?1", [key], |r| {
+                r.get(0)
+            })
             .optional()
             .context("failed to read existing lock")?;
         let stolen = match existing {
@@ -593,7 +643,8 @@ impl SyncState {
             // The latter case just costs one extra poll cycle.
             _ => false,
         };
-        tx.commit().context("failed to commit lock-steal transaction")?;
+        tx.commit()
+            .context("failed to commit lock-steal transaction")?;
         Ok(stolen)
     }
 
@@ -624,7 +675,10 @@ impl SyncState {
                 if waited {
                     tracing::info!("[{key}] acquired lock (was waiting on another process)");
                 }
-                return Ok(LockGuard { state: self.clone(), key });
+                return Ok(LockGuard {
+                    state: self.clone(),
+                    key,
+                });
             }
             if !waited {
                 tracing::info!("[{key}] waiting for lock held by another server instance...");

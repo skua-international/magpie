@@ -8,5 +8,8 @@ use kube::CustomResourceExt;
 
 fn main() {
     let crd = crd::ModSource::crd();
-    print!("{}", serde_yaml::to_string(&crd).expect("CRD serializes to YAML"));
+    print!(
+        "{}",
+        serde_yaml::to_string(&crd).expect("CRD serializes to YAML")
+    );
 }

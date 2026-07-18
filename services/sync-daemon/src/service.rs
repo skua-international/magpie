@@ -4,11 +4,13 @@ use std::sync::{Arc, Mutex};
 
 use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest, ServiceResult};
 use protocol::proto::sync::v1::{
-    ClaimJobState, ClaimRequest, ClaimResponse, DeregisterSourceRequest, DeregisterSourceResponse, GetClaimStatusRequest,
-    GetClaimStatusResponse, GetSourceModsRequest, GetSourceModsResponse, GetSyncStatsRequest, GetSyncStatsResponse,
-    GetSyncedModRequest, GetSyncedModResponse, InvalidateModRequest, InvalidateModResponse, ListSyncedModsRequest,
-    ListSyncedModsResponse, RefreshSourceRequest, RefreshSourceResponse, RefreshSteamAuthRequest, RefreshSteamAuthResponse,
-    RegisterSourceRequest, RegisterSourceResponse, ResolvedMod as ProtoResolvedMod, SyncService, SyncedMod,
+    ClaimJobState, ClaimRequest, ClaimResponse, DeregisterSourceRequest, DeregisterSourceResponse,
+    GetClaimStatusRequest, GetClaimStatusResponse, GetSourceModsRequest, GetSourceModsResponse,
+    GetSyncStatsRequest, GetSyncStatsResponse, GetSyncedModRequest, GetSyncedModResponse,
+    InvalidateModRequest, InvalidateModResponse, ListSyncedModsRequest, ListSyncedModsResponse,
+    RefreshSourceRequest, RefreshSourceResponse, RefreshSteamAuthRequest, RefreshSteamAuthResponse,
+    RegisterSourceRequest, RegisterSourceResponse, ResolvedMod as ProtoResolvedMod, SyncService,
+    SyncedMod,
 };
 use steam_sync::cache::SyncState;
 use steam_sync::steam::{self, CmPool, GuardType, InteractiveAuthResult, ResolvedMod, SyncTasks};
@@ -88,14 +90,20 @@ impl Shared {
     /// Steam access should go through this instead of touching `self.pool`
     /// directly, so that error is consistent everywhere.
     fn pool(&self) -> anyhow::Result<&Arc<CmPool>> {
-        self.pool.as_ref().ok_or_else(|| anyhow::anyhow!("no Steam session established -- call RefreshSteamAuth first"))
+        self.pool.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("no Steam session established -- call RefreshSteamAuth first")
+        })
     }
 
     /// Resolve `candidate_ids` and persist the result as `source_id`'s
     /// current membership. Shared by the `RegisterSource` RPC and the
     /// background poller (main.rs), which both need exactly this
     /// resolve-then-diff-upsert sequence.
-    pub async fn register_source_impl(&self, candidate_ids: &[u64], source_id: &str) -> anyhow::Result<RegisterSourceOutcome> {
+    pub async fn register_source_impl(
+        &self,
+        candidate_ids: &[u64],
+        source_id: &str,
+    ) -> anyhow::Result<RegisterSourceOutcome> {
         let mut conn = self.pool()?.acquire().await;
         let result = steam::resolve_source_ids(&mut conn, candidate_ids).await;
         if let Err(e) = &result {
@@ -114,11 +122,18 @@ impl Shared {
         }
 
         let root_title = match candidate_ids {
-            [single] => outcome.candidate_titles.get(single).cloned().unwrap_or_default(),
+            [single] => outcome
+                .candidate_titles
+                .get(single)
+                .cloned()
+                .unwrap_or_default(),
             _ => String::new(),
         };
 
-        Ok(RegisterSourceOutcome { mods: outcome.mods, root_title })
+        Ok(RegisterSourceOutcome {
+            mods: outcome.mods,
+            root_title,
+        })
     }
 
     /// Re-resolve `source_id` against whatever candidate IDs it was last
@@ -126,7 +141,10 @@ impl Shared {
     /// poller's full sweep, for a caller (the controller's
     /// UpdateServer/StartServer) that wants one specific source refreshed
     /// right now without having to remember/resupply its candidate IDs.
-    pub async fn refresh_source_impl(&self, source_id: &str) -> anyhow::Result<RegisterSourceOutcome> {
+    pub async fn refresh_source_impl(
+        &self,
+        source_id: &str,
+    ) -> anyhow::Result<RegisterSourceOutcome> {
         let candidate_ids = self
             .sync_state
             .candidate_ids_for_source(source_id)?
@@ -140,7 +158,9 @@ impl Shared {
             Ok(claim_path) => JobStatus::Done { claim_path },
             Err(e) => {
                 error!("claim job {job_id} failed: {e:#}");
-                JobStatus::Failed { error: format!("{e:#}") }
+                JobStatus::Failed {
+                    error: format!("{e:#}"),
+                }
             }
         };
         self.jobs.lock().unwrap().insert(job_id, status);
@@ -153,9 +173,16 @@ impl Shared {
         let mut conn = self.pool()?.acquire().await;
         // Server/CDLC depots aren't part of the source registry -- they're
         // always wanted, same as before this rework.
-        let result =
-            steam::resolve_and_spawn_server(&mut conn, &self.content_root, false, &[], sem.clone(), &tasks, self.sync_state.clone())
-                .await;
+        let result = steam::resolve_and_spawn_server(
+            &mut conn,
+            &self.content_root,
+            false,
+            &[],
+            sem.clone(),
+            &tasks,
+            self.sync_state.clone(),
+        )
+        .await;
         if let Err(e) = &result {
             if steam::is_transient(e) {
                 conn.mark_bad();
@@ -167,9 +194,16 @@ impl Shared {
         let desired = self.sync_state.desired_mod_ids()?;
         if !desired.is_empty() {
             let mut conn = self.pool()?.acquire().await;
-            let result =
-                workshop::sync_mods(&mut conn, &desired, false, &self.content_root, sem.clone(), &tasks, self.sync_state.clone())
-                    .await;
+            let result = workshop::sync_mods(
+                &mut conn,
+                &desired,
+                false,
+                &self.content_root,
+                sem.clone(),
+                &tasks,
+                self.sync_state.clone(),
+            )
+            .await;
             if let Err(e) = &result {
                 if steam::is_transient(e) {
                     conn.mark_bad();
@@ -221,8 +255,20 @@ impl SyncService for SyncServiceImpl {
             .await
             .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
 
-        let mods = outcome.mods.into_iter().map(|m| ProtoResolvedMod { mod_id: m.mod_id, title: m.title, ..Default::default() }).collect();
-        Response::ok(RegisterSourceResponse { mods, root_title: outcome.root_title, ..Default::default() })
+        let mods = outcome
+            .mods
+            .into_iter()
+            .map(|m| ProtoResolvedMod {
+                mod_id: m.mod_id,
+                title: m.title,
+                ..Default::default()
+            })
+            .collect();
+        Response::ok(RegisterSourceResponse {
+            mods,
+            root_title: outcome.root_title,
+            ..Default::default()
+        })
     }
 
     async fn deregister_source<'a>(
@@ -230,7 +276,10 @@ impl SyncService for SyncServiceImpl {
         _ctx: RequestContext,
         request: ServiceRequest<'_, DeregisterSourceRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<DeregisterSourceResponse> + Send + use<'a>> {
-        self.shared.sync_state.delete_source(&request.source_id).map_err(|e| ConnectError::internal(format!("{e:#}")))?;
+        self.shared
+            .sync_state
+            .delete_source(&request.source_id)
+            .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
         Response::ok(DeregisterSourceResponse::default())
     }
 
@@ -240,14 +289,21 @@ impl SyncService for SyncServiceImpl {
         _request: ServiceRequest<'_, ClaimRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<ClaimResponse> + Send + use<'a>> {
         let job_id = Uuid::now_v7().to_string();
-        self.shared.jobs.lock().unwrap().insert(job_id.clone(), JobStatus::Running);
+        self.shared
+            .jobs
+            .lock()
+            .unwrap()
+            .insert(job_id.clone(), JobStatus::Running);
 
         let shared = self.shared.clone();
         let spawned_job_id = job_id.clone();
         tokio::spawn(async move { shared.run_claim_job(spawned_job_id).await });
 
         info!("started claim job {job_id}");
-        Response::ok(ClaimResponse { job_id, ..Default::default() })
+        Response::ok(ClaimResponse {
+            job_id,
+            ..Default::default()
+        })
     }
 
     async fn get_source_mods<'a>(
@@ -255,9 +311,15 @@ impl SyncService for SyncServiceImpl {
         _ctx: RequestContext,
         request: ServiceRequest<'_, GetSourceModsRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<GetSourceModsResponse> + Send + use<'a>> {
-        let mod_ids =
-            self.shared.sync_state.mod_ids_for_source(request.source_id).map_err(|e| ConnectError::internal(format!("{e:#}")))?;
-        Response::ok(GetSourceModsResponse { mod_ids, ..Default::default() })
+        let mod_ids = self
+            .shared
+            .sync_state
+            .mod_ids_for_source(request.source_id)
+            .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
+        Response::ok(GetSourceModsResponse {
+            mod_ids,
+            ..Default::default()
+        })
     }
 
     async fn refresh_source<'a>(
@@ -265,9 +327,24 @@ impl SyncService for SyncServiceImpl {
         _ctx: RequestContext,
         request: ServiceRequest<'_, RefreshSourceRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<RefreshSourceResponse> + Send + use<'a>> {
-        let outcome = self.shared.refresh_source_impl(request.source_id).await.map_err(|e| ConnectError::internal(format!("{e:#}")))?;
-        let mods = outcome.mods.into_iter().map(|m| ProtoResolvedMod { mod_id: m.mod_id, title: m.title, ..Default::default() }).collect();
-        Response::ok(RefreshSourceResponse { mods, ..Default::default() })
+        let outcome = self
+            .shared
+            .refresh_source_impl(request.source_id)
+            .await
+            .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
+        let mods = outcome
+            .mods
+            .into_iter()
+            .map(|m| ProtoResolvedMod {
+                mod_id: m.mod_id,
+                title: m.title,
+                ..Default::default()
+            })
+            .collect();
+        Response::ok(RefreshSourceResponse {
+            mods,
+            ..Default::default()
+        })
     }
 
     async fn get_claim_status<'a>(
@@ -284,13 +361,20 @@ impl SyncService for SyncServiceImpl {
 
         use buffa::enumeration::EnumValue;
         let response = match status {
-            JobStatus::Running => GetClaimStatusResponse { state: EnumValue::Known(ClaimJobState::Running), ..Default::default() },
-            JobStatus::Done { claim_path } => {
-                GetClaimStatusResponse { state: EnumValue::Known(ClaimJobState::Done), claim_path, ..Default::default() }
-            }
-            JobStatus::Failed { error } => {
-                GetClaimStatusResponse { state: EnumValue::Known(ClaimJobState::Failed), error, ..Default::default() }
-            }
+            JobStatus::Running => GetClaimStatusResponse {
+                state: EnumValue::Known(ClaimJobState::Running),
+                ..Default::default()
+            },
+            JobStatus::Done { claim_path } => GetClaimStatusResponse {
+                state: EnumValue::Known(ClaimJobState::Done),
+                claim_path,
+                ..Default::default()
+            },
+            JobStatus::Failed { error } => GetClaimStatusResponse {
+                state: EnumValue::Known(ClaimJobState::Failed),
+                error,
+                ..Default::default()
+            },
         };
         Response::ok(response)
     }
@@ -313,7 +397,10 @@ impl SyncService for SyncServiceImpl {
                 ..Default::default()
             })
             .collect();
-        Response::ok(ListSyncedModsResponse { mods, ..Default::default() })
+        Response::ok(ListSyncedModsResponse {
+            mods,
+            ..Default::default()
+        })
     }
 
     async fn get_synced_mod<'a>(
@@ -322,15 +409,23 @@ impl SyncService for SyncServiceImpl {
         request: ServiceRequest<'_, GetSyncedModRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<GetSyncedModResponse> + Send + use<'a>> {
         let mod_id = request.mod_id;
-        let m = self.shared.sync_state.get_synced_mod(mod_id).map(|m| SyncedMod {
-            mod_id: m.mod_id,
-            manifest_id: m.manifest_id,
-            size_bytes: m.size_bytes,
-            title: m.title,
-            ..Default::default()
-        });
+        let m = self
+            .shared
+            .sync_state
+            .get_synced_mod(mod_id)
+            .map(|m| SyncedMod {
+                mod_id: m.mod_id,
+                manifest_id: m.manifest_id,
+                size_bytes: m.size_bytes,
+                title: m.title,
+                ..Default::default()
+            });
         let source_ids = self.shared.sync_state.sources_for_mod(mod_id);
-        Response::ok(GetSyncedModResponse { r#mod: m.into(), source_ids, ..Default::default() })
+        Response::ok(GetSyncedModResponse {
+            r#mod: m.into(),
+            source_ids,
+            ..Default::default()
+        })
     }
 
     async fn get_sync_stats<'a>(
@@ -385,10 +480,20 @@ impl SyncService for SyncServiceImpl {
             InteractiveAuthResult::Success { refresh_token } => refresh_token,
         };
 
-        let session = Session { user: username, refresh_token };
-        secrets::write_session(&self.shared.client, &self.shared.namespace, &self.shared.steam_session_secret_name, &session)
-            .await
-            .map_err(|e| ConnectError::internal(format!("failed to persist new Steam session: {e:#}")))?;
+        let session = Session {
+            user: username,
+            refresh_token,
+        };
+        secrets::write_session(
+            &self.shared.client,
+            &self.shared.namespace,
+            &self.shared.steam_session_secret_name,
+            &session,
+        )
+        .await
+        .map_err(|e| {
+            ConnectError::internal(format!("failed to persist new Steam session: {e:#}"))
+        })?;
 
         // The freshly established session isn't picked up by the
         // already-running CmPool (if any) -- exiting and letting the
@@ -406,6 +511,10 @@ impl SyncService for SyncServiceImpl {
             std::process::exit(0);
         });
 
-        Response::ok(RefreshSteamAuthResponse { needs_guard: false, guard_type: String::new(), ..Default::default() })
+        Response::ok(RefreshSteamAuthResponse {
+            needs_guard: false,
+            guard_type: String::new(),
+            ..Default::default()
+        })
     }
 }

@@ -103,8 +103,8 @@ pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Inst
             client_launch.push_str(&format!(" -password={password}"));
         }
 
-        let hc_profile_template = std::env::var("HEADLESS_CLIENTS_PROFILE")
-            .unwrap_or_else(|_| "$profile-hc-$i".into());
+        let hc_profile_template =
+            std::env::var("HEADLESS_CLIENTS_PROFILE").unwrap_or_else(|_| "$profile-hc-$i".into());
         let arma_profile = std::env::var("ARMA_PROFILE").unwrap_or_else(|_| "main".into());
 
         for i in 0..clients {
@@ -182,7 +182,9 @@ pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Inst
     if !status.success() {
         anyhow::bail!(
             "arma3server exited with status {}",
-            status.code().unwrap_or_else(|| status.signal().unwrap_or(-1))
+            status
+                .code()
+                .unwrap_or_else(|| status.signal().unwrap_or(-1))
         );
     }
 

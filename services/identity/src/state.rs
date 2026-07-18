@@ -8,7 +8,7 @@
 //! valid one without our private key, and can't replay an old one past
 //! `exp`.
 
-use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -42,12 +42,23 @@ pub struct StateClaims {
     pub redirect_uri: Option<String>,
 }
 
-pub fn issue(signer: &Signer, provider: &str, link_user_id: Option<Uuid>, redirect_uri: Option<String>) -> anyhow::Result<String> {
+pub fn issue(
+    signer: &Signer,
+    provider: &str,
+    link_user_id: Option<Uuid>,
+    redirect_uri: Option<String>,
+) -> anyhow::Result<String> {
     if let Some(uri) = &redirect_uri {
-        let parsed = url::Url::parse(uri).map_err(|_| anyhow::anyhow!("redirect_uri is not a valid URL"))?;
-        let is_loopback = matches!(parsed.host_str(), Some("127.0.0.1") | Some("localhost") | Some("::1"));
+        let parsed =
+            url::Url::parse(uri).map_err(|_| anyhow::anyhow!("redirect_uri is not a valid URL"))?;
+        let is_loopback = matches!(
+            parsed.host_str(),
+            Some("127.0.0.1") | Some("localhost") | Some("::1")
+        );
         if !is_loopback {
-            anyhow::bail!("redirect_uri must be a loopback address (127.0.0.1/localhost) -- got {uri}");
+            anyhow::bail!(
+                "redirect_uri must be a loopback address (127.0.0.1/localhost) -- got {uri}"
+            );
         }
     }
     let claims = StateClaims {
@@ -60,13 +71,18 @@ pub fn issue(signer: &Signer, provider: &str, link_user_id: Option<Uuid>, redire
     signer.sign(&claims)
 }
 
-pub fn verify(signer: &Signer, token: &str, expected_provider: &str) -> Result<StateClaims, &'static str> {
+pub fn verify(
+    signer: &Signer,
+    token: &str,
+    expected_provider: &str,
+) -> Result<StateClaims, &'static str> {
     let key = DecodingKey::from_jwk(&signer.jwk).map_err(|_| "invalid signer jwk")?;
     let mut validation = Validation::new(Algorithm::ES256);
     validation.set_audience(&[STATE_AUDIENCE]);
     validation.validate_exp = true;
 
-    let data = decode::<StateClaims>(token, &key, &validation).map_err(|_| "invalid or expired state")?;
+    let data =
+        decode::<StateClaims>(token, &key, &validation).map_err(|_| "invalid or expired state")?;
     if data.claims.provider != expected_provider {
         return Err("state provider mismatch");
     }

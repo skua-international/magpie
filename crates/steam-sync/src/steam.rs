@@ -3,7 +3,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use futures::stream::{FuturesUnordered, StreamExt};
 use steamdepot::auth;
 use steamdepot::cdn::CdnPool;
@@ -28,14 +28,20 @@ use crate::cache;
 #[derive(Clone)]
 pub enum SteamAuth {
     Anonymous,
-    Credentials { user: String, password: String },
+    Credentials {
+        user: String,
+        password: String,
+    },
     /// Reuse an already-negotiated refresh token directly -- no RSA/
     /// begin-auth-session/poll negotiation, no password needed at all.
     /// Used when a session was established out-of-band (e.g. an
     /// interactive credential+guard-code exchange run once, elsewhere)
     /// and persisted somewhere this process reads at startup, rather than
     /// negotiated fresh here.
-    Session { user: String, refresh_token: String },
+    Session {
+        user: String,
+        refresh_token: String,
+    },
 }
 
 const ARMA3_SERVER_APP_ID: u32 = 233780;
@@ -168,7 +174,9 @@ impl CmPool {
                     debug!("pool slot {slot} logged in");
                     Ok::<_, anyhow::Error>((slot, conn))
                 });
-                let conns = futures::future::try_join_all(logins).await.context("failed to start connection pool")?;
+                let conns = futures::future::try_join_all(logins)
+                    .await
+                    .context("failed to start connection pool")?;
                 (conns, None)
             }
             SteamAuth::Credentials { user, password } => {
@@ -181,7 +189,8 @@ impl CmPool {
                 // that token to disk and tries it first on the *next*
                 // process start, so most restarts skip the negotiation
                 // entirely -- same ClientLogon-only cost as anonymous login.
-                let refresh_token = negotiate_or_reuse_refresh_token(user, password, install_dir).await?;
+                let refresh_token =
+                    negotiate_or_reuse_refresh_token(user, password, install_dir).await?;
                 let logins = (0..n).map(|slot| {
                     let refresh_token = refresh_token.clone();
                     async move {
@@ -190,10 +199,15 @@ impl CmPool {
                         Ok::<_, anyhow::Error>((slot, conn))
                     }
                 });
-                let conns = futures::future::try_join_all(logins).await.context("failed to start connection pool")?;
+                let conns = futures::future::try_join_all(logins)
+                    .await
+                    .context("failed to start connection pool")?;
                 (conns, Some((user.clone(), refresh_token)))
             }
-            SteamAuth::Session { user, refresh_token } => {
+            SteamAuth::Session {
+                user,
+                refresh_token,
+            } => {
                 // No negotiation, no disk cache -- the token was already
                 // established elsewhere (an interactive RefreshSteamAuth
                 // call) and handed to us directly.
@@ -205,7 +219,9 @@ impl CmPool {
                         Ok::<_, anyhow::Error>((slot, conn))
                     }
                 });
-                let conns = futures::future::try_join_all(logins).await.context("failed to start connection pool")?;
+                let conns = futures::future::try_join_all(logins)
+                    .await
+                    .context("failed to start connection pool")?;
                 (conns, Some((user.clone(), refresh_token.clone())))
             }
         };
@@ -234,12 +250,16 @@ impl CmPool {
             };
             match result {
                 Ok(conn) => {
-                    info!("pool slot {slot} reconnected after being marked bad (attempt {attempt}/{RELOGIN_ATTEMPTS})");
+                    info!(
+                        "pool slot {slot} reconnected after being marked bad (attempt {attempt}/{RELOGIN_ATTEMPTS})"
+                    );
                     self.idle.lock().unwrap().push((slot, conn));
                     return;
                 }
                 Err(e) if attempt < RELOGIN_ATTEMPTS => {
-                    warn!("pool slot {slot} reconnect attempt {attempt}/{RELOGIN_ATTEMPTS} failed: {e:#}");
+                    warn!(
+                        "pool slot {slot} reconnect attempt {attempt}/{RELOGIN_ATTEMPTS} failed: {e:#}"
+                    );
                     tokio::time::sleep(std::time::Duration::from_secs(2 * attempt as u64)).await;
                 }
                 Err(e) => {
@@ -257,12 +277,19 @@ impl CmPool {
     /// caller that just called [`CmPool::start`] persist whatever token
     /// was used/negotiated, without needing to separately track it itself.
     pub fn session(&self) -> Option<(&str, &str)> {
-        self.relogin.as_ref().map(|(user, token)| (user.as_str(), token.as_str()))
+        self.relogin
+            .as_ref()
+            .map(|(user, token)| (user.as_str(), token.as_str()))
     }
 
     /// Check out a connection, waiting if all `n` are currently in use.
     pub async fn acquire(self: &Arc<Self>) -> PooledConn {
-        let permit = self.sem.clone().acquire_owned().await.expect("semaphore never closed");
+        let permit = self
+            .sem
+            .clone()
+            .acquire_owned()
+            .await
+            .expect("semaphore never closed");
         let (slot, conn) = self
             .idle
             .lock()
@@ -333,9 +360,14 @@ impl std::ops::DerefMut for PooledConn {
 
 impl Drop for PooledConn {
     fn drop(&mut self) {
-        let (Some(conn), Some(permit)) = (self.conn.take(), self.permit.take()) else { return };
+        let (Some(conn), Some(permit)) = (self.conn.take(), self.permit.take()) else {
+            return;
+        };
         if self.bad {
-            debug!("pool slot {} marked bad, reconnecting in background", self.slot);
+            debug!(
+                "pool slot {} marked bad, reconnecting in background",
+                self.slot
+            );
             let pool = self.pool.clone();
             let slot = self.slot;
             tokio::spawn(async move {
@@ -369,7 +401,10 @@ pub fn is_transient(e: &anyhow::Error) -> bool {
         return true;
     };
     match steam_err {
-        SteamError::WebSocket(_) | SteamError::Io(_) | SteamError::ConnectionClosed | SteamError::ServiceMethodTimeout(_) => true,
+        SteamError::WebSocket(_)
+        | SteamError::Io(_)
+        | SteamError::ConnectionClosed
+        | SteamError::ServiceMethodTimeout(_) => true,
         SteamError::EResult { eresult, .. } => matches!(
             eresult,
             3   // NoConnection
@@ -415,7 +450,9 @@ async fn with_retry<T, R>(
     label: impl std::fmt::Display,
     attempts: usize,
     resource: &mut R,
-    mut f: impl for<'r> FnMut(&'r mut R) -> std::pin::Pin<Box<dyn Future<Output = Result<T>> + Send + 'r>>,
+    mut f: impl for<'r> FnMut(
+        &'r mut R,
+    ) -> std::pin::Pin<Box<dyn Future<Output = Result<T>> + Send + 'r>>,
 ) -> Result<T> {
     for attempt in 1..=attempts {
         match f(resource).await {
@@ -439,7 +476,11 @@ async fn with_retry<T, R>(
 /// (re-)persisted, so a successful cached-token reuse doesn't need to hit
 /// the disk cache write path at all, and a fallback negotiation updates the
 /// cache for the *next* restart.
-async fn negotiate_or_reuse_refresh_token(username: &str, password: &str, install_dir: &Path) -> Result<String> {
+async fn negotiate_or_reuse_refresh_token(
+    username: &str,
+    password: &str,
+    install_dir: &Path,
+) -> Result<String> {
     if let Some(cached) = cache::load_refresh_token(install_dir) {
         // Hand-rolled retry loop rather than with_retry -- this is the one
         // call site with no natural resource (like a CmConnection) to pass
@@ -451,7 +492,9 @@ async fn negotiate_or_reuse_refresh_token(username: &str, password: &str, instal
             if !is_transient(e) {
                 break;
             }
-            warn!("transient error on cached Steam refresh token probe (attempt {attempt}/{DEFAULT_RETRY_ATTEMPTS}): {e:#}");
+            warn!(
+                "transient error on cached Steam refresh token probe (attempt {attempt}/{DEFAULT_RETRY_ATTEMPTS}): {e:#}"
+            );
             tokio::time::sleep(std::time::Duration::from_millis(500 * attempt as u64)).await;
             result = login_with_refresh_token(username, &cached).await;
         }
@@ -517,8 +560,12 @@ async fn negotiate_refresh_token(username: &str, password: &str) -> Result<Strin
 pub enum InteractiveAuthResult {
     /// No code was supplied and one is required -- call again with
     /// `guard_code` set to complete the login.
-    NeedsGuard { guard_type: GuardType },
-    Success { refresh_token: String },
+    NeedsGuard {
+        guard_type: GuardType,
+    },
+    Success {
+        refresh_token: String,
+    },
 }
 
 /// Interactive credential (+ optional Steam Guard code) login, for
@@ -527,8 +574,14 @@ pub enum InteractiveAuthResult {
 /// on its own. The password is used only for the duration of this call;
 /// nothing about it is persisted anywhere, only the resulting
 /// `refresh_token`.
-pub async fn negotiate_interactive(username: &str, password: &str, guard_code: Option<&str>) -> Result<InteractiveAuthResult> {
-    let (mut conn, session) = auth::begin(username, password).await.context("failed to begin Steam auth session")?;
+pub async fn negotiate_interactive(
+    username: &str,
+    password: &str,
+    guard_code: Option<&str>,
+) -> Result<InteractiveAuthResult> {
+    let (mut conn, session) = auth::begin(username, password)
+        .await
+        .context("failed to begin Steam auth session")?;
 
     let needed_guard_type = if session.needs_guard(GuardType::EmailCode) {
         Some(GuardType::EmailCode)
@@ -545,22 +598,30 @@ pub async fn negotiate_interactive(username: &str, password: &str, guard_code: O
                 return Ok(InteractiveAuthResult::NeedsGuard { guard_type });
             }
             Some(code) => {
-                auth::submit_guard(&mut conn, &session, code, guard_type).await.context("failed to submit Steam Guard code")?;
+                auth::submit_guard(&mut conn, &session, code, guard_type)
+                    .await
+                    .context("failed to submit Steam Guard code")?;
             }
         }
     }
 
-    let tokens = auth::poll(&mut conn, &session).await.context("failed while polling auth session status")?;
+    let tokens = auth::poll(&mut conn, &session)
+        .await
+        .context("failed while polling auth session status")?;
     let _ = conn.shutdown().await;
 
-    Ok(InteractiveAuthResult::Success { refresh_token: tokens.refresh_token })
+    Ok(InteractiveAuthResult::Success {
+        refresh_token: tokens.refresh_token,
+    })
 }
 
 /// The cheap part: open a fresh connection and log on with an
 /// already-negotiated refresh token -- one `ClientLogon`, no RSA/auth-
 /// session/poll round-trips.
 async fn login_with_refresh_token(username: &str, refresh_token: &str) -> Result<CmConnection> {
-    let mut conn = connect_ws().await.context("failed to open a fresh CM connection")?;
+    let mut conn = connect_ws()
+        .await
+        .context("failed to open a fresh CM connection")?;
 
     login::login_with_token(&mut conn, username, refresh_token)
         .await
@@ -575,7 +636,9 @@ async fn login_with_refresh_token(username: &str, refresh_token: &str) -> Result
 /// Steam won't grant free CDLC licenses or workshop item access to
 /// anonymous sessions -- see [`SteamAuth`].
 pub async fn login_anonymous() -> Result<CmConnection> {
-    let mut conn = connect_ws().await.context("failed to open a fresh CM connection")?;
+    let mut conn = connect_ws()
+        .await
+        .context("failed to open a fresh CM connection")?;
     login::login_anonymous(&mut conn)
         .await
         .context("anonymous login failed")?;
@@ -585,7 +648,9 @@ pub async fn login_anonymous() -> Result<CmConnection> {
 
 async fn connect_ws() -> Result<CmConnection> {
     let http = reqwest::Client::new();
-    let cm_list = cm_list::get_cm_list(&http).await.context("failed to fetch CM server list")?;
+    let cm_list = cm_list::get_cm_list(&http)
+        .await
+        .context("failed to fetch CM server list")?;
 
     let ws_server = cm_list
         .serverlist
@@ -616,28 +681,35 @@ async fn resolve_wanted_depots(
     // so that's several seconds spent on depots we're about to throw away.
     // Filtering before fetching keys instead cuts straight to the ones we
     // need.
-    let info = with_retry(format!("get_product_info(app {ARMA3_SERVER_APP_ID})"), DEFAULT_RETRY_ATTEMPTS, conn, |conn| {
-        Box::pin(async move {
-            with_timeout(
-                format!("get_product_info(app {ARMA3_SERVER_APP_ID})"),
-                pics::get_product_info(conn, &[ARMA3_SERVER_APP_ID], &[]),
-            )
-            .await
-        })
-    })
+    let info = with_retry(
+        format!("get_product_info(app {ARMA3_SERVER_APP_ID})"),
+        DEFAULT_RETRY_ATTEMPTS,
+        conn,
+        |conn| {
+            Box::pin(async move {
+                with_timeout(
+                    format!("get_product_info(app {ARMA3_SERVER_APP_ID})"),
+                    pics::get_product_info(conn, &[ARMA3_SERVER_APP_ID], &[]),
+                )
+                .await
+            })
+        },
+    )
     .await
     .context("failed to fetch product info")?;
-    let app_info = info
-        .apps
-        .into_iter()
-        .next()
-        .ok_or_else(|| anyhow::anyhow!("app {ARMA3_SERVER_APP_ID} not found in product info"))?;
+    let app_info =
+        info.apps.into_iter().next().ok_or_else(|| {
+            anyhow::anyhow!("app {ARMA3_SERVER_APP_ID} not found in product info")
+        })?;
 
     let all_depots = depot::resolve_depots(&app_info, TARGET_OS, TARGET_BRANCH)
         .context("failed to resolve depot list")?;
     debug!(
         "all depots on branch {TARGET_BRANCH} for os {TARGET_OS}: {:?}",
-        all_depots.iter().map(|d| (d.depot_id, d.depot_from_app)).collect::<Vec<_>>()
+        all_depots
+            .iter()
+            .map(|d| (d.depot_id, d.depot_from_app))
+            .collect::<Vec<_>>()
     );
 
     // 233781 = Default Content, 233783 = Linux Server, 233785 = Profiling
@@ -696,10 +768,21 @@ async fn resolve_wanted_depots(
     }
     let is_authenticated = conn.session().map(|s| s.authenticated).unwrap_or(false);
     if is_authenticated {
-        let result = with_retry("request_free_license", DEFAULT_RETRY_ATTEMPTS, conn, |conn| {
-            let license_apps = license_apps.clone();
-            Box::pin(async move { with_timeout("request_free_license", pics::request_free_license(conn, &license_apps)).await })
-        })
+        let result = with_retry(
+            "request_free_license",
+            DEFAULT_RETRY_ATTEMPTS,
+            conn,
+            |conn| {
+                let license_apps = license_apps.clone();
+                Box::pin(async move {
+                    with_timeout(
+                        "request_free_license",
+                        pics::request_free_license(conn, &license_apps),
+                    )
+                    .await
+                })
+            },
+        )
         .await;
         match result {
             Ok(resp) if !resp.granted_appids.is_empty() || !resp.granted_packageids.is_empty() => {
@@ -750,7 +833,10 @@ async fn resolve_wanted_depots(
                     // have access to for some transient reason) failing to
                     // resolve shouldn't block every other depot, let alone
                     // fail server startup outright.
-                    warn!("depot {} failed to get depot key, skipping: {e:#}", depot.depot_id);
+                    warn!(
+                        "depot {} failed to get depot key, skipping: {e:#}",
+                        depot.depot_id
+                    );
                     continue;
                 }
             };
@@ -795,7 +881,14 @@ pub async fn resolve_and_spawn_server(
     tasks: &Mutex<SyncTasks>,
     sync_state: Arc<cache::SyncState>,
 ) -> Result<()> {
-    let plan = resolve_wanted_depots(conn, install_dir, include_profiling, cdlc_depot_ids, &sync_state).await?;
+    let plan = resolve_wanted_depots(
+        conn,
+        install_dir,
+        include_profiling,
+        cdlc_depot_ids,
+        &sync_state,
+    )
+    .await?;
 
     // An empty plan here means everything wanted was already fully synced
     // (see resolve_wanted_depots' cache filter) -- resolve_wanted_depots
@@ -805,7 +898,16 @@ pub async fn resolve_and_spawn_server(
         return Ok(());
     }
 
-    spawn_plan_downloads(conn, plan, TARGET_BRANCH, install_dir, sem, tasks, sync_state).await
+    spawn_plan_downloads(
+        conn,
+        plan,
+        TARGET_BRANCH,
+        install_dir,
+        sem,
+        tasks,
+        sync_state,
+    )
+    .await
 }
 
 /// Fetch manifests for an already-resolved plan, then spawn each depot's
@@ -833,7 +935,10 @@ async fn spawn_plan_downloads(
         Box::pin(async move {
             with_timeout(
                 "get_cdn_servers",
-                steamdepot::cdn::get_cdn_servers(conn, conn.session().map(|s| s.cell_id).unwrap_or(0)),
+                steamdepot::cdn::get_cdn_servers(
+                    conn,
+                    conn.session().map(|s| s.cell_id).unwrap_or(0),
+                ),
             )
             .await
         })
@@ -855,7 +960,10 @@ async fn spawn_plan_downloads(
     for dp in plan.plans {
         match cache::load_manifest(install_dir, dp.depot.depot_id, dp.depot.manifest_id) {
             Some(manifest) => {
-                debug!("depot {} manifest: cache hit (manifest_id {})", dp.depot.depot_id, dp.depot.manifest_id);
+                debug!(
+                    "depot {} manifest: cache hit (manifest_id {})",
+                    dp.depot.depot_id, dp.depot.manifest_id
+                );
                 let mut dp = dp;
                 dp.manifest = Some(manifest);
                 cache_hits.push(dp);
@@ -895,7 +1003,10 @@ async fn spawn_plan_downloads(
             // one depot failing here (transient Steam-side issue, access
             // hiccup right after a content update, ...) shouldn't cost the
             // rest of the batch or crash server startup.
-            Err(e) => warn!("depot {} failed to get manifest request code, skipping: {e:#}", dp.depot.depot_id),
+            Err(e) => warn!(
+                "depot {} failed to get manifest request code, skipping: {e:#}",
+                dp.depot.depot_id
+            ),
         }
     }
 
@@ -915,9 +1026,22 @@ async fn spawn_plan_downloads(
                 None,
             )
             .await
-            .with_context(|| format!("failed to download manifest for depot {}", dp.depot.depot_id))?;
-            if let Err(e) = cache::save_manifest(&install_dir, dp.depot.depot_id, dp.depot.manifest_id, &manifest) {
-                warn!("failed to cache manifest for depot {}: {e}", dp.depot.depot_id);
+            .with_context(|| {
+                format!(
+                    "failed to download manifest for depot {}",
+                    dp.depot.depot_id
+                )
+            })?;
+            if let Err(e) = cache::save_manifest(
+                &install_dir,
+                dp.depot.depot_id,
+                dp.depot.manifest_id,
+                &manifest,
+            ) {
+                warn!(
+                    "failed to cache manifest for depot {}: {e}",
+                    dp.depot.depot_id
+                );
             }
             dp.manifest_request_code = Some(code);
             dp.manifest = Some(manifest);
@@ -936,7 +1060,13 @@ async fn spawn_plan_downloads(
     let pool = Arc::new(Mutex::new(CdnPool::new(cdn_servers)));
 
     for dp in resolved_plans {
-        let fut = download_one_depot(dp, install_dir.to_path_buf(), http.clone(), pool.clone(), sync_state.clone());
+        let fut = download_one_depot(
+            dp,
+            install_dir.to_path_buf(),
+            http.clone(),
+            pool.clone(),
+            sync_state.clone(),
+        );
         spawn_bounded(tasks, sem.clone(), fut);
     }
 
@@ -1000,7 +1130,10 @@ pub async fn resolve_workshop_items(
     )
     .await
     .context("failed to resolve workshop items")?;
-    info!("Resolved {} workshop item(s), fetching manifest request codes...", items.len());
+    info!(
+        "Resolved {} workshop item(s), fetching manifest request codes...",
+        items.len()
+    );
 
     // Every Arma 3 workshop item shares depot_id == consumer_appid (the
     // whole workshop is one "depot" for the app), so without dedup this
@@ -1034,7 +1167,8 @@ pub async fn resolve_workshop_items(
         }
 
         let load_start = std::time::Instant::now();
-        let cached_manifest = cache::load_manifest(install_dir, item.consumer_appid, item.manifest_id);
+        let cached_manifest =
+            cache::load_manifest(install_dir, item.consumer_appid, item.manifest_id);
         load_manifest_total += load_start.elapsed();
         if let Some(manifest) = cached_manifest {
             debug!(
@@ -1045,7 +1179,10 @@ pub async fn resolve_workshop_items(
                 cached.clone()
             } else {
                 let fetched = with_retry(
-                    format!("get_depot_decryption_key(workshop item {})", item.published_file_id),
+                    format!(
+                        "get_depot_decryption_key(workshop item {})",
+                        item.published_file_id
+                    ),
                     DEFAULT_RETRY_ATTEMPTS,
                     conn,
                     |conn| {
@@ -1053,8 +1190,14 @@ pub async fn resolve_workshop_items(
                         let consumer_appid = item.consumer_appid;
                         Box::pin(async move {
                             with_timeout(
-                                format!("get_depot_decryption_key(workshop item {published_file_id})"),
-                                pics::get_depot_decryption_key(conn, consumer_appid, consumer_appid),
+                                format!(
+                                    "get_depot_decryption_key(workshop item {published_file_id})"
+                                ),
+                                pics::get_depot_decryption_key(
+                                    conn,
+                                    consumer_appid,
+                                    consumer_appid,
+                                ),
                             )
                             .await
                         })
@@ -1070,7 +1213,10 @@ pub async fn resolve_workshop_items(
                         // the whole launcher over it (see the
                         // manifest-request-code failure below for why this
                         // whole loop tolerates per-item failures now).
-                        warn!("[{}] failed to get depot key, skipping: {e:#}", item.published_file_id);
+                        warn!(
+                            "[{}] failed to get depot key, skipping: {e:#}",
+                            item.published_file_id
+                        );
                         continue;
                     }
                 };
@@ -1107,7 +1253,10 @@ pub async fn resolve_workshop_items(
             cached.clone()
         } else {
             let fetched = with_retry(
-                format!("get_depot_decryption_key(workshop item {})", item.published_file_id),
+                format!(
+                    "get_depot_decryption_key(workshop item {})",
+                    item.published_file_id
+                ),
                 DEFAULT_RETRY_ATTEMPTS,
                 conn,
                 |conn| {
@@ -1126,7 +1275,10 @@ pub async fn resolve_workshop_items(
             let key = match fetched {
                 Ok(key) => key,
                 Err(e) => {
-                    warn!("[{}] failed to get depot key, skipping: {e:#}", item.published_file_id);
+                    warn!(
+                        "[{}] failed to get depot key, skipping: {e:#}",
+                        item.published_file_id
+                    );
                     continue;
                 }
             };
@@ -1148,7 +1300,10 @@ pub async fn resolve_workshop_items(
         // it keeps getting retried for free on every restart until it
         // succeeds.
         let request_code = match with_retry(
-            format!("get_manifest_request_code(workshop item {})", item.published_file_id),
+            format!(
+                "get_manifest_request_code(workshop item {})",
+                item.published_file_id
+            ),
             DEFAULT_RETRY_ATTEMPTS,
             conn,
             |conn| {
@@ -1196,12 +1351,19 @@ pub async fn resolve_workshop_items(
     // Phase 2 (parallel -- plain CDN HTTP, no CmConnection involved): fetch
     // each item's manifest bytes concurrently, for whatever wasn't already
     // a cache hit above.
-    info!("Fetching {} manifest(s) from CDN ({} already cached)...", pending.len(), cache_hits.len());
+    info!(
+        "Fetching {} manifest(s) from CDN ({} already cached)...",
+        pending.len(),
+        cache_hits.len()
+    );
     let cdn_servers = with_retry("get_cdn_servers", DEFAULT_RETRY_ATTEMPTS, conn, |conn| {
         Box::pin(async move {
             with_timeout(
                 "get_cdn_servers",
-                steamdepot::cdn::get_cdn_servers(conn, conn.session().map(|s| s.cell_id).unwrap_or(0)),
+                steamdepot::cdn::get_cdn_servers(
+                    conn,
+                    conn.session().map(|s| s.cell_id).unwrap_or(0),
+                ),
             )
             .await
         })
@@ -1230,10 +1392,23 @@ pub async fn resolve_workshop_items(
                 None,
             )
             .await
-            .with_context(|| format!("failed to fetch manifest for workshop item {}", item.published_file_id))?;
+            .with_context(|| {
+                format!(
+                    "failed to fetch manifest for workshop item {}",
+                    item.published_file_id
+                )
+            })?;
             info!("[{}] manifest ready", item.published_file_id);
-            if let Err(e) = cache::save_manifest(&install_dir, item.consumer_appid, item.manifest_id, &manifest) {
-                warn!("failed to cache manifest for workshop item {}: {e}", item.published_file_id);
+            if let Err(e) = cache::save_manifest(
+                &install_dir,
+                item.consumer_appid,
+                item.manifest_id,
+                &manifest,
+            ) {
+                warn!(
+                    "failed to cache manifest for workshop item {}: {e}",
+                    item.published_file_id
+                );
             }
 
             Ok::<_, anyhow::Error>(ResolvedWorkshopItem {
@@ -1276,13 +1451,19 @@ pub(crate) async fn download_one_depot(
     pool: Arc<Mutex<CdnPool>>,
     sync_state: Arc<cache::SyncState>,
 ) -> Result<()> {
-    let manifest = dp
-        .manifest
-        .as_mut()
-        .with_context(|| format!("depot {} has no manifest after fetch_manifests", dp.depot.depot_id))?;
+    let manifest = dp.manifest.as_mut().with_context(|| {
+        format!(
+            "depot {} has no manifest after fetch_manifests",
+            dp.depot.depot_id
+        )
+    })?;
 
-    decrypt_manifest_filenames(manifest, &dp.key)
-        .with_context(|| format!("failed to decrypt filenames for depot {}", dp.depot.depot_id))?;
+    decrypt_manifest_filenames(manifest, &dp.key).with_context(|| {
+        format!(
+            "failed to decrypt filenames for depot {}",
+            dp.depot.depot_id
+        )
+    })?;
 
     let depot_id = dp.depot.depot_id;
     // depot_id alone doesn't uniquely identify a download: every workshop
@@ -1311,7 +1492,9 @@ pub(crate) async fn download_one_depot(
     // syncing this exact manifest_id while we were waiting, trust its work
     // instead of redundantly re-verifying everything ourselves.
     if sync_state.is_synced(&sync_key, manifest_id, install_dir.is_dir()) {
-        info!("[{tag}] another server instance already synced this manifest_id ({manifest_id}) while we waited, trusting it");
+        info!(
+            "[{tag}] another server instance already synced this manifest_id ({manifest_id}) while we waited, trusting it"
+        );
         return Ok(());
     }
 
@@ -1323,7 +1506,9 @@ pub(crate) async fn download_one_depot(
         Some(old) => info!(
             "[{tag}] manifest_id changed since last verified sync ({old} -> {manifest_id}), content was updated -- verifying"
         ),
-        None => info!("[{tag}] no previous synced-manifest marker (manifest_id {manifest_id}), verifying"),
+        None => info!(
+            "[{tag}] no previous synced-manifest marker (manifest_id {manifest_id}), verifying"
+        ),
     }
 
     info!(
@@ -1355,7 +1540,10 @@ pub(crate) async fn download_one_depot(
             };
             let prev = last_pct.load(Ordering::Relaxed);
             if prev == u32::MAX || pct > prev {
-                if last_pct.compare_exchange(prev, pct, Ordering::Relaxed, Ordering::Relaxed).is_ok() {
+                if last_pct
+                    .compare_exchange(prev, pct, Ordering::Relaxed, Ordering::Relaxed)
+                    .is_ok()
+                {
                     info!(
                         "[{tag_progress}] {}%  chunks {}/{} (verified {})  bytes {}",
                         pct, p.chunks_done, p.chunks_total, p.chunks_verified, p.bytes_downloaded
@@ -1381,9 +1569,12 @@ pub(crate) async fn download_one_depot(
     // downloads -- an updated manifest can reintroduce mixed-case names)
     // and before mark_synced, so nothing is ever recorded as synced with
     // filenames Arma can't actually load.
-    lowercase_synced_tree(&install_dir)
-        .await
-        .with_context(|| format!("failed to lowercase filenames under {}", install_dir.display()))?;
+    lowercase_synced_tree(&install_dir).await.with_context(|| {
+        format!(
+            "failed to lowercase filenames under {}",
+            install_dir.display()
+        )
+    })?;
 
     // The dedicated server depot's manifest doesn't set FLAG_EXECUTABLE on
     // its own server binaries (confirmed live: steamdepot's download.rs
@@ -1392,9 +1583,12 @@ pub(crate) async fn download_one_depot(
     // depot's Linux-executable metadata apparently can't be trusted here,
     // so fix up the known binary names explicitly, same fixup-after-sync
     // pattern as lowercase_synced_tree above.
-    fix_executable_bits(&install_dir)
-        .await
-        .with_context(|| format!("failed to set executable bits under {}", install_dir.display()))?;
+    fix_executable_bits(&install_dir).await.with_context(|| {
+        format!(
+            "failed to set executable bits under {}",
+            install_dir.display()
+        )
+    })?;
 
     let size_bytes = dir_size(&install_dir).await.unwrap_or_else(|e| {
         warn!("[{tag}] failed to compute on-disk size, recording 0: {e:#}");
@@ -1410,13 +1604,21 @@ pub(crate) async fn download_one_depot(
 /// invalidates a path this same pass still needs to visit.
 async fn lowercase_synced_tree(dir: &std::path::Path) -> Result<()> {
     let dir = dir.to_path_buf();
-    tokio::task::spawn_blocking(move || lowercase_tree_blocking(&dir)).await.context("lowercase-filenames task panicked")?
+    tokio::task::spawn_blocking(move || lowercase_tree_blocking(&dir))
+        .await
+        .context("lowercase-filenames task panicked")?
 }
 
 fn lowercase_tree_blocking(dir: &std::path::Path) -> Result<()> {
-    for entry in walkdir::WalkDir::new(dir).contents_first(true).into_iter().filter_map(|e| e.ok()) {
+    for entry in walkdir::WalkDir::new(dir)
+        .contents_first(true)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
         let path = entry.path();
-        let Some(name) = path.file_name().and_then(|n| n.to_str()) else { continue };
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
         let lower = name.to_lowercase();
         if lower == name {
             continue;
@@ -1426,10 +1628,14 @@ fn lowercase_tree_blocking(dir: &std::path::Path) -> Result<()> {
         if dest.exists() {
             // Two siblings differing only by case (rare, but possible in a
             // sloppily-packaged mod) would otherwise clobber each other.
-            warn!("[{}] not renaming {name} -> {lower}: a file with that name already exists", dir.display());
+            warn!(
+                "[{}] not renaming {name} -> {lower}: a file with that name already exists",
+                dir.display()
+            );
             continue;
         }
-        std::fs::rename(path, &dest).with_context(|| format!("failed to rename {} to {lower}", path.display()))?;
+        std::fs::rename(path, &dest)
+            .with_context(|| format!("failed to rename {} to {lower}", path.display()))?;
     }
     Ok(())
 }
@@ -1461,15 +1667,22 @@ const KNOWN_SERVER_BINARIES: &[&str] = &["arma3server", "arma3server_x64"];
 
 async fn fix_executable_bits(dir: &std::path::Path) -> Result<()> {
     let dir = dir.to_path_buf();
-    tokio::task::spawn_blocking(move || fix_executable_bits_blocking(&dir)).await.context("chmod task panicked")?
+    tokio::task::spawn_blocking(move || fix_executable_bits_blocking(&dir))
+        .await
+        .context("chmod task panicked")?
 }
 
 fn fix_executable_bits_blocking(dir: &std::path::Path) -> Result<()> {
     use std::os::unix::fs::PermissionsExt;
 
-    for entry in walkdir::WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+    for entry in walkdir::WalkDir::new(dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
         let path = entry.path();
-        let Some(name) = path.file_name().and_then(|n| n.to_str()) else { continue };
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
         if !KNOWN_SERVER_BINARIES.contains(&name) {
             continue;
         }
@@ -1514,14 +1727,18 @@ const WORKSHOP_FILE_TYPE_COLLECTION: u32 = 2;
 /// children (a collection's members, or a mod's required items) are
 /// still expanded into the next frontier either way -- the only
 /// difference is whether the item itself also gets added to `resolved`.
-pub async fn resolve_source_ids(conn: &mut CmConnection, candidate_ids: &[u64]) -> Result<ResolveOutcome> {
+pub async fn resolve_source_ids(
+    conn: &mut CmConnection,
+    candidate_ids: &[u64],
+) -> Result<ResolveOutcome> {
     let mut resolved: std::collections::HashMap<u64, String> = std::collections::HashMap::new();
     // The originally-requested candidates' own titles (a mod's own title,
     // or a collection's -- collections carry their own `title` even though
     // `children` is what actually gets expanded). Only ever populated from
     // the first request round (depth 1 below), since that's the only round
     // that ever sees an original candidate ID.
-    let mut candidate_titles: std::collections::HashMap<u64, String> = std::collections::HashMap::new();
+    let mut candidate_titles: std::collections::HashMap<u64, String> =
+        std::collections::HashMap::new();
     let mut frontier: Vec<u64> = candidate_ids.to_vec();
     let mut depth = 0;
 
@@ -1541,7 +1758,10 @@ pub async fn resolve_source_ids(conn: &mut CmConnection, candidate_ids: &[u64]) 
             ..Default::default()
         };
         let resp_bytes = with_retry(
-            format!("PublishedFile.GetDetails(includechildren, {} ids)", frontier.len()),
+            format!(
+                "PublishedFile.GetDetails(includechildren, {} ids)",
+                frontier.len()
+            ),
             DEFAULT_RETRY_ATTEMPTS,
             conn,
             |conn| {
@@ -1549,22 +1769,29 @@ pub async fn resolve_source_ids(conn: &mut CmConnection, candidate_ids: &[u64]) 
                 Box::pin(async move {
                     with_timeout(
                         "PublishedFile.GetDetails(includechildren)",
-                        conn.service_method_call("PublishedFile.GetDetails#1", &prost::Message::encode_to_vec(&req)),
+                        conn.service_method_call(
+                            "PublishedFile.GetDetails#1",
+                            &prost::Message::encode_to_vec(&req),
+                        ),
                     )
                     .await
                 })
             },
         )
         .await?;
-        let resp = <steamdepot::proto::CPublishedFileGetDetailsResponse as prost::Message>::decode(resp_bytes.as_slice())
-            .context("failed to decode PublishedFile.GetDetails response")?;
+        let resp = <steamdepot::proto::CPublishedFileGetDetailsResponse as prost::Message>::decode(
+            resp_bytes.as_slice(),
+        )
+        .context("failed to decode PublishedFile.GetDetails response")?;
 
         let mut next_frontier = Vec::new();
         for details in resp.publishedfiledetails {
             let id = details.publishedfileid.unwrap_or(0);
             let eresult = details.result.unwrap_or(0);
             if eresult != 1 {
-                warn!("workshop item {id} GetDetails returned eresult {eresult} (skipping -- may be private/unlisted/removed)");
+                warn!(
+                    "workshop item {id} GetDetails returned eresult {eresult} (skipping -- may be private/unlisted/removed)"
+                );
                 continue;
             }
             let title = details.title.clone().unwrap_or_default();
@@ -1585,7 +1812,10 @@ pub async fn resolve_source_ids(conn: &mut CmConnection, candidate_ids: &[u64]) 
     }
 
     Ok(ResolveOutcome {
-        mods: resolved.into_iter().map(|(mod_id, title)| ResolvedMod { mod_id, title }).collect(),
+        mods: resolved
+            .into_iter()
+            .map(|(mod_id, title)| ResolvedMod { mod_id, title })
+            .collect(),
         candidate_titles,
     })
 }

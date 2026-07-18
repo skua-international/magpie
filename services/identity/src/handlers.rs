@@ -36,14 +36,22 @@ pub struct AppState {
 
 impl AppState {
     fn token_issuer(&self) -> TokenIssuer<'_> {
-        TokenIssuer { signer: &self.signer, issuer: self.issuer.clone(), audience: self.audience.clone() }
+        TokenIssuer {
+            signer: &self.signer,
+            issuer: self.issuer.clone(),
+            audience: self.audience.clone(),
+        }
     }
 
     /// Verifies a bearer access token this service itself issued -- used
     /// only to authorize the "link a second provider to my account" case,
     /// so this never needs to call out to its own JWKS endpoint over HTTP.
     fn verify_bearer(&self, headers: &HeaderMap) -> Option<Uuid> {
-        let token = headers.get(axum::http::header::AUTHORIZATION)?.to_str().ok()?.strip_prefix("Bearer ")?;
+        let token = headers
+            .get(axum::http::header::AUTHORIZATION)?
+            .to_str()
+            .ok()?
+            .strip_prefix("Bearer ")?;
         let key = jsonwebtoken::DecodingKey::from_jwk(&self.signer.jwk).ok()?;
         let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::ES256);
         validation.set_issuer(&[&self.issuer]);
@@ -87,16 +95,28 @@ pub async fn start(
     };
 
     if provider == "steam" {
-        let return_to = format!("{}/auth/steam/callback?state={}", app.base_url, urlencode(&state_token));
+        let return_to = format!(
+            "{}/auth/steam/callback?state={}",
+            app.base_url,
+            urlencode(&state_token)
+        );
         let url = steam::login_url(&return_to, &app.base_url);
         return Json(json!({ "url": url.to_string() })).into_response();
     }
 
     let Some(kind) = ProviderKind::parse(&provider) else {
-        return (StatusCode::NOT_FOUND, format!("unknown provider: {provider}")).into_response();
+        return (
+            StatusCode::NOT_FOUND,
+            format!("unknown provider: {provider}"),
+        )
+            .into_response();
     };
     let Some(oauth) = app.oauth_providers.get(&kind) else {
-        return (StatusCode::NOT_FOUND, format!("provider not configured: {provider}")).into_response();
+        return (
+            StatusCode::NOT_FOUND,
+            format!("provider not configured: {provider}"),
+        )
+            .into_response();
     };
     Json(json!({ "url": oauth.authorize_url(state_token).to_string() })).into_response()
 }
@@ -113,7 +133,11 @@ pub async fn start(
 ///   referrer headers) -- `code` is only ever useful for one immediate
 ///   `POST /auth/exchange` call, which is expected to happen
 ///   server-to-server from whatever's listening at `redirect_uri`.
-pub async fn callback(Path(provider): Path<String>, State(app): State<Arc<AppState>>, Query(query): Query<HashMap<String, String>>) -> Response {
+pub async fn callback(
+    Path(provider): Path<String>,
+    State(app): State<Arc<AppState>>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
     let Some(state_token) = query.get("state") else {
         return (StatusCode::BAD_REQUEST, "missing state").into_response();
     };
@@ -129,10 +153,18 @@ pub async fn callback(Path(provider): Path<String>, State(app): State<Arc<AppSta
         }
     } else {
         let Some(kind) = ProviderKind::parse(&provider) else {
-            return (StatusCode::NOT_FOUND, format!("unknown provider: {provider}")).into_response();
+            return (
+                StatusCode::NOT_FOUND,
+                format!("unknown provider: {provider}"),
+            )
+                .into_response();
         };
         let Some(oauth) = app.oauth_providers.get(&kind) else {
-            return (StatusCode::NOT_FOUND, format!("provider not configured: {provider}")).into_response();
+            return (
+                StatusCode::NOT_FOUND,
+                format!("provider not configured: {provider}"),
+            )
+                .into_response();
         };
         let Some(code) = query.get("code").cloned() else {
             return (StatusCode::BAD_REQUEST, "missing code").into_response();
@@ -148,14 +180,30 @@ pub async fn callback(Path(provider): Path<String>, State(app): State<Arc<AppSta
     };
 
     let user_id_result = match claims.link_user_id {
-        Some(existing_user_id) => registry_db::link_account_to_user(&app.pool, &provider, &provider_user_id, existing_user_id, &display_name)
-            .await
-            .map(|()| existing_user_id),
-        None => match registry_db::find_linked_account(&app.pool, &provider, &provider_user_id).await {
-            Ok(Some(user_id)) => Ok(user_id),
-            Ok(None) => registry_db::create_user_and_link(&app.pool, &provider, &provider_user_id, &display_name).await,
-            Err(e) => Err(e),
-        },
+        Some(existing_user_id) => registry_db::link_account_to_user(
+            &app.pool,
+            &provider,
+            &provider_user_id,
+            existing_user_id,
+            &display_name,
+        )
+        .await
+        .map(|()| existing_user_id),
+        None => {
+            match registry_db::find_linked_account(&app.pool, &provider, &provider_user_id).await {
+                Ok(Some(user_id)) => Ok(user_id),
+                Ok(None) => {
+                    registry_db::create_user_and_link(
+                        &app.pool,
+                        &provider,
+                        &provider_user_id,
+                        &display_name,
+                    )
+                    .await
+                }
+                Err(e) => Err(e),
+            }
+        }
     };
     let user_id = match user_id_result {
         Ok(id) => id,
@@ -173,13 +221,25 @@ pub async fn callback(Path(provider): Path<String>, State(app): State<Arc<AppSta
     let code = {
         use ring::rand::SecureRandom;
         let mut bytes = [0u8; 24];
-        ring::rand::SystemRandom::new().fill(&mut bytes).expect("OS RNG must be available");
+        ring::rand::SystemRandom::new()
+            .fill(&mut bytes)
+            .expect("OS RNG must be available");
         base64::Engine::encode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, bytes)
     };
-    app.exchange_codes.lock().unwrap().insert(code.clone(), ExchangeEntry { tokens: pair, expires_at: std::time::Instant::now() + EXCHANGE_CODE_TTL });
+    app.exchange_codes.lock().unwrap().insert(
+        code.clone(),
+        ExchangeEntry {
+            tokens: pair,
+            expires_at: std::time::Instant::now() + EXCHANGE_CODE_TTL,
+        },
+    );
 
     let separator = if redirect_uri.contains('?') { '&' } else { '?' };
-    Redirect::to(&format!("{redirect_uri}{separator}code={}", urlencode(&code))).into_response()
+    Redirect::to(&format!(
+        "{redirect_uri}{separator}code={}",
+        urlencode(&code)
+    ))
+    .into_response()
 }
 
 #[derive(Deserialize)]
@@ -187,10 +247,21 @@ pub struct RefreshRequest {
     refresh_token: String,
 }
 
-pub async fn refresh(State(app): State<Arc<AppState>>, Json(body): Json<RefreshRequest>) -> Response {
-    match app.token_issuer().refresh(&app.pool, &body.refresh_token).await {
+pub async fn refresh(
+    State(app): State<Arc<AppState>>,
+    Json(body): Json<RefreshRequest>,
+) -> Response {
+    match app
+        .token_issuer()
+        .refresh(&app.pool, &body.refresh_token)
+        .await
+    {
         Ok(pair) => Json(pair).into_response(),
-        Err(_) => (StatusCode::UNAUTHORIZED, "invalid, expired, or already-used refresh token").into_response(),
+        Err(_) => (
+            StatusCode::UNAUTHORIZED,
+            "invalid, expired, or already-used refresh token",
+        )
+            .into_response(),
     }
 }
 
@@ -207,11 +278,20 @@ pub struct ExchangeRequest {
 /// address (validated at `state::issue` time): a code briefly visible in
 /// a local process's own request log is a different risk than one
 /// visible to any network intermediary.
-pub async fn exchange(State(app): State<Arc<AppState>>, Json(body): Json<ExchangeRequest>) -> Response {
+pub async fn exchange(
+    State(app): State<Arc<AppState>>,
+    Json(body): Json<ExchangeRequest>,
+) -> Response {
     let entry = app.exchange_codes.lock().unwrap().remove(&body.code);
     match entry {
-        Some(entry) if entry.expires_at >= std::time::Instant::now() => Json(entry.tokens).into_response(),
-        _ => (StatusCode::UNAUTHORIZED, "invalid, expired, or already-used exchange code").into_response(),
+        Some(entry) if entry.expires_at >= std::time::Instant::now() => {
+            Json(entry.tokens).into_response()
+        }
+        _ => (
+            StatusCode::UNAUTHORIZED,
+            "invalid, expired, or already-used exchange code",
+        )
+            .into_response(),
     }
 }
 

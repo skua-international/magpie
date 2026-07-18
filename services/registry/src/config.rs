@@ -20,10 +20,12 @@ pub struct Config {
 impl Config {
     pub fn from_env() -> anyhow::Result<Self> {
         Ok(Self {
-            local_content_root: env::var("LOCAL_CONTENT_ROOT").unwrap_or_else(|_| "/local-content".into()),
+            local_content_root: env::var("LOCAL_CONTENT_ROOT")
+                .unwrap_or_else(|_| "/local-content".into()),
             listen_addr: env::var("LISTEN_ADDR").unwrap_or_else(|_| "0.0.0.0:8444".into()),
             database_url: require_env("DATABASE_URL")?,
-            sync_daemon_url: env::var("SYNC_DAEMON_URL").unwrap_or_else(|_| "http://sync-daemon:8080".into()),
+            sync_daemon_url: env::var("SYNC_DAEMON_URL")
+                .unwrap_or_else(|_| "http://sync-daemon:8080".into()),
             namespace: env::var("NAMESPACE").unwrap_or_else(|_| "default".into()),
             jwt: JwtConfig {
                 jwks_url: require_env("JWKS_URL")?,

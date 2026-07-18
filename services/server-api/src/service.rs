@@ -11,13 +11,17 @@ use std::sync::Arc;
 
 use buffa::enumeration::EnumValue;
 use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest, ServiceResult};
-use crd::{port_ranges_overlap, ArmaServer, ArmaServerPhase, ArmaServerSpec, DesiredState, ModSource, ModSourceInput};
+use crd::{
+    ArmaServer, ArmaServerPhase, ArmaServerSpec, DesiredState, ModSource, ModSourceInput,
+    port_ranges_overlap,
+};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use kube::api::{Api, DeleteParams, ListParams, Patch, PatchParams};
 use kube::{Client, ResourceExt};
 use protocol::proto::controller::v1::{
-    CreateServerRequest, DeleteServerRequest, DeleteServerResponse, DesiredState as ProtoDesiredState, GetServerRequest,
-    ListServersRequest, ListServersResponse, ServerInfo, ServerPhase, StartServerRequest, StopServerRequest, UpdateServerRequest,
+    CreateServerRequest, DeleteServerRequest, DeleteServerResponse,
+    DesiredState as ProtoDesiredState, GetServerRequest, ListServersRequest, ListServersResponse,
+    ServerInfo, ServerPhase, StartServerRequest, StopServerRequest, UpdateServerRequest,
 };
 use sync_client::SyncClient;
 
@@ -29,7 +33,11 @@ pub struct ServerServiceImpl {
 
 impl ServerServiceImpl {
     pub fn new(client: Client, namespace: String, sync_client: SyncClient) -> Arc<Self> {
-        Arc::new(Self { client, namespace, sync_client })
+        Arc::new(Self {
+            client,
+            namespace,
+            sync_client,
+        })
     }
 
     fn mod_sources(&self) -> Api<ModSource> {
@@ -48,12 +56,21 @@ impl ServerServiceImpl {
     /// the latest content" -- they only differ in whether `desired_state`
     /// also gets flipped to `Running`.
     async fn resync_and_repending(&self, id: &str) -> Result<ArmaServer, ConnectError> {
-        let obj = self.api().get(id).await.map_err(|_| ConnectError::not_found(format!("no such server: {id}")))?;
+        let obj = self
+            .api()
+            .get(id)
+            .await
+            .map_err(|_| ConnectError::not_found(format!("no such server: {id}")))?;
 
         for source_id in &obj.spec.mod_source_ids {
-            let Ok(source) = self.mod_sources().get(source_id).await else { continue };
+            let Ok(source) = self.mod_sources().get(source_id).await else {
+                continue;
+            };
             if !matches!(source.spec.source, ModSourceInput::Local { .. }) {
-                self.sync_client.refresh_source(source_id).await.map_err(|e| ConnectError::internal(format!("{e:#}")))?;
+                self.sync_client
+                    .refresh_source(source_id)
+                    .await
+                    .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
             }
         }
 
@@ -70,8 +87,16 @@ impl ServerServiceImpl {
     /// merely `Pending`/`Claiming` toward `Running` still means to occupy
     /// that range imminently. `exclude_name` lets `StartServer` check
     /// without conflicting against its own already-stored port.
-    async fn check_port_conflict(&self, port: u16, exclude_name: Option<&str>) -> Result<(), ConnectError> {
-        let list = self.api().list(&ListParams::default()).await.map_err(|e| ConnectError::internal(format!("{e:#}")))?;
+    async fn check_port_conflict(
+        &self,
+        port: u16,
+        exclude_name: Option<&str>,
+    ) -> Result<(), ConnectError> {
+        let list = self
+            .api()
+            .list(&ListParams::default())
+            .await
+            .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
         for other in &list.items {
             if Some(other.name_any().as_str()) == exclude_name {
                 continue;
@@ -142,27 +167,50 @@ impl protocol::proto::controller::v1::ServerService for ServerServiceImpl {
         self.check_port_conflict(port, None).await?;
 
         let spec = ArmaServerSpec {
-            mod_source_ids: request.mod_source_ids.iter().map(|s| s.to_string()).collect(),
+            mod_source_ids: request
+                .mod_source_ids
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
             port,
             cdlc: Vec::new(),
             profiling: false,
             params: Vec::new(),
             desired_state: DesiredState::Running,
-            arma_config: request.arma_config.map(|s| s.to_string()).unwrap_or_else(crd::default_arma_config),
-            network_config: request.network_config.map(|s| s.to_string()).unwrap_or_else(crd::default_network_config),
+            arma_config: request
+                .arma_config
+                .map(|s| s.to_string())
+                .unwrap_or_else(crd::default_arma_config),
+            network_config: request
+                .network_config
+                .map(|s| s.to_string())
+                .unwrap_or_else(crd::default_network_config),
         };
         let name = request.name.to_string();
 
-        let obj = ArmaServer { metadata: ObjectMeta { name: Some(name.clone()), ..Default::default() }, spec, status: None };
+        let obj = ArmaServer {
+            metadata: ObjectMeta {
+                name: Some(name.clone()),
+                ..Default::default()
+            },
+            spec,
+            status: None,
+        };
 
         // RegisterSource/Claim/Deployment creation all happen in the
         // reconciler once it observes this object -- this call only needs
         // to make the desired state durable.
         let applied = self
             .api()
-            .patch(&name, &PatchParams::apply("arma-controller").force(), &Patch::Apply(&obj))
+            .patch(
+                &name,
+                &PatchParams::apply("arma-controller").force(),
+                &Patch::Apply(&obj),
+            )
             .await
-            .map_err(|e| ConnectError::internal(format!("failed to apply ArmaServer {name}: {e:#}")))?;
+            .map_err(|e| {
+                ConnectError::internal(format!("failed to apply ArmaServer {name}: {e:#}"))
+            })?;
 
         Response::ok(to_info(&applied))
     }
@@ -180,7 +228,9 @@ impl protocol::proto::controller::v1::ServerService for ServerServiceImpl {
         self.api()
             .delete(request.id, &DeleteParams::default())
             .await
-            .map_err(|e| ConnectError::internal(format!("failed to delete ArmaServer {}: {e:#}", request.id)))?;
+            .map_err(|e| {
+                ConnectError::internal(format!("failed to delete ArmaServer {}: {e:#}", request.id))
+            })?;
         Response::ok(DeleteServerResponse::default())
     }
 
@@ -202,10 +252,16 @@ impl protocol::proto::controller::v1::ServerService for ServerServiceImpl {
         _ctx: RequestContext,
         _request: ServiceRequest<'_, ListServersRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<ListServersResponse> + Send + use<'a>> {
-        let list =
-            self.api().list(&ListParams::default()).await.map_err(|e| ConnectError::internal(format!("failed to list: {e:#}")))?;
+        let list = self
+            .api()
+            .list(&ListParams::default())
+            .await
+            .map_err(|e| ConnectError::internal(format!("failed to list: {e:#}")))?;
         let servers = list.items.iter().map(to_info).collect();
-        Response::ok(ListServersResponse { servers, ..Default::default() })
+        Response::ok(ListServersResponse {
+            servers,
+            ..Default::default()
+        })
     }
 
     async fn update_server<'a>(
@@ -222,11 +278,16 @@ impl protocol::proto::controller::v1::ServerService for ServerServiceImpl {
         _ctx: RequestContext,
         request: ServiceRequest<'_, StartServerRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<ServerInfo> + Send + use<'a>> {
-        let existing = self.api().get(request.id).await.map_err(|_| ConnectError::not_found(format!("no such server: {}", request.id)))?;
+        let existing = self
+            .api()
+            .get(request.id)
+            .await
+            .map_err(|_| ConnectError::not_found(format!("no such server: {}", request.id)))?;
         // Re-checked here, not just at CreateServer time: this server may
         // have been sitting Stopped while another server was created (or
         // started) on an overlapping port range in the meantime.
-        self.check_port_conflict(existing.spec.port, Some(request.id)).await?;
+        self.check_port_conflict(existing.spec.port, Some(request.id))
+            .await?;
 
         let patch = serde_json::json!({ "spec": { "desiredState": "Running" } });
         self.api()

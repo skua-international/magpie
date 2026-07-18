@@ -11,10 +11,10 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use authn::authz::{require_auth, AuthState};
+use authn::authz::{AuthState, require_auth};
 use authn::jwt::JwtVerifier;
 use axum::routing::get;
-use axum::{middleware, Router};
+use axum::{Router, middleware};
 use connectrpc::Router as ConnectRouter;
 use kube::Client;
 use server_api::config::Config;
@@ -38,7 +38,9 @@ fn required_scope(path: &str) -> Option<&'static str> {
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
+        )
         .with_target(false)
         .init();
 
@@ -54,14 +56,21 @@ async fn main() -> Result<()> {
     let server_service = ServerServiceImpl::new(client, cfg.namespace.clone(), sync_client);
 
     let verifier = JwtVerifier::fetch(&cfg.jwt).await?;
-    let auth_state = Arc::new(AuthState { verifier, pool, required_scope });
+    let auth_state = Arc::new(AuthState {
+        verifier,
+        pool,
+        required_scope,
+    });
 
     let connect = ConnectRouter::new().add_service(server_service);
 
-    let connect_service =
-        tower::ServiceBuilder::new().layer(middleware::from_fn_with_state(auth_state, require_auth)).service(connect.into_axum_service());
+    let connect_service = tower::ServiceBuilder::new()
+        .layer(middleware::from_fn_with_state(auth_state, require_auth))
+        .service(connect.into_axum_service());
 
-    let app = Router::new().route("/healthz", get(|| async { "ok" })).fallback_service(connect_service);
+    let app = Router::new()
+        .route("/healthz", get(|| async { "ok" }))
+        .fallback_service(connect_service);
 
     let listener = tokio::net::TcpListener::bind(&cfg.listen_addr).await?;
     info!("listening on {}", cfg.listen_addr);

@@ -12,7 +12,8 @@ use regex::Regex;
 
 const USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36";
 
-static FILEDETAILS_ID_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"filedetails/\?id=(\d+)").unwrap());
+static FILEDETAILS_ID_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"filedetails/\?id=(\d+)").unwrap());
 
 /// Extract candidate IDs from `mod_source`, auto-detecting which of the two
 /// supported shapes it is:
@@ -36,7 +37,9 @@ pub async fn extract_candidate_ids(mod_source: &str) -> Result<Vec<u64>> {
 /// Public because callers that already have a single raw Workshop URL in
 /// hand (no preset export, no fetch needed) can skip straight to this.
 pub fn extract_single_id(url: &str) -> Option<u64> {
-    FILEDETAILS_ID_RE.captures(url).and_then(|c| c[1].parse().ok())
+    FILEDETAILS_ID_RE
+        .captures(url)
+        .and_then(|c| c[1].parse().ok())
 }
 
 /// Scan `html` for every `filedetails/?id=` link (a preset export's usual
@@ -44,7 +47,10 @@ pub fn extract_single_id(url: &str) -> Option<u64> {
 /// HTML content in hand (e.g. uploaded directly rather than fetched from a
 /// URL) and want to skip [`extract_candidate_ids`]'s own fetch step.
 pub fn parse_preset_html(html: &str) -> Vec<u64> {
-    FILEDETAILS_ID_RE.captures_iter(html).filter_map(|c| c[1].parse().ok()).collect()
+    FILEDETAILS_ID_RE
+        .captures_iter(html)
+        .filter_map(|c| c[1].parse().ok())
+        .collect()
 }
 
 async fn fetch_source(mod_source: &str) -> Result<String> {
@@ -60,7 +66,8 @@ async fn fetch_source(mod_source: &str) -> Result<String> {
             .await
             .context("failed to read mod preset response body")
     } else {
-        std::fs::read_to_string(mod_source).with_context(|| format!("failed to read mod preset file {mod_source}"))
+        std::fs::read_to_string(mod_source)
+            .with_context(|| format!("failed to read mod preset file {mod_source}"))
     }
 }
 
@@ -70,8 +77,14 @@ mod tests {
 
     #[test]
     fn single_url_extracts_directly() {
-        assert_eq!(extract_single_id("https://steamcommunity.com/sharedfiles/filedetails/?id=1978754337"), Some(1978754337));
-        assert_eq!(extract_single_id("https://steamcommunity.com/workshop/filedetails/?id=843770737"), Some(843770737));
+        assert_eq!(
+            extract_single_id("https://steamcommunity.com/sharedfiles/filedetails/?id=1978754337"),
+            Some(1978754337)
+        );
+        assert_eq!(
+            extract_single_id("https://steamcommunity.com/workshop/filedetails/?id=843770737"),
+            Some(843770737)
+        );
     }
 
     #[test]

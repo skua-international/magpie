@@ -9,7 +9,7 @@
 use jsonwebtoken::jwk::{Jwk, JwkSet};
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
 use ring::rand::SystemRandom;
-use ring::signature::{EcdsaKeyPair, ECDSA_P256_SHA256_FIXED_SIGNING};
+use ring::signature::{ECDSA_P256_SHA256_FIXED_SIGNING, EcdsaKeyPair};
 use serde::Serialize;
 use sqlx::PgPool;
 
@@ -40,7 +40,7 @@ impl Signer {
         // bookkeeping, and would change automatically if the key were ever
         // rotated to different material.
         let kid = {
-            use ring::digest::{digest, SHA256};
+            use ring::digest::{SHA256, digest};
             let hash = digest(&SHA256, &der);
             data_encoding_hex(&hash.as_ref()[..8])
         };
@@ -48,7 +48,11 @@ impl Signer {
         let mut jwk = Jwk::from_encoding_key(&encoding_key, Algorithm::ES256)?;
         jwk.common.key_id = Some(kid.clone());
 
-        Ok(Self { encoding_key, jwk, kid })
+        Ok(Self {
+            encoding_key,
+            jwk,
+            kid,
+        })
     }
 
     pub fn sign<T: Serialize>(&self, claims: &T) -> anyhow::Result<String> {
@@ -58,7 +62,10 @@ impl Signer {
     }
 
     pub fn jwks_json(&self) -> serde_json::Value {
-        serde_json::to_value(JwkSet { keys: vec![self.jwk.clone()] }).expect("JwkSet always serializes")
+        serde_json::to_value(JwkSet {
+            keys: vec![self.jwk.clone()],
+        })
+        .expect("JwkSet always serializes")
     }
 }
 

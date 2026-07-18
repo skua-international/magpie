@@ -23,10 +23,10 @@ use std::time::Duration;
 use crd::{ModSource, ModSourceInput, ModSourcePhase, ModSourceStatus};
 use futures::StreamExt;
 use kube::api::{Api, Patch, PatchParams};
-use kube::runtime::controller::Action;
-use kube::runtime::finalizer::{finalizer, Event as FinalizerEvent};
-use kube::runtime::watcher;
 use kube::runtime::Controller;
+use kube::runtime::controller::Action;
+use kube::runtime::finalizer::{Event as FinalizerEvent, finalizer};
+use kube::runtime::watcher;
 use kube::{Client, ResourceExt};
 use tracing::{error, info, warn};
 
@@ -47,7 +47,12 @@ struct Ctx {
 }
 
 pub fn spawn(client: Client, namespace: String, drift_requeue: Duration, shared: Arc<Shared>) {
-    let ctx = Arc::new(Ctx { client: client.clone(), namespace: namespace.clone(), drift_requeue, shared });
+    let ctx = Arc::new(Ctx {
+        client: client.clone(),
+        namespace: namespace.clone(),
+        drift_requeue,
+        shared,
+    });
     let api: Api<ModSource> = Api::namespaced(client, &namespace);
 
     tokio::spawn(async move {
@@ -93,12 +98,15 @@ async fn resolve(obj: &ModSource, ctx: &Ctx) -> anyhow::Result<Action> {
 
     let (candidate_ids, kind_hint) = match &obj.spec.source {
         ModSourceInput::SteamUrl(url) => {
-            let id = workshop_parse::extract_single_id(url)
-                .ok_or_else(|| anyhow::anyhow!("not a recognizable Workshop filedetails URL: {url}"))?;
+            let id = workshop_parse::extract_single_id(url).ok_or_else(|| {
+                anyhow::anyhow!("not a recognizable Workshop filedetails URL: {url}")
+            })?;
             (vec![id], None)
         }
         ModSourceInput::HtmlUrl(url) => {
-            let ids = workshop_parse::extract_candidate_ids(url).await.map_err(|e| anyhow::anyhow!("{e:#}"))?;
+            let ids = workshop_parse::extract_candidate_ids(url)
+                .await
+                .map_err(|e| anyhow::anyhow!("{e:#}"))?;
             (ids, Some("preset"))
         }
         ModSourceInput::HtmlContent(html) => {
@@ -123,7 +131,13 @@ async fn resolve(obj: &ModSource, ctx: &Ctx) -> anyhow::Result<Action> {
             // A single-candidate SteamUrl that resolved to exactly itself is
             // a plain mod; anything else (collection expansion) came from a
             // collection. HtmlUrl/HtmlContent are always presets.
-            let kind = kind_hint.unwrap_or(if resolved_mod_ids == candidate_ids { "mod" } else { "collection" }).to_string();
+            let kind = kind_hint
+                .unwrap_or(if resolved_mod_ids == candidate_ids {
+                    "mod"
+                } else {
+                    "collection"
+                })
+                .to_string();
 
             set_status(
                 ctx,
@@ -145,7 +159,11 @@ async fn resolve(obj: &ModSource, ctx: &Ctx) -> anyhow::Result<Action> {
             set_status(
                 ctx,
                 &name,
-                ModSourceStatus { phase: ModSourcePhase::Failed, message: format!("{e:#}"), ..Default::default() },
+                ModSourceStatus {
+                    phase: ModSourcePhase::Failed,
+                    message: format!("{e:#}"),
+                    ..Default::default()
+                },
             )
             .await?;
             warn!("{name}: failed to resolve: {e:#}");
@@ -165,6 +183,7 @@ async fn cleanup(obj: &ModSource, ctx: &Ctx) -> anyhow::Result<Action> {
 async fn set_status(ctx: &Ctx, name: &str, status: ModSourceStatus) -> anyhow::Result<()> {
     let api: Api<ModSource> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
     let patch = serde_json::json!({ "status": status });
-    api.patch_status(name, &PatchParams::default(), &Patch::Merge(patch)).await?;
+    api.patch_status(name, &PatchParams::default(), &Patch::Merge(patch))
+        .await?;
     Ok(())
 }

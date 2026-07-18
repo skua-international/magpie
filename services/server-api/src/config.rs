@@ -19,7 +19,8 @@ impl Config {
             namespace: env::var("NAMESPACE").unwrap_or_else(|_| "default".into()),
             listen_addr: env::var("LISTEN_ADDR").unwrap_or_else(|_| "0.0.0.0:8443".into()),
             database_url: require_env("DATABASE_URL")?,
-            sync_daemon_url: env::var("SYNC_DAEMON_URL").unwrap_or_else(|_| "http://sync-daemon:8080".into()),
+            sync_daemon_url: env::var("SYNC_DAEMON_URL")
+                .unwrap_or_else(|_| "http://sync-daemon:8080".into()),
             jwt: JwtConfig {
                 jwks_url: require_env("JWKS_URL")?,
                 issuer: require_env("JWT_ISSUER")?,

@@ -79,7 +79,10 @@ pub async fn sync_mods(
 ) -> Result<SyncModsResult> {
     let replace_app_id = !cdlc_force;
     let workshop_root = server_root.join("workshop");
-    let mod_dirs: Vec<(u64, PathBuf)> = mod_ids.iter().map(|&id| (id, workshop_root.join(id.to_string()))).collect();
+    let mod_dirs: Vec<(u64, PathBuf)> = mod_ids
+        .iter()
+        .map(|&id| (id, workshop_root.join(id.to_string())))
+        .collect();
 
     // Every candidate goes through resolve_workshop_items, which handles
     // the depot-key/manifest caching itself (skipping network round-trips
@@ -108,7 +111,10 @@ pub async fn sync_mods(
     }
 
     Ok(SyncModsResult {
-        mods: mod_dirs.iter().map(|(id, _)| format!("workshop/{id}")).collect(),
+        mods: mod_dirs
+            .iter()
+            .map(|(id, _)| format!("workshop/{id}"))
+            .collect(),
         key_dirs: mod_dirs.into_iter().map(|(_, dir)| dir).collect(),
     })
 }

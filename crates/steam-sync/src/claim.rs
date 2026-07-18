@@ -11,7 +11,7 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 
 /// Reflink-copy (falling back to a real copy) `golden_dir` into `claim_dir`.
 /// `claim_dir` must not already exist -- claims are meant to be fresh,
@@ -26,15 +26,24 @@ pub fn claim(golden_dir: &Path, claim_dir: &Path) -> Result<PathBuf> {
 
     match run_cp_reflink(golden_dir, claim_dir) {
         Ok(()) => {
-            tracing::debug!("claimed {} -> {} (reflink)", golden_dir.display(), claim_dir.display());
+            tracing::debug!(
+                "claimed {} -> {} (reflink)",
+                golden_dir.display(),
+                claim_dir.display()
+            );
         }
         Err(e) => {
             tracing::warn!(
                 "reflink copy failed ({e:#}), falling back to a real copy -- this will be slower \
                  and use real disk space proportional to the content size"
             );
-            copy_dir_recursive(golden_dir, claim_dir)
-                .with_context(|| format!("failed to copy {} -> {}", golden_dir.display(), claim_dir.display()))?;
+            copy_dir_recursive(golden_dir, claim_dir).with_context(|| {
+                format!(
+                    "failed to copy {} -> {}",
+                    golden_dir.display(),
+                    claim_dir.display()
+                )
+            })?;
         }
     }
 

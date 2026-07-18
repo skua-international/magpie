@@ -8,9 +8,13 @@
 //! path for id_token verification that would only apply to one provider.
 
 use oauth2::basic::BasicClient;
-use oauth2::{AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointNotSet, EndpointSet, RedirectUrl, Scope, TokenResponse, TokenUrl};
+use oauth2::{
+    AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointNotSet, EndpointSet,
+    RedirectUrl, Scope, TokenResponse, TokenUrl,
+};
 
-type ConfiguredClient = BasicClient<EndpointSet, EndpointNotSet, EndpointNotSet, EndpointNotSet, EndpointSet>;
+type ConfiguredClient =
+    BasicClient<EndpointSet, EndpointNotSet, EndpointNotSet, EndpointNotSet, EndpointSet>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ProviderKind {
@@ -76,7 +80,12 @@ pub struct OAuthProvider {
 }
 
 impl OAuthProvider {
-    pub fn new(kind: ProviderKind, client_id: String, client_secret: String, redirect_uri: String) -> anyhow::Result<Self> {
+    pub fn new(
+        kind: ProviderKind,
+        client_id: String,
+        client_secret: String,
+        redirect_uri: String,
+    ) -> anyhow::Result<Self> {
         let client = BasicClient::new(ClientId::new(client_id))
             .set_client_secret(ClientSecret::new(client_secret))
             .set_auth_uri(AuthUrl::new(kind.auth_url().to_string())?)
@@ -97,7 +106,11 @@ impl OAuthProvider {
         url
     }
 
-    pub async fn exchange_code(&self, http: &reqwest::Client, code: String) -> anyhow::Result<String> {
+    pub async fn exchange_code(
+        &self,
+        http: &reqwest::Client,
+        code: String,
+    ) -> anyhow::Result<String> {
         let token = self
             .client
             .exchange_code(AuthorizationCode::new(code))
@@ -108,7 +121,11 @@ impl OAuthProvider {
     }
 
     /// Returns `(provider_user_id, display_name)`.
-    pub async fn fetch_identity(&self, http: &reqwest::Client, access_token: &str) -> anyhow::Result<(String, String)> {
+    pub async fn fetch_identity(
+        &self,
+        http: &reqwest::Client,
+        access_token: &str,
+    ) -> anyhow::Result<(String, String)> {
         let mut req = http.get(self.kind.userinfo_url()).bearer_auth(access_token);
         if matches!(self.kind, ProviderKind::Github) {
             // GitHub's API rejects requests with no User-Agent.
@@ -118,15 +135,24 @@ impl OAuthProvider {
 
         let (id, name) = match self.kind {
             ProviderKind::Discord => (
-                body["id"].as_str().ok_or_else(|| anyhow::anyhow!("discord userinfo missing id"))?.to_string(),
+                body["id"]
+                    .as_str()
+                    .ok_or_else(|| anyhow::anyhow!("discord userinfo missing id"))?
+                    .to_string(),
                 body["username"].as_str().unwrap_or_default().to_string(),
             ),
             ProviderKind::Github => (
-                body["id"].as_i64().ok_or_else(|| anyhow::anyhow!("github userinfo missing id"))?.to_string(),
+                body["id"]
+                    .as_i64()
+                    .ok_or_else(|| anyhow::anyhow!("github userinfo missing id"))?
+                    .to_string(),
                 body["login"].as_str().unwrap_or_default().to_string(),
             ),
             ProviderKind::Google => (
-                body["sub"].as_str().ok_or_else(|| anyhow::anyhow!("google userinfo missing sub"))?.to_string(),
+                body["sub"]
+                    .as_str()
+                    .ok_or_else(|| anyhow::anyhow!("google userinfo missing sub"))?
+                    .to_string(),
                 body["name"].as_str().unwrap_or_default().to_string(),
             ),
         };

@@ -10,8 +10,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
-use axum::routing::{get, post};
 use axum::Router;
+use axum::routing::{get, post};
 use config::Config;
 use handlers::AppState;
 use oauth::OAuthProvider;
@@ -20,7 +20,9 @@ use tracing::info;
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
+        )
         .with_target(false)
         .init();
 
@@ -32,17 +34,26 @@ async fn main() -> Result<()> {
     let signer = signing::Signer::load_or_create(&pool).await?;
     info!("signing key ready");
 
-    let http = reqwest::Client::builder().redirect(reqwest::redirect::Policy::none()).build()?;
+    let http = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()?;
 
     let mut oauth_providers = HashMap::new();
     for provider in &cfg.providers {
         let redirect_uri = format!("{}/auth/{}/callback", cfg.base_url, provider.kind.as_str());
-        let client = OAuthProvider::new(provider.kind, provider.client_id.clone(), provider.client_secret.clone(), redirect_uri)?;
+        let client = OAuthProvider::new(
+            provider.kind,
+            provider.client_id.clone(),
+            provider.client_secret.clone(),
+            redirect_uri,
+        )?;
         info!("enabled OAuth2 provider: {}", provider.kind.as_str());
         oauth_providers.insert(provider.kind, client);
     }
     if oauth_providers.is_empty() {
-        info!("no OAuth2 providers configured (only Steam login will work) -- set e.g. DISCORD_CLIENT_ID/DISCORD_CLIENT_SECRET to enable one");
+        info!(
+            "no OAuth2 providers configured (only Steam login will work) -- set e.g. DISCORD_CLIENT_ID/DISCORD_CLIENT_SECRET to enable one"
+        );
     }
 
     let app_state = Arc::new(AppState {

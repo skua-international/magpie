@@ -7,7 +7,7 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use uuid::Uuid;
 
 pub fn local_mods_dir(root: &Path) -> PathBuf {
@@ -26,23 +26,33 @@ pub fn extract_local_mod(root: &Path, unique_id: &str, zip_bytes: &[u8]) -> Resu
     validate_path_component(unique_id)?;
     let dest = local_mods_dir(root).join(unique_id);
     if dest.exists() {
-        std::fs::remove_dir_all(&dest).context("failed to remove existing local mod directory before re-extracting")?;
+        std::fs::remove_dir_all(&dest)
+            .context("failed to remove existing local mod directory before re-extracting")?;
     }
     std::fs::create_dir_all(&dest).context("failed to create local mod directory")?;
 
     let reader = std::io::Cursor::new(zip_bytes);
     let mut archive = zip::ZipArchive::new(reader).context("failed to read zip archive")?;
-    archive.extract(&dest).context("failed to extract zip archive")?;
+    archive
+        .extract(&dest)
+        .context("failed to extract zip archive")?;
 
     let mod_root = if dest.join("mod.cpp").is_file() {
         dest.clone()
     } else {
         // Look for a single top-level directory wrapping the actual mod
         // content (e.g. the zip was exported as "MyMod-main/mod.cpp").
-        let entries: Vec<_> = std::fs::read_dir(&dest).context("failed to list extracted mod directory")?.filter_map(|e| e.ok()).collect();
+        let entries: Vec<_> = std::fs::read_dir(&dest)
+            .context("failed to list extracted mod directory")?
+            .filter_map(|e| e.ok())
+            .collect();
         match entries.as_slice() {
-            [entry] if entry.path().is_dir() && entry.path().join("mod.cpp").is_file() => entry.path(),
-            _ => bail!("extracted archive has no mod.cpp at its root or in a single wrapping folder"),
+            [entry] if entry.path().is_dir() && entry.path().join("mod.cpp").is_file() => {
+                entry.path()
+            }
+            _ => {
+                bail!("extracted archive has no mod.cpp at its root or in a single wrapping folder")
+            }
         }
     };
 
@@ -91,7 +101,16 @@ pub fn delete_local_mod(root: &Path, unique_id: &str) -> Result<()> {
 /// human-meaningful name in the actual file on disk, since Arma's mission
 /// browser and mission-selection config reference missions by filename.
 fn mission_filename(id: Uuid, name: &str) -> String {
-    let sanitized: String = name.chars().map(|c| if c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-') { c } else { '_' }).collect();
+    let sanitized: String = name
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-') {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
     format!("{id}__{sanitized}")
 }
 
@@ -110,7 +129,9 @@ pub fn write_mission(root: &Path, id: Uuid, name: &str, pbo_bytes: &[u8]) -> Res
 
 pub fn delete_mission_file(root: &Path, id: Uuid) -> Result<()> {
     let dir = missions_dir(root);
-    let Ok(entries) = std::fs::read_dir(&dir) else { return Ok(()) };
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return Ok(());
+    };
     let prefix = format!("{id}__");
     for entry in entries.filter_map(|e| e.ok()) {
         if entry.file_name().to_string_lossy().starts_with(&prefix) {

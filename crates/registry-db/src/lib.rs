@@ -22,7 +22,10 @@ pub async fn connect(database_url: &str) -> anyhow::Result<PgPool> {
     // here covers all of them from one place.
     let _ = rustls::crypto::ring::default_provider().install_default();
 
-    let pool = sqlx::postgres::PgPoolOptions::new().max_connections(10).connect(database_url).await?;
+    let pool = sqlx::postgres::PgPoolOptions::new()
+        .max_connections(10)
+        .connect(database_url)
+        .await?;
     // raw_sql, not query(): the schema block below is several
     // semicolon-separated statements in one string, which Postgres's
     // extended query protocol (what query()/prepared statements use)
@@ -90,7 +93,13 @@ pub struct MissionRow {
     pub created_by: String,
 }
 
-pub async fn upsert_mission(pool: &PgPool, id: Uuid, name: &str, filesize: i64, created_by: &str) -> sqlx::Result<()> {
+pub async fn upsert_mission(
+    pool: &PgPool,
+    id: Uuid,
+    name: &str,
+    filesize: i64,
+    created_by: &str,
+) -> sqlx::Result<()> {
     sqlx::query(
         "INSERT INTO missions (id, name, filesize, created_by) VALUES ($1, $2, $3, $4)
          ON CONFLICT (id) DO UPDATE SET name = excluded.name, filesize = excluded.filesize",
@@ -105,15 +114,25 @@ pub async fn upsert_mission(pool: &PgPool, id: Uuid, name: &str, filesize: i64, 
 }
 
 pub async fn get_mission(pool: &PgPool, id: Uuid) -> sqlx::Result<Option<MissionRow>> {
-    sqlx::query_as("SELECT id, name, filesize, created_at, created_by FROM missions WHERE id = $1").bind(id).fetch_optional(pool).await
+    sqlx::query_as("SELECT id, name, filesize, created_at, created_by FROM missions WHERE id = $1")
+        .bind(id)
+        .fetch_optional(pool)
+        .await
 }
 
 pub async fn list_missions(pool: &PgPool) -> sqlx::Result<Vec<MissionRow>> {
-    sqlx::query_as("SELECT id, name, filesize, created_at, created_by FROM missions ORDER BY created_at").fetch_all(pool).await
+    sqlx::query_as(
+        "SELECT id, name, filesize, created_at, created_by FROM missions ORDER BY created_at",
+    )
+    .fetch_all(pool)
+    .await
 }
 
 pub async fn delete_mission(pool: &PgPool, id: Uuid) -> sqlx::Result<bool> {
-    let result = sqlx::query("DELETE FROM missions WHERE id = $1").bind(id).execute(pool).await?;
+    let result = sqlx::query("DELETE FROM missions WHERE id = $1")
+        .bind(id)
+        .execute(pool)
+        .await?;
     Ok(result.rows_affected() > 0)
 }
 
@@ -122,7 +141,11 @@ pub async fn delete_mission(pool: &PgPool, id: Uuid) -> sqlx::Result<bool> {
 /// `"*"` in the returned set means "every scope" -- a coarse admin grant,
 /// since there's no real role hierarchy yet.
 pub async fn scopes_for_subject(pool: &PgPool, subject: &str) -> sqlx::Result<Vec<String>> {
-    let row: Option<(Vec<String>,)> = sqlx::query_as("SELECT scopes FROM acl_grants WHERE subject = $1").bind(subject).fetch_optional(pool).await?;
+    let row: Option<(Vec<String>,)> =
+        sqlx::query_as("SELECT scopes FROM acl_grants WHERE subject = $1")
+            .bind(subject)
+            .fetch_optional(pool)
+            .await?;
     Ok(row.map(|(scopes,)| scopes).unwrap_or_default())
 }
 
@@ -144,7 +167,9 @@ pub async fn grant_scopes(pool: &PgPool, subject: &str, scopes: &[String]) -> sq
 /// on first boot with no RBAC/Secret-writing needed. Read by
 /// `get_or_create_signing_key`; written directly only by that function.
 pub async fn get_signing_key(pool: &PgPool) -> sqlx::Result<Option<Vec<u8>>> {
-    let row: Option<(Vec<u8>,)> = sqlx::query_as("SELECT pkcs8_der FROM signing_keys WHERE id = 1").fetch_optional(pool).await?;
+    let row: Option<(Vec<u8>,)> = sqlx::query_as("SELECT pkcs8_der FROM signing_keys WHERE id = 1")
+        .fetch_optional(pool)
+        .await?;
     Ok(row.map(|(der,)| der))
 }
 
@@ -153,21 +178,36 @@ pub async fn get_signing_key(pool: &PgPool) -> sqlx::Result<Option<Vec<u8>>> {
 /// race first, the `INSERT` is a no-op (`ON CONFLICT DO NOTHING`) and this
 /// re-reads whatever actually landed, so every caller ends up agreeing on
 /// one key regardless of who generated it.
-pub async fn insert_signing_key_if_absent(pool: &PgPool, pkcs8_der: &[u8]) -> sqlx::Result<Vec<u8>> {
-    sqlx::query("INSERT INTO signing_keys (id, pkcs8_der) VALUES (1, $1) ON CONFLICT (id) DO NOTHING").bind(pkcs8_der).execute(pool).await?;
-    let (der,): (Vec<u8>,) =
-        sqlx::query_as("SELECT pkcs8_der FROM signing_keys WHERE id = 1").fetch_one(pool).await?;
+pub async fn insert_signing_key_if_absent(
+    pool: &PgPool,
+    pkcs8_der: &[u8],
+) -> sqlx::Result<Vec<u8>> {
+    sqlx::query(
+        "INSERT INTO signing_keys (id, pkcs8_der) VALUES (1, $1) ON CONFLICT (id) DO NOTHING",
+    )
+    .bind(pkcs8_der)
+    .execute(pool)
+    .await?;
+    let (der,): (Vec<u8>,) = sqlx::query_as("SELECT pkcs8_der FROM signing_keys WHERE id = 1")
+        .fetch_one(pool)
+        .await?;
     Ok(der)
 }
 
 /// A linked external identity (Discord/GitHub/Google OAuth2, or Steam
 /// OpenID), if `(provider, provider_user_id)` has been seen before.
-pub async fn find_linked_account(pool: &PgPool, provider: &str, provider_user_id: &str) -> sqlx::Result<Option<Uuid>> {
-    let row: Option<(Uuid,)> = sqlx::query_as("SELECT user_id FROM linked_accounts WHERE provider = $1 AND provider_user_id = $2")
-        .bind(provider)
-        .bind(provider_user_id)
-        .fetch_optional(pool)
-        .await?;
+pub async fn find_linked_account(
+    pool: &PgPool,
+    provider: &str,
+    provider_user_id: &str,
+) -> sqlx::Result<Option<Uuid>> {
+    let row: Option<(Uuid,)> = sqlx::query_as(
+        "SELECT user_id FROM linked_accounts WHERE provider = $1 AND provider_user_id = $2",
+    )
+    .bind(provider)
+    .bind(provider_user_id)
+    .fetch_optional(pool)
+    .await?;
     Ok(row.map(|(id,)| id))
 }
 
@@ -179,14 +219,27 @@ pub async fn find_linked_account(pool: &PgPool, provider: &str, provider_user_id
 /// whole thing runs under `LOCK TABLE users` so two simultaneous first-ever
 /// logins can't both win that race; this only ever matters once, at
 /// bootstrap, so the heavy-handed lock is fine.
-pub async fn create_user_and_link(pool: &PgPool, provider: &str, provider_user_id: &str, display_name: &str) -> sqlx::Result<Uuid> {
+pub async fn create_user_and_link(
+    pool: &PgPool,
+    provider: &str,
+    provider_user_id: &str,
+    display_name: &str,
+) -> sqlx::Result<Uuid> {
     let mut tx = pool.begin().await?;
-    sqlx::query("LOCK TABLE users IN EXCLUSIVE MODE").execute(&mut *tx).await?;
+    sqlx::query("LOCK TABLE users IN EXCLUSIVE MODE")
+        .execute(&mut *tx)
+        .await?;
 
-    let is_first = sqlx::query_scalar::<_, i64>("SELECT count(*) FROM users").fetch_one(&mut *tx).await? == 0;
+    let is_first = sqlx::query_scalar::<_, i64>("SELECT count(*) FROM users")
+        .fetch_one(&mut *tx)
+        .await?
+        == 0;
 
     let user_id = Uuid::now_v7();
-    sqlx::query("INSERT INTO users (id) VALUES ($1)").bind(user_id).execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO users (id) VALUES ($1)")
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
     sqlx::query("INSERT INTO linked_accounts (provider, provider_user_id, user_id, display_name) VALUES ($1, $2, $3, $4)")
         .bind(provider)
         .bind(provider_user_id)
@@ -211,7 +264,12 @@ pub async fn create_user_and_link(pool: &PgPool, provider: &str, provider_user_i
 
 /// Persists a newly issued refresh token (already hashed by the caller --
 /// this crate never sees the raw secret).
-pub async fn insert_refresh_token(pool: &PgPool, token_hash: &str, user_id: Uuid, expires_at: chrono::DateTime<chrono::Utc>) -> sqlx::Result<()> {
+pub async fn insert_refresh_token(
+    pool: &PgPool,
+    token_hash: &str,
+    user_id: Uuid,
+    expires_at: chrono::DateTime<chrono::Utc>,
+) -> sqlx::Result<()> {
     sqlx::query("INSERT INTO refresh_tokens (token_hash, user_id, expires_at) VALUES ($1, $2, $3)")
         .bind(token_hash)
         .bind(user_id)
@@ -223,7 +281,10 @@ pub async fn insert_refresh_token(pool: &PgPool, token_hash: &str, user_id: Uuid
 
 /// Returns the owning user if `token_hash` is a currently valid (not
 /// expired, not revoked) refresh token.
-pub async fn valid_refresh_token_user(pool: &PgPool, token_hash: &str) -> sqlx::Result<Option<Uuid>> {
+pub async fn valid_refresh_token_user(
+    pool: &PgPool,
+    token_hash: &str,
+) -> sqlx::Result<Option<Uuid>> {
     let row: Option<(Uuid,)> =
         sqlx::query_as("SELECT user_id FROM refresh_tokens WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > now()")
             .bind(token_hash)
@@ -237,7 +298,12 @@ pub async fn valid_refresh_token_user(pool: &PgPool, token_hash: &str) -> sqlx::
 /// single-use, a fresh one is issued alongside the new access token) and
 /// on explicit logout.
 pub async fn revoke_refresh_token(pool: &PgPool, token_hash: &str) -> sqlx::Result<()> {
-    sqlx::query("UPDATE refresh_tokens SET revoked_at = now() WHERE token_hash = $1 AND revoked_at IS NULL").bind(token_hash).execute(pool).await?;
+    sqlx::query(
+        "UPDATE refresh_tokens SET revoked_at = now() WHERE token_hash = $1 AND revoked_at IS NULL",
+    )
+    .bind(token_hash)
+    .execute(pool)
+    .await?;
     Ok(())
 }
 
@@ -259,7 +325,13 @@ pub async fn revoke_refresh_token(pool: &PgPool, token_hash: &str) -> sqlx::Resu
 /// first-ever superuser doesn't silently lose that scope), and the
 /// now-empty other account is deleted. All under one transaction so a
 /// concurrent login can't observe a half-merged state.
-pub async fn link_account_to_user(pool: &PgPool, provider: &str, provider_user_id: &str, user_id: Uuid, display_name: &str) -> sqlx::Result<()> {
+pub async fn link_account_to_user(
+    pool: &PgPool,
+    provider: &str,
+    provider_user_id: &str,
+    user_id: Uuid,
+    display_name: &str,
+) -> sqlx::Result<()> {
     let mut tx = pool.begin().await?;
 
     let other_user_id: Option<Uuid> =
@@ -286,20 +358,33 @@ pub async fn link_account_to_user(pool: &PgPool, provider: &str, provider_user_i
             .bind(user_id)
             .execute(&mut *tx)
             .await?;
-            sqlx::query("DELETE FROM acl_grants WHERE subject = $1::text").bind(other_user_id).execute(&mut *tx).await?;
+            sqlx::query("DELETE FROM acl_grants WHERE subject = $1::text")
+                .bind(other_user_id)
+                .execute(&mut *tx)
+                .await?;
 
             // Re-point every linked_accounts row other_user_id had (this
             // one included) onto user_id -- covers the case where the
             // stray account itself had more than one provider linked.
-            sqlx::query("UPDATE linked_accounts SET user_id = $1 WHERE user_id = $2").bind(user_id).bind(other_user_id).execute(&mut *tx).await?;
+            sqlx::query("UPDATE linked_accounts SET user_id = $1 WHERE user_id = $2")
+                .bind(user_id)
+                .bind(other_user_id)
+                .execute(&mut *tx)
+                .await?;
 
             // refresh_tokens for other_user_id are now pointless (nobody
             // will ever present a token minted for a user_id that no
             // longer exists) -- ON DELETE CASCADE on the users row below
             // would clean these up anyway, but being explicit here keeps
             // this transaction's intent readable end to end.
-            sqlx::query("DELETE FROM refresh_tokens WHERE user_id = $1").bind(other_user_id).execute(&mut *tx).await?;
-            sqlx::query("DELETE FROM users WHERE id = $1").bind(other_user_id).execute(&mut *tx).await?;
+            sqlx::query("DELETE FROM refresh_tokens WHERE user_id = $1")
+                .bind(other_user_id)
+                .execute(&mut *tx)
+                .await?;
+            sqlx::query("DELETE FROM users WHERE id = $1")
+                .bind(other_user_id)
+                .execute(&mut *tx)
+                .await?;
         }
     } else {
         sqlx::query("INSERT INTO linked_accounts (provider, provider_user_id, user_id, display_name) VALUES ($1, $2, $3, $4)")

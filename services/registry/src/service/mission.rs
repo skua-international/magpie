@@ -6,12 +6,12 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use authn::authz::AuthIdentity;
 use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest, ServiceResult};
 use protocol::proto::registry::v1::{
-    DeleteMissionRequest, DeleteMissionResponse, GetMissionRequest, ListMissionsRequest, ListMissionsResponse, MissionInfo,
-    UploadMissionRequest,
+    DeleteMissionRequest, DeleteMissionResponse, GetMissionRequest, ListMissionsRequest,
+    ListMissionsResponse, MissionInfo, UploadMissionRequest,
 };
-use authn::authz::AuthIdentity;
 use registry_db as db;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -25,7 +25,10 @@ pub struct MissionServiceImpl {
 
 impl MissionServiceImpl {
     pub fn new(pool: PgPool, local_content_root: PathBuf) -> Arc<Self> {
-        Arc::new(Self { pool, local_content_root })
+        Arc::new(Self {
+            pool,
+            local_content_root,
+        })
     }
 }
 
@@ -53,7 +56,8 @@ impl protocol::proto::registry::v1::MissionService for MissionServiceImpl {
             .ok_or_else(|| ConnectError::internal("missing authenticated identity"))?;
 
         let id = match request.id {
-            Some(existing) => Uuid::parse_str(existing).map_err(|_| ConnectError::invalid_argument("id is not a valid UUID"))?,
+            Some(existing) => Uuid::parse_str(existing)
+                .map_err(|_| ConnectError::invalid_argument("id is not a valid UUID"))?,
             None => Uuid::now_v7(),
         };
 
@@ -61,15 +65,28 @@ impl protocol::proto::registry::v1::MissionService for MissionServiceImpl {
             return Err(ConnectError::invalid_argument("name is required"));
         }
 
-        storage::write_mission(&self.local_content_root, id, request.name, request.pbo_content)
-            .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
+        storage::write_mission(
+            &self.local_content_root,
+            id,
+            request.name,
+            request.pbo_content,
+        )
+        .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
 
-        db::upsert_mission(&self.pool, id, request.name, request.pbo_content.len() as i64, &subject)
+        db::upsert_mission(
+            &self.pool,
+            id,
+            request.name,
+            request.pbo_content.len() as i64,
+            &subject,
+        )
+        .await
+        .map_err(|e| ConnectError::internal(format!("failed to persist mission: {e:#}")))?;
+
+        let row = db::get_mission(&self.pool, id)
             .await
-            .map_err(|e| ConnectError::internal(format!("failed to persist mission: {e:#}")))?;
-
-        let row =
-            db::get_mission(&self.pool, id).await.map_err(|e| ConnectError::internal(format!("{e:#}")))?.ok_or_else(|| {
+            .map_err(|e| ConnectError::internal(format!("{e:#}")))?
+            .ok_or_else(|| {
                 ConnectError::internal("mission vanished immediately after being written")
             })?;
 
@@ -81,7 +98,8 @@ impl protocol::proto::registry::v1::MissionService for MissionServiceImpl {
         _ctx: RequestContext,
         request: ServiceRequest<'_, GetMissionRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<MissionInfo> + Send + use<'a>> {
-        let id = Uuid::parse_str(request.id).map_err(|_| ConnectError::invalid_argument("id is not a valid UUID"))?;
+        let id = Uuid::parse_str(request.id)
+            .map_err(|_| ConnectError::invalid_argument("id is not a valid UUID"))?;
         let row = db::get_mission(&self.pool, id)
             .await
             .map_err(|e| ConnectError::internal(format!("{e:#}")))?
@@ -94,8 +112,13 @@ impl protocol::proto::registry::v1::MissionService for MissionServiceImpl {
         _ctx: RequestContext,
         _request: ServiceRequest<'_, ListMissionsRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<ListMissionsResponse> + Send + use<'a>> {
-        let rows = db::list_missions(&self.pool).await.map_err(|e| ConnectError::internal(format!("{e:#}")))?;
-        Response::ok(ListMissionsResponse { missions: rows.into_iter().map(to_info).collect(), ..Default::default() })
+        let rows = db::list_missions(&self.pool)
+            .await
+            .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
+        Response::ok(ListMissionsResponse {
+            missions: rows.into_iter().map(to_info).collect(),
+            ..Default::default()
+        })
     }
 
     async fn delete_mission<'a>(
@@ -103,12 +126,19 @@ impl protocol::proto::registry::v1::MissionService for MissionServiceImpl {
         _ctx: RequestContext,
         request: ServiceRequest<'_, DeleteMissionRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<DeleteMissionResponse> + Send + use<'a>> {
-        let id = Uuid::parse_str(request.id).map_err(|_| ConnectError::invalid_argument("id is not a valid UUID"))?;
-        let deleted = db::delete_mission(&self.pool, id).await.map_err(|e| ConnectError::internal(format!("{e:#}")))?;
+        let id = Uuid::parse_str(request.id)
+            .map_err(|_| ConnectError::invalid_argument("id is not a valid UUID"))?;
+        let deleted = db::delete_mission(&self.pool, id)
+            .await
+            .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
         if !deleted {
-            return Err(ConnectError::not_found(format!("no such mission: {}", request.id)));
+            return Err(ConnectError::not_found(format!(
+                "no such mission: {}",
+                request.id
+            )));
         }
-        storage::delete_mission_file(&self.local_content_root, id).map_err(|e| ConnectError::internal(format!("{e:#}")))?;
+        storage::delete_mission_file(&self.local_content_root, id)
+            .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
         Response::ok(DeleteMissionResponse::default())
     }
 }

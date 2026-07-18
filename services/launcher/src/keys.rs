@@ -38,8 +38,13 @@ pub fn copy(mod_dir: &Path) -> Result<()> {
         }
 
         let dest = Path::new(KEYS_DIR).join(entry.file_name());
-        std::fs::copy(entry.path(), &dest)
-            .with_context(|| format!("failed to copy key {} -> {}", entry.path().display(), dest.display()))?;
+        std::fs::copy(entry.path(), &dest).with_context(|| {
+            format!(
+                "failed to copy key {} -> {}",
+                entry.path().display(),
+                dest.display()
+            )
+        })?;
         found += 1;
     }
 

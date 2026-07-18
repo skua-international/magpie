@@ -23,14 +23,15 @@ use crd::{ArmaServer, ArmaServerPhase, ArmaServerStatus, DesiredState, ModSource
 use futures::StreamExt;
 use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec};
 use k8s_openapi::api::core::v1::{
-    Container, EnvVar, HostPathVolumeSource, LocalObjectReference, PodSpec, PodTemplateSpec, Volume, VolumeMount,
+    Container, EnvVar, HostPathVolumeSource, LocalObjectReference, PodSpec, PodTemplateSpec,
+    Volume, VolumeMount,
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
 use kube::api::{Api, DeleteParams, Patch, PatchParams};
-use kube::runtime::controller::Action;
-use kube::runtime::finalizer::{finalizer, Event as FinalizerEvent};
-use kube::runtime::watcher;
 use kube::runtime::Controller;
+use kube::runtime::controller::Action;
+use kube::runtime::finalizer::{Event as FinalizerEvent, finalizer};
+use kube::runtime::watcher;
 use kube::{Client, Resource, ResourceExt};
 use sync_client::{ClaimStatus, SyncClient};
 use tracing::{error, info, warn};
@@ -57,7 +58,11 @@ struct Ctx {
 
 pub fn spawn(client: Client, cfg: Arc<Config>) -> anyhow::Result<()> {
     let sync_client = SyncClient::new(&cfg.sync_daemon_url)?;
-    let ctx = Arc::new(Ctx { client: client.clone(), cfg, sync_client });
+    let ctx = Arc::new(Ctx {
+        client: client.clone(),
+        cfg,
+        sync_client,
+    });
     let api: Api<ArmaServer> = Api::namespaced(client, &ctx.cfg.namespace);
 
     tokio::spawn(async move {
@@ -98,21 +103,45 @@ async fn apply(obj: &ArmaServer, ctx: &Ctx) -> anyhow::Result<Action> {
 
     match status.phase {
         ArmaServerPhase::Stopped if desired_running => {
-            set_status(ctx, &name, ArmaServerStatus { phase: ArmaServerPhase::Pending, ..Default::default() }).await?;
+            set_status(
+                ctx,
+                &name,
+                ArmaServerStatus {
+                    phase: ArmaServerPhase::Pending,
+                    ..Default::default()
+                },
+            )
+            .await?;
             Ok(Action::requeue(FAST_REQUEUE))
         }
         ArmaServerPhase::Stopped => Ok(Action::await_change()),
 
         _ if !desired_running => {
             scale_down(ctx, &name).await?;
-            set_status(ctx, &name, ArmaServerStatus { phase: ArmaServerPhase::Stopped, ..Default::default() }).await?;
+            set_status(
+                ctx,
+                &name,
+                ArmaServerStatus {
+                    phase: ArmaServerPhase::Stopped,
+                    ..Default::default()
+                },
+            )
+            .await?;
             Ok(Action::await_change())
         }
 
         ArmaServerPhase::Pending => {
             let job_id = ctx.sync_client.claim().await?;
-            set_status(ctx, &name, ArmaServerStatus { phase: ArmaServerPhase::Claiming, claim_path: job_id, message: String::new() })
-                .await?;
+            set_status(
+                ctx,
+                &name,
+                ArmaServerStatus {
+                    phase: ArmaServerPhase::Claiming,
+                    claim_path: job_id,
+                    message: String::new(),
+                },
+            )
+            .await?;
             Ok(Action::requeue(FAST_REQUEUE))
         }
         ArmaServerPhase::Claiming => {
@@ -127,8 +156,16 @@ async fn apply(obj: &ArmaServer, ctx: &Ctx) -> anyhow::Result<Action> {
             match ctx.sync_client.claim_status(&job_id).await? {
                 ClaimStatus::Running => Ok(Action::requeue(FAST_REQUEUE)),
                 ClaimStatus::Failed { error } => {
-                    set_status(ctx, &name, ArmaServerStatus { phase: ArmaServerPhase::Failed, claim_path: String::new(), message: error })
-                        .await?;
+                    set_status(
+                        ctx,
+                        &name,
+                        ArmaServerStatus {
+                            phase: ArmaServerPhase::Failed,
+                            claim_path: String::new(),
+                            message: error,
+                        },
+                    )
+                    .await?;
                     Ok(Action::requeue(SLOW_REQUEUE))
                 }
                 ClaimStatus::Done { claim_path } => {
@@ -137,7 +174,11 @@ async fn apply(obj: &ArmaServer, ctx: &Ctx) -> anyhow::Result<Action> {
                     set_status(
                         ctx,
                         &name,
-                        ArmaServerStatus { phase: ArmaServerPhase::Running, claim_path, message: String::new() },
+                        ArmaServerStatus {
+                            phase: ArmaServerPhase::Running,
+                            claim_path,
+                            message: String::new(),
+                        },
                     )
                     .await?;
                     Ok(Action::requeue(SLOW_REQUEUE))
@@ -155,7 +196,15 @@ async fn apply(obj: &ArmaServer, ctx: &Ctx) -> anyhow::Result<Action> {
             Ok(Action::requeue(SLOW_REQUEUE))
         }
         ArmaServerPhase::Failed => {
-            set_status(ctx, &name, ArmaServerStatus { phase: ArmaServerPhase::Pending, ..Default::default() }).await?;
+            set_status(
+                ctx,
+                &name,
+                ArmaServerStatus {
+                    phase: ArmaServerPhase::Pending,
+                    ..Default::default()
+                },
+            )
+            .await?;
             Ok(Action::requeue(FAST_REQUEUE))
         }
     }
@@ -180,7 +229,8 @@ async fn scale_down(ctx: &Ctx, name: &str) -> anyhow::Result<()> {
 async fn set_status(ctx: &Ctx, name: &str, status: ArmaServerStatus) -> anyhow::Result<()> {
     let api: Api<ArmaServer> = Api::namespaced(ctx.client.clone(), &ctx.cfg.namespace);
     let patch = serde_json::json!({ "status": status });
-    api.patch_status(name, &PatchParams::default(), &Patch::Merge(patch)).await?;
+    api.patch_status(name, &PatchParams::default(), &Patch::Merge(patch))
+        .await?;
     Ok(())
 }
 
@@ -193,12 +243,18 @@ async fn resolve_mod_paths(ctx: &Ctx, obj: &ArmaServer) -> anyhow::Result<Vec<St
     let mut paths = Vec::new();
     for source_id in &obj.spec.mod_source_ids {
         let source = mod_sources.get(source_id).await.map_err(|e| match e {
-            kube::Error::Api(e) if e.code == 404 => anyhow::anyhow!("mod source {source_id} no longer exists"),
+            kube::Error::Api(e) if e.code == 404 => {
+                anyhow::anyhow!("mod source {source_id} no longer exists")
+            }
             e => e.into(),
         })?;
         match &source.spec.source {
-            ModSourceInput::Local { unique_id } => paths.push(format!("{}/mods/{}", ctx.cfg.local_content_root, unique_id)),
-            ModSourceInput::SteamUrl(_) | ModSourceInput::HtmlUrl(_) | ModSourceInput::HtmlContent(_) => {
+            ModSourceInput::Local { unique_id } => {
+                paths.push(format!("{}/mods/{}", ctx.cfg.local_content_root, unique_id))
+            }
+            ModSourceInput::SteamUrl(_)
+            | ModSourceInput::HtmlUrl(_)
+            | ModSourceInput::HtmlContent(_) => {
                 let mod_ids = ctx.sync_client.get_source_mods(source_id).await?;
                 paths.extend(mod_ids.into_iter().map(|id| format!("workshop/{id}")));
             }
@@ -207,35 +263,77 @@ async fn resolve_mod_paths(ctx: &Ctx, obj: &ArmaServer) -> anyhow::Result<Vec<St
     Ok(paths)
 }
 
-async fn ensure_deployment(ctx: &Ctx, obj: &ArmaServer, claim_path: &str, mod_paths: &[String]) -> anyhow::Result<()> {
+async fn ensure_deployment(
+    ctx: &Ctx,
+    obj: &ArmaServer,
+    claim_path: &str,
+    mod_paths: &[String],
+) -> anyhow::Result<()> {
     let name = obj.name_any();
     let deployments: Api<Deployment> = Api::namespaced(ctx.client.clone(), &ctx.cfg.namespace);
 
     let mut env = vec![
-        EnvVar { name: "CLAIM_PATH".into(), value: Some(claim_path.to_string()), ..Default::default() },
-        EnvVar { name: "MODS".into(), value: Some(mod_paths.join(";")), ..Default::default() },
-        EnvVar { name: "ARMA_CDLC".into(), value: Some(obj.spec.cdlc.join(";")), ..Default::default() },
-        EnvVar { name: "PORT".into(), value: Some(obj.spec.port.to_string()), ..Default::default() },
-        EnvVar { name: "ARMA_CONFIG".into(), value: Some(obj.spec.arma_config.clone()), ..Default::default() },
-        EnvVar { name: "NETWORK_CONFIG".into(), value: Some(obj.spec.network_config.clone()), ..Default::default() },
+        EnvVar {
+            name: "CLAIM_PATH".into(),
+            value: Some(claim_path.to_string()),
+            ..Default::default()
+        },
+        EnvVar {
+            name: "MODS".into(),
+            value: Some(mod_paths.join(";")),
+            ..Default::default()
+        },
+        EnvVar {
+            name: "ARMA_CDLC".into(),
+            value: Some(obj.spec.cdlc.join(";")),
+            ..Default::default()
+        },
+        EnvVar {
+            name: "PORT".into(),
+            value: Some(obj.spec.port.to_string()),
+            ..Default::default()
+        },
+        EnvVar {
+            name: "ARMA_CONFIG".into(),
+            value: Some(obj.spec.arma_config.clone()),
+            ..Default::default()
+        },
+        EnvVar {
+            name: "NETWORK_CONFIG".into(),
+            value: Some(obj.spec.network_config.clone()),
+            ..Default::default()
+        },
     ];
     if !obj.spec.params.is_empty() {
-        env.push(EnvVar { name: "ARMA_PARAMS".into(), value: Some(obj.spec.params.join(" ")), ..Default::default() });
+        env.push(EnvVar {
+            name: "ARMA_PARAMS".into(),
+            value: Some(obj.spec.params.join(" ")),
+            ..Default::default()
+        });
     }
 
-    let labels: std::collections::BTreeMap<String, String> =
-        [("app".to_string(), "arma-server".to_string()), ("armaserver".to_string(), name.clone())].into();
+    let labels: std::collections::BTreeMap<String, String> = [
+        ("app".to_string(), "arma-server".to_string()),
+        ("armaserver".to_string(), name.clone()),
+    ]
+    .into();
 
     let deployment = Deployment {
         metadata: ObjectMeta {
             name: Some(name.clone()),
             labels: Some(labels.clone()),
-            owner_references: Some(vec![obj.controller_owner_ref(&()).expect("ArmaServer has a name")]),
+            owner_references: Some(vec![
+                obj.controller_owner_ref(&())
+                    .expect("ArmaServer has a name"),
+            ]),
             ..Default::default()
         },
         spec: Some(DeploymentSpec {
             replicas: Some(1),
-            selector: LabelSelector { match_labels: Some(labels.clone()), ..Default::default() },
+            selector: LabelSelector {
+                match_labels: Some(labels.clone()),
+                ..Default::default()
+            },
             // hostNetwork Pods can't run two-at-a-time on the same port on
             // the same node anyway (this project's single-node k3s scope
             // makes that doubly true) -- Recreate guarantees the old Pod is
@@ -246,7 +344,10 @@ async fn ensure_deployment(ctx: &Ctx, obj: &ArmaServer, claim_path: &str, mod_pa
                 rolling_update: None,
             }),
             template: PodTemplateSpec {
-                metadata: Some(ObjectMeta { labels: Some(labels), ..Default::default() }),
+                metadata: Some(ObjectMeta {
+                    labels: Some(labels),
+                    ..Default::default()
+                }),
                 spec: Some(PodSpec {
                     host_network: Some(true),
                     image_pull_secrets: (!ctx.cfg.image_pull_secrets.is_empty()).then(|| {
@@ -277,7 +378,11 @@ async fn ensure_deployment(ctx: &Ctx, obj: &ArmaServer, claim_path: &str, mod_pa
                                 read_only: Some(true),
                                 ..Default::default()
                             },
-                            VolumeMount { name: "server-root".into(), mount_path: "/arma3/server".into(), ..Default::default() },
+                            VolumeMount {
+                                name: "server-root".into(),
+                                mount_path: "/arma3/server".into(),
+                                ..Default::default()
+                            },
                             VolumeMount {
                                 name: "local-content".into(),
                                 mount_path: ctx.cfg.local_content_root.clone(),
@@ -332,6 +437,12 @@ async fn ensure_deployment(ctx: &Ctx, obj: &ArmaServer, claim_path: &str, mod_pa
         ..Default::default()
     };
 
-    deployments.patch(&name, &PatchParams::apply("arma-controller").force(), &Patch::Apply(&deployment)).await?;
+    deployments
+        .patch(
+            &name,
+            &PatchParams::apply("arma-controller").force(),
+            &Patch::Apply(&deployment),
+        )
+        .await?;
     Ok(())
 }

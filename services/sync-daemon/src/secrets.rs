@@ -10,8 +10,8 @@
 
 use base64::Engine;
 use k8s_openapi::api::core::v1::Secret;
-use kube::api::{Api, Patch, PatchParams};
 use kube::Client;
+use kube::api::{Api, Patch, PatchParams};
 
 pub struct Session {
     pub user: String,
@@ -30,7 +30,10 @@ pub async fn read_session(client: &Client, namespace: &str, secret_name: &str) -
     if user.is_empty() || refresh_token.is_empty() {
         return None;
     }
-    Some(Session { user, refresh_token })
+    Some(Session {
+        user,
+        refresh_token,
+    })
 }
 
 /// Overwrites the session Secret's data with a freshly established
@@ -38,7 +41,12 @@ pub async fn read_session(client: &Client, namespace: &str, secret_name: &str) -
 /// negotiation or an interactive RefreshSteamAuth call) that produced a
 /// (possibly new) refresh token, so a future restart can skip straight to
 /// [`read_session`] instead of needing credentials again.
-pub async fn write_session(client: &Client, namespace: &str, secret_name: &str, session: &Session) -> anyhow::Result<()> {
+pub async fn write_session(
+    client: &Client,
+    namespace: &str,
+    secret_name: &str,
+    session: &Session,
+) -> anyhow::Result<()> {
     let api: Api<Secret> = Api::namespaced(client.clone(), namespace);
     let b64 = base64::engine::general_purpose::STANDARD;
     let patch = serde_json::json!({
@@ -47,6 +55,7 @@ pub async fn write_session(client: &Client, namespace: &str, secret_name: &str, 
             "refresh_token": b64.encode(&session.refresh_token),
         }
     });
-    api.patch(secret_name, &PatchParams::default(), &Patch::Merge(patch)).await?;
+    api.patch(secret_name, &PatchParams::default(), &Patch::Merge(patch))
+        .await?;
     Ok(())
 }
