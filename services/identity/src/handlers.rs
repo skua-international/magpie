@@ -1,16 +1,27 @@
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
-use axum::response::{IntoResponse, Json, Response};
+use axum::response::{IntoResponse, Json, Redirect, Response};
 use serde::Deserialize;
 use serde_json::json;
 use uuid::Uuid;
 
 use crate::oauth::ProviderKind;
-use crate::tokens::TokenIssuer;
+use crate::tokens::{TokenIssuer, TokenPair};
 use crate::{state, steam};
+
+/// A completed login's tokens, held just long enough for the one
+/// server-to-server call that trades `code` for them (see `exchange`) --
+/// single-use (removed from the map on either a successful exchange or
+/// expiry), so this is deliberately not a general-purpose session store.
+pub struct ExchangeEntry {
+    tokens: TokenPair,
+    expires_at: std::time::Instant,
+}
+
+const EXCHANGE_CODE_TTL: std::time::Duration = std::time::Duration::from_secs(120);
 
 pub struct AppState {
     pub pool: sqlx::PgPool,
@@ -20,6 +31,7 @@ pub struct AppState {
     pub issuer: String,
     pub audience: String,
     pub oauth_providers: HashMap<ProviderKind, crate::oauth::OAuthProvider>,
+    pub exchange_codes: Mutex<HashMap<String, ExchangeEntry>>,
 }
 
 impl AppState {
@@ -60,12 +72,18 @@ pub async fn jwks(State(app): State<Arc<AppState>>) -> Json<serde_json::Value> {
 /// request instead of it ever having to appear inside a browser-visible
 /// URL. Direct human navigation (plain login, no header) works the same
 /// way, just always in login mode.
-pub async fn start(Path(provider): Path<String>, State(app): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+pub async fn start(
+    Path(provider): Path<String>,
+    State(app): State<Arc<AppState>>,
+    Query(query): Query<HashMap<String, String>>,
+    headers: HeaderMap,
+) -> Response {
     let link_user_id = app.verify_bearer(&headers);
+    let redirect_uri = query.get("redirect_uri").cloned();
 
-    let state_token = match state::issue(&app.signer, &provider, link_user_id) {
+    let state_token = match state::issue(&app.signer, &provider, link_user_id, redirect_uri) {
         Ok(t) => t,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, format!("{e:#}")).into_response(),
+        Err(e) => return (StatusCode::BAD_REQUEST, format!("{e:#}")).into_response(),
     };
 
     if provider == "steam" {
@@ -84,10 +102,17 @@ pub async fn start(Path(provider): Path<String>, State(app): State<Arc<AppState>
 }
 
 /// `GET /auth/:provider/callback` -- lands here directly from the
-/// provider's own redirect. Returns the token pair as JSON; a real
-/// website frontend would instead have this hand off via a page that
-/// captures the tokens client-side, but there's no website yet, and JSON
-/// is enough to actually use this end to end today.
+/// provider's own redirect. Two shapes, both driven by whether `start`
+/// was called with a `redirect_uri` (see its own doc):
+/// - No `redirect_uri` (a program calling this itself, e.g. a website's
+///   own backend fetching the callback server-to-server): returns the
+///   token pair as JSON directly, same as always.
+/// - `redirect_uri` set (a real human in a browser -- the CLI's login
+///   flow): 302s the browser to `redirect_uri?code=<one-time code>`
+///   instead. The real tokens never appear in a URL (browser history,
+///   referrer headers) -- `code` is only ever useful for one immediate
+///   `POST /auth/exchange` call, which is expected to happen
+///   server-to-server from whatever's listening at `redirect_uri`.
 pub async fn callback(Path(provider): Path<String>, State(app): State<Arc<AppState>>, Query(query): Query<HashMap<String, String>>) -> Response {
     let Some(state_token) = query.get("state") else {
         return (StatusCode::BAD_REQUEST, "missing state").into_response();
@@ -137,10 +162,24 @@ pub async fn callback(Path(provider): Path<String>, State(app): State<Arc<AppSta
         Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, format!("{e:#}")).into_response(),
     };
 
-    match app.token_issuer().issue(&app.pool, user_id).await {
-        Ok(pair) => Json(pair).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{e:#}")).into_response(),
-    }
+    let pair = match app.token_issuer().issue(&app.pool, user_id).await {
+        Ok(pair) => pair,
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, format!("{e:#}")).into_response(),
+    };
+
+    let Some(redirect_uri) = claims.redirect_uri else {
+        return Json(pair).into_response();
+    };
+    let code = {
+        use ring::rand::SecureRandom;
+        let mut bytes = [0u8; 24];
+        ring::rand::SystemRandom::new().fill(&mut bytes).expect("OS RNG must be available");
+        base64::Engine::encode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, bytes)
+    };
+    app.exchange_codes.lock().unwrap().insert(code.clone(), ExchangeEntry { tokens: pair, expires_at: std::time::Instant::now() + EXCHANGE_CODE_TTL });
+
+    let separator = if redirect_uri.contains('?') { '&' } else { '?' };
+    Redirect::to(&format!("{redirect_uri}{separator}code={}", urlencode(&code))).into_response()
 }
 
 #[derive(Deserialize)]
@@ -152,6 +191,27 @@ pub async fn refresh(State(app): State<Arc<AppState>>, Json(body): Json<RefreshR
     match app.token_issuer().refresh(&app.pool, &body.refresh_token).await {
         Ok(pair) => Json(pair).into_response(),
         Err(_) => (StatusCode::UNAUTHORIZED, "invalid, expired, or already-used refresh token").into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct ExchangeRequest {
+    code: String,
+}
+
+/// `POST /auth/exchange` -- trades a one-time code from a browser-redirect
+/// callback (see `callback`'s own doc) for the real tokens. Whoever holds
+/// `code` for the few seconds between the redirect landing and this call
+/// is trusted implicitly (same threat model as an OAuth authorization
+/// code) -- this is why `callback` only ever redirects to a loopback
+/// address (validated at `state::issue` time): a code briefly visible in
+/// a local process's own request log is a different risk than one
+/// visible to any network intermediary.
+pub async fn exchange(State(app): State<Arc<AppState>>, Json(body): Json<ExchangeRequest>) -> Response {
+    let entry = app.exchange_codes.lock().unwrap().remove(&body.code);
+    match entry {
+        Some(entry) if entry.expires_at >= std::time::Instant::now() => Json(entry.tokens).into_response(),
+        _ => (StatusCode::UNAUTHORIZED, "invalid, expired, or already-used exchange code").into_response(),
     }
 }
 

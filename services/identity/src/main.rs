@@ -7,7 +7,7 @@ mod steam;
 mod tokens;
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use axum::routing::{get, post};
@@ -53,6 +53,7 @@ async fn main() -> Result<()> {
         issuer: cfg.issuer,
         audience: cfg.audience,
         oauth_providers,
+        exchange_codes: Mutex::new(HashMap::new()),
     });
 
     let app = Router::new()
@@ -61,6 +62,7 @@ async fn main() -> Result<()> {
         .route("/auth/{provider}/start", get(handlers::start))
         .route("/auth/{provider}/callback", get(handlers::callback))
         .route("/auth/refresh", post(handlers::refresh))
+        .route("/auth/exchange", post(handlers::exchange))
         .with_state(app_state);
 
     let listener = tokio::net::TcpListener::bind(&cfg.listen_addr).await?;

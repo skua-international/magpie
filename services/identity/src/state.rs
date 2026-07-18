@@ -29,14 +29,33 @@ pub struct StateClaims {
     /// `Some(user_id)` means "this is a link flow, attach the successful
     /// login to this already-existing user" rather than creating a new one.
     pub link_user_id: Option<Uuid>,
+    /// Set when the caller is a human in a real browser rather than a
+    /// program making the request itself (a website's own backend,
+    /// fetching the callback server-to-server) -- on success, the
+    /// callback redirects here with a one-time exchange code instead of
+    /// returning the real tokens as JSON directly (see handlers.rs's
+    /// `exchange` endpoint for why: a token in a redirect URL is visible
+    /// in browser history/referrer headers, an exchange code that's only
+    /// ever useful for one immediate server-to-server call isn't).
+    /// Validated to a loopback host at issue time -- see `issue`'s own
+    /// doc -- so this can't be turned into an open redirect.
+    pub redirect_uri: Option<String>,
 }
 
-pub fn issue(signer: &Signer, provider: &str, link_user_id: Option<Uuid>) -> anyhow::Result<String> {
+pub fn issue(signer: &Signer, provider: &str, link_user_id: Option<Uuid>, redirect_uri: Option<String>) -> anyhow::Result<String> {
+    if let Some(uri) = &redirect_uri {
+        let parsed = url::Url::parse(uri).map_err(|_| anyhow::anyhow!("redirect_uri is not a valid URL"))?;
+        let is_loopback = matches!(parsed.host_str(), Some("127.0.0.1") | Some("localhost") | Some("::1"));
+        if !is_loopback {
+            anyhow::bail!("redirect_uri must be a loopback address (127.0.0.1/localhost) -- got {uri}");
+        }
+    }
     let claims = StateClaims {
         aud: STATE_AUDIENCE.to_string(),
         exp: chrono::Utc::now().timestamp() + STATE_TTL_SECS,
         provider: provider.to_string(),
         link_user_id,
+        redirect_uri,
     };
     signer.sign(&claims)
 }
