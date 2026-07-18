@@ -47,7 +47,75 @@ service SyncService {
   // UpdateServer/StartServer RPCs ("force resync this server's mod
   // sources") -- callers don't need to remember/resupply candidate IDs.
   rpc RefreshSource(RefreshSourceRequest) returns (RefreshSourceResponse);
+
+  // Every workshop mod ID currently tracked as verified-synced, and the
+  // manifest_id it was last verified at. A plain read of the sync cache --
+  // no Steam calls, no depot state (server/CDLC depots aren't included,
+  // only workshop mods).
+  rpc ListSyncedMods(ListSyncedModsRequest) returns (ListSyncedModsResponse);
+
+  // Clear one mod's "last verified" marker only -- never deletes its files
+  // on disk. The next resolve pass genuinely re-verifies that mod's chunks
+  // against Steam's current manifest, redownloading only whatever's
+  // actually missing or divergent. Deliberately not a real
+  // wipe-and-redownload -- this is the restricted, non-destructive shape
+  // of "force refresh a mod's cache".
+  rpc InvalidateMod(InvalidateModRequest) returns (InvalidateModResponse);
+
+  // A single mod's synced state plus every source_id currently
+  // referencing it -- one extra query beyond ListSyncedMods, so kept
+  // separate rather than having every list entry pay for it.
+  rpc GetSyncedMod(GetSyncedModRequest) returns (GetSyncedModResponse);
+
+  // Cluster-wide totals: every synced mod's size deduplicated across
+  // sources, plus base game/CDLC depot size -- for registry's
+  // AdminService.GetDiskUsage.
+  rpc GetSyncStats(GetSyncStatsRequest) returns (GetSyncStatsResponse);
 }
+
+message ListSyncedModsRequest {}
+
+message SyncedMod {
+  uint64 mod_id = 1;
+  uint64 manifest_id = 2;
+  uint64 size_bytes = 3;
+  // Empty if this mod was resolved (RegisterSource/RefreshSource/the
+  // background poller) before this process last restarted -- titles
+  // aren't independently persisted across restarts yet, only learned
+  // fresh from Steam each time a mod is actually resolved.
+  string title = 4;
+}
+
+message ListSyncedModsResponse {
+  repeated SyncedMod mods = 1;
+}
+
+message GetSyncedModRequest {
+  uint64 mod_id = 1;
+}
+
+message GetSyncedModResponse {
+  // Unset if mod_id isn't currently tracked as synced at all.
+  optional SyncedMod mod = 1;
+  repeated string source_ids = 2;
+}
+
+message GetSyncStatsRequest {}
+
+message GetSyncStatsResponse {
+  // Every currently-synced workshop mod's on-disk size, counted exactly
+  // once regardless of how many sources reference it -- `synced` is keyed
+  // by mod, not by source.
+  uint64 mods_bytes = 1;
+  // Base game + selected CDLC depot content on disk (not mod content).
+  uint64 game_files_bytes = 2;
+}
+
+message InvalidateModRequest {
+  uint64 mod_id = 1;
+}
+
+message InvalidateModResponse {}
 
 message RefreshSourceRequest {
   string source_id = 1;

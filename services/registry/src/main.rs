@@ -7,6 +7,7 @@ use axum::routing::get;
 use axum::{middleware, Router};
 use connectrpc::Router as ConnectRouter;
 use registry::config::Config;
+use registry::service::admin::AdminServiceImpl;
 use registry::service::mission::MissionServiceImpl;
 use registry::service::mod_source::ModSourceServiceImpl;
 use sync_client::SyncClient;
@@ -17,10 +18,22 @@ fn required_scope(path: &str) -> Option<&'static str> {
         "/registry.v1.ModSourceService/AddModSource" => Some("mod-sources:write"),
         "/registry.v1.ModSourceService/DeleteModSource" => Some("mod-sources:write"),
         "/registry.v1.ModSourceService/ListModSources" => Some("mod-sources:read"),
+        // Same scope as AddModSource -- re-resolve + sync whatever's
+        // already desired is relatively harmless, nothing destructive.
+        "/registry.v1.ModSourceService/SyncModSource" => Some("mod-sources:write"),
+        "/registry.v1.ModSourceService/ListSyncedMods" => Some("mod-sources:read"),
+        "/registry.v1.ModSourceService/GetSyncedMod" => Some("mod-sources:read"),
+        // Deliberately its own scope, distinct from mod-sources:write --
+        // even though it's non-destructive (cache-only, see the RPC's own
+        // doc), it's still a "force everyone to re-verify this" lever
+        // that's easy to misuse/abuse if handed out as casually as
+        // AddModSource.
+        "/registry.v1.ModSourceService/InvalidateMod" => Some("mod-sources:invalidate"),
         "/registry.v1.MissionService/UploadMission" => Some("missions:write"),
         "/registry.v1.MissionService/DeleteMission" => Some("missions:write"),
         "/registry.v1.MissionService/ListMissions" => Some("missions:read"),
         "/registry.v1.MissionService/GetMission" => Some("missions:read"),
+        "/registry.v1.AdminService/GetDiskUsage" => Some("admin:disk-usage"),
         _ => None,
     }
 }
@@ -40,13 +53,14 @@ async fn main() -> Result<()> {
     info!("connected to Postgres");
 
     let sync_client = Arc::new(SyncClient::new(&cfg.sync_daemon_url)?);
-    let mod_source_service = ModSourceServiceImpl::new(pool.clone(), sync_client, cfg.local_content_root.clone().into());
+    let mod_source_service = ModSourceServiceImpl::new(pool.clone(), sync_client.clone(), cfg.local_content_root.clone().into());
     let mission_service = MissionServiceImpl::new(pool.clone(), cfg.local_content_root.clone().into());
+    let admin_service = AdminServiceImpl::new(pool.clone(), sync_client);
 
     let verifier = JwtVerifier::fetch(&cfg.jwt).await?;
     let auth_state = Arc::new(AuthState { verifier, pool, required_scope });
 
-    let connect = ConnectRouter::new().add_service(mod_source_service).add_service(mission_service);
+    let connect = ConnectRouter::new().add_service(mod_source_service).add_service(mission_service).add_service(admin_service);
 
     // /healthz deliberately stays outside the auth layer -- health checks
     // shouldn't need a bearer token.

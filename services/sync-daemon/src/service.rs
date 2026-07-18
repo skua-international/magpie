@@ -5,8 +5,10 @@ use std::sync::{Arc, Mutex};
 use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest, ServiceResult};
 use protocol::proto::sync::v1::{
     ClaimJobState, ClaimRequest, ClaimResponse, DeregisterSourceRequest, DeregisterSourceResponse, GetClaimStatusRequest,
-    GetClaimStatusResponse, GetSourceModsRequest, GetSourceModsResponse, RefreshSourceRequest, RefreshSourceResponse,
-    RegisterSourceRequest, RegisterSourceResponse, ResolvedMod as ProtoResolvedMod, SyncService,
+    GetClaimStatusResponse, GetSourceModsRequest, GetSourceModsResponse, GetSyncStatsRequest, GetSyncStatsResponse,
+    GetSyncedModRequest, GetSyncedModResponse, InvalidateModRequest, InvalidateModResponse, ListSyncedModsRequest,
+    ListSyncedModsResponse, RefreshSourceRequest, RefreshSourceResponse, RegisterSourceRequest, RegisterSourceResponse,
+    ResolvedMod as ProtoResolvedMod, SyncService, SyncedMod,
 };
 use steam_sync::cache::SyncState;
 use steam_sync::steam::{self, CmPool, ResolvedMod, SyncTasks};
@@ -61,6 +63,9 @@ impl Shared {
         let mod_ids: Vec<u64> = outcome.mods.iter().map(|m| m.mod_id).collect();
         self.sync_state.upsert_source(source_id, candidate_ids)?;
         self.sync_state.set_source_mods(source_id, &mod_ids)?;
+        for m in &outcome.mods {
+            self.sync_state.record_mod_title(m.mod_id, &m.title);
+        }
 
         let root_title = match candidate_ids {
             [single] => outcome.candidate_titles.get(single).cloned().unwrap_or_default(),
@@ -227,5 +232,67 @@ impl SyncService for SyncServiceImpl {
             }
         };
         Response::ok(response)
+    }
+
+    async fn list_synced_mods<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        _request: ServiceRequest<'_, ListSyncedModsRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<ListSyncedModsResponse> + Send + use<'a>> {
+        let mods = self
+            .shared
+            .sync_state
+            .list_synced_mods()
+            .into_iter()
+            .map(|m| SyncedMod {
+                mod_id: m.mod_id,
+                manifest_id: m.manifest_id,
+                size_bytes: m.size_bytes,
+                title: m.title,
+                ..Default::default()
+            })
+            .collect();
+        Response::ok(ListSyncedModsResponse { mods, ..Default::default() })
+    }
+
+    async fn get_synced_mod<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        request: ServiceRequest<'_, GetSyncedModRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<GetSyncedModResponse> + Send + use<'a>> {
+        let mod_id = request.mod_id;
+        let m = self.shared.sync_state.get_synced_mod(mod_id).map(|m| SyncedMod {
+            mod_id: m.mod_id,
+            manifest_id: m.manifest_id,
+            size_bytes: m.size_bytes,
+            title: m.title,
+            ..Default::default()
+        });
+        let source_ids = self.shared.sync_state.sources_for_mod(mod_id);
+        Response::ok(GetSyncedModResponse { r#mod: m.into(), source_ids, ..Default::default() })
+    }
+
+    async fn get_sync_stats<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        _request: ServiceRequest<'_, GetSyncStatsRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<GetSyncStatsResponse> + Send + use<'a>> {
+        Response::ok(GetSyncStatsResponse {
+            mods_bytes: self.shared.sync_state.total_mods_size(),
+            game_files_bytes: self.shared.sync_state.total_game_files_size(),
+            ..Default::default()
+        })
+    }
+
+    async fn invalidate_mod<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        request: ServiceRequest<'_, InvalidateModRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<InvalidateModResponse> + Send + use<'a>> {
+        // Matches list_synced_mods'/sync_key's own key format: every Arma 3
+        // workshop item shares depot_id (consumer_appid) 107410.
+        let key = format!("107410/{}", request.mod_id);
+        self.shared.sync_state.invalidate(&key);
+        Response::ok(InvalidateModResponse::default())
     }
 }

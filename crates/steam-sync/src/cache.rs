@@ -7,6 +7,17 @@ use anyhow::{Context, Result};
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use steamdepot::cdn::DepotManifest;
 
+/// One workshop mod's synced state, as returned by
+/// [`SyncState::list_synced_mods`]/[`SyncState::get_synced_mod`].
+pub struct SyncedModRow {
+    pub mod_id: u64,
+    pub manifest_id: u64,
+    pub size_bytes: u64,
+    /// Empty if this mod was never seen via `record_mod_title` in this
+    /// cache's lifetime -- see that method's own doc.
+    pub title: String,
+}
+
 /// Cache lives alongside the actual downloaded content (`install_dir`,
 /// e.g. `/arma3/server`), not a separate Docker volume -- that path is
 /// already a host bind mount that survives container recreation (not just
@@ -181,7 +192,8 @@ impl SyncState {
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS synced (
                 key TEXT PRIMARY KEY,
-                manifest_id INTEGER NOT NULL
+                manifest_id INTEGER NOT NULL,
+                size_bytes INTEGER NOT NULL DEFAULT 0
             );
             CREATE TABLE IF NOT EXISTS locks (
                 key TEXT PRIMARY KEY,
@@ -196,7 +208,12 @@ impl SyncState {
                 source_id TEXT NOT NULL,
                 mod_id INTEGER NOT NULL,
                 PRIMARY KEY (source_id, mod_id)
-            );",
+            );
+            CREATE TABLE IF NOT EXISTS mod_titles (
+                mod_id INTEGER PRIMARY KEY,
+                title TEXT NOT NULL
+            );
+            ALTER TABLE synced ADD COLUMN IF NOT EXISTS size_bytes INTEGER NOT NULL DEFAULT 0;",
         )
         .context("failed to initialize sync state schema")?;
         Ok(Arc::new(Self { conn: Mutex::new(conn) }))
@@ -369,19 +386,160 @@ impl SyncState {
         }
     }
 
-    /// Record that `key` was just fully chunk-verified at `manifest_id`.
-    /// Call this only after [`steamdepot::download::sync_depot`] reports
-    /// success, never speculatively, since this is later trusted to skip
-    /// verification outright. Logs and swallows a write failure rather than
-    /// propagating it -- losing this run's persistence is a slower next
-    /// run, not a correctness problem worth failing an otherwise-successful
-    /// sync over.
-    pub fn mark_synced(&self, key: &str, manifest_id: u64) {
+    /// Clear `key`'s "last verified" marker only -- never touches files on
+    /// disk. The next resolve pass then genuinely re-verifies this key's
+    /// chunks against Steam's current manifest (via
+    /// `steamdepot::download::sync_depot`, which always verifies before
+    /// downloading anything -- see `download_one_depot`'s own comment),
+    /// redownloading only whatever's actually missing or divergent, not a
+    /// blind full wipe-and-refetch. This is the deliberately
+    /// non-destructive half of "force refresh a mod" -- the caller-facing
+    /// API surface (registry's `InvalidateMod`) is intentionally
+    /// restricted to exactly this, not real file deletion.
+    pub fn invalidate(&self, key: &str) {
+        let conn = self.conn.lock().unwrap();
+        if let Err(e) = conn.execute("DELETE FROM synced WHERE key = ?1", [key]) {
+            tracing::warn!("failed to invalidate sync state for {key}: {e:#}");
+        }
+    }
+
+    /// Every currently-tracked workshop mod ID with its manifest_id,
+    /// on-disk size, and title (empty if never seen by
+    /// `record_mod_title`). Filtered to depot_id 107410 specifically --
+    /// every Arma 3 workshop item shares that as its `consumer_appid`
+    /// (see `sync_key`'s doc), which is how this distinguishes mod
+    /// entries from server/CDLC depot entries (under app 233780) in the
+    /// same table.
+    pub fn list_synced_mods(&self) -> Vec<SyncedModRow> {
+        const WORKSHOP_CONSUMER_APP_ID: &str = "107410";
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = match conn.prepare(
+            "SELECT s.key, s.manifest_id, s.size_bytes, COALESCE(t.title, '')
+             FROM synced s LEFT JOIN mod_titles t ON t.mod_id = CAST(substr(s.key, instr(s.key, '/') + 1) AS INTEGER)",
+        ) {
+            Ok(stmt) => stmt,
+            Err(e) => {
+                tracing::warn!("failed to prepare list_synced_mods query: {e:#}");
+                return Vec::new();
+            }
+        };
+        let rows = stmt.query_map([], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)? as u64, r.get::<_, i64>(2)? as u64, r.get::<_, String>(3)?))
+        });
+        match rows {
+            Ok(rows) => rows
+                .filter_map(|r| r.ok())
+                .filter_map(|(key, manifest_id, size_bytes, title)| {
+                    let (depot, leaf) = key.split_once('/')?;
+                    if depot != WORKSHOP_CONSUMER_APP_ID {
+                        return None;
+                    }
+                    leaf.parse::<u64>().ok().map(|mod_id| SyncedModRow { mod_id, manifest_id, size_bytes, title })
+                })
+                .collect(),
+            Err(e) => {
+                tracing::warn!("failed to read list_synced_mods rows: {e:#}");
+                Vec::new()
+            }
+        }
+    }
+
+    /// A single workshop mod's synced state, or `None` if it isn't
+    /// currently tracked as synced at all.
+    pub fn get_synced_mod(&self, mod_id: u64) -> Option<SyncedModRow> {
+        self.list_synced_mods().into_iter().find(|m| m.mod_id == mod_id)
+    }
+
+    /// Every source_id currently referencing `mod_id` -- a mod can be
+    /// shared by more than one source (see `source_mods`'s own doc).
+    pub fn sources_for_mod(&self, mod_id: u64) -> Vec<String> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = match conn.prepare("SELECT source_id FROM source_mods WHERE mod_id = ?1") {
+            Ok(stmt) => stmt,
+            Err(e) => {
+                tracing::warn!("failed to prepare sources_for_mod query: {e:#}");
+                return Vec::new();
+            }
+        };
+        stmt.query_map([mod_id as i64], |r| r.get::<_, String>(0))
+            .map(|rows| rows.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default()
+    }
+
+    /// Total on-disk bytes across every currently-synced workshop mod,
+    /// each counted exactly once regardless of how many sources reference
+    /// it -- `synced` is keyed by mod, not by source, so this is naturally
+    /// deduplicated already.
+    pub fn total_mods_size(&self) -> u64 {
+        self.list_synced_mods().iter().map(|m| m.size_bytes).sum()
+    }
+
+    /// Total on-disk bytes of every currently-synced server/CDLC depot
+    /// entry (the base game + selected CDLCs) -- everything in `synced`
+    /// that *isn't* a workshop mod (see `list_synced_mods`'s filter).
+    pub fn total_game_files_size(&self) -> u64 {
+        const WORKSHOP_CONSUMER_APP_ID: &str = "107410";
+        self.snapshot_with_size()
+            .into_iter()
+            .filter(|(key, _)| !key.starts_with(&format!("{WORKSHOP_CONSUMER_APP_ID}/")))
+            .map(|(_, size_bytes)| size_bytes)
+            .sum()
+    }
+
+    fn snapshot_with_size(&self) -> Vec<(String, u64)> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = match conn.prepare("SELECT key, size_bytes FROM synced") {
+            Ok(stmt) => stmt,
+            Err(e) => {
+                tracing::warn!("failed to prepare snapshot_with_size query: {e:#}");
+                return Vec::new();
+            }
+        };
+        let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)? as u64)));
+        match rows {
+            Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+            Err(e) => {
+                tracing::warn!("failed to read snapshot_with_size rows: {e:#}");
+                Vec::new()
+            }
+        }
+    }
+
+    /// Record/refresh a workshop mod's display title, seen from a real
+    /// `resolve_source_ids`/`resolve_workshop_items` result -- the only
+    /// place titles are ever known. Best-effort: a mod that's synced but
+    /// was never resolved through either of those in this process' cache
+    /// lifetime just has an empty title in `list_synced_mods`/
+    /// `get_synced_mod` until the next time it is.
+    pub fn record_mod_title(&self, mod_id: u64, title: &str) {
+        if title.is_empty() {
+            return;
+        }
         let conn = self.conn.lock().unwrap();
         let result = conn.execute(
-            "INSERT INTO synced (key, manifest_id) VALUES (?1, ?2)
-             ON CONFLICT(key) DO UPDATE SET manifest_id = excluded.manifest_id",
-            params![key, manifest_id as i64],
+            "INSERT INTO mod_titles (mod_id, title) VALUES (?1, ?2)
+             ON CONFLICT(mod_id) DO UPDATE SET title = excluded.title",
+            params![mod_id as i64, title],
+        );
+        if let Err(e) = result {
+            tracing::warn!("failed to record title for mod {mod_id}: {e:#}");
+        }
+    }
+
+    /// Record that `key` was just fully chunk-verified at `manifest_id`,
+    /// with its current on-disk size. Call this only after
+    /// [`steamdepot::download::sync_depot`] reports success, never
+    /// speculatively, since this is later trusted to skip verification
+    /// outright. Logs and swallows a write failure rather than propagating
+    /// it -- losing this run's persistence is a slower next run, not a
+    /// correctness problem worth failing an otherwise-successful sync
+    /// over.
+    pub fn mark_synced(&self, key: &str, manifest_id: u64, size_bytes: u64) {
+        let conn = self.conn.lock().unwrap();
+        let result = conn.execute(
+            "INSERT INTO synced (key, manifest_id, size_bytes) VALUES (?1, ?2, ?3)
+             ON CONFLICT(key) DO UPDATE SET manifest_id = excluded.manifest_id, size_bytes = excluded.size_bytes",
+            params![key, manifest_id as i64, size_bytes as i64],
         );
         if let Err(e) = result {
             tracing::warn!("failed to persist sync state for {key}: {e:#}");

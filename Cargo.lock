@@ -3088,6 +3088,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+ "walkdir",
  "workshop-parse",
  "zip 8.6.0",
 ]

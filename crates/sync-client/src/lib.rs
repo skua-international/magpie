@@ -4,8 +4,9 @@
 
 use connectrpc::client::{ClientConfig, HttpClient};
 use protocol::proto::sync::v1::{
-    ClaimJobState, ClaimRequest, DeregisterSourceRequest, GetClaimStatusRequest, GetSourceModsRequest, RefreshSourceRequest,
-    RegisterSourceRequest, SyncServiceClient,
+    ClaimJobState, ClaimRequest, DeregisterSourceRequest, GetClaimStatusRequest, GetSourceModsRequest, GetSyncStatsRequest,
+    GetSyncedModRequest, InvalidateModRequest, ListSyncedModsRequest, RefreshSourceRequest, RegisterSourceRequest,
+    SyncServiceClient,
 };
 
 pub struct SyncClient {
@@ -16,6 +17,18 @@ pub enum ClaimStatus {
     Running,
     Done { claim_path: String },
     Failed { error: String },
+}
+
+pub struct SyncedMod {
+    pub mod_id: u64,
+    pub manifest_id: u64,
+    pub size_bytes: u64,
+    pub title: String,
+}
+
+pub struct SyncStats {
+    pub mods_bytes: u64,
+    pub game_files_bytes: u64,
 }
 
 pub struct RegisterSourceResult {
@@ -91,6 +104,63 @@ impl SyncClient {
     pub async fn claim(&self) -> anyhow::Result<String> {
         let response = self.inner.claim(ClaimRequest::default()).await.map_err(|e| anyhow::anyhow!("Claim failed: {e}"))?;
         Ok(response.view().job_id.to_string())
+    }
+
+    /// Every currently-tracked workshop mod ID and the manifest_id it was
+    /// last verified at.
+    pub async fn list_synced_mods(&self) -> anyhow::Result<Vec<SyncedMod>> {
+        let response = self
+            .inner
+            .list_synced_mods(ListSyncedModsRequest::default())
+            .await
+            .map_err(|e| anyhow::anyhow!("ListSyncedMods failed: {e}"))?;
+        Ok(response
+            .view()
+            .mods
+            .iter()
+            .map(|m| SyncedMod { mod_id: m.mod_id, manifest_id: m.manifest_id, size_bytes: m.size_bytes, title: m.title.to_string() })
+            .collect())
+    }
+
+    /// A single mod's synced state (`None` if not currently tracked as
+    /// synced) plus every source_id currently referencing it.
+    pub async fn get_synced_mod(&self, mod_id: u64) -> anyhow::Result<(Option<SyncedMod>, Vec<String>)> {
+        let response = self
+            .inner
+            .get_synced_mod(GetSyncedModRequest { mod_id, ..Default::default() })
+            .await
+            .map_err(|e| anyhow::anyhow!("GetSyncedMod failed: {e}"))?;
+        let view = response.view();
+        let m = view.r#mod.as_option().map(|m| SyncedMod {
+            mod_id: m.mod_id,
+            manifest_id: m.manifest_id,
+            size_bytes: m.size_bytes,
+            title: m.title.to_string(),
+        });
+        Ok((m, view.source_ids.iter().map(|s| s.to_string()).collect()))
+    }
+
+    /// Clear one mod's "last verified" marker -- never deletes its files.
+    /// The next resolve pass genuinely re-verifies it against Steam's
+    /// current manifest, redownloading only whatever's missing/divergent.
+    pub async fn invalidate_mod(&self, mod_id: u64) -> anyhow::Result<()> {
+        self.inner
+            .invalidate_mod(InvalidateModRequest { mod_id, ..Default::default() })
+            .await
+            .map_err(|e| anyhow::anyhow!("InvalidateMod failed: {e}"))?;
+        Ok(())
+    }
+
+    /// Cluster-wide totals: every synced mod's size deduplicated across
+    /// sources, plus base game/CDLC depot size.
+    pub async fn sync_stats(&self) -> anyhow::Result<SyncStats> {
+        let response = self
+            .inner
+            .get_sync_stats(GetSyncStatsRequest::default())
+            .await
+            .map_err(|e| anyhow::anyhow!("GetSyncStats failed: {e}"))?;
+        let view = response.view();
+        Ok(SyncStats { mods_bytes: view.mods_bytes, game_files_bytes: view.game_files_bytes })
     }
 
     pub async fn claim_status(&self, job_id: &str) -> anyhow::Result<ClaimStatus> {

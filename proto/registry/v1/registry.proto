@@ -18,6 +18,32 @@ service ModSourceService {
   rpc AddModSource(AddModSourceRequest) returns (AddModSourceResponse);
   rpc DeleteModSource(DeleteModSourceRequest) returns (DeleteModSourceResponse);
   rpc ListModSources(ListModSourcesRequest) returns (ListModSourcesResponse);
+
+  // Force one source to be re-resolved and a claim job started covering
+  // the full current desired state -- doesn't wait for the claim to
+  // finish, same fire-and-forget shape as sync-daemon's own Claim(). Same
+  // scope as AddModSource: this is a relatively harmless operation
+  // (re-resolve + sync whatever's actually desired, nothing destructive).
+  rpc SyncModSource(SyncModSourceRequest) returns (SyncModSourceResponse);
+
+  // Every workshop mod ID currently tracked as verified-synced, and the
+  // manifest_id it was last verified at -- independent of any source
+  // (a mod can outlive/predate the source that first pulled it in).
+  rpc ListSyncedMods(ListSyncedModsRequest) returns (ListSyncedModsResponse);
+
+  // Clear one mod's verification cache only -- never deletes its files.
+  // The next sync genuinely re-verifies it against Steam's current
+  // manifest, redownloading only whatever's actually missing or
+  // divergent. Deliberately not real file deletion (see the RPC's own
+  // restricted scope, distinct from mod-sources:write) -- a mod can be
+  // shared by other sources or by servers currently running content
+  // claimed from it, and a claim is its own independent copy that's never
+  // touched by anything done to the shared golden tree afterward.
+  rpc InvalidateMod(InvalidateModRequest) returns (InvalidateModResponse);
+
+  // A single mod's synced state (title, on-disk size) plus every mod
+  // source currently referencing it.
+  rpc GetSyncedMod(GetSyncedModRequest) returns (GetSyncedModResponse);
 }
 
 message AddModSourceRequest {
@@ -56,6 +82,49 @@ message DeleteModSourceRequest {
 
 message DeleteModSourceResponse {}
 
+message SyncModSourceRequest {
+  string id = 1;
+}
+
+message SyncModSourceResponse {
+  // The claim job ID sync-daemon started -- purely informational, no RPC
+  // currently exposes polling it from this side; the next real Claim()
+  // (e.g. a server actually starting/restarting) will see the refreshed
+  // content either way.
+  string job_id = 1;
+}
+
+message ListSyncedModsRequest {}
+
+message SyncedMod {
+  uint64 mod_id = 1;
+  uint64 manifest_id = 2;
+  uint64 size_bytes = 3;
+  // Empty if this mod hasn't been resolved (RegisterSource/RefreshSource/
+  // the background poller) since sync-daemon last restarted.
+  string title = 4;
+}
+
+message ListSyncedModsResponse {
+  repeated SyncedMod mods = 1;
+}
+
+message InvalidateModRequest {
+  uint64 mod_id = 1;
+}
+
+message InvalidateModResponse {}
+
+message GetSyncedModRequest {
+  uint64 mod_id = 1;
+}
+
+message GetSyncedModResponse {
+  // Unset if mod_id isn't currently tracked as synced at all.
+  optional SyncedMod mod = 1;
+  repeated ModSourceInfo mod_sources = 2;
+}
+
 enum ModSourceKind {
   MOD_SOURCE_KIND_UNSPECIFIED = 0;
   MOD_SOURCE_KIND_MOD = 1;
@@ -79,6 +148,12 @@ message ModSourceInfo {
   // single title applies.
   string display_name = 4;
   int64 created_at_unix_ms = 5;
+  // Sum of on-disk size across every mod this source currently resolves
+  // to (local kind: the extracted zip's own directory size). A mod shared
+  // by more than one source counts fully toward each -- unlike
+  // GetDiskUsage's cluster-wide total, this is "how much does *this
+  // source* need", not a deduplicated figure.
+  uint64 size_bytes = 6;
 }
 
 message ListModSourcesRequest {}
@@ -125,6 +200,30 @@ message ListMissionsRequest {}
 
 message ListMissionsResponse {
   repeated MissionInfo missions = 1;
+}
+
+// Cluster-wide storage accounting, spanning both mod content (owned by
+// sync-daemon for Steam-backed sources, this service's own storage for
+// local ones) and missions (this service's own storage) -- the one place
+// that answers "how much disk is all of this actually using" as a single
+// figure, rather than callers having to sum ModSourceInfo.size_bytes
+// themselves (which double-counts any mod shared by more than one
+// source).
+service AdminService {
+  rpc GetDiskUsage(GetDiskUsageRequest) returns (GetDiskUsageResponse);
+}
+
+message GetDiskUsageRequest {}
+
+message GetDiskUsageResponse {
+  // Every currently-synced workshop mod's on-disk size, counted exactly
+  // once regardless of how many mod sources reference it.
+  uint64 mods_bytes = 1;
+  // Every uploaded mission's stored file size.
+  uint64 missions_bytes = 2;
+  // Base game + selected CDLC depot content (not mod/mission content).
+  uint64 game_files_bytes = 3;
+  uint64 total_bytes = 4;
 }
 
 message DeleteMissionRequest {

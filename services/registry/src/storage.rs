@@ -61,6 +61,21 @@ pub fn extract_local_mod(root: &Path, unique_id: &str, zip_bytes: &[u8]) -> Resu
     Ok(dest)
 }
 
+/// Total bytes of every regular file under a local mod's own directory --
+/// local mods have no separate size bookkeeping (unlike Steam-backed
+/// mods, tracked in sync-daemon's SyncState at sync time), so this is a
+/// live directory walk on each call.
+pub fn local_mod_size(root: &Path, unique_id: &str) -> u64 {
+    let dir = local_mods_dir(root).join(unique_id);
+    walkdir::WalkDir::new(&dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
+        .filter_map(|e| e.metadata().ok())
+        .map(|m| m.len())
+        .sum()
+}
+
 pub fn delete_local_mod(root: &Path, unique_id: &str) -> Result<()> {
     validate_path_component(unique_id)?;
     let dest = local_mods_dir(root).join(unique_id);

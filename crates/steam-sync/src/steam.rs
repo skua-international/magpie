@@ -1243,7 +1243,11 @@ pub(crate) async fn download_one_depot(
         .await
         .with_context(|| format!("failed to set executable bits under {}", install_dir.display()))?;
 
-    sync_state.mark_synced(&sync_key, manifest_id);
+    let size_bytes = dir_size(&install_dir).await.unwrap_or_else(|e| {
+        warn!("[{tag}] failed to compute on-disk size, recording 0: {e:#}");
+        0
+    });
+    sync_state.mark_synced(&sync_key, manifest_id, size_bytes);
 
     Ok(())
 }
@@ -1275,6 +1279,25 @@ fn lowercase_tree_blocking(dir: &std::path::Path) -> Result<()> {
         std::fs::rename(path, &dest).with_context(|| format!("failed to rename {} to {lower}", path.display()))?;
     }
     Ok(())
+}
+
+/// Total bytes of every regular file under `dir`, recursively -- used to
+/// record a synced depot/mod's on-disk footprint alongside its
+/// verified-manifest marker, so disk-usage queries are a plain read of
+/// `SyncState` rather than a live directory walk on every call.
+async fn dir_size(dir: &std::path::Path) -> Result<u64> {
+    let dir = dir.to_path_buf();
+    tokio::task::spawn_blocking(move || {
+        Ok(walkdir::WalkDir::new(&dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_type().is_file())
+            .filter_map(|e| e.metadata().ok())
+            .map(|m| m.len())
+            .sum())
+    })
+    .await
+    .context("dir_size task panicked")?
 }
 
 /// Known Linux server binary names Arma 3's dedicated server depot
