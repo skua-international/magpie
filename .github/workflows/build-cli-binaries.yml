@@ -2,21 +2,11 @@ name: Build CLI binaries
 
 # Main-branch pushes build snapshot CLI binaries for validation. Publishing
 # remains tag-only in release-cli.yml; this workflow never uploads release
-# assets.
+# assets. In the monorepo model, every main push rebuilds every artifact
+# family so nothing depends on path-filtered trigger coverage.
 on:
   push:
     branches: [main]
-    paths:
-      - "cli/magpie/**"
-      - "generated/go/**"
-      - "proto/**"
-      - ".github/workflows/build-cli-binaries.yml"
-      - ".github/workflows/release.yml"
-      - "release.config.js"
-      - "generated/go/go.mod"
-      - "generated/go/go.sum"
-      - "Cargo.toml"
-      - "Cargo.lock"
   workflow_dispatch: {}
 
 concurrency:

@@ -1,27 +1,19 @@
 name: Build and push images
 
-# Push-triggered on main for regular commit builds. Main keeps the fast
-# branch/sha/latest images flowing; release tags are handled by a separate
-# tag-only workflow so the promotion step cannot be filtered away by the
-# branch path rules here.
+# Push-triggered on every main push for regular commit builds. Main keeps
+# the fast branch/sha/latest images flowing; release tags are handled by a
+# separate tag-only workflow so the promotion step cannot be filtered away
+# by path rules here.
 #
 # Nothing here depends on generated/go or generated/ts (only cli/magpie
 # and a future website would) -- crates/protocol's build.rs shells out to
 # protoc directly against proto/ at `cargo build` time, so every service
 # image here regenerates its own Rust bindings fresh on every build
 # regardless of whether release.yml has run yet. That's what makes
-# triggering directly off proto/service/chart changes safe at all.
+# triggering directly off a monorepo-wide main push safe at all.
 on:
   push:
     branches: [main]
-    paths:
-      - "services/**"
-      - "crates/**"
-      - "proto/**"
-      - "charts/**"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - ".github/workflows/build-images.yml"
   workflow_dispatch: {}
 
 concurrency:
@@ -102,4 +94,4 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=cargo-${{ github.ref_name }}
           cache-to: type=gha,mode=max,scope=cargo-${{ github.ref_name }}
-# End of branch-only image build workflow.
+# End of main-branch image build workflow.
