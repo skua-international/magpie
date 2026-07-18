@@ -52,10 +52,19 @@ jobs:
   # exactly against runtime.GOOS/GOARCH, no translation table needed.
   #
   # One native runner per OS rather than cross-compiling everything from
-  # a single Linux runner: macOS/Windows targets build with their
-  # platform's own real toolchain (no osxcross/mingw setup), and the only
-  # actual cross-compilation here is linux/arm64 from an amd64 runner,
-  # which just needs a cross-linker apt already has a package for.
+  # a single Linux runner: macOS targets build with their platform's own
+  # real toolchain (no osxcross setup), and the only actual cross-
+  # compilation here is linux/arm64 from an amd64 runner, which just
+  # needs a cross-linker apt already has a package for.
+  #
+  # Windows target included since steamdepot@2986921 -- crates/steam-sync's
+  # pinned git dependency used to use Unix-only APIs unconditionally in
+  # download.rs (confirmed via a real failed build here, not a guess),
+  # which meant the whole crate failed to compile for Windows at all.
+  # Fixed upstream (we own that fork): FileExt::read_at ->
+  # a cfg-gated read_at()/seek_read() wrapper, PermissionsExt::from_mode
+  # cfg(unix)-gated outright (no Windows equivalent to translate the
+  # executable bit to), tokio::fs::symlink -> symlink_file on Windows.
   steam-login:
     strategy:
       fail-fast: false
