@@ -5,7 +5,7 @@ edition.workspace = true
 
 [dependencies]
 connectrpc = "0.8"
-buffa = "0.8"
+buffa = "0.9"
 serde = "1"
 
 [build-dependencies]
