@@ -37,6 +37,11 @@
 #                           --set postgres.existingSecret=arma-postgres-creds \
 #                           --set syncDaemon.steamAuth.existingSecret=arma-steam-creds \
 #                           --set imagePullSecrets='{ghcr-pull-secret}'
+#                       (syncDaemon.steamAuth.existingSecret is optional --
+#                       omit it and bootstrap Steam auth after install with
+#                       `magpie admin refresh-steam-auth` instead. ingress.
+#                       baseDomain defaults to magpie.local; override it too
+#                       if your host uses a different one.)
 #   --dry-run          Render and diff without actually applying anything
 #   --debug            Pass Helm's verbose/debug output through for chart
 #                      pull, values fetch, and upgrade

@@ -34,24 +34,75 @@ Kubernetes-native orchestration for Arma 3 dedicated servers: mod/collection syn
 - **`registry`** — JWT-authenticated mod source registry (a Steam mod, a collection, a preset export, or a locally-uploaded zip mod) and mission (`.pbo`) storage. Never touches the Kubernetes API.
 - **`identity`** — OAuth2 login (Discord/GitHub/Google) and Steam login (OpenID 2.0 — Steam never adopted OIDC), account linking, and JWT issuance for every JWT-gated service above to verify. The first person to ever sign in is automatically granted every permission.
 
-All inter-service and client-facing APIs are [ConnectRPC](https://connectrpc.com/) (`proto/`). Cluster state lives in one shared Postgres instance (mod sources, missions, ACL grants, identities) plus `hostPath` volumes sized for this project's single-node k3s target — see `charts/magpie/values.yaml`'s `hostPaths` comment for why that's a deliberate choice, not just the easy one.
+All inter-service and client-facing APIs are [ConnectRPC](https://connectrpc.com/) (`proto/`). Mod sources (`ModSource`) and servers (`ArmaServer`) are Kubernetes CRDs, not database rows — `kubectl get modsources`/`kubectl get armaservers` shows live state directly, and `sync-daemon`/`controller` reconcile them the same way any other operator would. Postgres holds what's left: missions, ACL grants, and identities. Everything sits on `hostPath` volumes sized for this project's single-node k3s target — see `charts/magpie/values.yaml`'s `hostPaths` comment for why that's a deliberate choice, not just the easy one.
 
 ## Deploying
 
+First install, on a fresh host with no Kubernetes yet:
+
 ```bash
-./deploy/k3s-bootstrap.sh   # installs k3s on a fresh single-node host, prints the helm install command
+./deploy/k3s-bootstrap.sh   # installs k3s, checks the data dir's filesystem, walks through required secrets
 ```
 
-The script walks through the required secrets (Steam credentials, the shared Postgres password, optional OAuth2 app credentials) and installs `charts/magpie`. See the chart's `values.yaml` for every knob — most have sane defaults.
+It ends by printing the exact `scripts/deploy.sh --install` invocation to run, with every `--set` you'll actually need filled in.
+
+Upgrades (including the very first install, via `--install`) all go through one script:
+
+```bash
+./scripts/deploy.sh                       # deploy this checkout's own chart version, same image tag
+./scripts/deploy.sh 1.5.0                 # deploy a specific published version
+./scripts/deploy.sh --image-tag c5130c2   # keep the chart version, swap just the images (e.g. testing an unreleased commit)
+./scripts/deploy.sh --dry-run             # render + preflight without applying anything
+```
+
+It pulls the chart from its OCI publish (`oci://ghcr.io/skua-international/magpie/charts/magpie`) rather than the local checkout, so it always deploys the exact artifact CI published for that version — never a locally-edited template that hasn't gone through CI. See `scripts/deploy.sh --help` for the rest (namespace/release name overrides, preflighting that the target image tags actually exist in GHCR before touching anything, etc). See the chart's `values.yaml` for every knob — most have sane defaults.
+
+### Steam authentication
+
+`syncDaemon.steamAuth.existingSecret` only bootstraps the *first* session. From then on (or instead, skipping that Secret entirely) run `magpie admin refresh-steam-auth` — it's a normal interactive Steam login (username + password, with a Steam Guard code prompt if 2FA kicks in) using whatever real Steam account you give it. The password itself is never stored; only the resulting refresh token is, in the `arma-steam-session` Secret, and that's what sync-daemon uses as the cluster's Steam identity for every workshop/depot operation from then on.
+
+This isn't elevated access — visibility into private/unlisted mods and collections is scoped to whatever that specific Steam account can actually see (its own subscriptions, friends-only shares, etc.), same as browsing the Workshop as that account normally would. Use an account that's actually subscribed to / has visibility into whatever private content the servers need.
+
+## Installing the CLI
+
+`magpie` is both a direct CLI (`magpie servers list`, `magpie login`, ...) and, run with no subcommand, an interactive TUI — everything the TUI can do is also a direct invocation, and vice versa (see `cli/magpie/internal/actions`, the one implementation both surfaces call into).
+
+Download a prebuilt binary from [the latest release](https://github.com/skua-international/magpie/releases/latest):
+
+```bash
+# Linux/macOS -- picks the right archive for your OS/arch automatically
+os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+arch="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')"
+curl -sL "https://github.com/skua-international/magpie/releases/latest/download/magpie_${os}_${arch}.tar.gz" \
+  | tar xz -C /usr/local/bin magpie
+```
+
+Windows: download `magpie_windows_amd64.zip` from the releases page directly.
+
+Then point it at your cluster and log in:
+
+```bash
+magpie --identity-url http://identity.magpie.local \
+       --server-api-url http://server-api.magpie.local \
+       --registry-url http://registry.magpie.local \
+       auth login
+magpie completion install   # optional -- bash/zsh/fish/powershell autocompletion
+```
+
+(Those base URLs are this chart's own `ingress.baseDomain` default, `magpie.local` — override to match whatever you actually set at install time.)
+
+Building from source instead (e.g. to run an unreleased commit): `cd cli/magpie && go install ./cmd/magpie` -- only works from within a clone of this monorepo, since `cli/magpie`'s `go.mod` points at `generated/go` via a relative `replace` directive rather than a published module.
 
 ## Repo layout
 
 ```
 crates/            shared library crates (steam-sync, registry-db, authn, protocol, crd, ...)
 services/          the six binaries described above
+cli/magpie/        the magpie CLI/TUI (Go)
 proto/             ConnectRPC service definitions
 charts/magpie/      the Helm chart
 deploy/            k3s-bootstrap.sh
+scripts/           deploy.sh, bump-version.sh
 configs/           example main.cfg/basic.cfg to seed a server's operator-provided config directory
 ```
 
