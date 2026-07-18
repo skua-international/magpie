@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file sync/v1/sync.proto.
  */
 export const file_sync_v1_sync: GenFile = /*@__PURE__*/
-  fileDesc("ChJzeW5jL3YxL3N5bmMucHJvdG8SB3N5bmMudjEiFwoVTGlzdFN5bmNlZE1vZHNSZXF1ZXN0IlMKCVN5bmNlZE1vZBIOCgZtb2RfaWQYASABKAQSEwoLbWFuaWZlc3RfaWQYAiABKAQSEgoKc2l6ZV9ieXRlcxgDIAEoBBINCgV0aXRsZRgEIAEoCSI6ChZMaXN0U3luY2VkTW9kc1Jlc3BvbnNlEiAKBG1vZHMYASADKAsyEi5zeW5jLnYxLlN5bmNlZE1vZCIlChNHZXRTeW5jZWRNb2RSZXF1ZXN0Eg4KBm1vZF9pZBgBIAEoBCJYChRHZXRTeW5jZWRNb2RSZXNwb25zZRIkCgNtb2QYASABKAsyEi5zeW5jLnYxLlN5bmNlZE1vZEgAiAEBEhIKCnNvdXJjZV9pZHMYAiADKAlCBgoEX21vZCIVChNHZXRTeW5jU3RhdHNSZXF1ZXN0IkQKFEdldFN5bmNTdGF0c1Jlc3BvbnNlEhIKCm1vZHNfYnl0ZXMYASABKAQSGAoQZ2FtZV9maWxlc19ieXRlcxgCIAEoBCJlChdSZWZyZXNoU3RlYW1BdXRoUmVxdWVzdBIQCgh1c2VybmFtZRgBIAEoCRIQCghwYXNzd29yZBgCIAEoCRIXCgpndWFyZF9jb2RlGAMgASgJSACIAQFCDQoLX2d1YXJkX2NvZGUiQwoYUmVmcmVzaFN0ZWFtQXV0aFJlc3BvbnNlEhMKC25lZWRzX2d1YXJkGAEgASgIEhIKCmd1YXJkX3R5cGUYAiABKAkiJgoUSW52YWxpZGF0ZU1vZFJlcXVlc3QSDgoGbW9kX2lkGAEgASgEIhcKFUludmFsaWRhdGVNb2RSZXNwb25zZSIpChRSZWZyZXNoU291cmNlUmVxdWVzdBIRCglzb3VyY2VfaWQYASABKAkiOwoVUmVmcmVzaFNvdXJjZVJlc3BvbnNlEiIKBG1vZHMYASADKAsyFC5zeW5jLnYxLlJlc29sdmVkTW9kIikKFEdldFNvdXJjZU1vZHNSZXF1ZXN0EhEKCXNvdXJjZV9pZBgBIAEoCSIoChVHZXRTb3VyY2VNb2RzUmVzcG9uc2USDwoHbW9kX2lkcxgBIAMoBCJBChVSZWdpc3RlclNvdXJjZVJlcXVlc3QSFQoNY2FuZGlkYXRlX2lkcxgBIAMoBBIRCglzb3VyY2VfaWQYAiABKAkiLAoLUmVzb2x2ZWRNb2QSDgoGbW9kX2lkGAEgASgEEg0KBXRpdGxlGAIgASgJIlAKFlJlZ2lzdGVyU291cmNlUmVzcG9uc2USIgoEbW9kcxgBIAMoCzIULnN5bmMudjEuUmVzb2x2ZWRNb2QSEgoKcm9vdF90aXRsZRgCIAEoCSIsChdEZXJlZ2lzdGVyU291cmNlUmVxdWVzdBIRCglzb3VyY2VfaWQYASABKAkiGgoYRGVyZWdpc3RlclNvdXJjZVJlc3BvbnNlIg4KDENsYWltUmVxdWVzdCIfCg1DbGFpbVJlc3BvbnNlEg4KBmpvYl9pZBgBIAEoCSInChVHZXRDbGFpbVN0YXR1c1JlcXVlc3QSDgoGam9iX2lkGAEgASgJImIKFkdldENsYWltU3RhdHVzUmVzcG9uc2USJQoFc3RhdGUYASABKA4yFi5zeW5jLnYxLkNsYWltSm9iU3RhdGUSEgoKY2xhaW1fcGF0aBgCIAEoCRINCgVlcnJvchgDIAEoCSqDAQoNQ2xhaW1Kb2JTdGF0ZRIfChtDTEFJTV9KT0JfU1RBVEVfVU5TUEVDSUZJRUQQABIbChdDTEFJTV9KT0JfU1RBVEVfUlVOTklORxABEhgKFENMQUlNX0pPQl9TVEFURV9ET05FEAISGgoWQ0xBSU1fSk9CX1NUQVRFX0ZBSUxFRBADMvoGCgtTeW5jU2VydmljZRJRCg5SZWdpc3RlclNvdXJjZRIeLnN5bmMudjEuUmVnaXN0ZXJTb3VyY2VSZXF1ZXN0Gh8uc3luYy52MS5SZWdpc3RlclNvdXJjZVJlc3BvbnNlElcKEERlcmVnaXN0ZXJTb3VyY2USIC5zeW5jLnYxLkRlcmVnaXN0ZXJTb3VyY2VSZXF1ZXN0GiEuc3luYy52MS5EZXJlZ2lzdGVyU291cmNlUmVzcG9uc2USNgoFQ2xhaW0SFS5zeW5jLnYxLkNsYWltUmVxdWVzdBoWLnN5bmMudjEuQ2xhaW1SZXNwb25zZRJRCg5HZXRDbGFpbVN0YXR1cxIeLnN5bmMudjEuR2V0Q2xhaW1TdGF0dXNSZXF1ZXN0Gh8uc3luYy52MS5HZXRDbGFpbVN0YXR1c1Jlc3BvbnNlEk4KDUdldFNvdXJjZU1vZHMSHS5zeW5jLnYxLkdldFNvdXJjZU1vZHNSZXF1ZXN0Gh4uc3luYy52MS5HZXRTb3VyY2VNb2RzUmVzcG9uc2USTgoNUmVmcmVzaFNvdXJjZRIdLnN5bmMudjEuUmVmcmVzaFNvdXJjZVJlcXVlc3QaHi5zeW5jLnYxLlJlZnJlc2hTb3VyY2VSZXNwb25zZRJRCg5MaXN0U3luY2VkTW9kcxIeLnN5bmMudjEuTGlzdFN5bmNlZE1vZHNSZXF1ZXN0Gh8uc3luYy52MS5MaXN0U3luY2VkTW9kc1Jlc3BvbnNlEk4KDUludmFsaWRhdGVNb2QSHS5zeW5jLnYxLkludmFsaWRhdGVNb2RSZXF1ZXN0Gh4uc3luYy52MS5JbnZhbGlkYXRlTW9kUmVzcG9uc2USSwoMR2V0U3luY2VkTW9kEhwuc3luYy52MS5HZXRTeW5jZWRNb2RSZXF1ZXN0Gh0uc3luYy52MS5HZXRTeW5jZWRNb2RSZXNwb25zZRJLCgxHZXRTeW5jU3RhdHMSHC5zeW5jLnYxLkdldFN5bmNTdGF0c1JlcXVlc3QaHS5zeW5jLnYxLkdldFN5bmNTdGF0c1Jlc3BvbnNlElcKEFJlZnJlc2hTdGVhbUF1dGgSIC5zeW5jLnYxLlJlZnJlc2hTdGVhbUF1dGhSZXF1ZXN0GiEuc3luYy52MS5SZWZyZXNoU3RlYW1BdXRoUmVzcG9uc2VCQlpAZ2l0aHViLmNvbS9za3VhLWludGVybmF0aW9uYWwvbWFncGllL2dlbmVyYXRlZC9nby9zeW5jL3YxO3N5bmN2MWIGcHJvdG8z");
+  fileDesc("ChJzeW5jL3YxL3N5bmMucHJvdG8SB3N5bmMudjEiFwoVTGlzdFN5bmNlZE1vZHNSZXF1ZXN0IlMKCVN5bmNlZE1vZBIOCgZtb2RfaWQYASABKAQSEwoLbWFuaWZlc3RfaWQYAiABKAQSEgoKc2l6ZV9ieXRlcxgDIAEoBBINCgV0aXRsZRgEIAEoCSI6ChZMaXN0U3luY2VkTW9kc1Jlc3BvbnNlEiAKBG1vZHMYASADKAsyEi5zeW5jLnYxLlN5bmNlZE1vZCIlChNHZXRTeW5jZWRNb2RSZXF1ZXN0Eg4KBm1vZF9pZBgBIAEoBCJYChRHZXRTeW5jZWRNb2RSZXNwb25zZRIkCgNtb2QYASABKAsyEi5zeW5jLnYxLlN5bmNlZE1vZEgAiAEBEhIKCnNvdXJjZV9pZHMYAiADKAlCBgoEX21vZCIVChNHZXRTeW5jU3RhdHNSZXF1ZXN0IkQKFEdldFN5bmNTdGF0c1Jlc3BvbnNlEhIKCm1vZHNfYnl0ZXMYASABKAQSGAoQZ2FtZV9maWxlc19ieXRlcxgCIAEoBCJCChdSZWZyZXNoU3RlYW1BdXRoUmVxdWVzdBIQCgh1c2VybmFtZRgBIAEoCRIVCg1yZWZyZXNoX3Rva2VuGAIgASgJIhoKGFJlZnJlc2hTdGVhbUF1dGhSZXNwb25zZSImChRJbnZhbGlkYXRlTW9kUmVxdWVzdBIOCgZtb2RfaWQYASABKAQiFwoVSW52YWxpZGF0ZU1vZFJlc3BvbnNlIikKFFJlZnJlc2hTb3VyY2VSZXF1ZXN0EhEKCXNvdXJjZV9pZBgBIAEoCSI7ChVSZWZyZXNoU291cmNlUmVzcG9uc2USIgoEbW9kcxgBIAMoCzIULnN5bmMudjEuUmVzb2x2ZWRNb2QiKQoUR2V0U291cmNlTW9kc1JlcXVlc3QSEQoJc291cmNlX2lkGAEgASgJIigKFUdldFNvdXJjZU1vZHNSZXNwb25zZRIPCgdtb2RfaWRzGAEgAygEIkEKFVJlZ2lzdGVyU291cmNlUmVxdWVzdBIVCg1jYW5kaWRhdGVfaWRzGAEgAygEEhEKCXNvdXJjZV9pZBgCIAEoCSIsCgtSZXNvbHZlZE1vZBIOCgZtb2RfaWQYASABKAQSDQoFdGl0bGUYAiABKAkiUAoWUmVnaXN0ZXJTb3VyY2VSZXNwb25zZRIiCgRtb2RzGAEgAygLMhQuc3luYy52MS5SZXNvbHZlZE1vZBISCgpyb290X3RpdGxlGAIgASgJIiwKF0RlcmVnaXN0ZXJTb3VyY2VSZXF1ZXN0EhEKCXNvdXJjZV9pZBgBIAEoCSIaChhEZXJlZ2lzdGVyU291cmNlUmVzcG9uc2UiDgoMQ2xhaW1SZXF1ZXN0Ih8KDUNsYWltUmVzcG9uc2USDgoGam9iX2lkGAEgASgJIicKFUdldENsYWltU3RhdHVzUmVxdWVzdBIOCgZqb2JfaWQYASABKAkiYgoWR2V0Q2xhaW1TdGF0dXNSZXNwb25zZRIlCgVzdGF0ZRgBIAEoDjIWLnN5bmMudjEuQ2xhaW1Kb2JTdGF0ZRISCgpjbGFpbV9wYXRoGAIgASgJEg0KBWVycm9yGAMgASgJKoMBCg1DbGFpbUpvYlN0YXRlEh8KG0NMQUlNX0pPQl9TVEFURV9VTlNQRUNJRklFRBAAEhsKF0NMQUlNX0pPQl9TVEFURV9SVU5OSU5HEAESGAoUQ0xBSU1fSk9CX1NUQVRFX0RPTkUQAhIaChZDTEFJTV9KT0JfU1RBVEVfRkFJTEVEEAMy+gYKC1N5bmNTZXJ2aWNlElEKDlJlZ2lzdGVyU291cmNlEh4uc3luYy52MS5SZWdpc3RlclNvdXJjZVJlcXVlc3QaHy5zeW5jLnYxLlJlZ2lzdGVyU291cmNlUmVzcG9uc2USVwoQRGVyZWdpc3RlclNvdXJjZRIgLnN5bmMudjEuRGVyZWdpc3RlclNvdXJjZVJlcXVlc3QaIS5zeW5jLnYxLkRlcmVnaXN0ZXJTb3VyY2VSZXNwb25zZRI2CgVDbGFpbRIVLnN5bmMudjEuQ2xhaW1SZXF1ZXN0GhYuc3luYy52MS5DbGFpbVJlc3BvbnNlElEKDkdldENsYWltU3RhdHVzEh4uc3luYy52MS5HZXRDbGFpbVN0YXR1c1JlcXVlc3QaHy5zeW5jLnYxLkdldENsYWltU3RhdHVzUmVzcG9uc2USTgoNR2V0U291cmNlTW9kcxIdLnN5bmMudjEuR2V0U291cmNlTW9kc1JlcXVlc3QaHi5zeW5jLnYxLkdldFNvdXJjZU1vZHNSZXNwb25zZRJOCg1SZWZyZXNoU291cmNlEh0uc3luYy52MS5SZWZyZXNoU291cmNlUmVxdWVzdBoeLnN5bmMudjEuUmVmcmVzaFNvdXJjZVJlc3BvbnNlElEKDkxpc3RTeW5jZWRNb2RzEh4uc3luYy52MS5MaXN0U3luY2VkTW9kc1JlcXVlc3QaHy5zeW5jLnYxLkxpc3RTeW5jZWRNb2RzUmVzcG9uc2USTgoNSW52YWxpZGF0ZU1vZBIdLnN5bmMudjEuSW52YWxpZGF0ZU1vZFJlcXVlc3QaHi5zeW5jLnYxLkludmFsaWRhdGVNb2RSZXNwb25zZRJLCgxHZXRTeW5jZWRNb2QSHC5zeW5jLnYxLkdldFN5bmNlZE1vZFJlcXVlc3QaHS5zeW5jLnYxLkdldFN5bmNlZE1vZFJlc3BvbnNlEksKDEdldFN5bmNTdGF0cxIcLnN5bmMudjEuR2V0U3luY1N0YXRzUmVxdWVzdBodLnN5bmMudjEuR2V0U3luY1N0YXRzUmVzcG9uc2USVwoQUmVmcmVzaFN0ZWFtQXV0aBIgLnN5bmMudjEuUmVmcmVzaFN0ZWFtQXV0aFJlcXVlc3QaIS5zeW5jLnYxLlJlZnJlc2hTdGVhbUF1dGhSZXNwb25zZUJCWkBnaXRodWIuY29tL3NrdWEtaW50ZXJuYXRpb25hbC9tYWdwaWUvZ2VuZXJhdGVkL2dvL3N5bmMvdjE7c3luY3YxYgZwcm90bzM");
 
 /**
  * @generated from message sync.v1.ListSyncedModsRequest
@@ -171,17 +171,12 @@ export type RefreshSteamAuthRequest = Message<"sync.v1.RefreshSteamAuthRequest">
   username: string;
 
   /**
-   * @generated from field: string password = 2;
-   */
-  password: string;
-
-  /**
-   * Only needed on a second call, once a first call without one returned
-   * needs_guard=true.
+   * Already negotiated client-side (see the RPC's own doc) -- this
+   * process never sees a password, only ever this.
    *
-   * @generated from field: optional string guard_code = 3;
+   * @generated from field: string refresh_token = 2;
    */
-  guardCode?: string | undefined;
+  refreshToken: string;
 };
 
 /**
@@ -195,21 +190,6 @@ export const RefreshSteamAuthRequestSchema: GenMessage<RefreshSteamAuthRequest> 
  * @generated from message sync.v1.RefreshSteamAuthResponse
  */
 export type RefreshSteamAuthResponse = Message<"sync.v1.RefreshSteamAuthResponse"> & {
-  /**
-   * True if Steam requires a guard code and `guard_code` wasn't supplied
-   * -- no session was established, call again with the code.
-   *
-   * @generated from field: bool needs_guard = 1;
-   */
-  needsGuard: boolean;
-
-  /**
-   * "email" | "device" -- which kind of code Steam is expecting, set only
-   * when needs_guard is true.
-   *
-   * @generated from field: string guard_type = 2;
-   */
-  guardType: string;
 };
 
 /**
@@ -680,17 +660,18 @@ export const SyncService: GenService<{
     output: typeof GetSyncStatsResponseSchema;
   },
   /**
-   * Establish (or replace) this cluster's Steam session interactively --
-   * the only way to get a session running with zero pre-existing
-   * credentials anywhere: `password` is used only for the duration of
-   * this call, never persisted anywhere, only the resulting refresh
-   * token is (to a Secret, not disk). If Steam Guard confirmation is
-   * required and `guard_code` wasn't supplied, returns needs_guard=true
-   * without completing the login -- call again with the code from
-   * whatever channel (email/mobile app) Steam sent it to. On success,
-   * the new session is persisted and this process exits to pick it up
-   * fresh on restart (see the handler's own doc for why) -- the response
-   * still reaches the caller first.
+   * Establish (or replace) this cluster's Steam session from an
+   * already-negotiated refresh token -- the interactive username+password
+   * (+ Guard code) negotiation itself never happens inside this or any
+   * other deployed service; it happens client-side, in
+   * cli/magpie's `magpie admin refresh-steam-auth` (which shells out to
+   * steam-sync's steam-login helper binary for the actual Steam login,
+   * then calls this RPC with just the result). A password reaching this
+   * process, even transiently, is exactly what this RPC shape is
+   * designed to make impossible. On success, the new session is persisted
+   * and this process exits to pick it up fresh on restart (see the
+   * handler's own doc for why) -- the response still reaches the caller
+   * first.
    *
    * @generated from rpc sync.v1.SyncService.RefreshSteamAuth
    */

@@ -1352,8 +1352,7 @@ func (x *GetDiskUsageResponse) GetTotalBytes() uint64 {
 type RefreshSteamAuthRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
-	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
-	GuardCode     *string                `protobuf:"bytes,3,opt,name=guard_code,json=guardCode,proto3,oneof" json:"guard_code,omitempty"`
+	RefreshToken  string                 `protobuf:"bytes,2,opt,name=refresh_token,json=refreshToken,proto3" json:"refresh_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1395,24 +1394,15 @@ func (x *RefreshSteamAuthRequest) GetUsername() string {
 	return ""
 }
 
-func (x *RefreshSteamAuthRequest) GetPassword() string {
+func (x *RefreshSteamAuthRequest) GetRefreshToken() string {
 	if x != nil {
-		return x.Password
-	}
-	return ""
-}
-
-func (x *RefreshSteamAuthRequest) GetGuardCode() string {
-	if x != nil && x.GuardCode != nil {
-		return *x.GuardCode
+		return x.RefreshToken
 	}
 	return ""
 }
 
 type RefreshSteamAuthResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	NeedsGuard    bool                   `protobuf:"varint,1,opt,name=needs_guard,json=needsGuard,proto3" json:"needs_guard,omitempty"`
-	GuardType     string                 `protobuf:"bytes,2,opt,name=guard_type,json=guardType,proto3" json:"guard_type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1445,20 +1435,6 @@ func (x *RefreshSteamAuthResponse) ProtoReflect() protoreflect.Message {
 // Deprecated: Use RefreshSteamAuthResponse.ProtoReflect.Descriptor instead.
 func (*RefreshSteamAuthResponse) Descriptor() ([]byte, []int) {
 	return file_registry_v1_registry_proto_rawDescGZIP(), []int{25}
-}
-
-func (x *RefreshSteamAuthResponse) GetNeedsGuard() bool {
-	if x != nil {
-		return x.NeedsGuard
-	}
-	return false
-}
-
-func (x *RefreshSteamAuthResponse) GetGuardType() string {
-	if x != nil {
-		return x.GuardType
-	}
-	return ""
 }
 
 type DeleteMissionRequest struct {
@@ -1621,18 +1597,11 @@ const file_registry_v1_registry_proto_rawDesc = "" +
 	"\x0emissions_bytes\x18\x02 \x01(\x04R\rmissionsBytes\x12(\n" +
 	"\x10game_files_bytes\x18\x03 \x01(\x04R\x0egameFilesBytes\x12\x1f\n" +
 	"\vtotal_bytes\x18\x04 \x01(\x04R\n" +
-	"totalBytes\"\x84\x01\n" +
+	"totalBytes\"Z\n" +
 	"\x17RefreshSteamAuthRequest\x12\x1a\n" +
-	"\busername\x18\x01 \x01(\tR\busername\x12\x1a\n" +
-	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\"\n" +
-	"\n" +
-	"guard_code\x18\x03 \x01(\tH\x00R\tguardCode\x88\x01\x01B\r\n" +
-	"\v_guard_code\"Z\n" +
-	"\x18RefreshSteamAuthResponse\x12\x1f\n" +
-	"\vneeds_guard\x18\x01 \x01(\bR\n" +
-	"needsGuard\x12\x1d\n" +
-	"\n" +
-	"guard_type\x18\x02 \x01(\tR\tguardType\"&\n" +
+	"\busername\x18\x01 \x01(\tR\busername\x12#\n" +
+	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\"\x1a\n" +
+	"\x18RefreshSteamAuthResponse\"&\n" +
 	"\x14DeleteMissionRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x17\n" +
 	"\x15DeleteMissionResponse*\xa0\x01\n" +
@@ -1759,7 +1728,6 @@ func file_registry_v1_registry_proto_init() {
 	}
 	file_registry_v1_registry_proto_msgTypes[13].OneofWrappers = []any{}
 	file_registry_v1_registry_proto_msgTypes[17].OneofWrappers = []any{}
-	file_registry_v1_registry_proto_msgTypes[24].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

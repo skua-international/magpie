@@ -49,17 +49,6 @@ spec:
             {{- if .Values.syncDaemon.steamAuth.anonymous }}
             - name: ANONYMOUS_LOGIN
               value: "true"
-            {{- else if .Values.syncDaemon.steamAuth.existingSecret }}
-            - name: STEAM_USER
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.syncDaemon.steamAuth.existingSecret }}
-                  key: STEAM_USER
-            - name: STEAM_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.syncDaemon.steamAuth.existingSecret }}
-                  key: STEAM_PASSWORD
             {{- end }}
           volumeMounts:
             - name: content

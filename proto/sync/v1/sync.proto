@@ -72,17 +72,18 @@ service SyncService {
   // AdminService.GetDiskUsage.
   rpc GetSyncStats(GetSyncStatsRequest) returns (GetSyncStatsResponse);
 
-  // Establish (or replace) this cluster's Steam session interactively --
-  // the only way to get a session running with zero pre-existing
-  // credentials anywhere: `password` is used only for the duration of
-  // this call, never persisted anywhere, only the resulting refresh
-  // token is (to a Secret, not disk). If Steam Guard confirmation is
-  // required and `guard_code` wasn't supplied, returns needs_guard=true
-  // without completing the login -- call again with the code from
-  // whatever channel (email/mobile app) Steam sent it to. On success,
-  // the new session is persisted and this process exits to pick it up
-  // fresh on restart (see the handler's own doc for why) -- the response
-  // still reaches the caller first.
+  // Establish (or replace) this cluster's Steam session from an
+  // already-negotiated refresh token -- the interactive username+password
+  // (+ Guard code) negotiation itself never happens inside this or any
+  // other deployed service; it happens client-side, in
+  // cli/magpie's `magpie admin refresh-steam-auth` (which shells out to
+  // steam-sync's steam-login helper binary for the actual Steam login,
+  // then calls this RPC with just the result). A password reaching this
+  // process, even transiently, is exactly what this RPC shape is
+  // designed to make impossible. On success, the new session is persisted
+  // and this process exits to pick it up fresh on restart (see the
+  // handler's own doc for why) -- the response still reaches the caller
+  // first.
   rpc RefreshSteamAuth(RefreshSteamAuthRequest) returns (RefreshSteamAuthResponse);
 }
 
@@ -126,20 +127,12 @@ message GetSyncStatsResponse {
 
 message RefreshSteamAuthRequest {
   string username = 1;
-  string password = 2;
-  // Only needed on a second call, once a first call without one returned
-  // needs_guard=true.
-  optional string guard_code = 3;
+  // Already negotiated client-side (see the RPC's own doc) -- this
+  // process never sees a password, only ever this.
+  string refresh_token = 2;
 }
 
-message RefreshSteamAuthResponse {
-  // True if Steam requires a guard code and `guard_code` wasn't supplied
-  // -- no session was established, call again with the code.
-  bool needs_guard = 1;
-  // "email" | "device" -- which kind of code Steam is expecting, set only
-  // when needs_guard is true.
-  string guard_type = 2;
-}
+message RefreshSteamAuthResponse {}
 
 message InvalidateModRequest {
   uint64 mod_id = 1;

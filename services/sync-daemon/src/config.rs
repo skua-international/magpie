@@ -7,18 +7,20 @@ use anyhow::Result;
 /// touching the session Secret (see `secrets.rs`) -- `main.rs` combines
 /// this with whatever's actually in that Secret to decide the real
 /// `SteamAuth` to start `CmPool` with, so a stored session always takes
-/// priority over these when both are present.
+/// priority over this when both are present. Deliberately has no
+/// credentials-at-startup variant at all -- a Steam password should never
+/// reach this (or any other deployed) process, not even via an env var
+/// sourced from a Secret. The only ways to get a session running are
+/// `Anonymous` or an already-negotiated refresh token, established
+/// out-of-band via `RefreshSteamAuth` (see its own proto doc) and read
+/// back from the session Secret below.
 pub enum SteamAuthConfig {
     Anonymous,
-    Credentials {
-        user: String,
-        password: String,
-    },
-    /// Neither anonymous login nor STEAM_USER/STEAM_PASSWORD were
-    /// configured -- fine as long as the session Secret already has a
-    /// valid refresh token (established via a prior RefreshSteamAuth
-    /// call); if it doesn't either, this process starts with no Steam
-    /// session at all until RefreshSteamAuth is called.
+    /// Anonymous login isn't configured either -- fine as long as the
+    /// session Secret already has a valid refresh token (established via
+    /// a prior RefreshSteamAuth call); if it doesn't either, this process
+    /// starts with no Steam session at all until RefreshSteamAuth is
+    /// called.
     None,
 }
 
@@ -42,20 +44,16 @@ pub struct Config {
     /// Name of an existing Secret (pre-created by the chart, never by
     /// this process -- see secrets.rs's own doc for why) holding
     /// `steam_user`/`refresh_token` keys once a session has been
-    /// established, either at startup from STEAM_USER/STEAM_PASSWORD or
-    /// later via RefreshSteamAuth.
+    /// established via RefreshSteamAuth.
     pub steam_session_secret_name: String,
 }
 
 impl Config {
     pub fn from_env() -> Result<Self> {
-        let anonymous_login = bool_env("ANONYMOUS_LOGIN", false);
-        let steam_user = env::var("STEAM_USER").ok();
-        let steam_password = env::var("STEAM_PASSWORD").ok();
-        let steam_auth = match (anonymous_login, steam_user, steam_password) {
-            (true, _, _) => SteamAuthConfig::Anonymous,
-            (false, Some(user), Some(password)) => SteamAuthConfig::Credentials { user, password },
-            (false, _, _) => SteamAuthConfig::None,
+        let steam_auth = if bool_env("ANONYMOUS_LOGIN", false) {
+            SteamAuthConfig::Anonymous
+        } else {
+            SteamAuthConfig::None
         };
 
         Ok(Self {

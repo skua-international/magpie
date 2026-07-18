@@ -169,16 +169,14 @@ syncDaemon:
     # Anonymous Steam login (no credentials) -- fine for public workshop
     # content, not for private/unlisted mods or collections.
     anonymous: false
-    # Name of an existing Secret with STEAM_USER/STEAM_PASSWORD keys, used
-    # only to bootstrap the *first* session. Genuinely optional -- leave
-    # empty and use the AdminService.RefreshSteamAuth RPC instead (see its
-    # own doc) to establish a session with no long-lived password Secret
-    # anywhere in the cluster at all; the resulting refresh token is all
-    # that's actually needed from then on, and it's revocable independent
-    # of the account's real password. Not created by this chart --
-    # `kubectl create secret generic <name> --from-literal=...` ahead of
-    # `helm install`, so credentials never live in values.yaml.
-    existingSecret: ""
+    # There is deliberately no "existing Secret with STEAM_USER/
+    # STEAM_PASSWORD" option -- a Steam password should never reach a
+    # deployed service, not even via a Secret-sourced env var. Establish
+    # a session with `magpie admin refresh-steam-auth` instead: the
+    # interactive login happens entirely client-side (on the operator's
+    # own machine), and only the resulting refresh token -- revocable
+    # independent of the account's real password -- ever reaches the
+    # cluster, via the AdminService.RefreshSteamAuth RPC (see its own doc).
     # This chart creates a Secret by this name, empty, so sync-daemon's
     # own RBAC can be scoped to get/patch on one specific pre-existing
     # object (Kubernetes RBAC's resourceNames can't restrict a create

@@ -32,11 +32,6 @@ pub struct SyncStats {
     pub game_files_bytes: u64,
 }
 
-pub enum RefreshSteamAuthResult {
-    NeedsGuard { guard_type: String },
-    Success,
-}
-
 pub struct RegisterSourceResult {
     pub mod_ids: Vec<u64>,
     /// The registered candidate's own Workshop title, when `candidate_ids`
@@ -207,30 +202,19 @@ impl SyncClient {
 
     /// Establish (or replace) the Steam session interactively -- proxies
     /// straight through to sync-daemon's own RPC of the same name.
-    pub async fn refresh_steam_auth(
-        &self,
-        username: &str,
-        password: &str,
-        guard_code: Option<&str>,
-    ) -> anyhow::Result<RefreshSteamAuthResult> {
-        let response = self
-            .inner
+    /// `refresh_token` must already be negotiated -- this process (and
+    /// everything downstream of it) never handles a Steam password, see
+    /// the RPC's own proto doc for the full rationale.
+    pub async fn refresh_steam_auth(&self, username: &str, refresh_token: &str) -> anyhow::Result<()> {
+        self.inner
             .refresh_steam_auth(RefreshSteamAuthRequest {
                 username: username.to_string(),
-                password: password.to_string(),
-                guard_code: guard_code.map(str::to_string),
+                refresh_token: refresh_token.to_string(),
                 ..Default::default()
             })
             .await
             .map_err(|e| anyhow::anyhow!("RefreshSteamAuth failed: {e}"))?;
-        let view = response.view();
-        Ok(if view.needs_guard {
-            RefreshSteamAuthResult::NeedsGuard {
-                guard_type: view.guard_type.to_string(),
-            }
-        } else {
-            RefreshSteamAuthResult::Success
-        })
+        Ok(())
     }
 
     pub async fn claim_status(&self, job_id: &str) -> anyhow::Result<ClaimStatus> {

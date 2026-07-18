@@ -16,3 +16,8 @@ bincode = "1"
 rusqlite = { version = "0.31", features = ["bundled"] }
 prost = "0.13"
 walkdir = "2.5.0"
+
+# Only used by src/bin/steam-login.rs's hidden password prompt -- see that
+# file's own doc for why it lives here (a bin target on this crate)
+# instead of as a separate workspace member.
+rpassword = "7"

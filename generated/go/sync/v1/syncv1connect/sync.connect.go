@@ -124,17 +124,18 @@ type SyncServiceClient interface {
 	// sources, plus base game/CDLC depot size -- for registry's
 	// AdminService.GetDiskUsage.
 	GetSyncStats(context.Context, *connect.Request[v1.GetSyncStatsRequest]) (*connect.Response[v1.GetSyncStatsResponse], error)
-	// Establish (or replace) this cluster's Steam session interactively --
-	// the only way to get a session running with zero pre-existing
-	// credentials anywhere: `password` is used only for the duration of
-	// this call, never persisted anywhere, only the resulting refresh
-	// token is (to a Secret, not disk). If Steam Guard confirmation is
-	// required and `guard_code` wasn't supplied, returns needs_guard=true
-	// without completing the login -- call again with the code from
-	// whatever channel (email/mobile app) Steam sent it to. On success,
-	// the new session is persisted and this process exits to pick it up
-	// fresh on restart (see the handler's own doc for why) -- the response
-	// still reaches the caller first.
+	// Establish (or replace) this cluster's Steam session from an
+	// already-negotiated refresh token -- the interactive username+password
+	// (+ Guard code) negotiation itself never happens inside this or any
+	// other deployed service; it happens client-side, in
+	// cli/magpie's `magpie admin refresh-steam-auth` (which shells out to
+	// steam-sync's steam-login helper binary for the actual Steam login,
+	// then calls this RPC with just the result). A password reaching this
+	// process, even transiently, is exactly what this RPC shape is
+	// designed to make impossible. On success, the new session is persisted
+	// and this process exits to pick it up fresh on restart (see the
+	// handler's own doc for why) -- the response still reaches the caller
+	// first.
 	RefreshSteamAuth(context.Context, *connect.Request[v1.RefreshSteamAuthRequest]) (*connect.Response[v1.RefreshSteamAuthResponse], error)
 }
 
@@ -345,17 +346,18 @@ type SyncServiceHandler interface {
 	// sources, plus base game/CDLC depot size -- for registry's
 	// AdminService.GetDiskUsage.
 	GetSyncStats(context.Context, *connect.Request[v1.GetSyncStatsRequest]) (*connect.Response[v1.GetSyncStatsResponse], error)
-	// Establish (or replace) this cluster's Steam session interactively --
-	// the only way to get a session running with zero pre-existing
-	// credentials anywhere: `password` is used only for the duration of
-	// this call, never persisted anywhere, only the resulting refresh
-	// token is (to a Secret, not disk). If Steam Guard confirmation is
-	// required and `guard_code` wasn't supplied, returns needs_guard=true
-	// without completing the login -- call again with the code from
-	// whatever channel (email/mobile app) Steam sent it to. On success,
-	// the new session is persisted and this process exits to pick it up
-	// fresh on restart (see the handler's own doc for why) -- the response
-	// still reaches the caller first.
+	// Establish (or replace) this cluster's Steam session from an
+	// already-negotiated refresh token -- the interactive username+password
+	// (+ Guard code) negotiation itself never happens inside this or any
+	// other deployed service; it happens client-side, in
+	// cli/magpie's `magpie admin refresh-steam-auth` (which shells out to
+	// steam-sync's steam-login helper binary for the actual Steam login,
+	// then calls this RPC with just the result). A password reaching this
+	// process, even transiently, is exactly what this RPC shape is
+	// designed to make impossible. On success, the new session is persisted
+	// and this process exits to pick it up fresh on restart (see the
+	// handler's own doc for why) -- the response still reaches the caller
+	// first.
 	RefreshSteamAuth(context.Context, *connect.Request[v1.RefreshSteamAuthRequest]) (*connect.Response[v1.RefreshSteamAuthResponse], error)
 }
 

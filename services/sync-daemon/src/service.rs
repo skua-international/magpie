@@ -13,7 +13,7 @@ use protocol::proto::sync::v1::{
     SyncedMod,
 };
 use steam_sync::cache::SyncState;
-use steam_sync::steam::{self, CmPool, GuardType, InteractiveAuthResult, ResolvedMod, SyncTasks};
+use steam_sync::steam::{self, CmPool, ResolvedMod, SyncTasks};
 use steam_sync::workshop;
 use tokio::sync::Semaphore;
 use tracing::{error, info};
@@ -452,37 +452,22 @@ impl SyncService for SyncServiceImpl {
         Response::ok(InvalidateModResponse::default())
     }
 
+    /// `request.refresh_token` must already be negotiated -- this process
+    /// (like every other deployed service) never sees a Steam password,
+    /// not even transiently. The interactive username+password (+ Guard
+    /// code) negotiation happens entirely client-side, in cli/magpie's
+    /// `magpie admin refresh-steam-auth`, which shells out to
+    /// steam-sync's steam-login helper binary for the actual Steam login
+    /// and calls this RPC with only the result. See the proto's own doc
+    /// for the full rationale.
     async fn refresh_steam_auth<'a>(
         &'a self,
         _ctx: RequestContext,
         request: ServiceRequest<'_, RefreshSteamAuthRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<RefreshSteamAuthResponse> + Send + use<'a>> {
-        let username = request.username.to_string();
-        let password = request.password.to_string();
-        let guard_code = request.guard_code.as_deref();
-
-        let result = steam::negotiate_interactive(&username, &password, guard_code)
-            .await
-            .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
-
-        let refresh_token = match result {
-            InteractiveAuthResult::NeedsGuard { guard_type } => {
-                let guard_type = match guard_type {
-                    GuardType::EmailCode => "email",
-                    GuardType::DeviceCode => "device",
-                };
-                return Response::ok(RefreshSteamAuthResponse {
-                    needs_guard: true,
-                    guard_type: guard_type.to_string(),
-                    ..Default::default()
-                });
-            }
-            InteractiveAuthResult::Success { refresh_token } => refresh_token,
-        };
-
         let session = Session {
-            user: username,
-            refresh_token,
+            user: request.username.to_string(),
+            refresh_token: request.refresh_token.to_string(),
         };
         secrets::write_session(
             &self.shared.client,
@@ -511,10 +496,6 @@ impl SyncService for SyncServiceImpl {
             std::process::exit(0);
         });
 
-        Response::ok(RefreshSteamAuthResponse {
-            needs_guard: false,
-            guard_type: String::new(),
-            ..Default::default()
-        })
+        Response::ok(RefreshSteamAuthResponse::default())
     }
 }

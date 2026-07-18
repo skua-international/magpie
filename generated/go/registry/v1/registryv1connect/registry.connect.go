@@ -491,13 +491,13 @@ func (UnimplementedMissionServiceHandler) DeleteMission(context.Context, *connec
 // AdminServiceClient is a client for the registry.v1.AdminService service.
 type AdminServiceClient interface {
 	GetDiskUsage(context.Context, *connect.Request[v1.GetDiskUsageRequest]) (*connect.Response[v1.GetDiskUsageResponse], error)
-	// Establish (or replace) the cluster's Steam session interactively --
-	// proxies straight to sync-daemon's own RPC of the same name (see its
-	// doc for the full flow/guard-code handling). The only way to get a
-	// working Steam session with zero pre-existing credentials anywhere in
-	// the cluster: `password` exists only for the duration of this call.
-	// Its own scope, deliberately separate from and more restricted than
-	// anything else here -- this can authenticate as the Steam account.
+	// Establish (or replace) the cluster's Steam session from an
+	// already-negotiated refresh token -- proxies straight to sync-daemon's
+	// own RPC of the same name (see its doc for the full rationale on why
+	// the interactive username+password negotiation itself happens
+	// client-side, never here). Its own scope, deliberately separate from
+	// and more restricted than anything else here -- this can authenticate
+	// as the Steam account.
 	RefreshSteamAuth(context.Context, *connect.Request[v1.RefreshSteamAuthRequest]) (*connect.Response[v1.RefreshSteamAuthResponse], error)
 }
 
@@ -546,13 +546,13 @@ func (c *adminServiceClient) RefreshSteamAuth(ctx context.Context, req *connect.
 // AdminServiceHandler is an implementation of the registry.v1.AdminService service.
 type AdminServiceHandler interface {
 	GetDiskUsage(context.Context, *connect.Request[v1.GetDiskUsageRequest]) (*connect.Response[v1.GetDiskUsageResponse], error)
-	// Establish (or replace) the cluster's Steam session interactively --
-	// proxies straight to sync-daemon's own RPC of the same name (see its
-	// doc for the full flow/guard-code handling). The only way to get a
-	// working Steam session with zero pre-existing credentials anywhere in
-	// the cluster: `password` exists only for the duration of this call.
-	// Its own scope, deliberately separate from and more restricted than
-	// anything else here -- this can authenticate as the Steam account.
+	// Establish (or replace) the cluster's Steam session from an
+	// already-negotiated refresh token -- proxies straight to sync-daemon's
+	// own RPC of the same name (see its doc for the full rationale on why
+	// the interactive username+password negotiation itself happens
+	// client-side, never here). Its own scope, deliberately separate from
+	// and more restricted than anything else here -- this can authenticate
+	// as the Steam account.
 	RefreshSteamAuth(context.Context, *connect.Request[v1.RefreshSteamAuthRequest]) (*connect.Response[v1.RefreshSteamAuthResponse], error)
 }
 

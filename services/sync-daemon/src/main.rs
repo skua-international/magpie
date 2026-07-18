@@ -34,10 +34,11 @@ async fn main() -> Result<()> {
     let client = Client::try_default().await?;
     info!("connected to Kubernetes API");
 
-    // A stored session always wins over STEAM_USER/STEAM_PASSWORD -- once
-    // established (at startup or via a later RefreshSteamAuth call), the
-    // Secret is the source of truth, so a redeploy never re-negotiates
-    // against Steam (or needs credentials at all) as long as it's valid.
+    // A stored session always wins over ANONYMOUS_LOGIN -- once
+    // established via a RefreshSteamAuth call, the Secret is the source
+    // of truth, so a redeploy never re-negotiates against Steam as long
+    // as it's valid. There's no credentials-at-startup path at all (see
+    // SteamAuthConfig's own doc) -- a password never reaches this process.
     let stored_session =
         secrets::read_session(&client, &cfg.namespace, &cfg.steam_session_secret_name).await;
     let auth = match (&stored_session, &cfg.steam_auth) {
@@ -46,10 +47,6 @@ async fn main() -> Result<()> {
             refresh_token: session.refresh_token.clone(),
         }),
         (None, SteamAuthConfig::Anonymous) => Some(SteamAuth::Anonymous),
-        (None, SteamAuthConfig::Credentials { user, password }) => Some(SteamAuth::Credentials {
-            user: user.clone(),
-            password: password.clone(),
-        }),
         (None, SteamAuthConfig::None) => None,
     };
 

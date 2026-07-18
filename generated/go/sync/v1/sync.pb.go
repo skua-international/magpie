@@ -417,10 +417,9 @@ func (x *GetSyncStatsResponse) GetGameFilesBytes() uint64 {
 type RefreshSteamAuthRequest struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	Username string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
-	Password string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
-	// Only needed on a second call, once a first call without one returned
-	// needs_guard=true.
-	GuardCode     *string `protobuf:"bytes,3,opt,name=guard_code,json=guardCode,proto3,oneof" json:"guard_code,omitempty"`
+	// Already negotiated client-side (see the RPC's own doc) -- this
+	// process never sees a password, only ever this.
+	RefreshToken  string `protobuf:"bytes,2,opt,name=refresh_token,json=refreshToken,proto3" json:"refresh_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -462,28 +461,15 @@ func (x *RefreshSteamAuthRequest) GetUsername() string {
 	return ""
 }
 
-func (x *RefreshSteamAuthRequest) GetPassword() string {
+func (x *RefreshSteamAuthRequest) GetRefreshToken() string {
 	if x != nil {
-		return x.Password
-	}
-	return ""
-}
-
-func (x *RefreshSteamAuthRequest) GetGuardCode() string {
-	if x != nil && x.GuardCode != nil {
-		return *x.GuardCode
+		return x.RefreshToken
 	}
 	return ""
 }
 
 type RefreshSteamAuthResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// True if Steam requires a guard code and `guard_code` wasn't supplied
-	// -- no session was established, call again with the code.
-	NeedsGuard bool `protobuf:"varint,1,opt,name=needs_guard,json=needsGuard,proto3" json:"needs_guard,omitempty"`
-	// "email" | "device" -- which kind of code Steam is expecting, set only
-	// when needs_guard is true.
-	GuardType     string `protobuf:"bytes,2,opt,name=guard_type,json=guardType,proto3" json:"guard_type,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -516,20 +502,6 @@ func (x *RefreshSteamAuthResponse) ProtoReflect() protoreflect.Message {
 // Deprecated: Use RefreshSteamAuthResponse.ProtoReflect.Descriptor instead.
 func (*RefreshSteamAuthResponse) Descriptor() ([]byte, []int) {
 	return file_sync_v1_sync_proto_rawDescGZIP(), []int{8}
-}
-
-func (x *RefreshSteamAuthResponse) GetNeedsGuard() bool {
-	if x != nil {
-		return x.NeedsGuard
-	}
-	return false
-}
-
-func (x *RefreshSteamAuthResponse) GetGuardType() string {
-	if x != nil {
-		return x.GuardType
-	}
-	return ""
 }
 
 type InvalidateModRequest struct {
@@ -1245,18 +1217,11 @@ const file_sync_v1_sync_proto_rawDesc = "" +
 	"\x14GetSyncStatsResponse\x12\x1d\n" +
 	"\n" +
 	"mods_bytes\x18\x01 \x01(\x04R\tmodsBytes\x12(\n" +
-	"\x10game_files_bytes\x18\x02 \x01(\x04R\x0egameFilesBytes\"\x84\x01\n" +
+	"\x10game_files_bytes\x18\x02 \x01(\x04R\x0egameFilesBytes\"Z\n" +
 	"\x17RefreshSteamAuthRequest\x12\x1a\n" +
-	"\busername\x18\x01 \x01(\tR\busername\x12\x1a\n" +
-	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\"\n" +
-	"\n" +
-	"guard_code\x18\x03 \x01(\tH\x00R\tguardCode\x88\x01\x01B\r\n" +
-	"\v_guard_code\"Z\n" +
-	"\x18RefreshSteamAuthResponse\x12\x1f\n" +
-	"\vneeds_guard\x18\x01 \x01(\bR\n" +
-	"needsGuard\x12\x1d\n" +
-	"\n" +
-	"guard_type\x18\x02 \x01(\tR\tguardType\"-\n" +
+	"\busername\x18\x01 \x01(\tR\busername\x12#\n" +
+	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\"\x1a\n" +
+	"\x18RefreshSteamAuthResponse\"-\n" +
 	"\x14InvalidateModRequest\x12\x15\n" +
 	"\x06mod_id\x18\x01 \x01(\x04R\x05modId\"\x17\n" +
 	"\x15InvalidateModResponse\"3\n" +
@@ -1391,7 +1356,6 @@ func file_sync_v1_sync_proto_init() {
 		return
 	}
 	file_sync_v1_sync_proto_msgTypes[4].OneofWrappers = []any{}
-	file_sync_v1_sync_proto_msgTypes[7].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
