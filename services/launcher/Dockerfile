@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 # Shared cargo-chef base for every service's Dockerfile in this repo.
 # Replaces the old hand-maintained "stub every workspace member's src,
 # build, delete the stubs" dance -- chef computes a dependency-only
@@ -12,7 +13,9 @@ RUN apt-get update \
         git \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-RUN cargo install cargo-chef --locked
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    cargo install cargo-chef --locked
 WORKDIR /build
 
 FROM chef AS planner
@@ -21,9 +24,15 @@ RUN cargo chef prepare --recipe-path recipe.json --bin launcher
 
 FROM chef AS builder
 COPY --from=planner /build/recipe.json recipe.json
-RUN cargo chef cook --release --recipe-path recipe.json -p launcher
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/build/target \
+    cargo chef cook --release --recipe-path recipe.json -p launcher
 COPY . .
-RUN cargo build --release --locked -p launcher
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/build/target \
+    cargo build --release --locked -p launcher
 
 FROM debian:bookworm-slim
 

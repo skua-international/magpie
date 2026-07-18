@@ -118,8 +118,8 @@ jobs:
       # service: most of these share a large chunk of their cargo-chef
       # dependency layer (tokio, serde, sqlx, connectrpc, ...), so a
       # per-service scope would rebuild that overlap redundantly in every
-      # job. The gha cache backend is content-addressed, so parallel jobs
-      # writing to the same scope dedupe safely rather than race.
+      # job. Make it branch-aware so unrelated refs do not churn the same
+      # cache bucket.
       - uses: docker/build-push-action@v6
         with:
           context: .
@@ -127,8 +127,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=cargo
-          cache-to: type=gha,mode=max,scope=cargo
+          cache-from: type=gha,scope=cargo-${{ github.ref_name }}
+          cache-to: type=gha,mode=max,scope=cargo-${{ github.ref_name }}
 
   # Separate job, not part of the image matrix above -- packaging/pushing
   # the chart has nothing to do with any one service's Dockerfile. Publishes

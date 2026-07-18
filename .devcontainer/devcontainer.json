@@ -1,0 +1,26 @@
+{
+  "name": "skua-magpie",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "workspaceFolder": "/workspaces/skua-magpie",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "bufbuild.vscode-buf",
+        "rust-lang.rust-analyzer",
+        "ms-azuretools.vscode-docker",
+        "redhat.vscode-yaml"
+      ],
+      "settings": {
+        "rust-analyzer.checkOnSave.command": "clippy",
+        "go.useLanguageServer": true,
+        "go.toolsManagement.autoUpdate": true
+      }
+    }
+  },
+  "postCreateCommand": "cargo fetch --workspace && npm install --prefix generated/ts",
+  "remoteUser": "vscode"
+}

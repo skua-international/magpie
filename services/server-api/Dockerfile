@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 FROM rust:bookworm AS chef
 RUN apt-get update \
     && apt-get install -y --no-install-recommends --no-install-suggests \
@@ -5,7 +6,9 @@ RUN apt-get update \
         git \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-RUN cargo install cargo-chef --locked
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    cargo install cargo-chef --locked
 WORKDIR /build
 
 FROM chef AS planner
@@ -14,9 +17,15 @@ RUN cargo chef prepare --recipe-path recipe.json --bin server-api
 
 FROM chef AS builder
 COPY --from=planner /build/recipe.json recipe.json
-RUN cargo chef cook --release --recipe-path recipe.json -p server-api
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/build/target \
+    cargo chef cook --release --recipe-path recipe.json -p server-api
 COPY . .
-RUN cargo build --release --locked -p server-api
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/build/target \
+    cargo build --release --locked -p server-api
 
 # Pure Rust binary, no subprocess/shell use -- distroless: no shell, no
 # package manager, nothing beyond libc and CA certs. This is the one
