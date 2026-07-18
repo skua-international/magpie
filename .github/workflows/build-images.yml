@@ -1,62 +1,55 @@
 name: Build and push images
 
-# Triggered off release.yml's completion, not its own push/tag triggers --
-# release.yml runs on every push to main and, if semantic-release decides
-# to cut a release, pushes a second (version-bump) commit itself. That
-# second push is App-authored, so it *does* re-trigger workflows -- if
-# this workflow also listened on push/tags directly, both the original
-# push and the version-bump push would independently start a build here,
-# with no ordering guarantee between the two. Whichever finished pushing
-# `latest` last would win, possibly leaving `latest` built from the
-# pre-bump commit even though a newer tagged release exists. Building
-# only after release.yml fully completes -- checked out at its exact
-# final head_sha -- makes this race impossible: exactly one build run per
-# push to main, always against whatever main looks like once any version
-# bump has already landed. Same fix shape as folding proto-stub
-# regeneration into release.yml itself (see that workflow's own comment).
+# Push-triggered directly (paths-filtered to what can actually change an
+# image), not chained off release.yml's completion via workflow_run --
+# workflow_run-triggered runs never show up on the triggering commit's
+# own checks list (GitHub only auto-associates push/pull_request triggers
+# that way), so that design traded a real, if narrow, correctness
+# guarantee for a UX regression on every single commit. Push-triggering
+# gets that back for free.
+#
+# The guarantee workflow_run chaining bought was ordering: release.yml
+# runs on every push to main and, if semantic-release decides to cut a
+# release, pushes a second (App-authored, so it re-triggers workflows)
+# version-bump commit itself moments later. Two independent push-triggered
+# runs -- one for the original commit, one for the bump commit -- could
+# finish in either order, and whichever pushed `latest` last would win,
+# possibly leaving it built from the pre-bump commit even though a newer
+# tagged release exists. The `concurrency` block below is what actually
+# prevents that: it cancels an in-progress run for an older commit the
+# instant a newer one on the same ref queues, so a push followed shortly
+# by a bump commit produces exactly one completed run -- the bump
+# commit's -- not a race between two.
+#
+# Nothing here depends on generated/go or generated/ts (only cli/magpie
+# and a future website would) -- crates/protocol's build.rs shells out to
+# protoc directly against proto/ at `cargo build` time, so every service
+# image here regenerates its own Rust bindings fresh on every build
+# regardless of whether release.yml has run yet. That's what makes
+# triggering directly off proto/service/chart changes safe at all.
 on:
-  workflow_run:
-    workflows: ["Release"]
-    types: [completed]
+  push:
+    branches: [main]
+    paths:
+      - "services/**"
+      - "crates/**"
+      - "proto/**"
+      - "charts/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/build-images.yml"
   workflow_dispatch: {}
+
+concurrency:
+  group: build-images-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   REGISTRY: ghcr.io
   IMAGE_BASE: ghcr.io/skua-international/magpie
 
 jobs:
-  # workflow_run-triggered runs never show up on the triggering commit's
-  # own checks list -- GitHub only associates push/pull_request-triggered
-  # runs with a commit automatically. Posting an explicit commit status
-  # here (pending now, success/failure in report-status below) is what
-  # makes "which build does this commit correspond to" visible on the
-  # commit page/PR checks at all, since the Actions tab alone doesn't show
-  # that association either for a workflow_run chain like this one.
-  resolve:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
-    permissions:
-      statuses: write
-    outputs:
-      sha: ${{ steps.sha.outputs.sha }}
-    steps:
-      - id: sha
-        run: echo "sha=${{ github.event.workflow_run.head_sha || github.sha }}" >> "$GITHUB_OUTPUT"
-      - uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.repos.createCommitStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              sha: '${{ steps.sha.outputs.sha }}',
-              state: 'pending',
-              context: 'images / build-and-push',
-              target_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-              description: 'Building and pushing images + chart...',
-            });
-
   build:
-    needs: resolve
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -80,13 +73,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # release.yml's own head_sha -- the version-bump commit (if
-          # semantic-release cut one) and its tag both already exist there
-          # by the time it completes. A plain checkout of `main` would
-          # usually land on the same commit, but pinning explicitly avoids
-          # any window where another push has already landed on main
-          # between release.yml finishing and this job starting.
-          ref: ${{ needs.resolve.outputs.sha }}
           fetch-tags: true
 
       - uses: docker/setup-buildx-action@v4
@@ -136,15 +122,12 @@ jobs:
   # login/auth this workflow's image builds already do, no separate hosting
   # to stand up.
   publish-chart:
-    needs: resolve
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.resolve.outputs.sha }}
 
       - uses: azure/setup-helm@v4
 
@@ -158,27 +141,3 @@ jobs:
         run: |
           helm package charts/magpie -d /tmp/chart-out
           helm push /tmp/chart-out/magpie-*.tgz oci://${{ env.IMAGE_BASE }}/charts
-
-  # Reports final pass/fail back onto the commit resolve.sha started a
-  # status on -- `if: always()` so a failed build/publish still gets
-  # reported instead of leaving the commit stuck on "pending" forever.
-  report-status:
-    needs: [resolve, build, publish-chart]
-    if: always() && needs.resolve.result == 'success'
-    runs-on: ubuntu-latest
-    permissions:
-      statuses: write
-    steps:
-      - uses: actions/github-script@v7
-        with:
-          script: |
-            const ok = '${{ needs.build.result }}' === 'success' && '${{ needs.publish-chart.result }}' === 'success';
-            await github.rest.repos.createCommitStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              sha: '${{ needs.resolve.outputs.sha }}',
-              state: ok ? 'success' : 'failure',
-              context: 'images / build-and-push',
-              target_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-              description: ok ? 'Images + chart published' : 'Image or chart build failed',
-            });
