@@ -3,10 +3,21 @@
 # genuinely different image, not a different tag of one image -- see each
 # section's own image.repository default below, which is what actually
 # gets used unless you override it). Images are built and pushed to GHCR
-# by .github/workflows/build-images.yml on push to main / version tags.
+# by .github/workflows/build-images.yml on every push to main that
+# touches something build-relevant, tagged with (among others) the exact
+# version from this same Chart.yaml -- see that workflow's "Resolve
+# version" step.
+#
+# Left empty here rather than "latest": the chart's own image helper
+# (_helpers.tpl's magpie.image) falls back to .Chart.AppVersion when this
+# is unset, so a plain `helm install`/`upgrade` at chart version X.Y.Z
+# deploys images tagged X.Y.Z by default -- reproducible by construction,
+# not whatever happens to be `latest` on the registry at that moment. Set
+# this explicitly (or use scripts/deploy.sh's version argument) to pin to
+# something else, e.g. a specific commit's short-sha tag.
 image:
   repository: ""
-  tag: latest
+  tag: ""
   pullPolicy: IfNotPresent
 
 # Names of existing docker-registry Secrets granting pull access, e.g. to

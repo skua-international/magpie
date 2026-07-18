@@ -38,7 +38,7 @@ override to the chart-wide default. Called as:
 */}}
 {{- define "magpie.image" -}}
 {{- $repo := .override.repository | default .root.Values.image.repository -}}
-{{- $tag := .override.tag | default .root.Values.image.tag -}}
+{{- $tag := .override.tag | default .root.Values.image.tag | default .root.Chart.AppVersion -}}
 {{- printf "%s:%s" $repo $tag -}}
 {{- end -}}
 

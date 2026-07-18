@@ -75,6 +75,22 @@ jobs:
         with:
           fetch-tags: true
 
+      # docker/metadata-action's `type=semver` tag rule only reads
+      # github.ref, so it only ever fires for an actual tag-push event --
+      # it silently produces nothing on a branch push, even though the
+      # release tag genuinely exists on this exact commit by the time
+      # this job runs (release.yml pushes the version-bump commit *and*
+      # its tag before completing, and both charts/magpie/Chart.yaml and
+      # every Cargo.toml get bumped to match in that same commit -- see
+      # scripts/bump-version.sh). Reading it straight from Chart.yaml
+      # gives an explicit, reliable version tag instead of relying on
+      # that auto-detection, which is what left every image untagged by
+      # version for every release so far -- only `latest`/branch/sha
+      # tags ever actually got published.
+      - name: Resolve version
+        id: version
+        run: echo "version=$(grep '^version:' charts/magpie/Chart.yaml | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
       - uses: docker/setup-buildx-action@v4
 
       - uses: docker/login-action@v4
@@ -89,8 +105,8 @@ jobs:
           images: ${{ env.IMAGE_BASE }}/${{ matrix.service.name }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ steps.version.outputs.version }}
             type=ref,event=branch
-            type=semver,pattern={{version}}
             type=sha,prefix=,format=short
 
       # All Dockerfiles build from the repo root (COPY . . -- every
