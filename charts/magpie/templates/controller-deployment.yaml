@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "magpie.fullname" . }}-controller
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ include "magpie.namespace" . }}
   labels:
     {{- include "magpie.labels" . | nindent 4 }}
     app.kubernetes.io/component: controller

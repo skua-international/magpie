@@ -100,3 +100,34 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=cargo
           cache-to: type=gha,mode=max,scope=cargo
+
+  # Separate job, not part of the image matrix above -- packaging/pushing
+  # the chart has nothing to do with any one service's Dockerfile. Publishes
+  # as an OCI artifact (`helm push`), not a traditional index.yaml/gh-pages
+  # chart repo -- OCI is the current recommended Helm distribution
+  # mechanism (stable since Helm 3.8) and reuses the exact same GHCR
+  # login/auth this workflow's image builds already do, no separate hosting
+  # to stand up.
+  publish-chart:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: azure/setup-helm@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package and push chart
+        run: |
+          helm package charts/magpie -d /tmp/chart-out
+          helm push /tmp/chart-out/magpie-*.tgz oci://${{ env.IMAGE_BASE }}/charts

@@ -4,14 +4,22 @@
 # workspace inherits its version from [workspace.package] (`version.workspace
 # = true`), so bumping is one edit to the root manifest, not one per crate
 # -- see Cargo.toml's own comment on why. Also bumps generated/ts's
-# package.json, the one other artifact in the repo with its own version
-# field. @semantic-release/git then commits whatever this touches, and
-# @semantic-release/github tags the resulting commit.
+# package.json and charts/magpie/Chart.yaml, the other artifacts in the
+# repo with their own version fields. @semantic-release/git then commits
+# whatever this touches, and @semantic-release/github tags the resulting
+# commit.
 set -euo pipefail
 
 VERSION="${1:?usage: bump-version.sh X.Y.Z}"
 
 sed -i -E "s/^version = \"[0-9]+\.[0-9]+\.[0-9]+\"\$/version = \"${VERSION}\"/" Cargo.toml
+
+# Chart.yaml's version is the chart's own package version (what `helm push`
+# publishes under); appVersion is just informational (the app version it
+# deploys) -- both track the same release version here since this repo has
+# no reason for them to diverge.
+sed -i -E "s/^version: [0-9]+\.[0-9]+\.[0-9]+\$/version: ${VERSION}/" charts/magpie/Chart.yaml
+sed -i -E "s/^appVersion: \"[0-9]+\.[0-9]+\.[0-9]+\"\$/appVersion: \"${VERSION}\"/" charts/magpie/Chart.yaml
 
 python3 - "$VERSION" <<'EOF'
 import json

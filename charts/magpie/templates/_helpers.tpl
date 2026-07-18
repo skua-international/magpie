@@ -12,12 +12,23 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 
+{{/*
+This chart's own dedicated namespace -- every resource it creates lands
+here regardless of whatever namespace `helm install`/`upgrade` itself was
+invoked with, so a plain `helm install` can never accidentally dump
+everything into `default` (or wherever the operator's kubectl context
+happens to be pointed). See templates/namespace.yaml, which creates it.
+*/}}
+{{- define "magpie.namespace" -}}
+{{- .Values.namespace -}}
+{{- end -}}
+
 {{- define "magpie.controllerNamespace" -}}
-{{- .Values.controller.namespace | default .Release.Namespace -}}
+{{- .Values.controller.namespace | default (include "magpie.namespace" .) -}}
 {{- end -}}
 
 {{- define "magpie.serverApiNamespace" -}}
-{{- .Values.serverApi.namespace | default .Release.Namespace -}}
+{{- .Values.serverApi.namespace | default (include "magpie.namespace" .) -}}
 {{- end -}}
 
 {{/*

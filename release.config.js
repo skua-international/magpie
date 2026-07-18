@@ -20,7 +20,7 @@ module.exports = {
         // comment for why it's done there and not in a separately
         // triggered workflow) -- picked up here alongside the version
         // bump so one commit covers both, atomically.
-        assets: ["Cargo.toml", "Cargo.lock", "generated/go/**", "generated/ts/**"],
+        assets: ["Cargo.toml", "Cargo.lock", "generated/go/**", "generated/ts/**", "charts/magpie/Chart.yaml"],
         // [skip ci]: this push is App-authored (see release.yml), which
         // *does* trigger other workflows -- without this marker it would
         // re-trigger release.yml itself on its own version-bump commit.

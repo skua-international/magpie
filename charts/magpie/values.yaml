@@ -21,6 +21,15 @@ imagePullSecrets: []
 # launcher Pod. Not deployed by this chart itself -- just referenced.
 launcherImage: ghcr.io/skua-international/magpie/launcher:latest
 
+# Every resource this chart creates lands here, regardless of what
+# namespace `helm install`/`upgrade` itself was invoked with -- a plain
+# `helm install arma charts/magpie` (no -n flag) can never accidentally
+# dump everything into `default`. The chart creates this namespace itself
+# (templates/namespace.yaml); `helm uninstall` still cleans it up
+# correctly regardless, since Helm tracks exactly what it created, not
+# just what's in the invoking namespace.
+namespace: magpie
+
 # services/server-api, services/identity, and services/registry are
 # ClusterIP-only -- reached from outside the cluster via the Ingress
 # resources this chart also creates (see ingress.* below), fronted by

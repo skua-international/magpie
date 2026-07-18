@@ -3,7 +3,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: {{ include "magpie.fullname" . }}-controller
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ include "magpie.namespace" . }}
   labels:
     {{- include "magpie.labels" . | nindent 4 }}
 ---
@@ -50,5 +50,5 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: {{ include "magpie.fullname" . }}-controller
-    namespace: {{ .Release.Namespace }}
+    namespace: {{ include "magpie.namespace" . }}
 {{- end }}
