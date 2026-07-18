@@ -26,6 +26,13 @@ var (
 	serverAPIURL  string
 	registryURL   string
 	loginProvider string
+
+	// providerFlagChanged is captured once in Root's PersistentPreRun,
+	// before any subcommand's RunE -- doLogin can be reached from many
+	// places that don't have the *cobra.Command in hand (ensureCredentials'
+	// auto-login fallback in particular), so this is the one place that
+	// knows whether --provider was actually passed vs. left at its default.
+	providerFlagChanged bool
 )
 
 func Root() *cobra.Command {
@@ -43,6 +50,11 @@ func Root() *cobra.Command {
 		// default completion command is disabled here to avoid a
 		// name collision.
 		CompletionOptions: cobra.CompletionOptions{DisableDefaultCmd: true},
+		PersistentPreRun: func(c *cobra.Command, _ []string) {
+			if f := c.Root().PersistentFlags().Lookup("provider"); f != nil {
+				providerFlagChanged = f.Changed
+			}
+		},
 		RunE: func(c *cobra.Command, _ []string) error {
 			return runTUI(c.Context())
 		},
@@ -64,28 +76,9 @@ func loginCmd() *cobra.Command {
 		Use:   "login",
 		Short: "Log in to the cluster via your browser (shortcut for `magpie auth login`)",
 		RunE: func(c *cobra.Command, _ []string) error {
-			return runLogin(c)
+			return doLogin(c.Context())
 		},
 	}
-}
-
-// runLogin prompts for a provider first if the caller didn't pass
-// --provider explicitly and stdin looks interactive -- matching `gh auth
-// login`'s "which account do you want to log in with" prompt instead of
-// silently defaulting to Steam every time.
-func runLogin(c *cobra.Command) error {
-	providerChanged := false
-	if f := c.Root().PersistentFlags().Lookup("provider"); f != nil {
-		providerChanged = f.Changed
-	}
-	if !providerChanged && term.IsTerminal(int(os.Stdin.Fd())) {
-		chosen, err := promptProvider()
-		if err != nil {
-			return err
-		}
-		loginProvider = chosen
-	}
-	return doLogin(c.Context())
 }
 
 func promptProvider() (string, error) {
@@ -111,7 +104,20 @@ func promptProvider() (string, error) {
 	return "", fmt.Errorf("unrecognized provider %q", line)
 }
 
+// doLogin is the single entry point every path funnels through --
+// `login`, `auth login`, and ensureCredentials' auto-login fallback (bare
+// `magpie`, or any subcommand run with no stored session yet) -- so the
+// provider prompt below fires exactly once, everywhere, rather than only
+// on the paths that happened to call it explicitly.
 func doLogin(ctx context.Context) error {
+	if !providerFlagChanged && term.IsTerminal(int(os.Stdin.Fd())) {
+		chosen, err := promptProvider()
+		if err != nil {
+			return err
+		}
+		loginProvider = chosen
+	}
+
 	loginCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 

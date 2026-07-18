@@ -24,7 +24,7 @@ func authLoginCmd() *cobra.Command {
 		Use:   "login",
 		Short: "Log in to the cluster via your browser",
 		RunE: func(c *cobra.Command, _ []string) error {
-			return runLogin(c)
+			return doLogin(c.Context())
 		},
 	}
 }
