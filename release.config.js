@@ -21,10 +21,14 @@ module.exports = {
         // triggered workflow) -- picked up here alongside the version
         // bump so one commit covers both, atomically.
         assets: ["Cargo.toml", "Cargo.lock", "generated/go/**", "generated/ts/**", "charts/magpie/Chart.yaml"],
-        // [skip ci]: this push is App-authored (see release.yml), which
-        // *does* trigger other workflows -- without this marker it would
-        // re-trigger release.yml itself on its own version-bump commit.
-        message: "chore(release): ${nextRelease.version} [skip ci]",
+        // Deliberately NOT `[skip ci]` -- that's a blanket GitHub
+        // mechanism that skips *every* push-triggered workflow for this
+        // commit, not just release.yml, and build-images.yml needs to
+        // fire on exactly this commit (it's the one carrying the real
+        // version tag). release.yml guards against re-triggering on its
+        // own bump commit with an explicit `if:` on the commit message
+        // prefix instead -- see that workflow's own comment.
+        message: "chore(release): ${nextRelease.version}",
       },
     ],
     [

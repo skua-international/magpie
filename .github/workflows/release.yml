@@ -43,6 +43,18 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # semantic-release's own version-bump commit (App-authored, so it does
+    # re-trigger push workflows -- see the App-token comment above) would
+    # otherwise start a second release.yml run against a commit that has
+    # nothing new to release, which is at best wasted work and at worst a
+    # race with the run that's still finishing. Guarding on the commit
+    # message prefix (release.config.js's @semantic-release/git message,
+    # kept in sync with this string) rather than GitHub's blanket
+    # `[skip ci]` convention is deliberate: `[skip ci]` skips *every*
+    # push-triggered workflow for that commit repo-wide, and
+    # build-images.yml specifically needs to fire on exactly this commit
+    # -- it's the one carrying the real version tag.
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     permissions:
       contents: write
     steps:
