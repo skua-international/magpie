@@ -58,3 +58,16 @@ func Load() (*Credentials, error) {
 	}
 	return &creds, nil
 }
+
+// Clear removes the stored session, if any. Not an error if the caller
+// was already logged out.
+func Clear() error {
+	path, err := configPath()
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
+}

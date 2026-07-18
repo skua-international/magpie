@@ -5,12 +5,17 @@
 package cmd
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/skua-international/magpie/cli/internal/auth"
 	"github.com/skua-international/magpie/cli/internal/client"
@@ -28,7 +33,16 @@ func Root() *cobra.Command {
 		Use:   "magpie",
 		Short: "Manage a magpie-orchestrated Arma 3 cluster",
 		Long: "magpie is both a direct CLI and, with no subcommand, an interactive TUI " +
-			"for managing servers, mod sources, and missions on a magpie cluster.",
+			"for managing servers, mod sources, and missions on a magpie cluster.\n\n" +
+			"You log in to the cluster itself (identity is the cluster's own account system) -- " +
+			"--provider only picks which external OAuth2/OIDC service vouches for who you are. " +
+			"The cluster has no username/password of its own to avoid re-implementing what Steam/" +
+			"Discord/GitHub/Google already do securely.",
+		// Shell completions are hand-rolled in completion.go (with an
+		// `install` subcommand cobra's default doesn't offer), so the
+		// default completion command is disabled here to avoid a
+		// name collision.
+		CompletionOptions: cobra.CompletionOptions{DisableDefaultCmd: true},
 		RunE: func(c *cobra.Command, _ []string) error {
 			return runTUI(c.Context())
 		},
@@ -37,20 +51,64 @@ func Root() *cobra.Command {
 	root.PersistentFlags().StringVar(&identityURL, "identity-url", "http://identity.magpie.local", "base URL of the identity service")
 	root.PersistentFlags().StringVar(&serverAPIURL, "server-api-url", "http://server-api.magpie.local", "base URL of server-api")
 	root.PersistentFlags().StringVar(&registryURL, "registry-url", "http://registry.magpie.local", "base URL of registry")
-	root.PersistentFlags().StringVar(&loginProvider, "provider", "steam", "login provider: steam, discord, github, or google")
+	root.PersistentFlags().StringVar(&loginProvider, "provider", "steam", "login provider: steam, discord, github, or google (prompts interactively if omitted on a TTY)")
 
-	root.AddCommand(loginCmd(), accountCmd(), serversCmd(), modsCmd(), missionsCmd(), adminCmd())
+	root.AddCommand(loginCmd(), authCmd(), accountCmd(), serversCmd(), modsCmd(), missionsCmd(), adminCmd(), completionCmd())
 	return root
 }
 
+// loginCmd is kept as a top-level shortcut for `magpie auth login` --
+// same command, just less to type for the common case.
 func loginCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "login",
-		Short: "Log in via browser and save the session",
+		Short: "Log in to the cluster via your browser (shortcut for `magpie auth login`)",
 		RunE: func(c *cobra.Command, _ []string) error {
-			return doLogin(c.Context())
+			return runLogin(c)
 		},
 	}
+}
+
+// runLogin prompts for a provider first if the caller didn't pass
+// --provider explicitly and stdin looks interactive -- matching `gh auth
+// login`'s "which account do you want to log in with" prompt instead of
+// silently defaulting to Steam every time.
+func runLogin(c *cobra.Command) error {
+	providerChanged := false
+	if f := c.Root().PersistentFlags().Lookup("provider"); f != nil {
+		providerChanged = f.Changed
+	}
+	if !providerChanged && term.IsTerminal(int(os.Stdin.Fd())) {
+		chosen, err := promptProvider()
+		if err != nil {
+			return err
+		}
+		loginProvider = chosen
+	}
+	return doLogin(c.Context())
+}
+
+func promptProvider() (string, error) {
+	options := []string{"steam", "discord", "github", "google"}
+	fmt.Println("? Which account would you like to log in with?")
+	for i, o := range options {
+		fmt.Printf("  %d. %s\n", i+1, o)
+	}
+	fmt.Print("> ")
+	line, err := bufio.NewReader(os.Stdin).ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+	line = strings.TrimSpace(line)
+	if n, err := strconv.Atoi(line); err == nil && n >= 1 && n <= len(options) {
+		return options[n-1], nil
+	}
+	for _, o := range options {
+		if strings.EqualFold(o, line) {
+			return o, nil
+		}
+	}
+	return "", fmt.Errorf("unrecognized provider %q", line)
 }
 
 func doLogin(ctx context.Context) error {
