@@ -50,6 +50,18 @@ const (
 	// SyncServiceRefreshSourceProcedure is the fully-qualified name of the SyncService's RefreshSource
 	// RPC.
 	SyncServiceRefreshSourceProcedure = "/sync.v1.SyncService/RefreshSource"
+	// SyncServiceListSyncedModsProcedure is the fully-qualified name of the SyncService's
+	// ListSyncedMods RPC.
+	SyncServiceListSyncedModsProcedure = "/sync.v1.SyncService/ListSyncedMods"
+	// SyncServiceInvalidateModProcedure is the fully-qualified name of the SyncService's InvalidateMod
+	// RPC.
+	SyncServiceInvalidateModProcedure = "/sync.v1.SyncService/InvalidateMod"
+	// SyncServiceGetSyncedModProcedure is the fully-qualified name of the SyncService's GetSyncedMod
+	// RPC.
+	SyncServiceGetSyncedModProcedure = "/sync.v1.SyncService/GetSyncedMod"
+	// SyncServiceGetSyncStatsProcedure is the fully-qualified name of the SyncService's GetSyncStats
+	// RPC.
+	SyncServiceGetSyncStatsProcedure = "/sync.v1.SyncService/GetSyncStats"
 )
 
 // SyncServiceClient is a client for the sync.v1.SyncService service.
@@ -89,6 +101,26 @@ type SyncServiceClient interface {
 	// UpdateServer/StartServer RPCs ("force resync this server's mod
 	// sources") -- callers don't need to remember/resupply candidate IDs.
 	RefreshSource(context.Context, *connect.Request[v1.RefreshSourceRequest]) (*connect.Response[v1.RefreshSourceResponse], error)
+	// Every workshop mod ID currently tracked as verified-synced, and the
+	// manifest_id it was last verified at. A plain read of the sync cache --
+	// no Steam calls, no depot state (server/CDLC depots aren't included,
+	// only workshop mods).
+	ListSyncedMods(context.Context, *connect.Request[v1.ListSyncedModsRequest]) (*connect.Response[v1.ListSyncedModsResponse], error)
+	// Clear one mod's "last verified" marker only -- never deletes its files
+	// on disk. The next resolve pass genuinely re-verifies that mod's chunks
+	// against Steam's current manifest, redownloading only whatever's
+	// actually missing or divergent. Deliberately not a real
+	// wipe-and-redownload -- this is the restricted, non-destructive shape
+	// of "force refresh a mod's cache".
+	InvalidateMod(context.Context, *connect.Request[v1.InvalidateModRequest]) (*connect.Response[v1.InvalidateModResponse], error)
+	// A single mod's synced state plus every source_id currently
+	// referencing it -- one extra query beyond ListSyncedMods, so kept
+	// separate rather than having every list entry pay for it.
+	GetSyncedMod(context.Context, *connect.Request[v1.GetSyncedModRequest]) (*connect.Response[v1.GetSyncedModResponse], error)
+	// Cluster-wide totals: every synced mod's size deduplicated across
+	// sources, plus base game/CDLC depot size -- for registry's
+	// AdminService.GetDiskUsage.
+	GetSyncStats(context.Context, *connect.Request[v1.GetSyncStatsRequest]) (*connect.Response[v1.GetSyncStatsResponse], error)
 }
 
 // NewSyncServiceClient constructs a client for the sync.v1.SyncService service. By default, it uses
@@ -138,6 +170,30 @@ func NewSyncServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(syncServiceMethods.ByName("RefreshSource")),
 			connect.WithClientOptions(opts...),
 		),
+		listSyncedMods: connect.NewClient[v1.ListSyncedModsRequest, v1.ListSyncedModsResponse](
+			httpClient,
+			baseURL+SyncServiceListSyncedModsProcedure,
+			connect.WithSchema(syncServiceMethods.ByName("ListSyncedMods")),
+			connect.WithClientOptions(opts...),
+		),
+		invalidateMod: connect.NewClient[v1.InvalidateModRequest, v1.InvalidateModResponse](
+			httpClient,
+			baseURL+SyncServiceInvalidateModProcedure,
+			connect.WithSchema(syncServiceMethods.ByName("InvalidateMod")),
+			connect.WithClientOptions(opts...),
+		),
+		getSyncedMod: connect.NewClient[v1.GetSyncedModRequest, v1.GetSyncedModResponse](
+			httpClient,
+			baseURL+SyncServiceGetSyncedModProcedure,
+			connect.WithSchema(syncServiceMethods.ByName("GetSyncedMod")),
+			connect.WithClientOptions(opts...),
+		),
+		getSyncStats: connect.NewClient[v1.GetSyncStatsRequest, v1.GetSyncStatsResponse](
+			httpClient,
+			baseURL+SyncServiceGetSyncStatsProcedure,
+			connect.WithSchema(syncServiceMethods.ByName("GetSyncStats")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -149,6 +205,10 @@ type syncServiceClient struct {
 	getClaimStatus   *connect.Client[v1.GetClaimStatusRequest, v1.GetClaimStatusResponse]
 	getSourceMods    *connect.Client[v1.GetSourceModsRequest, v1.GetSourceModsResponse]
 	refreshSource    *connect.Client[v1.RefreshSourceRequest, v1.RefreshSourceResponse]
+	listSyncedMods   *connect.Client[v1.ListSyncedModsRequest, v1.ListSyncedModsResponse]
+	invalidateMod    *connect.Client[v1.InvalidateModRequest, v1.InvalidateModResponse]
+	getSyncedMod     *connect.Client[v1.GetSyncedModRequest, v1.GetSyncedModResponse]
+	getSyncStats     *connect.Client[v1.GetSyncStatsRequest, v1.GetSyncStatsResponse]
 }
 
 // RegisterSource calls sync.v1.SyncService.RegisterSource.
@@ -179,6 +239,26 @@ func (c *syncServiceClient) GetSourceMods(ctx context.Context, req *connect.Requ
 // RefreshSource calls sync.v1.SyncService.RefreshSource.
 func (c *syncServiceClient) RefreshSource(ctx context.Context, req *connect.Request[v1.RefreshSourceRequest]) (*connect.Response[v1.RefreshSourceResponse], error) {
 	return c.refreshSource.CallUnary(ctx, req)
+}
+
+// ListSyncedMods calls sync.v1.SyncService.ListSyncedMods.
+func (c *syncServiceClient) ListSyncedMods(ctx context.Context, req *connect.Request[v1.ListSyncedModsRequest]) (*connect.Response[v1.ListSyncedModsResponse], error) {
+	return c.listSyncedMods.CallUnary(ctx, req)
+}
+
+// InvalidateMod calls sync.v1.SyncService.InvalidateMod.
+func (c *syncServiceClient) InvalidateMod(ctx context.Context, req *connect.Request[v1.InvalidateModRequest]) (*connect.Response[v1.InvalidateModResponse], error) {
+	return c.invalidateMod.CallUnary(ctx, req)
+}
+
+// GetSyncedMod calls sync.v1.SyncService.GetSyncedMod.
+func (c *syncServiceClient) GetSyncedMod(ctx context.Context, req *connect.Request[v1.GetSyncedModRequest]) (*connect.Response[v1.GetSyncedModResponse], error) {
+	return c.getSyncedMod.CallUnary(ctx, req)
+}
+
+// GetSyncStats calls sync.v1.SyncService.GetSyncStats.
+func (c *syncServiceClient) GetSyncStats(ctx context.Context, req *connect.Request[v1.GetSyncStatsRequest]) (*connect.Response[v1.GetSyncStatsResponse], error) {
+	return c.getSyncStats.CallUnary(ctx, req)
 }
 
 // SyncServiceHandler is an implementation of the sync.v1.SyncService service.
@@ -218,6 +298,26 @@ type SyncServiceHandler interface {
 	// UpdateServer/StartServer RPCs ("force resync this server's mod
 	// sources") -- callers don't need to remember/resupply candidate IDs.
 	RefreshSource(context.Context, *connect.Request[v1.RefreshSourceRequest]) (*connect.Response[v1.RefreshSourceResponse], error)
+	// Every workshop mod ID currently tracked as verified-synced, and the
+	// manifest_id it was last verified at. A plain read of the sync cache --
+	// no Steam calls, no depot state (server/CDLC depots aren't included,
+	// only workshop mods).
+	ListSyncedMods(context.Context, *connect.Request[v1.ListSyncedModsRequest]) (*connect.Response[v1.ListSyncedModsResponse], error)
+	// Clear one mod's "last verified" marker only -- never deletes its files
+	// on disk. The next resolve pass genuinely re-verifies that mod's chunks
+	// against Steam's current manifest, redownloading only whatever's
+	// actually missing or divergent. Deliberately not a real
+	// wipe-and-redownload -- this is the restricted, non-destructive shape
+	// of "force refresh a mod's cache".
+	InvalidateMod(context.Context, *connect.Request[v1.InvalidateModRequest]) (*connect.Response[v1.InvalidateModResponse], error)
+	// A single mod's synced state plus every source_id currently
+	// referencing it -- one extra query beyond ListSyncedMods, so kept
+	// separate rather than having every list entry pay for it.
+	GetSyncedMod(context.Context, *connect.Request[v1.GetSyncedModRequest]) (*connect.Response[v1.GetSyncedModResponse], error)
+	// Cluster-wide totals: every synced mod's size deduplicated across
+	// sources, plus base game/CDLC depot size -- for registry's
+	// AdminService.GetDiskUsage.
+	GetSyncStats(context.Context, *connect.Request[v1.GetSyncStatsRequest]) (*connect.Response[v1.GetSyncStatsResponse], error)
 }
 
 // NewSyncServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -263,6 +363,30 @@ func NewSyncServiceHandler(svc SyncServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(syncServiceMethods.ByName("RefreshSource")),
 		connect.WithHandlerOptions(opts...),
 	)
+	syncServiceListSyncedModsHandler := connect.NewUnaryHandler(
+		SyncServiceListSyncedModsProcedure,
+		svc.ListSyncedMods,
+		connect.WithSchema(syncServiceMethods.ByName("ListSyncedMods")),
+		connect.WithHandlerOptions(opts...),
+	)
+	syncServiceInvalidateModHandler := connect.NewUnaryHandler(
+		SyncServiceInvalidateModProcedure,
+		svc.InvalidateMod,
+		connect.WithSchema(syncServiceMethods.ByName("InvalidateMod")),
+		connect.WithHandlerOptions(opts...),
+	)
+	syncServiceGetSyncedModHandler := connect.NewUnaryHandler(
+		SyncServiceGetSyncedModProcedure,
+		svc.GetSyncedMod,
+		connect.WithSchema(syncServiceMethods.ByName("GetSyncedMod")),
+		connect.WithHandlerOptions(opts...),
+	)
+	syncServiceGetSyncStatsHandler := connect.NewUnaryHandler(
+		SyncServiceGetSyncStatsProcedure,
+		svc.GetSyncStats,
+		connect.WithSchema(syncServiceMethods.ByName("GetSyncStats")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/sync.v1.SyncService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SyncServiceRegisterSourceProcedure:
@@ -277,6 +401,14 @@ func NewSyncServiceHandler(svc SyncServiceHandler, opts ...connect.HandlerOption
 			syncServiceGetSourceModsHandler.ServeHTTP(w, r)
 		case SyncServiceRefreshSourceProcedure:
 			syncServiceRefreshSourceHandler.ServeHTTP(w, r)
+		case SyncServiceListSyncedModsProcedure:
+			syncServiceListSyncedModsHandler.ServeHTTP(w, r)
+		case SyncServiceInvalidateModProcedure:
+			syncServiceInvalidateModHandler.ServeHTTP(w, r)
+		case SyncServiceGetSyncedModProcedure:
+			syncServiceGetSyncedModHandler.ServeHTTP(w, r)
+		case SyncServiceGetSyncStatsProcedure:
+			syncServiceGetSyncStatsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -308,4 +440,20 @@ func (UnimplementedSyncServiceHandler) GetSourceMods(context.Context, *connect.R
 
 func (UnimplementedSyncServiceHandler) RefreshSource(context.Context, *connect.Request[v1.RefreshSourceRequest]) (*connect.Response[v1.RefreshSourceResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sync.v1.SyncService.RefreshSource is not implemented"))
+}
+
+func (UnimplementedSyncServiceHandler) ListSyncedMods(context.Context, *connect.Request[v1.ListSyncedModsRequest]) (*connect.Response[v1.ListSyncedModsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sync.v1.SyncService.ListSyncedMods is not implemented"))
+}
+
+func (UnimplementedSyncServiceHandler) InvalidateMod(context.Context, *connect.Request[v1.InvalidateModRequest]) (*connect.Response[v1.InvalidateModResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sync.v1.SyncService.InvalidateMod is not implemented"))
+}
+
+func (UnimplementedSyncServiceHandler) GetSyncedMod(context.Context, *connect.Request[v1.GetSyncedModRequest]) (*connect.Response[v1.GetSyncedModResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sync.v1.SyncService.GetSyncedMod is not implemented"))
+}
+
+func (UnimplementedSyncServiceHandler) GetSyncStats(context.Context, *connect.Request[v1.GetSyncStatsRequest]) (*connect.Response[v1.GetSyncStatsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sync.v1.SyncService.GetSyncStats is not implemented"))
 }

@@ -25,6 +25,8 @@ const (
 	ModSourceServiceName = "registry.v1.ModSourceService"
 	// MissionServiceName is the fully-qualified name of the MissionService service.
 	MissionServiceName = "registry.v1.MissionService"
+	// AdminServiceName is the fully-qualified name of the AdminService service.
+	AdminServiceName = "registry.v1.AdminService"
 )
 
 // These constants are the fully-qualified names of the RPCs defined in this package. They're
@@ -44,6 +46,18 @@ const (
 	// ModSourceServiceListModSourcesProcedure is the fully-qualified name of the ModSourceService's
 	// ListModSources RPC.
 	ModSourceServiceListModSourcesProcedure = "/registry.v1.ModSourceService/ListModSources"
+	// ModSourceServiceSyncModSourceProcedure is the fully-qualified name of the ModSourceService's
+	// SyncModSource RPC.
+	ModSourceServiceSyncModSourceProcedure = "/registry.v1.ModSourceService/SyncModSource"
+	// ModSourceServiceListSyncedModsProcedure is the fully-qualified name of the ModSourceService's
+	// ListSyncedMods RPC.
+	ModSourceServiceListSyncedModsProcedure = "/registry.v1.ModSourceService/ListSyncedMods"
+	// ModSourceServiceInvalidateModProcedure is the fully-qualified name of the ModSourceService's
+	// InvalidateMod RPC.
+	ModSourceServiceInvalidateModProcedure = "/registry.v1.ModSourceService/InvalidateMod"
+	// ModSourceServiceGetSyncedModProcedure is the fully-qualified name of the ModSourceService's
+	// GetSyncedMod RPC.
+	ModSourceServiceGetSyncedModProcedure = "/registry.v1.ModSourceService/GetSyncedMod"
 	// MissionServiceUploadMissionProcedure is the fully-qualified name of the MissionService's
 	// UploadMission RPC.
 	MissionServiceUploadMissionProcedure = "/registry.v1.MissionService/UploadMission"
@@ -56,6 +70,9 @@ const (
 	// MissionServiceDeleteMissionProcedure is the fully-qualified name of the MissionService's
 	// DeleteMission RPC.
 	MissionServiceDeleteMissionProcedure = "/registry.v1.MissionService/DeleteMission"
+	// AdminServiceGetDiskUsageProcedure is the fully-qualified name of the AdminService's GetDiskUsage
+	// RPC.
+	AdminServiceGetDiskUsageProcedure = "/registry.v1.AdminService/GetDiskUsage"
 )
 
 // ModSourceServiceClient is a client for the registry.v1.ModSourceService service.
@@ -63,6 +80,28 @@ type ModSourceServiceClient interface {
 	AddModSource(context.Context, *connect.Request[v1.AddModSourceRequest]) (*connect.Response[v1.AddModSourceResponse], error)
 	DeleteModSource(context.Context, *connect.Request[v1.DeleteModSourceRequest]) (*connect.Response[v1.DeleteModSourceResponse], error)
 	ListModSources(context.Context, *connect.Request[v1.ListModSourcesRequest]) (*connect.Response[v1.ListModSourcesResponse], error)
+	// Force one source to be re-resolved and a claim job started covering
+	// the full current desired state -- doesn't wait for the claim to
+	// finish, same fire-and-forget shape as sync-daemon's own Claim(). Same
+	// scope as AddModSource: this is a relatively harmless operation
+	// (re-resolve + sync whatever's actually desired, nothing destructive).
+	SyncModSource(context.Context, *connect.Request[v1.SyncModSourceRequest]) (*connect.Response[v1.SyncModSourceResponse], error)
+	// Every workshop mod ID currently tracked as verified-synced, and the
+	// manifest_id it was last verified at -- independent of any source
+	// (a mod can outlive/predate the source that first pulled it in).
+	ListSyncedMods(context.Context, *connect.Request[v1.ListSyncedModsRequest]) (*connect.Response[v1.ListSyncedModsResponse], error)
+	// Clear one mod's verification cache only -- never deletes its files.
+	// The next sync genuinely re-verifies it against Steam's current
+	// manifest, redownloading only whatever's actually missing or
+	// divergent. Deliberately not real file deletion (see the RPC's own
+	// restricted scope, distinct from mod-sources:write) -- a mod can be
+	// shared by other sources or by servers currently running content
+	// claimed from it, and a claim is its own independent copy that's never
+	// touched by anything done to the shared golden tree afterward.
+	InvalidateMod(context.Context, *connect.Request[v1.InvalidateModRequest]) (*connect.Response[v1.InvalidateModResponse], error)
+	// A single mod's synced state (title, on-disk size) plus every mod
+	// source currently referencing it.
+	GetSyncedMod(context.Context, *connect.Request[v1.GetSyncedModRequest]) (*connect.Response[v1.GetSyncedModResponse], error)
 }
 
 // NewModSourceServiceClient constructs a client for the registry.v1.ModSourceService service. By
@@ -94,6 +133,30 @@ func NewModSourceServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(modSourceServiceMethods.ByName("ListModSources")),
 			connect.WithClientOptions(opts...),
 		),
+		syncModSource: connect.NewClient[v1.SyncModSourceRequest, v1.SyncModSourceResponse](
+			httpClient,
+			baseURL+ModSourceServiceSyncModSourceProcedure,
+			connect.WithSchema(modSourceServiceMethods.ByName("SyncModSource")),
+			connect.WithClientOptions(opts...),
+		),
+		listSyncedMods: connect.NewClient[v1.ListSyncedModsRequest, v1.ListSyncedModsResponse](
+			httpClient,
+			baseURL+ModSourceServiceListSyncedModsProcedure,
+			connect.WithSchema(modSourceServiceMethods.ByName("ListSyncedMods")),
+			connect.WithClientOptions(opts...),
+		),
+		invalidateMod: connect.NewClient[v1.InvalidateModRequest, v1.InvalidateModResponse](
+			httpClient,
+			baseURL+ModSourceServiceInvalidateModProcedure,
+			connect.WithSchema(modSourceServiceMethods.ByName("InvalidateMod")),
+			connect.WithClientOptions(opts...),
+		),
+		getSyncedMod: connect.NewClient[v1.GetSyncedModRequest, v1.GetSyncedModResponse](
+			httpClient,
+			baseURL+ModSourceServiceGetSyncedModProcedure,
+			connect.WithSchema(modSourceServiceMethods.ByName("GetSyncedMod")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -102,6 +165,10 @@ type modSourceServiceClient struct {
 	addModSource    *connect.Client[v1.AddModSourceRequest, v1.AddModSourceResponse]
 	deleteModSource *connect.Client[v1.DeleteModSourceRequest, v1.DeleteModSourceResponse]
 	listModSources  *connect.Client[v1.ListModSourcesRequest, v1.ListModSourcesResponse]
+	syncModSource   *connect.Client[v1.SyncModSourceRequest, v1.SyncModSourceResponse]
+	listSyncedMods  *connect.Client[v1.ListSyncedModsRequest, v1.ListSyncedModsResponse]
+	invalidateMod   *connect.Client[v1.InvalidateModRequest, v1.InvalidateModResponse]
+	getSyncedMod    *connect.Client[v1.GetSyncedModRequest, v1.GetSyncedModResponse]
 }
 
 // AddModSource calls registry.v1.ModSourceService.AddModSource.
@@ -119,11 +186,53 @@ func (c *modSourceServiceClient) ListModSources(ctx context.Context, req *connec
 	return c.listModSources.CallUnary(ctx, req)
 }
 
+// SyncModSource calls registry.v1.ModSourceService.SyncModSource.
+func (c *modSourceServiceClient) SyncModSource(ctx context.Context, req *connect.Request[v1.SyncModSourceRequest]) (*connect.Response[v1.SyncModSourceResponse], error) {
+	return c.syncModSource.CallUnary(ctx, req)
+}
+
+// ListSyncedMods calls registry.v1.ModSourceService.ListSyncedMods.
+func (c *modSourceServiceClient) ListSyncedMods(ctx context.Context, req *connect.Request[v1.ListSyncedModsRequest]) (*connect.Response[v1.ListSyncedModsResponse], error) {
+	return c.listSyncedMods.CallUnary(ctx, req)
+}
+
+// InvalidateMod calls registry.v1.ModSourceService.InvalidateMod.
+func (c *modSourceServiceClient) InvalidateMod(ctx context.Context, req *connect.Request[v1.InvalidateModRequest]) (*connect.Response[v1.InvalidateModResponse], error) {
+	return c.invalidateMod.CallUnary(ctx, req)
+}
+
+// GetSyncedMod calls registry.v1.ModSourceService.GetSyncedMod.
+func (c *modSourceServiceClient) GetSyncedMod(ctx context.Context, req *connect.Request[v1.GetSyncedModRequest]) (*connect.Response[v1.GetSyncedModResponse], error) {
+	return c.getSyncedMod.CallUnary(ctx, req)
+}
+
 // ModSourceServiceHandler is an implementation of the registry.v1.ModSourceService service.
 type ModSourceServiceHandler interface {
 	AddModSource(context.Context, *connect.Request[v1.AddModSourceRequest]) (*connect.Response[v1.AddModSourceResponse], error)
 	DeleteModSource(context.Context, *connect.Request[v1.DeleteModSourceRequest]) (*connect.Response[v1.DeleteModSourceResponse], error)
 	ListModSources(context.Context, *connect.Request[v1.ListModSourcesRequest]) (*connect.Response[v1.ListModSourcesResponse], error)
+	// Force one source to be re-resolved and a claim job started covering
+	// the full current desired state -- doesn't wait for the claim to
+	// finish, same fire-and-forget shape as sync-daemon's own Claim(). Same
+	// scope as AddModSource: this is a relatively harmless operation
+	// (re-resolve + sync whatever's actually desired, nothing destructive).
+	SyncModSource(context.Context, *connect.Request[v1.SyncModSourceRequest]) (*connect.Response[v1.SyncModSourceResponse], error)
+	// Every workshop mod ID currently tracked as verified-synced, and the
+	// manifest_id it was last verified at -- independent of any source
+	// (a mod can outlive/predate the source that first pulled it in).
+	ListSyncedMods(context.Context, *connect.Request[v1.ListSyncedModsRequest]) (*connect.Response[v1.ListSyncedModsResponse], error)
+	// Clear one mod's verification cache only -- never deletes its files.
+	// The next sync genuinely re-verifies it against Steam's current
+	// manifest, redownloading only whatever's actually missing or
+	// divergent. Deliberately not real file deletion (see the RPC's own
+	// restricted scope, distinct from mod-sources:write) -- a mod can be
+	// shared by other sources or by servers currently running content
+	// claimed from it, and a claim is its own independent copy that's never
+	// touched by anything done to the shared golden tree afterward.
+	InvalidateMod(context.Context, *connect.Request[v1.InvalidateModRequest]) (*connect.Response[v1.InvalidateModResponse], error)
+	// A single mod's synced state (title, on-disk size) plus every mod
+	// source currently referencing it.
+	GetSyncedMod(context.Context, *connect.Request[v1.GetSyncedModRequest]) (*connect.Response[v1.GetSyncedModResponse], error)
 }
 
 // NewModSourceServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -151,6 +260,30 @@ func NewModSourceServiceHandler(svc ModSourceServiceHandler, opts ...connect.Han
 		connect.WithSchema(modSourceServiceMethods.ByName("ListModSources")),
 		connect.WithHandlerOptions(opts...),
 	)
+	modSourceServiceSyncModSourceHandler := connect.NewUnaryHandler(
+		ModSourceServiceSyncModSourceProcedure,
+		svc.SyncModSource,
+		connect.WithSchema(modSourceServiceMethods.ByName("SyncModSource")),
+		connect.WithHandlerOptions(opts...),
+	)
+	modSourceServiceListSyncedModsHandler := connect.NewUnaryHandler(
+		ModSourceServiceListSyncedModsProcedure,
+		svc.ListSyncedMods,
+		connect.WithSchema(modSourceServiceMethods.ByName("ListSyncedMods")),
+		connect.WithHandlerOptions(opts...),
+	)
+	modSourceServiceInvalidateModHandler := connect.NewUnaryHandler(
+		ModSourceServiceInvalidateModProcedure,
+		svc.InvalidateMod,
+		connect.WithSchema(modSourceServiceMethods.ByName("InvalidateMod")),
+		connect.WithHandlerOptions(opts...),
+	)
+	modSourceServiceGetSyncedModHandler := connect.NewUnaryHandler(
+		ModSourceServiceGetSyncedModProcedure,
+		svc.GetSyncedMod,
+		connect.WithSchema(modSourceServiceMethods.ByName("GetSyncedMod")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/registry.v1.ModSourceService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ModSourceServiceAddModSourceProcedure:
@@ -159,6 +292,14 @@ func NewModSourceServiceHandler(svc ModSourceServiceHandler, opts ...connect.Han
 			modSourceServiceDeleteModSourceHandler.ServeHTTP(w, r)
 		case ModSourceServiceListModSourcesProcedure:
 			modSourceServiceListModSourcesHandler.ServeHTTP(w, r)
+		case ModSourceServiceSyncModSourceProcedure:
+			modSourceServiceSyncModSourceHandler.ServeHTTP(w, r)
+		case ModSourceServiceListSyncedModsProcedure:
+			modSourceServiceListSyncedModsHandler.ServeHTTP(w, r)
+		case ModSourceServiceInvalidateModProcedure:
+			modSourceServiceInvalidateModHandler.ServeHTTP(w, r)
+		case ModSourceServiceGetSyncedModProcedure:
+			modSourceServiceGetSyncedModHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -178,6 +319,22 @@ func (UnimplementedModSourceServiceHandler) DeleteModSource(context.Context, *co
 
 func (UnimplementedModSourceServiceHandler) ListModSources(context.Context, *connect.Request[v1.ListModSourcesRequest]) (*connect.Response[v1.ListModSourcesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.ModSourceService.ListModSources is not implemented"))
+}
+
+func (UnimplementedModSourceServiceHandler) SyncModSource(context.Context, *connect.Request[v1.SyncModSourceRequest]) (*connect.Response[v1.SyncModSourceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.ModSourceService.SyncModSource is not implemented"))
+}
+
+func (UnimplementedModSourceServiceHandler) ListSyncedMods(context.Context, *connect.Request[v1.ListSyncedModsRequest]) (*connect.Response[v1.ListSyncedModsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.ModSourceService.ListSyncedMods is not implemented"))
+}
+
+func (UnimplementedModSourceServiceHandler) InvalidateMod(context.Context, *connect.Request[v1.InvalidateModRequest]) (*connect.Response[v1.InvalidateModResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.ModSourceService.InvalidateMod is not implemented"))
+}
+
+func (UnimplementedModSourceServiceHandler) GetSyncedMod(context.Context, *connect.Request[v1.GetSyncedModRequest]) (*connect.Response[v1.GetSyncedModResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.ModSourceService.GetSyncedMod is not implemented"))
 }
 
 // MissionServiceClient is a client for the registry.v1.MissionService service.
@@ -326,4 +483,74 @@ func (UnimplementedMissionServiceHandler) ListMissions(context.Context, *connect
 
 func (UnimplementedMissionServiceHandler) DeleteMission(context.Context, *connect.Request[v1.DeleteMissionRequest]) (*connect.Response[v1.DeleteMissionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.MissionService.DeleteMission is not implemented"))
+}
+
+// AdminServiceClient is a client for the registry.v1.AdminService service.
+type AdminServiceClient interface {
+	GetDiskUsage(context.Context, *connect.Request[v1.GetDiskUsageRequest]) (*connect.Response[v1.GetDiskUsageResponse], error)
+}
+
+// NewAdminServiceClient constructs a client for the registry.v1.AdminService service. By default,
+// it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses, and
+// sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the connect.WithGRPC()
+// or connect.WithGRPCWeb() options.
+//
+// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
+// http://api.acme.com or https://acme.com/grpc).
+func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) AdminServiceClient {
+	baseURL = strings.TrimRight(baseURL, "/")
+	adminServiceMethods := v1.File_registry_v1_registry_proto.Services().ByName("AdminService").Methods()
+	return &adminServiceClient{
+		getDiskUsage: connect.NewClient[v1.GetDiskUsageRequest, v1.GetDiskUsageResponse](
+			httpClient,
+			baseURL+AdminServiceGetDiskUsageProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("GetDiskUsage")),
+			connect.WithClientOptions(opts...),
+		),
+	}
+}
+
+// adminServiceClient implements AdminServiceClient.
+type adminServiceClient struct {
+	getDiskUsage *connect.Client[v1.GetDiskUsageRequest, v1.GetDiskUsageResponse]
+}
+
+// GetDiskUsage calls registry.v1.AdminService.GetDiskUsage.
+func (c *adminServiceClient) GetDiskUsage(ctx context.Context, req *connect.Request[v1.GetDiskUsageRequest]) (*connect.Response[v1.GetDiskUsageResponse], error) {
+	return c.getDiskUsage.CallUnary(ctx, req)
+}
+
+// AdminServiceHandler is an implementation of the registry.v1.AdminService service.
+type AdminServiceHandler interface {
+	GetDiskUsage(context.Context, *connect.Request[v1.GetDiskUsageRequest]) (*connect.Response[v1.GetDiskUsageResponse], error)
+}
+
+// NewAdminServiceHandler builds an HTTP handler from the service implementation. It returns the
+// path on which to mount the handler and the handler itself.
+//
+// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
+// and JSON codecs. They also support gzip compression.
+func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	adminServiceMethods := v1.File_registry_v1_registry_proto.Services().ByName("AdminService").Methods()
+	adminServiceGetDiskUsageHandler := connect.NewUnaryHandler(
+		AdminServiceGetDiskUsageProcedure,
+		svc.GetDiskUsage,
+		connect.WithSchema(adminServiceMethods.ByName("GetDiskUsage")),
+		connect.WithHandlerOptions(opts...),
+	)
+	return "/registry.v1.AdminService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case AdminServiceGetDiskUsageProcedure:
+			adminServiceGetDiskUsageHandler.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+}
+
+// UnimplementedAdminServiceHandler returns CodeUnimplemented from all methods.
+type UnimplementedAdminServiceHandler struct{}
+
+func (UnimplementedAdminServiceHandler) GetDiskUsage(context.Context, *connect.Request[v1.GetDiskUsageRequest]) (*connect.Response[v1.GetDiskUsageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.GetDiskUsage is not implemented"))
 }

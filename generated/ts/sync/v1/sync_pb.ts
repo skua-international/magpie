@@ -10,7 +10,186 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file sync/v1/sync.proto.
  */
 export const file_sync_v1_sync: GenFile = /*@__PURE__*/
-  fileDesc("ChJzeW5jL3YxL3N5bmMucHJvdG8SB3N5bmMudjEiKQoUUmVmcmVzaFNvdXJjZVJlcXVlc3QSEQoJc291cmNlX2lkGAEgASgJIjsKFVJlZnJlc2hTb3VyY2VSZXNwb25zZRIiCgRtb2RzGAEgAygLMhQuc3luYy52MS5SZXNvbHZlZE1vZCIpChRHZXRTb3VyY2VNb2RzUmVxdWVzdBIRCglzb3VyY2VfaWQYASABKAkiKAoVR2V0U291cmNlTW9kc1Jlc3BvbnNlEg8KB21vZF9pZHMYASADKAQiQQoVUmVnaXN0ZXJTb3VyY2VSZXF1ZXN0EhUKDWNhbmRpZGF0ZV9pZHMYASADKAQSEQoJc291cmNlX2lkGAIgASgJIiwKC1Jlc29sdmVkTW9kEg4KBm1vZF9pZBgBIAEoBBINCgV0aXRsZRgCIAEoCSJQChZSZWdpc3RlclNvdXJjZVJlc3BvbnNlEiIKBG1vZHMYASADKAsyFC5zeW5jLnYxLlJlc29sdmVkTW9kEhIKCnJvb3RfdGl0bGUYAiABKAkiLAoXRGVyZWdpc3RlclNvdXJjZVJlcXVlc3QSEQoJc291cmNlX2lkGAEgASgJIhoKGERlcmVnaXN0ZXJTb3VyY2VSZXNwb25zZSIOCgxDbGFpbVJlcXVlc3QiHwoNQ2xhaW1SZXNwb25zZRIOCgZqb2JfaWQYASABKAkiJwoVR2V0Q2xhaW1TdGF0dXNSZXF1ZXN0Eg4KBmpvYl9pZBgBIAEoCSJiChZHZXRDbGFpbVN0YXR1c1Jlc3BvbnNlEiUKBXN0YXRlGAEgASgOMhYuc3luYy52MS5DbGFpbUpvYlN0YXRlEhIKCmNsYWltX3BhdGgYAiABKAkSDQoFZXJyb3IYAyABKAkqgwEKDUNsYWltSm9iU3RhdGUSHwobQ0xBSU1fSk9CX1NUQVRFX1VOU1BFQ0lGSUVEEAASGwoXQ0xBSU1fSk9CX1NUQVRFX1JVTk5JTkcQARIYChRDTEFJTV9KT0JfU1RBVEVfRE9ORRACEhoKFkNMQUlNX0pPQl9TVEFURV9GQUlMRUQQAzLkAwoLU3luY1NlcnZpY2USUQoOUmVnaXN0ZXJTb3VyY2USHi5zeW5jLnYxLlJlZ2lzdGVyU291cmNlUmVxdWVzdBofLnN5bmMudjEuUmVnaXN0ZXJTb3VyY2VSZXNwb25zZRJXChBEZXJlZ2lzdGVyU291cmNlEiAuc3luYy52MS5EZXJlZ2lzdGVyU291cmNlUmVxdWVzdBohLnN5bmMudjEuRGVyZWdpc3RlclNvdXJjZVJlc3BvbnNlEjYKBUNsYWltEhUuc3luYy52MS5DbGFpbVJlcXVlc3QaFi5zeW5jLnYxLkNsYWltUmVzcG9uc2USUQoOR2V0Q2xhaW1TdGF0dXMSHi5zeW5jLnYxLkdldENsYWltU3RhdHVzUmVxdWVzdBofLnN5bmMudjEuR2V0Q2xhaW1TdGF0dXNSZXNwb25zZRJOCg1HZXRTb3VyY2VNb2RzEh0uc3luYy52MS5HZXRTb3VyY2VNb2RzUmVxdWVzdBoeLnN5bmMudjEuR2V0U291cmNlTW9kc1Jlc3BvbnNlEk4KDVJlZnJlc2hTb3VyY2USHS5zeW5jLnYxLlJlZnJlc2hTb3VyY2VSZXF1ZXN0Gh4uc3luYy52MS5SZWZyZXNoU291cmNlUmVzcG9uc2VCQlpAZ2l0aHViLmNvbS9za3VhLWludGVybmF0aW9uYWwvbWFncGllL2dlbmVyYXRlZC9nby9zeW5jL3YxO3N5bmN2MWIGcHJvdG8z");
+  fileDesc("ChJzeW5jL3YxL3N5bmMucHJvdG8SB3N5bmMudjEiFwoVTGlzdFN5bmNlZE1vZHNSZXF1ZXN0IlMKCVN5bmNlZE1vZBIOCgZtb2RfaWQYASABKAQSEwoLbWFuaWZlc3RfaWQYAiABKAQSEgoKc2l6ZV9ieXRlcxgDIAEoBBINCgV0aXRsZRgEIAEoCSI6ChZMaXN0U3luY2VkTW9kc1Jlc3BvbnNlEiAKBG1vZHMYASADKAsyEi5zeW5jLnYxLlN5bmNlZE1vZCIlChNHZXRTeW5jZWRNb2RSZXF1ZXN0Eg4KBm1vZF9pZBgBIAEoBCJYChRHZXRTeW5jZWRNb2RSZXNwb25zZRIkCgNtb2QYASABKAsyEi5zeW5jLnYxLlN5bmNlZE1vZEgAiAEBEhIKCnNvdXJjZV9pZHMYAiADKAlCBgoEX21vZCIVChNHZXRTeW5jU3RhdHNSZXF1ZXN0IkQKFEdldFN5bmNTdGF0c1Jlc3BvbnNlEhIKCm1vZHNfYnl0ZXMYASABKAQSGAoQZ2FtZV9maWxlc19ieXRlcxgCIAEoBCImChRJbnZhbGlkYXRlTW9kUmVxdWVzdBIOCgZtb2RfaWQYASABKAQiFwoVSW52YWxpZGF0ZU1vZFJlc3BvbnNlIikKFFJlZnJlc2hTb3VyY2VSZXF1ZXN0EhEKCXNvdXJjZV9pZBgBIAEoCSI7ChVSZWZyZXNoU291cmNlUmVzcG9uc2USIgoEbW9kcxgBIAMoCzIULnN5bmMudjEuUmVzb2x2ZWRNb2QiKQoUR2V0U291cmNlTW9kc1JlcXVlc3QSEQoJc291cmNlX2lkGAEgASgJIigKFUdldFNvdXJjZU1vZHNSZXNwb25zZRIPCgdtb2RfaWRzGAEgAygEIkEKFVJlZ2lzdGVyU291cmNlUmVxdWVzdBIVCg1jYW5kaWRhdGVfaWRzGAEgAygEEhEKCXNvdXJjZV9pZBgCIAEoCSIsCgtSZXNvbHZlZE1vZBIOCgZtb2RfaWQYASABKAQSDQoFdGl0bGUYAiABKAkiUAoWUmVnaXN0ZXJTb3VyY2VSZXNwb25zZRIiCgRtb2RzGAEgAygLMhQuc3luYy52MS5SZXNvbHZlZE1vZBISCgpyb290X3RpdGxlGAIgASgJIiwKF0RlcmVnaXN0ZXJTb3VyY2VSZXF1ZXN0EhEKCXNvdXJjZV9pZBgBIAEoCSIaChhEZXJlZ2lzdGVyU291cmNlUmVzcG9uc2UiDgoMQ2xhaW1SZXF1ZXN0Ih8KDUNsYWltUmVzcG9uc2USDgoGam9iX2lkGAEgASgJIicKFUdldENsYWltU3RhdHVzUmVxdWVzdBIOCgZqb2JfaWQYASABKAkiYgoWR2V0Q2xhaW1TdGF0dXNSZXNwb25zZRIlCgVzdGF0ZRgBIAEoDjIWLnN5bmMudjEuQ2xhaW1Kb2JTdGF0ZRISCgpjbGFpbV9wYXRoGAIgASgJEg0KBWVycm9yGAMgASgJKoMBCg1DbGFpbUpvYlN0YXRlEh8KG0NMQUlNX0pPQl9TVEFURV9VTlNQRUNJRklFRBAAEhsKF0NMQUlNX0pPQl9TVEFURV9SVU5OSU5HEAESGAoUQ0xBSU1fSk9CX1NUQVRFX0RPTkUQAhIaChZDTEFJTV9KT0JfU1RBVEVfRkFJTEVEEAMyoQYKC1N5bmNTZXJ2aWNlElEKDlJlZ2lzdGVyU291cmNlEh4uc3luYy52MS5SZWdpc3RlclNvdXJjZVJlcXVlc3QaHy5zeW5jLnYxLlJlZ2lzdGVyU291cmNlUmVzcG9uc2USVwoQRGVyZWdpc3RlclNvdXJjZRIgLnN5bmMudjEuRGVyZWdpc3RlclNvdXJjZVJlcXVlc3QaIS5zeW5jLnYxLkRlcmVnaXN0ZXJTb3VyY2VSZXNwb25zZRI2CgVDbGFpbRIVLnN5bmMudjEuQ2xhaW1SZXF1ZXN0GhYuc3luYy52MS5DbGFpbVJlc3BvbnNlElEKDkdldENsYWltU3RhdHVzEh4uc3luYy52MS5HZXRDbGFpbVN0YXR1c1JlcXVlc3QaHy5zeW5jLnYxLkdldENsYWltU3RhdHVzUmVzcG9uc2USTgoNR2V0U291cmNlTW9kcxIdLnN5bmMudjEuR2V0U291cmNlTW9kc1JlcXVlc3QaHi5zeW5jLnYxLkdldFNvdXJjZU1vZHNSZXNwb25zZRJOCg1SZWZyZXNoU291cmNlEh0uc3luYy52MS5SZWZyZXNoU291cmNlUmVxdWVzdBoeLnN5bmMudjEuUmVmcmVzaFNvdXJjZVJlc3BvbnNlElEKDkxpc3RTeW5jZWRNb2RzEh4uc3luYy52MS5MaXN0U3luY2VkTW9kc1JlcXVlc3QaHy5zeW5jLnYxLkxpc3RTeW5jZWRNb2RzUmVzcG9uc2USTgoNSW52YWxpZGF0ZU1vZBIdLnN5bmMudjEuSW52YWxpZGF0ZU1vZFJlcXVlc3QaHi5zeW5jLnYxLkludmFsaWRhdGVNb2RSZXNwb25zZRJLCgxHZXRTeW5jZWRNb2QSHC5zeW5jLnYxLkdldFN5bmNlZE1vZFJlcXVlc3QaHS5zeW5jLnYxLkdldFN5bmNlZE1vZFJlc3BvbnNlEksKDEdldFN5bmNTdGF0cxIcLnN5bmMudjEuR2V0U3luY1N0YXRzUmVxdWVzdBodLnN5bmMudjEuR2V0U3luY1N0YXRzUmVzcG9uc2VCQlpAZ2l0aHViLmNvbS9za3VhLWludGVybmF0aW9uYWwvbWFncGllL2dlbmVyYXRlZC9nby9zeW5jL3YxO3N5bmN2MWIGcHJvdG8z");
+
+/**
+ * @generated from message sync.v1.ListSyncedModsRequest
+ */
+export type ListSyncedModsRequest = Message<"sync.v1.ListSyncedModsRequest"> & {
+};
+
+/**
+ * Describes the message sync.v1.ListSyncedModsRequest.
+ * Use `create(ListSyncedModsRequestSchema)` to create a new message.
+ */
+export const ListSyncedModsRequestSchema: GenMessage<ListSyncedModsRequest> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 0);
+
+/**
+ * @generated from message sync.v1.SyncedMod
+ */
+export type SyncedMod = Message<"sync.v1.SyncedMod"> & {
+  /**
+   * @generated from field: uint64 mod_id = 1;
+   */
+  modId: bigint;
+
+  /**
+   * @generated from field: uint64 manifest_id = 2;
+   */
+  manifestId: bigint;
+
+  /**
+   * @generated from field: uint64 size_bytes = 3;
+   */
+  sizeBytes: bigint;
+
+  /**
+   * Empty if this mod was resolved (RegisterSource/RefreshSource/the
+   * background poller) before this process last restarted -- titles
+   * aren't independently persisted across restarts yet, only learned
+   * fresh from Steam each time a mod is actually resolved.
+   *
+   * @generated from field: string title = 4;
+   */
+  title: string;
+};
+
+/**
+ * Describes the message sync.v1.SyncedMod.
+ * Use `create(SyncedModSchema)` to create a new message.
+ */
+export const SyncedModSchema: GenMessage<SyncedMod> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 1);
+
+/**
+ * @generated from message sync.v1.ListSyncedModsResponse
+ */
+export type ListSyncedModsResponse = Message<"sync.v1.ListSyncedModsResponse"> & {
+  /**
+   * @generated from field: repeated sync.v1.SyncedMod mods = 1;
+   */
+  mods: SyncedMod[];
+};
+
+/**
+ * Describes the message sync.v1.ListSyncedModsResponse.
+ * Use `create(ListSyncedModsResponseSchema)` to create a new message.
+ */
+export const ListSyncedModsResponseSchema: GenMessage<ListSyncedModsResponse> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 2);
+
+/**
+ * @generated from message sync.v1.GetSyncedModRequest
+ */
+export type GetSyncedModRequest = Message<"sync.v1.GetSyncedModRequest"> & {
+  /**
+   * @generated from field: uint64 mod_id = 1;
+   */
+  modId: bigint;
+};
+
+/**
+ * Describes the message sync.v1.GetSyncedModRequest.
+ * Use `create(GetSyncedModRequestSchema)` to create a new message.
+ */
+export const GetSyncedModRequestSchema: GenMessage<GetSyncedModRequest> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 3);
+
+/**
+ * @generated from message sync.v1.GetSyncedModResponse
+ */
+export type GetSyncedModResponse = Message<"sync.v1.GetSyncedModResponse"> & {
+  /**
+   * Unset if mod_id isn't currently tracked as synced at all.
+   *
+   * @generated from field: optional sync.v1.SyncedMod mod = 1;
+   */
+  mod?: SyncedMod | undefined;
+
+  /**
+   * @generated from field: repeated string source_ids = 2;
+   */
+  sourceIds: string[];
+};
+
+/**
+ * Describes the message sync.v1.GetSyncedModResponse.
+ * Use `create(GetSyncedModResponseSchema)` to create a new message.
+ */
+export const GetSyncedModResponseSchema: GenMessage<GetSyncedModResponse> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 4);
+
+/**
+ * @generated from message sync.v1.GetSyncStatsRequest
+ */
+export type GetSyncStatsRequest = Message<"sync.v1.GetSyncStatsRequest"> & {
+};
+
+/**
+ * Describes the message sync.v1.GetSyncStatsRequest.
+ * Use `create(GetSyncStatsRequestSchema)` to create a new message.
+ */
+export const GetSyncStatsRequestSchema: GenMessage<GetSyncStatsRequest> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 5);
+
+/**
+ * @generated from message sync.v1.GetSyncStatsResponse
+ */
+export type GetSyncStatsResponse = Message<"sync.v1.GetSyncStatsResponse"> & {
+  /**
+   * Every currently-synced workshop mod's on-disk size, counted exactly
+   * once regardless of how many sources reference it -- `synced` is keyed
+   * by mod, not by source.
+   *
+   * @generated from field: uint64 mods_bytes = 1;
+   */
+  modsBytes: bigint;
+
+  /**
+   * Base game + selected CDLC depot content on disk (not mod content).
+   *
+   * @generated from field: uint64 game_files_bytes = 2;
+   */
+  gameFilesBytes: bigint;
+};
+
+/**
+ * Describes the message sync.v1.GetSyncStatsResponse.
+ * Use `create(GetSyncStatsResponseSchema)` to create a new message.
+ */
+export const GetSyncStatsResponseSchema: GenMessage<GetSyncStatsResponse> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 6);
+
+/**
+ * @generated from message sync.v1.InvalidateModRequest
+ */
+export type InvalidateModRequest = Message<"sync.v1.InvalidateModRequest"> & {
+  /**
+   * @generated from field: uint64 mod_id = 1;
+   */
+  modId: bigint;
+};
+
+/**
+ * Describes the message sync.v1.InvalidateModRequest.
+ * Use `create(InvalidateModRequestSchema)` to create a new message.
+ */
+export const InvalidateModRequestSchema: GenMessage<InvalidateModRequest> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 7);
+
+/**
+ * @generated from message sync.v1.InvalidateModResponse
+ */
+export type InvalidateModResponse = Message<"sync.v1.InvalidateModResponse"> & {
+};
+
+/**
+ * Describes the message sync.v1.InvalidateModResponse.
+ * Use `create(InvalidateModResponseSchema)` to create a new message.
+ */
+export const InvalidateModResponseSchema: GenMessage<InvalidateModResponse> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 8);
 
 /**
  * @generated from message sync.v1.RefreshSourceRequest
@@ -27,7 +206,7 @@ export type RefreshSourceRequest = Message<"sync.v1.RefreshSourceRequest"> & {
  * Use `create(RefreshSourceRequestSchema)` to create a new message.
  */
 export const RefreshSourceRequestSchema: GenMessage<RefreshSourceRequest> = /*@__PURE__*/
-  messageDesc(file_sync_v1_sync, 0);
+  messageDesc(file_sync_v1_sync, 9);
 
 /**
  * @generated from message sync.v1.RefreshSourceResponse
@@ -44,7 +223,7 @@ export type RefreshSourceResponse = Message<"sync.v1.RefreshSourceResponse"> & {
  * Use `create(RefreshSourceResponseSchema)` to create a new message.
  */
 export const RefreshSourceResponseSchema: GenMessage<RefreshSourceResponse> = /*@__PURE__*/
-  messageDesc(file_sync_v1_sync, 1);
+  messageDesc(file_sync_v1_sync, 10);
 
 /**
  * @generated from message sync.v1.GetSourceModsRequest
@@ -61,7 +240,7 @@ export type GetSourceModsRequest = Message<"sync.v1.GetSourceModsRequest"> & {
  * Use `create(GetSourceModsRequestSchema)` to create a new message.
  */
 export const GetSourceModsRequestSchema: GenMessage<GetSourceModsRequest> = /*@__PURE__*/
-  messageDesc(file_sync_v1_sync, 2);
+  messageDesc(file_sync_v1_sync, 11);
 
 /**
  * @generated from message sync.v1.GetSourceModsResponse
@@ -78,7 +257,7 @@ export type GetSourceModsResponse = Message<"sync.v1.GetSourceModsResponse"> & {
  * Use `create(GetSourceModsResponseSchema)` to create a new message.
  */
 export const GetSourceModsResponseSchema: GenMessage<GetSourceModsResponse> = /*@__PURE__*/
-  messageDesc(file_sync_v1_sync, 3);
+  messageDesc(file_sync_v1_sync, 12);
 
 /**
  * @generated from message sync.v1.RegisterSourceRequest
@@ -100,7 +279,7 @@ export type RegisterSourceRequest = Message<"sync.v1.RegisterSourceRequest"> & {
  * Use `create(RegisterSourceRequestSchema)` to create a new message.
  */
 export const RegisterSourceRequestSchema: GenMessage<RegisterSourceRequest> = /*@__PURE__*/
-  messageDesc(file_sync_v1_sync, 4);
+  messageDesc(file_sync_v1_sync, 13);
 
 /**
  * A single resolved workshop item (a collection's candidate ID never
@@ -125,7 +304,7 @@ export type ResolvedMod = Message<"sync.v1.ResolvedMod"> & {
  * Use `create(ResolvedModSchema)` to create a new message.
  */
 export const ResolvedModSchema: GenMessage<ResolvedMod> = /*@__PURE__*/
-  messageDesc(file_sync_v1_sync, 5);
+  messageDesc(file_sync_v1_sync, 14);
 
 /**
  * @generated from message sync.v1.RegisterSourceResponse
@@ -158,7 +337,7 @@ export type RegisterSourceResponse = Message<"sync.v1.RegisterSourceResponse"> &
  * Use `create(RegisterSourceResponseSchema)` to create a new message.
  */
 export const RegisterSourceResponseSchema: GenMessage<RegisterSourceResponse> = /*@__PURE__*/
-  messageDesc(file_sync_v1_sync, 6);
+  messageDesc(file_sync_v1_sync, 15);
 
 /**
  * @generated from message sync.v1.DeregisterSourceRequest
@@ -175,7 +354,7 @@ export type DeregisterSourceRequest = Message<"sync.v1.DeregisterSourceRequest">
  * Use `create(DeregisterSourceRequestSchema)` to create a new message.
  */
 export const DeregisterSourceRequestSchema: GenMessage<DeregisterSourceRequest> = /*@__PURE__*/
-  messageDesc(file_sync_v1_sync, 7);
+  messageDesc(file_sync_v1_sync, 16);
 
 /**
  * @generated from message sync.v1.DeregisterSourceResponse
@@ -188,7 +367,7 @@ export type DeregisterSourceResponse = Message<"sync.v1.DeregisterSourceResponse
  * Use `create(DeregisterSourceResponseSchema)` to create a new message.
  */
 export const DeregisterSourceResponseSchema: GenMessage<DeregisterSourceResponse> = /*@__PURE__*/
-  messageDesc(file_sync_v1_sync, 8);
+  messageDesc(file_sync_v1_sync, 17);
 
 /**
  * @generated from message sync.v1.ClaimRequest
@@ -201,7 +380,7 @@ export type ClaimRequest = Message<"sync.v1.ClaimRequest"> & {
  * Use `create(ClaimRequestSchema)` to create a new message.
  */
 export const ClaimRequestSchema: GenMessage<ClaimRequest> = /*@__PURE__*/
-  messageDesc(file_sync_v1_sync, 9);
+  messageDesc(file_sync_v1_sync, 18);
 
 /**
  * @generated from message sync.v1.ClaimResponse
@@ -218,7 +397,7 @@ export type ClaimResponse = Message<"sync.v1.ClaimResponse"> & {
  * Use `create(ClaimResponseSchema)` to create a new message.
  */
 export const ClaimResponseSchema: GenMessage<ClaimResponse> = /*@__PURE__*/
-  messageDesc(file_sync_v1_sync, 10);
+  messageDesc(file_sync_v1_sync, 19);
 
 /**
  * @generated from message sync.v1.GetClaimStatusRequest
@@ -235,7 +414,7 @@ export type GetClaimStatusRequest = Message<"sync.v1.GetClaimStatusRequest"> & {
  * Use `create(GetClaimStatusRequestSchema)` to create a new message.
  */
 export const GetClaimStatusRequestSchema: GenMessage<GetClaimStatusRequest> = /*@__PURE__*/
-  messageDesc(file_sync_v1_sync, 11);
+  messageDesc(file_sync_v1_sync, 20);
 
 /**
  * @generated from message sync.v1.GetClaimStatusResponse
@@ -266,7 +445,7 @@ export type GetClaimStatusResponse = Message<"sync.v1.GetClaimStatusResponse"> &
  * Use `create(GetClaimStatusResponseSchema)` to create a new message.
  */
 export const GetClaimStatusResponseSchema: GenMessage<GetClaimStatusResponse> = /*@__PURE__*/
-  messageDesc(file_sync_v1_sync, 12);
+  messageDesc(file_sync_v1_sync, 21);
 
 /**
  * @generated from enum sync.v1.ClaimJobState
@@ -389,6 +568,58 @@ export const SyncService: GenService<{
     methodKind: "unary";
     input: typeof RefreshSourceRequestSchema;
     output: typeof RefreshSourceResponseSchema;
+  },
+  /**
+   * Every workshop mod ID currently tracked as verified-synced, and the
+   * manifest_id it was last verified at. A plain read of the sync cache --
+   * no Steam calls, no depot state (server/CDLC depots aren't included,
+   * only workshop mods).
+   *
+   * @generated from rpc sync.v1.SyncService.ListSyncedMods
+   */
+  listSyncedMods: {
+    methodKind: "unary";
+    input: typeof ListSyncedModsRequestSchema;
+    output: typeof ListSyncedModsResponseSchema;
+  },
+  /**
+   * Clear one mod's "last verified" marker only -- never deletes its files
+   * on disk. The next resolve pass genuinely re-verifies that mod's chunks
+   * against Steam's current manifest, redownloading only whatever's
+   * actually missing or divergent. Deliberately not a real
+   * wipe-and-redownload -- this is the restricted, non-destructive shape
+   * of "force refresh a mod's cache".
+   *
+   * @generated from rpc sync.v1.SyncService.InvalidateMod
+   */
+  invalidateMod: {
+    methodKind: "unary";
+    input: typeof InvalidateModRequestSchema;
+    output: typeof InvalidateModResponseSchema;
+  },
+  /**
+   * A single mod's synced state plus every source_id currently
+   * referencing it -- one extra query beyond ListSyncedMods, so kept
+   * separate rather than having every list entry pay for it.
+   *
+   * @generated from rpc sync.v1.SyncService.GetSyncedMod
+   */
+  getSyncedMod: {
+    methodKind: "unary";
+    input: typeof GetSyncedModRequestSchema;
+    output: typeof GetSyncedModResponseSchema;
+  },
+  /**
+   * Cluster-wide totals: every synced mod's size deduplicated across
+   * sources, plus base game/CDLC depot size -- for registry's
+   * AdminService.GetDiskUsage.
+   *
+   * @generated from rpc sync.v1.SyncService.GetSyncStats
+   */
+  getSyncStats: {
+    methodKind: "unary";
+    input: typeof GetSyncStatsRequestSchema;
+    output: typeof GetSyncStatsResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_sync_v1_sync, 0);

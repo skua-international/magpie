@@ -73,6 +73,427 @@ func (ClaimJobState) EnumDescriptor() ([]byte, []int) {
 	return file_sync_v1_sync_proto_rawDescGZIP(), []int{0}
 }
 
+type ListSyncedModsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSyncedModsRequest) Reset() {
+	*x = ListSyncedModsRequest{}
+	mi := &file_sync_v1_sync_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSyncedModsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSyncedModsRequest) ProtoMessage() {}
+
+func (x *ListSyncedModsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSyncedModsRequest.ProtoReflect.Descriptor instead.
+func (*ListSyncedModsRequest) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{0}
+}
+
+type SyncedMod struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	ModId      uint64                 `protobuf:"varint,1,opt,name=mod_id,json=modId,proto3" json:"mod_id,omitempty"`
+	ManifestId uint64                 `protobuf:"varint,2,opt,name=manifest_id,json=manifestId,proto3" json:"manifest_id,omitempty"`
+	SizeBytes  uint64                 `protobuf:"varint,3,opt,name=size_bytes,json=sizeBytes,proto3" json:"size_bytes,omitempty"`
+	// Empty if this mod was resolved (RegisterSource/RefreshSource/the
+	// background poller) before this process last restarted -- titles
+	// aren't independently persisted across restarts yet, only learned
+	// fresh from Steam each time a mod is actually resolved.
+	Title         string `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SyncedMod) Reset() {
+	*x = SyncedMod{}
+	mi := &file_sync_v1_sync_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncedMod) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncedMod) ProtoMessage() {}
+
+func (x *SyncedMod) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncedMod.ProtoReflect.Descriptor instead.
+func (*SyncedMod) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *SyncedMod) GetModId() uint64 {
+	if x != nil {
+		return x.ModId
+	}
+	return 0
+}
+
+func (x *SyncedMod) GetManifestId() uint64 {
+	if x != nil {
+		return x.ManifestId
+	}
+	return 0
+}
+
+func (x *SyncedMod) GetSizeBytes() uint64 {
+	if x != nil {
+		return x.SizeBytes
+	}
+	return 0
+}
+
+func (x *SyncedMod) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+type ListSyncedModsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Mods          []*SyncedMod           `protobuf:"bytes,1,rep,name=mods,proto3" json:"mods,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSyncedModsResponse) Reset() {
+	*x = ListSyncedModsResponse{}
+	mi := &file_sync_v1_sync_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSyncedModsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSyncedModsResponse) ProtoMessage() {}
+
+func (x *ListSyncedModsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSyncedModsResponse.ProtoReflect.Descriptor instead.
+func (*ListSyncedModsResponse) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ListSyncedModsResponse) GetMods() []*SyncedMod {
+	if x != nil {
+		return x.Mods
+	}
+	return nil
+}
+
+type GetSyncedModRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ModId         uint64                 `protobuf:"varint,1,opt,name=mod_id,json=modId,proto3" json:"mod_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSyncedModRequest) Reset() {
+	*x = GetSyncedModRequest{}
+	mi := &file_sync_v1_sync_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSyncedModRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSyncedModRequest) ProtoMessage() {}
+
+func (x *GetSyncedModRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSyncedModRequest.ProtoReflect.Descriptor instead.
+func (*GetSyncedModRequest) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *GetSyncedModRequest) GetModId() uint64 {
+	if x != nil {
+		return x.ModId
+	}
+	return 0
+}
+
+type GetSyncedModResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Unset if mod_id isn't currently tracked as synced at all.
+	Mod           *SyncedMod `protobuf:"bytes,1,opt,name=mod,proto3,oneof" json:"mod,omitempty"`
+	SourceIds     []string   `protobuf:"bytes,2,rep,name=source_ids,json=sourceIds,proto3" json:"source_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSyncedModResponse) Reset() {
+	*x = GetSyncedModResponse{}
+	mi := &file_sync_v1_sync_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSyncedModResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSyncedModResponse) ProtoMessage() {}
+
+func (x *GetSyncedModResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSyncedModResponse.ProtoReflect.Descriptor instead.
+func (*GetSyncedModResponse) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *GetSyncedModResponse) GetMod() *SyncedMod {
+	if x != nil {
+		return x.Mod
+	}
+	return nil
+}
+
+func (x *GetSyncedModResponse) GetSourceIds() []string {
+	if x != nil {
+		return x.SourceIds
+	}
+	return nil
+}
+
+type GetSyncStatsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSyncStatsRequest) Reset() {
+	*x = GetSyncStatsRequest{}
+	mi := &file_sync_v1_sync_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSyncStatsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSyncStatsRequest) ProtoMessage() {}
+
+func (x *GetSyncStatsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSyncStatsRequest.ProtoReflect.Descriptor instead.
+func (*GetSyncStatsRequest) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{5}
+}
+
+type GetSyncStatsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Every currently-synced workshop mod's on-disk size, counted exactly
+	// once regardless of how many sources reference it -- `synced` is keyed
+	// by mod, not by source.
+	ModsBytes uint64 `protobuf:"varint,1,opt,name=mods_bytes,json=modsBytes,proto3" json:"mods_bytes,omitempty"`
+	// Base game + selected CDLC depot content on disk (not mod content).
+	GameFilesBytes uint64 `protobuf:"varint,2,opt,name=game_files_bytes,json=gameFilesBytes,proto3" json:"game_files_bytes,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *GetSyncStatsResponse) Reset() {
+	*x = GetSyncStatsResponse{}
+	mi := &file_sync_v1_sync_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSyncStatsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSyncStatsResponse) ProtoMessage() {}
+
+func (x *GetSyncStatsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSyncStatsResponse.ProtoReflect.Descriptor instead.
+func (*GetSyncStatsResponse) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *GetSyncStatsResponse) GetModsBytes() uint64 {
+	if x != nil {
+		return x.ModsBytes
+	}
+	return 0
+}
+
+func (x *GetSyncStatsResponse) GetGameFilesBytes() uint64 {
+	if x != nil {
+		return x.GameFilesBytes
+	}
+	return 0
+}
+
+type InvalidateModRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ModId         uint64                 `protobuf:"varint,1,opt,name=mod_id,json=modId,proto3" json:"mod_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InvalidateModRequest) Reset() {
+	*x = InvalidateModRequest{}
+	mi := &file_sync_v1_sync_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InvalidateModRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InvalidateModRequest) ProtoMessage() {}
+
+func (x *InvalidateModRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InvalidateModRequest.ProtoReflect.Descriptor instead.
+func (*InvalidateModRequest) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *InvalidateModRequest) GetModId() uint64 {
+	if x != nil {
+		return x.ModId
+	}
+	return 0
+}
+
+type InvalidateModResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InvalidateModResponse) Reset() {
+	*x = InvalidateModResponse{}
+	mi := &file_sync_v1_sync_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InvalidateModResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InvalidateModResponse) ProtoMessage() {}
+
+func (x *InvalidateModResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InvalidateModResponse.ProtoReflect.Descriptor instead.
+func (*InvalidateModResponse) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{8}
+}
+
 type RefreshSourceRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	SourceId      string                 `protobuf:"bytes,1,opt,name=source_id,json=sourceId,proto3" json:"source_id,omitempty"`
@@ -82,7 +503,7 @@ type RefreshSourceRequest struct {
 
 func (x *RefreshSourceRequest) Reset() {
 	*x = RefreshSourceRequest{}
-	mi := &file_sync_v1_sync_proto_msgTypes[0]
+	mi := &file_sync_v1_sync_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -94,7 +515,7 @@ func (x *RefreshSourceRequest) String() string {
 func (*RefreshSourceRequest) ProtoMessage() {}
 
 func (x *RefreshSourceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_v1_sync_proto_msgTypes[0]
+	mi := &file_sync_v1_sync_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -107,7 +528,7 @@ func (x *RefreshSourceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshSourceRequest.ProtoReflect.Descriptor instead.
 func (*RefreshSourceRequest) Descriptor() ([]byte, []int) {
-	return file_sync_v1_sync_proto_rawDescGZIP(), []int{0}
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *RefreshSourceRequest) GetSourceId() string {
@@ -126,7 +547,7 @@ type RefreshSourceResponse struct {
 
 func (x *RefreshSourceResponse) Reset() {
 	*x = RefreshSourceResponse{}
-	mi := &file_sync_v1_sync_proto_msgTypes[1]
+	mi := &file_sync_v1_sync_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -138,7 +559,7 @@ func (x *RefreshSourceResponse) String() string {
 func (*RefreshSourceResponse) ProtoMessage() {}
 
 func (x *RefreshSourceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_v1_sync_proto_msgTypes[1]
+	mi := &file_sync_v1_sync_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -151,7 +572,7 @@ func (x *RefreshSourceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshSourceResponse.ProtoReflect.Descriptor instead.
 func (*RefreshSourceResponse) Descriptor() ([]byte, []int) {
-	return file_sync_v1_sync_proto_rawDescGZIP(), []int{1}
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *RefreshSourceResponse) GetMods() []*ResolvedMod {
@@ -170,7 +591,7 @@ type GetSourceModsRequest struct {
 
 func (x *GetSourceModsRequest) Reset() {
 	*x = GetSourceModsRequest{}
-	mi := &file_sync_v1_sync_proto_msgTypes[2]
+	mi := &file_sync_v1_sync_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -182,7 +603,7 @@ func (x *GetSourceModsRequest) String() string {
 func (*GetSourceModsRequest) ProtoMessage() {}
 
 func (x *GetSourceModsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_v1_sync_proto_msgTypes[2]
+	mi := &file_sync_v1_sync_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -195,7 +616,7 @@ func (x *GetSourceModsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSourceModsRequest.ProtoReflect.Descriptor instead.
 func (*GetSourceModsRequest) Descriptor() ([]byte, []int) {
-	return file_sync_v1_sync_proto_rawDescGZIP(), []int{2}
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetSourceModsRequest) GetSourceId() string {
@@ -214,7 +635,7 @@ type GetSourceModsResponse struct {
 
 func (x *GetSourceModsResponse) Reset() {
 	*x = GetSourceModsResponse{}
-	mi := &file_sync_v1_sync_proto_msgTypes[3]
+	mi := &file_sync_v1_sync_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -226,7 +647,7 @@ func (x *GetSourceModsResponse) String() string {
 func (*GetSourceModsResponse) ProtoMessage() {}
 
 func (x *GetSourceModsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_v1_sync_proto_msgTypes[3]
+	mi := &file_sync_v1_sync_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -239,7 +660,7 @@ func (x *GetSourceModsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSourceModsResponse.ProtoReflect.Descriptor instead.
 func (*GetSourceModsResponse) Descriptor() ([]byte, []int) {
-	return file_sync_v1_sync_proto_rawDescGZIP(), []int{3}
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetSourceModsResponse) GetModIds() []uint64 {
@@ -259,7 +680,7 @@ type RegisterSourceRequest struct {
 
 func (x *RegisterSourceRequest) Reset() {
 	*x = RegisterSourceRequest{}
-	mi := &file_sync_v1_sync_proto_msgTypes[4]
+	mi := &file_sync_v1_sync_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -271,7 +692,7 @@ func (x *RegisterSourceRequest) String() string {
 func (*RegisterSourceRequest) ProtoMessage() {}
 
 func (x *RegisterSourceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_v1_sync_proto_msgTypes[4]
+	mi := &file_sync_v1_sync_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -284,7 +705,7 @@ func (x *RegisterSourceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterSourceRequest.ProtoReflect.Descriptor instead.
 func (*RegisterSourceRequest) Descriptor() ([]byte, []int) {
-	return file_sync_v1_sync_proto_rawDescGZIP(), []int{4}
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *RegisterSourceRequest) GetCandidateIds() []uint64 {
@@ -313,7 +734,7 @@ type ResolvedMod struct {
 
 func (x *ResolvedMod) Reset() {
 	*x = ResolvedMod{}
-	mi := &file_sync_v1_sync_proto_msgTypes[5]
+	mi := &file_sync_v1_sync_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -325,7 +746,7 @@ func (x *ResolvedMod) String() string {
 func (*ResolvedMod) ProtoMessage() {}
 
 func (x *ResolvedMod) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_v1_sync_proto_msgTypes[5]
+	mi := &file_sync_v1_sync_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -338,7 +759,7 @@ func (x *ResolvedMod) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolvedMod.ProtoReflect.Descriptor instead.
 func (*ResolvedMod) Descriptor() ([]byte, []int) {
-	return file_sync_v1_sync_proto_rawDescGZIP(), []int{5}
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ResolvedMod) GetModId() uint64 {
@@ -374,7 +795,7 @@ type RegisterSourceResponse struct {
 
 func (x *RegisterSourceResponse) Reset() {
 	*x = RegisterSourceResponse{}
-	mi := &file_sync_v1_sync_proto_msgTypes[6]
+	mi := &file_sync_v1_sync_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -386,7 +807,7 @@ func (x *RegisterSourceResponse) String() string {
 func (*RegisterSourceResponse) ProtoMessage() {}
 
 func (x *RegisterSourceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_v1_sync_proto_msgTypes[6]
+	mi := &file_sync_v1_sync_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -399,7 +820,7 @@ func (x *RegisterSourceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterSourceResponse.ProtoReflect.Descriptor instead.
 func (*RegisterSourceResponse) Descriptor() ([]byte, []int) {
-	return file_sync_v1_sync_proto_rawDescGZIP(), []int{6}
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *RegisterSourceResponse) GetMods() []*ResolvedMod {
@@ -425,7 +846,7 @@ type DeregisterSourceRequest struct {
 
 func (x *DeregisterSourceRequest) Reset() {
 	*x = DeregisterSourceRequest{}
-	mi := &file_sync_v1_sync_proto_msgTypes[7]
+	mi := &file_sync_v1_sync_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -437,7 +858,7 @@ func (x *DeregisterSourceRequest) String() string {
 func (*DeregisterSourceRequest) ProtoMessage() {}
 
 func (x *DeregisterSourceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_v1_sync_proto_msgTypes[7]
+	mi := &file_sync_v1_sync_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -450,7 +871,7 @@ func (x *DeregisterSourceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeregisterSourceRequest.ProtoReflect.Descriptor instead.
 func (*DeregisterSourceRequest) Descriptor() ([]byte, []int) {
-	return file_sync_v1_sync_proto_rawDescGZIP(), []int{7}
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *DeregisterSourceRequest) GetSourceId() string {
@@ -468,7 +889,7 @@ type DeregisterSourceResponse struct {
 
 func (x *DeregisterSourceResponse) Reset() {
 	*x = DeregisterSourceResponse{}
-	mi := &file_sync_v1_sync_proto_msgTypes[8]
+	mi := &file_sync_v1_sync_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -480,7 +901,7 @@ func (x *DeregisterSourceResponse) String() string {
 func (*DeregisterSourceResponse) ProtoMessage() {}
 
 func (x *DeregisterSourceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_v1_sync_proto_msgTypes[8]
+	mi := &file_sync_v1_sync_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -493,7 +914,7 @@ func (x *DeregisterSourceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeregisterSourceResponse.ProtoReflect.Descriptor instead.
 func (*DeregisterSourceResponse) Descriptor() ([]byte, []int) {
-	return file_sync_v1_sync_proto_rawDescGZIP(), []int{8}
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{17}
 }
 
 type ClaimRequest struct {
@@ -504,7 +925,7 @@ type ClaimRequest struct {
 
 func (x *ClaimRequest) Reset() {
 	*x = ClaimRequest{}
-	mi := &file_sync_v1_sync_proto_msgTypes[9]
+	mi := &file_sync_v1_sync_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -516,7 +937,7 @@ func (x *ClaimRequest) String() string {
 func (*ClaimRequest) ProtoMessage() {}
 
 func (x *ClaimRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_v1_sync_proto_msgTypes[9]
+	mi := &file_sync_v1_sync_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -529,7 +950,7 @@ func (x *ClaimRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClaimRequest.ProtoReflect.Descriptor instead.
 func (*ClaimRequest) Descriptor() ([]byte, []int) {
-	return file_sync_v1_sync_proto_rawDescGZIP(), []int{9}
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{18}
 }
 
 type ClaimResponse struct {
@@ -541,7 +962,7 @@ type ClaimResponse struct {
 
 func (x *ClaimResponse) Reset() {
 	*x = ClaimResponse{}
-	mi := &file_sync_v1_sync_proto_msgTypes[10]
+	mi := &file_sync_v1_sync_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -553,7 +974,7 @@ func (x *ClaimResponse) String() string {
 func (*ClaimResponse) ProtoMessage() {}
 
 func (x *ClaimResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_v1_sync_proto_msgTypes[10]
+	mi := &file_sync_v1_sync_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -566,7 +987,7 @@ func (x *ClaimResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClaimResponse.ProtoReflect.Descriptor instead.
 func (*ClaimResponse) Descriptor() ([]byte, []int) {
-	return file_sync_v1_sync_proto_rawDescGZIP(), []int{10}
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ClaimResponse) GetJobId() string {
@@ -585,7 +1006,7 @@ type GetClaimStatusRequest struct {
 
 func (x *GetClaimStatusRequest) Reset() {
 	*x = GetClaimStatusRequest{}
-	mi := &file_sync_v1_sync_proto_msgTypes[11]
+	mi := &file_sync_v1_sync_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -597,7 +1018,7 @@ func (x *GetClaimStatusRequest) String() string {
 func (*GetClaimStatusRequest) ProtoMessage() {}
 
 func (x *GetClaimStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_v1_sync_proto_msgTypes[11]
+	mi := &file_sync_v1_sync_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -610,7 +1031,7 @@ func (x *GetClaimStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetClaimStatusRequest.ProtoReflect.Descriptor instead.
 func (*GetClaimStatusRequest) Descriptor() ([]byte, []int) {
-	return file_sync_v1_sync_proto_rawDescGZIP(), []int{11}
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *GetClaimStatusRequest) GetJobId() string {
@@ -631,7 +1052,7 @@ type GetClaimStatusResponse struct {
 
 func (x *GetClaimStatusResponse) Reset() {
 	*x = GetClaimStatusResponse{}
-	mi := &file_sync_v1_sync_proto_msgTypes[12]
+	mi := &file_sync_v1_sync_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -643,7 +1064,7 @@ func (x *GetClaimStatusResponse) String() string {
 func (*GetClaimStatusResponse) ProtoMessage() {}
 
 func (x *GetClaimStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_v1_sync_proto_msgTypes[12]
+	mi := &file_sync_v1_sync_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -656,7 +1077,7 @@ func (x *GetClaimStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetClaimStatusResponse.ProtoReflect.Descriptor instead.
 func (*GetClaimStatusResponse) Descriptor() ([]byte, []int) {
-	return file_sync_v1_sync_proto_rawDescGZIP(), []int{12}
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *GetClaimStatusResponse) GetState() ClaimJobState {
@@ -684,7 +1105,32 @@ var File_sync_v1_sync_proto protoreflect.FileDescriptor
 
 const file_sync_v1_sync_proto_rawDesc = "" +
 	"\n" +
-	"\x12sync/v1/sync.proto\x12\async.v1\"3\n" +
+	"\x12sync/v1/sync.proto\x12\async.v1\"\x17\n" +
+	"\x15ListSyncedModsRequest\"x\n" +
+	"\tSyncedMod\x12\x15\n" +
+	"\x06mod_id\x18\x01 \x01(\x04R\x05modId\x12\x1f\n" +
+	"\vmanifest_id\x18\x02 \x01(\x04R\n" +
+	"manifestId\x12\x1d\n" +
+	"\n" +
+	"size_bytes\x18\x03 \x01(\x04R\tsizeBytes\x12\x14\n" +
+	"\x05title\x18\x04 \x01(\tR\x05title\"@\n" +
+	"\x16ListSyncedModsResponse\x12&\n" +
+	"\x04mods\x18\x01 \x03(\v2\x12.sync.v1.SyncedModR\x04mods\",\n" +
+	"\x13GetSyncedModRequest\x12\x15\n" +
+	"\x06mod_id\x18\x01 \x01(\x04R\x05modId\"h\n" +
+	"\x14GetSyncedModResponse\x12)\n" +
+	"\x03mod\x18\x01 \x01(\v2\x12.sync.v1.SyncedModH\x00R\x03mod\x88\x01\x01\x12\x1d\n" +
+	"\n" +
+	"source_ids\x18\x02 \x03(\tR\tsourceIdsB\x06\n" +
+	"\x04_mod\"\x15\n" +
+	"\x13GetSyncStatsRequest\"_\n" +
+	"\x14GetSyncStatsResponse\x12\x1d\n" +
+	"\n" +
+	"mods_bytes\x18\x01 \x01(\x04R\tmodsBytes\x12(\n" +
+	"\x10game_files_bytes\x18\x02 \x01(\x04R\x0egameFilesBytes\"-\n" +
+	"\x14InvalidateModRequest\x12\x15\n" +
+	"\x06mod_id\x18\x01 \x01(\x04R\x05modId\"\x17\n" +
+	"\x15InvalidateModResponse\"3\n" +
 	"\x14RefreshSourceRequest\x12\x1b\n" +
 	"\tsource_id\x18\x01 \x01(\tR\bsourceId\"A\n" +
 	"\x15RefreshSourceResponse\x12(\n" +
@@ -720,14 +1166,18 @@ const file_sync_v1_sync_proto_rawDesc = "" +
 	"\x1bCLAIM_JOB_STATE_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17CLAIM_JOB_STATE_RUNNING\x10\x01\x12\x18\n" +
 	"\x14CLAIM_JOB_STATE_DONE\x10\x02\x12\x1a\n" +
-	"\x16CLAIM_JOB_STATE_FAILED\x10\x032\xe4\x03\n" +
+	"\x16CLAIM_JOB_STATE_FAILED\x10\x032\xa1\x06\n" +
 	"\vSyncService\x12Q\n" +
 	"\x0eRegisterSource\x12\x1e.sync.v1.RegisterSourceRequest\x1a\x1f.sync.v1.RegisterSourceResponse\x12W\n" +
 	"\x10DeregisterSource\x12 .sync.v1.DeregisterSourceRequest\x1a!.sync.v1.DeregisterSourceResponse\x126\n" +
 	"\x05Claim\x12\x15.sync.v1.ClaimRequest\x1a\x16.sync.v1.ClaimResponse\x12Q\n" +
 	"\x0eGetClaimStatus\x12\x1e.sync.v1.GetClaimStatusRequest\x1a\x1f.sync.v1.GetClaimStatusResponse\x12N\n" +
 	"\rGetSourceMods\x12\x1d.sync.v1.GetSourceModsRequest\x1a\x1e.sync.v1.GetSourceModsResponse\x12N\n" +
-	"\rRefreshSource\x12\x1d.sync.v1.RefreshSourceRequest\x1a\x1e.sync.v1.RefreshSourceResponseBBZ@github.com/skua-international/magpie/generated/go/sync/v1;syncv1b\x06proto3"
+	"\rRefreshSource\x12\x1d.sync.v1.RefreshSourceRequest\x1a\x1e.sync.v1.RefreshSourceResponse\x12Q\n" +
+	"\x0eListSyncedMods\x12\x1e.sync.v1.ListSyncedModsRequest\x1a\x1f.sync.v1.ListSyncedModsResponse\x12N\n" +
+	"\rInvalidateMod\x12\x1d.sync.v1.InvalidateModRequest\x1a\x1e.sync.v1.InvalidateModResponse\x12K\n" +
+	"\fGetSyncedMod\x12\x1c.sync.v1.GetSyncedModRequest\x1a\x1d.sync.v1.GetSyncedModResponse\x12K\n" +
+	"\fGetSyncStats\x12\x1c.sync.v1.GetSyncStatsRequest\x1a\x1d.sync.v1.GetSyncStatsResponseBBZ@github.com/skua-international/magpie/generated/go/sync/v1;syncv1b\x06proto3"
 
 var (
 	file_sync_v1_sync_proto_rawDescOnce sync.Once
@@ -742,44 +1192,63 @@ func file_sync_v1_sync_proto_rawDescGZIP() []byte {
 }
 
 var file_sync_v1_sync_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_sync_v1_sync_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_sync_v1_sync_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_sync_v1_sync_proto_goTypes = []any{
 	(ClaimJobState)(0),               // 0: sync.v1.ClaimJobState
-	(*RefreshSourceRequest)(nil),     // 1: sync.v1.RefreshSourceRequest
-	(*RefreshSourceResponse)(nil),    // 2: sync.v1.RefreshSourceResponse
-	(*GetSourceModsRequest)(nil),     // 3: sync.v1.GetSourceModsRequest
-	(*GetSourceModsResponse)(nil),    // 4: sync.v1.GetSourceModsResponse
-	(*RegisterSourceRequest)(nil),    // 5: sync.v1.RegisterSourceRequest
-	(*ResolvedMod)(nil),              // 6: sync.v1.ResolvedMod
-	(*RegisterSourceResponse)(nil),   // 7: sync.v1.RegisterSourceResponse
-	(*DeregisterSourceRequest)(nil),  // 8: sync.v1.DeregisterSourceRequest
-	(*DeregisterSourceResponse)(nil), // 9: sync.v1.DeregisterSourceResponse
-	(*ClaimRequest)(nil),             // 10: sync.v1.ClaimRequest
-	(*ClaimResponse)(nil),            // 11: sync.v1.ClaimResponse
-	(*GetClaimStatusRequest)(nil),    // 12: sync.v1.GetClaimStatusRequest
-	(*GetClaimStatusResponse)(nil),   // 13: sync.v1.GetClaimStatusResponse
+	(*ListSyncedModsRequest)(nil),    // 1: sync.v1.ListSyncedModsRequest
+	(*SyncedMod)(nil),                // 2: sync.v1.SyncedMod
+	(*ListSyncedModsResponse)(nil),   // 3: sync.v1.ListSyncedModsResponse
+	(*GetSyncedModRequest)(nil),      // 4: sync.v1.GetSyncedModRequest
+	(*GetSyncedModResponse)(nil),     // 5: sync.v1.GetSyncedModResponse
+	(*GetSyncStatsRequest)(nil),      // 6: sync.v1.GetSyncStatsRequest
+	(*GetSyncStatsResponse)(nil),     // 7: sync.v1.GetSyncStatsResponse
+	(*InvalidateModRequest)(nil),     // 8: sync.v1.InvalidateModRequest
+	(*InvalidateModResponse)(nil),    // 9: sync.v1.InvalidateModResponse
+	(*RefreshSourceRequest)(nil),     // 10: sync.v1.RefreshSourceRequest
+	(*RefreshSourceResponse)(nil),    // 11: sync.v1.RefreshSourceResponse
+	(*GetSourceModsRequest)(nil),     // 12: sync.v1.GetSourceModsRequest
+	(*GetSourceModsResponse)(nil),    // 13: sync.v1.GetSourceModsResponse
+	(*RegisterSourceRequest)(nil),    // 14: sync.v1.RegisterSourceRequest
+	(*ResolvedMod)(nil),              // 15: sync.v1.ResolvedMod
+	(*RegisterSourceResponse)(nil),   // 16: sync.v1.RegisterSourceResponse
+	(*DeregisterSourceRequest)(nil),  // 17: sync.v1.DeregisterSourceRequest
+	(*DeregisterSourceResponse)(nil), // 18: sync.v1.DeregisterSourceResponse
+	(*ClaimRequest)(nil),             // 19: sync.v1.ClaimRequest
+	(*ClaimResponse)(nil),            // 20: sync.v1.ClaimResponse
+	(*GetClaimStatusRequest)(nil),    // 21: sync.v1.GetClaimStatusRequest
+	(*GetClaimStatusResponse)(nil),   // 22: sync.v1.GetClaimStatusResponse
 }
 var file_sync_v1_sync_proto_depIdxs = []int32{
-	6,  // 0: sync.v1.RefreshSourceResponse.mods:type_name -> sync.v1.ResolvedMod
-	6,  // 1: sync.v1.RegisterSourceResponse.mods:type_name -> sync.v1.ResolvedMod
-	0,  // 2: sync.v1.GetClaimStatusResponse.state:type_name -> sync.v1.ClaimJobState
-	5,  // 3: sync.v1.SyncService.RegisterSource:input_type -> sync.v1.RegisterSourceRequest
-	8,  // 4: sync.v1.SyncService.DeregisterSource:input_type -> sync.v1.DeregisterSourceRequest
-	10, // 5: sync.v1.SyncService.Claim:input_type -> sync.v1.ClaimRequest
-	12, // 6: sync.v1.SyncService.GetClaimStatus:input_type -> sync.v1.GetClaimStatusRequest
-	3,  // 7: sync.v1.SyncService.GetSourceMods:input_type -> sync.v1.GetSourceModsRequest
-	1,  // 8: sync.v1.SyncService.RefreshSource:input_type -> sync.v1.RefreshSourceRequest
-	7,  // 9: sync.v1.SyncService.RegisterSource:output_type -> sync.v1.RegisterSourceResponse
-	9,  // 10: sync.v1.SyncService.DeregisterSource:output_type -> sync.v1.DeregisterSourceResponse
-	11, // 11: sync.v1.SyncService.Claim:output_type -> sync.v1.ClaimResponse
-	13, // 12: sync.v1.SyncService.GetClaimStatus:output_type -> sync.v1.GetClaimStatusResponse
-	4,  // 13: sync.v1.SyncService.GetSourceMods:output_type -> sync.v1.GetSourceModsResponse
-	2,  // 14: sync.v1.SyncService.RefreshSource:output_type -> sync.v1.RefreshSourceResponse
-	9,  // [9:15] is the sub-list for method output_type
-	3,  // [3:9] is the sub-list for method input_type
-	3,  // [3:3] is the sub-list for extension type_name
-	3,  // [3:3] is the sub-list for extension extendee
-	0,  // [0:3] is the sub-list for field type_name
+	2,  // 0: sync.v1.ListSyncedModsResponse.mods:type_name -> sync.v1.SyncedMod
+	2,  // 1: sync.v1.GetSyncedModResponse.mod:type_name -> sync.v1.SyncedMod
+	15, // 2: sync.v1.RefreshSourceResponse.mods:type_name -> sync.v1.ResolvedMod
+	15, // 3: sync.v1.RegisterSourceResponse.mods:type_name -> sync.v1.ResolvedMod
+	0,  // 4: sync.v1.GetClaimStatusResponse.state:type_name -> sync.v1.ClaimJobState
+	14, // 5: sync.v1.SyncService.RegisterSource:input_type -> sync.v1.RegisterSourceRequest
+	17, // 6: sync.v1.SyncService.DeregisterSource:input_type -> sync.v1.DeregisterSourceRequest
+	19, // 7: sync.v1.SyncService.Claim:input_type -> sync.v1.ClaimRequest
+	21, // 8: sync.v1.SyncService.GetClaimStatus:input_type -> sync.v1.GetClaimStatusRequest
+	12, // 9: sync.v1.SyncService.GetSourceMods:input_type -> sync.v1.GetSourceModsRequest
+	10, // 10: sync.v1.SyncService.RefreshSource:input_type -> sync.v1.RefreshSourceRequest
+	1,  // 11: sync.v1.SyncService.ListSyncedMods:input_type -> sync.v1.ListSyncedModsRequest
+	8,  // 12: sync.v1.SyncService.InvalidateMod:input_type -> sync.v1.InvalidateModRequest
+	4,  // 13: sync.v1.SyncService.GetSyncedMod:input_type -> sync.v1.GetSyncedModRequest
+	6,  // 14: sync.v1.SyncService.GetSyncStats:input_type -> sync.v1.GetSyncStatsRequest
+	16, // 15: sync.v1.SyncService.RegisterSource:output_type -> sync.v1.RegisterSourceResponse
+	18, // 16: sync.v1.SyncService.DeregisterSource:output_type -> sync.v1.DeregisterSourceResponse
+	20, // 17: sync.v1.SyncService.Claim:output_type -> sync.v1.ClaimResponse
+	22, // 18: sync.v1.SyncService.GetClaimStatus:output_type -> sync.v1.GetClaimStatusResponse
+	13, // 19: sync.v1.SyncService.GetSourceMods:output_type -> sync.v1.GetSourceModsResponse
+	11, // 20: sync.v1.SyncService.RefreshSource:output_type -> sync.v1.RefreshSourceResponse
+	3,  // 21: sync.v1.SyncService.ListSyncedMods:output_type -> sync.v1.ListSyncedModsResponse
+	9,  // 22: sync.v1.SyncService.InvalidateMod:output_type -> sync.v1.InvalidateModResponse
+	5,  // 23: sync.v1.SyncService.GetSyncedMod:output_type -> sync.v1.GetSyncedModResponse
+	7,  // 24: sync.v1.SyncService.GetSyncStats:output_type -> sync.v1.GetSyncStatsResponse
+	15, // [15:25] is the sub-list for method output_type
+	5,  // [5:15] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_sync_v1_sync_proto_init() }
@@ -787,13 +1256,14 @@ func file_sync_v1_sync_proto_init() {
 	if File_sync_v1_sync_proto != nil {
 		return
 	}
+	file_sync_v1_sync_proto_msgTypes[4].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sync_v1_sync_proto_rawDesc), len(file_sync_v1_sync_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   13,
+			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
