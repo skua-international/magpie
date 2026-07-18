@@ -43,3 +43,78 @@ jobs:
           workdir: cli/magpie
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Builds crates/steam-sync's steam-login companion binary
+  # (cli/magpie/internal/steamlogin downloads this on first use of
+  # `magpie admin refresh-steam-auth`) for the same 5 targets magpie
+  # itself ships for, uploaded to the same release under a naming
+  # convention (steam-login_<os>_<arch>[.exe]) that package matches
+  # exactly against runtime.GOOS/GOARCH, no translation table needed.
+  #
+  # One native runner per OS rather than cross-compiling everything from
+  # a single Linux runner: macOS/Windows targets build with their
+  # platform's own real toolchain (no osxcross/mingw setup), and the only
+  # actual cross-compilation here is linux/arm64 from an amd64 runner,
+  # which just needs a cross-linker apt already has a package for.
+  steam-login:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            asset: steam-login_linux_amd64
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            asset: steam-login_linux_arm64
+            cross-linker: aarch64-linux-gnu-gcc
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            asset: steam-login_darwin_amd64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            asset: steam-login_darwin_arm64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            asset: steam-login_windows_amd64.exe
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - uses: arduino/setup-protoc@v3
+        with:
+          # crates/protocol's build.rs shells out to a real protoc binary
+          # (via connectrpc-build) -- every crate in the workspace builds
+          # through cargo-chef-equivalent resolution, so steam-login needs
+          # this too even though it doesn't itself touch proto/.
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross-linker
+        if: matrix.cross-linker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Build
+        shell: bash
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.cross-linker }}
+        run: cargo build --release -p steam-sync --bin steam-login --target ${{ matrix.target }}
+
+      - name: Rename and upload
+        shell: bash
+        run: |
+          src="target/${{ matrix.target }}/release/steam-login"
+          [[ "${{ matrix.os }}" == windows-latest ]] && src="${src}.exe"
+          cp "$src" "${{ matrix.asset }}"
+          gh release upload "${{ inputs.tag || github.ref_name }}" "${{ matrix.asset }}" --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

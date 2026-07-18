@@ -38,60 +38,77 @@ All inter-service and client-facing APIs are [ConnectRPC](https://connectrpc.com
 
 ## Deploying
 
-First install, on a fresh host with no Kubernetes yet:
+This repo is private, so every command below that talks to GitHub (not GHCR/OCI, which uses its own pull secret) picks up auth from `gh auth token` automatically if the [GitHub CLI](https://cli.github.com/) is installed and logged in (`gh auth login`) -- no separate token to export.
+
+First install, on a fresh host with no Kubernetes yet -- either from a checkout:
 
 ```bash
 ./deploy/k3s-bootstrap.sh   # installs k3s, checks the data dir's filesystem, walks through required secrets
 ```
 
-It ends by printing the exact `scripts/deploy.sh --install` invocation to run, with every `--set` you'll actually need filled in.
+or with no checkout at all, piped straight from GitHub like most install.sh-style tools do it:
 
-Upgrades (including the very first install, via `--install`) all go through one script:
+```bash
+curl -sSf -H "Authorization: token $(gh auth token)" \
+  https://raw.githubusercontent.com/skua-international/magpie/main/deploy/k3s-bootstrap.sh | bash
+```
+
+Both are the same script -- piping it in just skips needing a clone first, and it fetches `scripts/deploy.sh` (and, for `--ssh`, itself) fresh from GitHub the same way when it can't find a local copy. It ends by actually running `scripts/deploy.sh --install` for you, with every `--set` it resolved along the way.
+
+Upgrades (including the very first install, via `--install`) all go through one script, same pattern:
 
 ```bash
 ./scripts/deploy.sh                       # deploy this checkout's own chart version, same image tag
 ./scripts/deploy.sh 1.5.0                 # deploy a specific published version
 ./scripts/deploy.sh --image-tag c5130c2   # keep the chart version, swap just the images (e.g. testing an unreleased commit)
 ./scripts/deploy.sh --dry-run             # render + preflight without applying anything
+
+# or, with no checkout:
+curl -sSf -H "Authorization: token $(gh auth token)" \
+  https://raw.githubusercontent.com/skua-international/magpie/main/scripts/deploy.sh | bash -s -- 1.5.0
 ```
 
-It pulls the chart from its OCI publish (`oci://ghcr.io/skua-international/magpie/charts/magpie`) rather than the local checkout, so it always deploys the exact artifact CI published for that version — never a locally-edited template that hasn't gone through CI. See `scripts/deploy.sh --help` for the rest (namespace/release name overrides, preflighting that the target image tags actually exist in GHCR before touching anything, etc). See the chart's `values.yaml` for every knob — most have sane defaults.
+It pulls the chart from its OCI publish (`oci://ghcr.io/skua-international/magpie/charts/magpie`) rather than the local checkout, so it always deploys the exact artifact CI published for that version — never a locally-edited template that hasn't gone through CI. With no VERSION and no local checkout to default from, it resolves the latest GitHub release instead. See `scripts/deploy.sh --help` for the rest (namespace/release name overrides, preflighting that the target image tags actually exist in GHCR before touching anything, etc). See the chart's `values.yaml` for every knob — most have sane defaults.
 
 ### Steam authentication
 
-`syncDaemon.steamAuth.existingSecret` only bootstraps the *first* session. From then on (or instead, skipping that Secret entirely) run `magpie admin refresh-steam-auth` — it's a normal interactive Steam login (username + password, with a Steam Guard code prompt if 2FA kicks in) using whatever real Steam account you give it. The password itself is never stored; only the resulting refresh token is, in the `arma-steam-session` Secret, and that's what sync-daemon uses as the cluster's Steam identity for every workshop/depot operation from then on.
+There's no password-based bootstrap Secret at all -- a Steam password should never reach a deployed service, not even transiently. Run `magpie admin refresh-steam-auth` instead: it prompts for a username + password (with a Steam Guard code prompt if 2FA kicks in) and does the interactive Steam login entirely client-side, on your own machine -- via a small helper binary (`steam-login`, built from `crates/steam-sync`) that `magpie` downloads on first use and caches locally, version-matched to your `magpie` build. Only the resulting refresh token ever reaches the cluster (written to the `arma-steam-session` Secret via the `RefreshSteamAuth` RPC, which only ever accepts a refresh token, never a password), and that's what sync-daemon uses as the cluster's Steam identity for every workshop/depot operation from then on.
 
 This isn't elevated access — visibility into private/unlisted mods and collections is scoped to whatever that specific Steam account can actually see (its own subscriptions, friends-only shares, etc.), same as browsing the Workshop as that account normally would. Use an account that's actually subscribed to / has visibility into whatever private content the servers need.
 
 ## Installing the CLI
 
-`magpie` is both a direct CLI (`magpie servers list`, `magpie login`, ...) and, run with no subcommand, an interactive TUI — everything the TUI can do is also a direct invocation, and vice versa (see `cli/magpie/internal/actions`, the one implementation both surfaces call into).
+`magpiectl` is both a direct CLI (`magpiectl servers list`, `magpiectl deploy`, ...) and, run with no subcommand, an interactive TUI — everything the TUI can do is also a direct invocation, and vice versa (see `cli/magpie/internal/actions`, the one implementation both surfaces call into). It can also drive the cluster's own lifecycle directly (`magpiectl deploy`/`upgrade`/`install`, shelling out to `helm`/`kubectl` the same way `scripts/deploy.sh` does) and establish the cluster's Steam session (`magpiectl admin refresh-steam-auth`, see "Steam authentication" above) without needing a repo checkout at all.
 
-Download a prebuilt binary from [the latest release](https://github.com/skua-international/magpie/releases/latest):
+Download a prebuilt binary from [the latest release](https://github.com/skua-international/magpie/releases/latest). This repo is private, so the plain `.../releases/latest/download/...` URL 404s without auth -- resolve the actual asset via the API instead (needs `gh auth login` once, and `jq`):
 
 ```bash
 # Linux/macOS -- picks the right archive for your OS/arch automatically
 os="$(uname -s | tr '[:upper:]' '[:lower:]')"
 arch="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')"
-curl -sL "https://github.com/skua-international/magpie/releases/latest/download/magpie_${os}_${arch}.tar.gz" \
-  | tar xz -C /usr/local/bin magpie
+asset="magpiectl_${os}_${arch}.tar.gz"
+token="$(gh auth token)"
+url="$(curl -sSf -H "Authorization: token $token" https://api.github.com/repos/skua-international/magpie/releases/latest \
+  | jq -r --arg name "$asset" '.assets[] | select(.name == $name) | .url')"
+curl -sSf -H "Authorization: token $token" -H 'Accept: application/octet-stream' -L "$url" \
+  | tar xz -C /usr/local/bin magpiectl
 ```
 
-Windows: download `magpie_windows_amd64.zip` from the releases page directly.
+Windows: same API dance (asset name `magpiectl_windows_amd64.zip`), or just download it from the releases page directly if you're already logged in to GitHub in your browser.
 
 Then point it at your cluster and log in:
 
 ```bash
-magpie --identity-url http://identity.magpie.local \
-       --server-api-url http://server-api.magpie.local \
-       --registry-url http://registry.magpie.local \
-       auth login
-magpie completion install   # optional -- bash/zsh/fish/powershell autocompletion
+magpiectl --identity-url http://identity.magpie.local \
+          --server-api-url http://server-api.magpie.local \
+          --registry-url http://registry.magpie.local \
+          auth login
+magpiectl completion install   # optional -- bash/zsh/fish/powershell autocompletion
 ```
 
 (Those base URLs are this chart's own `ingress.baseDomain` default, `magpie.local` — override to match whatever you actually set at install time.)
 
-Building from source instead (e.g. to run an unreleased commit): `cd cli/magpie && go install ./cmd/magpie` -- only works from within a clone of this monorepo, since `cli/magpie`'s `go.mod` points at `generated/go` via a relative `replace` directive rather than a published module.
+Building from source instead (e.g. to run an unreleased commit): `cd cli/magpie && go install ./cmd/magpiectl` -- only works from within a clone of this monorepo, since `cli/magpie`'s `go.mod` points at `generated/go` via a relative `replace` directive rather than a published module.
 
 ## Repo layout
 

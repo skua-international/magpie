@@ -49,7 +49,7 @@
 #   - arma-steam-creds: optional, bootstraps only the *first* Steam
 #     session (see syncDaemon.steamAuth.existingSecret's own doc in
 #     values.yaml) -- skip entirely for anonymous-only workshop access,
-#     or seed one later with `magpie admin refresh-steam-auth` instead,
+#     or seed one later with `magpiectl admin refresh-steam-auth` instead,
 #     which needs no long-lived password Secret in the cluster at all.
 #     Prompts interactively (hidden password input) unless
 #     --steam-user/--steam-password (or STEAM_USER/STEAM_PASSWORD env
@@ -98,7 +98,11 @@ while [[ $# -gt 0 ]]; do
         --ingress-base-domain) INGRESS_BASE_DOMAIN="$2"; shift 2 ;;
         --external-postgres-url) EXTERNAL_POSTGRES_URL="$2"; shift 2 ;;
         -h|--help)
-            grep '^#' "${BASH_SOURCE[0]}" | cut -c3-
+            if [[ -f "${BASH_SOURCE[0]:-}" ]]; then
+                grep '^#' "${BASH_SOURCE[0]:-}" | cut -c3-
+            else
+                echo "usage: see deploy/k3s-bootstrap.sh's own header at github.com/skua-international/magpie"
+            fi
             exit 0
             ;;
         *)
@@ -115,7 +119,44 @@ fi
 
 log() { echo "[k3s-bootstrap] $*"; }
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TEMP_FILES=()
+cleanup() {
+    [[ ${#TEMP_FILES[@]} -gt 0 ]] && rm -f "${TEMP_FILES[@]}"
+}
+trap cleanup EXIT
+
+GITHUB_REPO="skua-international/magpie"
+
+# This repo is private -- api.github.com/raw.githubusercontent.com both
+# 404 (not 401/403, GitHub doesn't distinguish "private" from "doesn't
+# exist" to an unauthenticated caller) without a token. `gh auth token`
+# reuses whatever session `gh` already has rather than needing a
+# separately exported GITHUB_TOKEN just to run this script.
+GH_AUTH_HEADER=()
+if command -v gh >/dev/null 2>&1; then
+    gh_token="$(gh auth token 2>/dev/null || true)"
+    [[ -n "$gh_token" ]] && GH_AUTH_HEADER=(-H "Authorization: token $gh_token")
+fi
+
+# Empty (not an error) when curl-piped -- ${BASH_SOURCE[0]:-} isn't a real
+# path in that case. Every local-file lookup below is guarded on this
+# being non-empty; scripts/deploy.sh is fetched fresh from GitHub instead
+# when it is.
+REPO_ROOT=""
+if [[ -f "${BASH_SOURCE[0]:-}" ]]; then
+    REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]:-}")/.." && pwd)"
+fi
+
+# The real path to *this script's own source* -- needed by --ssh below
+# (piping/scp-ing it to the remote host). When curl-piped, ${BASH_SOURCE[0]:-}
+# has already been fully consumed as bash's stdin and can't be re-read, so
+# there's nothing to fall back to except downloading a fresh copy.
+SELF_SCRIPT="${BASH_SOURCE[0]:-}"
+if [[ ! -f "$SELF_SCRIPT" ]]; then
+    SELF_SCRIPT="$(mktemp)"
+    TEMP_FILES+=("$SELF_SCRIPT")
+    curl -sSf "${GH_AUTH_HEADER[@]}" "https://raw.githubusercontent.com/${GITHUB_REPO}/main/deploy/k3s-bootstrap.sh" -o "$SELF_SCRIPT"
+fi
 
 # Set below to whichever kubeconfig this run ends up with -- so secret
 # resolution and the deploy step further down work identically whether
@@ -138,12 +179,12 @@ elif [[ -n "$SSH_HOST" ]]; then
     if [[ -n "$SSH_IDENTITY" ]]; then
         remote_script="/tmp/k3s-bootstrap.$$.sh"
         log "copying this script to $SSH_HOST:$remote_script..."
-        scp "${ssh_args[@]}" "${BASH_SOURCE[0]}" "$SSH_HOST:$remote_script"
+        scp "${ssh_args[@]}" "$SELF_SCRIPT" "$SSH_HOST:$remote_script"
         log "running it on $SSH_HOST..."
         ssh "${ssh_args[@]}" "$SSH_HOST" "$remote_env bash $remote_script; rm -f $remote_script"
     else
         log "running this script on $SSH_HOST over ssh..."
-        ssh "${ssh_args[@]}" "$SSH_HOST" "$remote_env bash -s" < "${BASH_SOURCE[0]}"
+        ssh "${ssh_args[@]}" "$SSH_HOST" "$remote_env bash -s" < "$SELF_SCRIPT"
     fi
 
     if [[ "$COPY_KUBECONFIG" == "true" ]]; then
@@ -248,7 +289,7 @@ if [[ -n "$KUBECONFIG_PATH" ]]; then
             --dry-run=client -o yaml | kctl apply -f - >/dev/null
         DEPLOY_SET_ARGS+=(--set syncDaemon.steamAuth.existingSecret=arma-steam-creds)
     else
-        log "skipping Steam credentials -- use 'magpie admin refresh-steam-auth' after install, or --set syncDaemon.steamAuth.anonymous=true for anonymous-only access"
+        log "skipping Steam credentials -- use 'magpiectl admin refresh-steam-auth' after install, or --set syncDaemon.steamAuth.anonymous=true for anonymous-only access"
     fi
 
     if [[ -n "$GHCR_USER" && -n "$GHCR_TOKEN" ]]; then
@@ -264,13 +305,16 @@ if [[ -n "$KUBECONFIG_PATH" ]]; then
     DEPLOY_SET_ARGS+=(--set "ingress.baseDomain=$INGRESS_BASE_DOMAIN")
     DEPLOY_SET_ARGS+=(--set "identity.baseUrl=${IDENTITY_BASE_URL:-http://identity.$INGRESS_BASE_DOMAIN}")
 
-    if [[ -x "$REPO_ROOT/scripts/deploy.sh" ]]; then
-        log "running scripts/deploy.sh --install..."
-        KUBECONFIG="$KUBECONFIG_PATH" "$REPO_ROOT/scripts/deploy.sh" --install -- "${DEPLOY_SET_ARGS[@]}"
-    else
-        log "scripts/deploy.sh not found or not executable -- run it yourself with:"
-        log "  KUBECONFIG=$KUBECONFIG_PATH ./scripts/deploy.sh --install -- ${DEPLOY_SET_ARGS[*]}"
+    deploy_script="$REPO_ROOT/scripts/deploy.sh"
+    if [[ -z "$REPO_ROOT" || ! -f "$deploy_script" ]]; then
+        log "no local checkout -- fetching scripts/deploy.sh from GitHub..."
+        deploy_script="$(mktemp)"
+        TEMP_FILES+=("$deploy_script")
+        curl -sSf "${GH_AUTH_HEADER[@]}" "https://raw.githubusercontent.com/${GITHUB_REPO}/main/scripts/deploy.sh" -o "$deploy_script"
+        chmod +x "$deploy_script"
     fi
+    log "running deploy.sh --install..."
+    KUBECONFIG="$KUBECONFIG_PATH" bash "$deploy_script" --install -- "${DEPLOY_SET_ARGS[@]}"
 else
     log "no kubeconfig available -- skipping secret creation and deploy. Set COPY_KUBECONFIG=true, or pass --kubeconfig, and re-run."
 fi
@@ -288,8 +332,8 @@ Remaining manual steps, if you want them:
 
 - Sign in once, at <identity.baseUrl>/auth/steam/start (or
   /auth/discord/start, etc. -- whichever providers you configured), or
-  via the magpie CLI/TUI (\`magpie login\`, or bare \`magpie\` -- see this
-  repo's README for install instructions). The very first person to ever
+  via the magpiectl CLI/TUI (\`magpiectl login\`, or bare \`magpiectl\` -- see
+  this repo's README for install instructions). The very first person to ever
   sign in is automatically granted every scope (there's no admin UI to
   hand out permissions any other way yet), so do this yourself before
   anyone else gets a chance to.

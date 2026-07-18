@@ -19,8 +19,11 @@
 #   scripts/deploy.sh [VERSION] [options] [-- extra helm args]
 #
 #   VERSION defaults to whatever's in this checkout's own
-#   charts/magpie/Chart.yaml -- i.e. with no arguments, deploys the
-#   published version matching this checkout.
+#   charts/magpie/Chart.yaml if run from one -- i.e. with no arguments,
+#   deploys the published version matching this checkout. Also runnable
+#   with no checkout at all (curl -sSf .../scripts/deploy.sh | bash -s --
+#   ..., see README.md), in which case it defaults to the latest GitHub
+#   release instead.
 #
 # Options:
 #   --image-tag TAG    Override just the image tag (chart stays at VERSION)
@@ -39,7 +42,7 @@
 #                           --set imagePullSecrets='{ghcr-pull-secret}'
 #                       (syncDaemon.steamAuth.existingSecret is optional --
 #                       omit it and bootstrap Steam auth after install with
-#                       `magpie admin refresh-steam-auth` instead. ingress.
+#                       `magpiectl admin refresh-steam-auth` instead. ingress.
 #                       baseDomain defaults to magpie.local; override it too
 #                       if your host uses a different one.)
 #   --dry-run          Render and diff without actually applying anything
@@ -54,8 +57,27 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Empty (not an error) when curl-piped -- ${BASH_SOURCE[0]:-} isn't a real
+# path in that case (typically "bash" or "/dev/stdin"), so there's no
+# local checkout to find a default VERSION or anything else in. Every
+# local-file lookup below is guarded on this being non-empty.
+REPO_ROOT=""
+if [[ -f "${BASH_SOURCE[0]:-}" ]]; then
+    REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]:-}")/.." && pwd)"
+fi
 CHART_REF="oci://ghcr.io/skua-international/magpie/charts/magpie"
+GITHUB_REPO="skua-international/magpie"
+
+# This repo is private -- api.github.com/raw.githubusercontent.com both
+# 404 (not 401/403, GitHub doesn't distinguish "private" from "doesn't
+# exist" to an unauthenticated caller) without a token. `gh auth token`
+# reuses whatever session `gh` already has rather than needing a
+# separately exported GITHUB_TOKEN just to run this script.
+GH_AUTH_HEADER=()
+if command -v gh >/dev/null 2>&1; then
+  gh_token="$(gh auth token 2>/dev/null || true)"
+  [[ -n "$gh_token" ]] && GH_AUTH_HEADER=(-H "Authorization: token $gh_token")
+fi
 
 NAMESPACE="magpie"
 RELEASE="arma"
@@ -154,7 +176,11 @@ while [[ $# -gt 0 ]]; do
     --dry-run) HELM_DRY_RUN="--dry-run"; KUBECTL_DRY_RUN="--dry-run=client"; shift ;;
     --debug) HELM_DEBUG_ARGS=(--debug); shift ;;
     -h|--help)
-      grep '^#' "${BASH_SOURCE[0]}" | cut -c3-
+      if [[ -f "${BASH_SOURCE[0]:-}" ]]; then
+        grep '^#' "${BASH_SOURCE[0]:-}" | cut -c3-
+      else
+        echo "usage: see scripts/deploy.sh's own header at github.com/skua-international/magpie"
+      fi
       exit 0
       ;;
     --)
@@ -174,8 +200,17 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$VERSION" ]]; then
-  VERSION="$(grep '^version:' "$REPO_ROOT/charts/magpie/Chart.yaml" | awk '{print $2}')"
-  echo "==> No version given, using this checkout's own chart version: $VERSION"
+  if [[ -n "$REPO_ROOT" && -f "$REPO_ROOT/charts/magpie/Chart.yaml" ]]; then
+    VERSION="$(grep '^version:' "$REPO_ROOT/charts/magpie/Chart.yaml" | awk '{print $2}')"
+    echo "==> No version given, using this checkout's own chart version: $VERSION"
+  else
+    VERSION="$(curl -sSf "${GH_AUTH_HEADER[@]}" "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" | grep '"tag_name"' | sed -E 's/.*"v?([^"]+)".*/\1/')"
+    if [[ -z "$VERSION" ]]; then
+      echo "error: no VERSION given and couldn't resolve the latest release from GitHub -- pass one explicitly" >&2
+      exit 1
+    fi
+    echo "==> No version given and no local checkout, using the latest release: $VERSION"
+  fi
 fi
 
 IMAGE_CHECK_TAG="$VERSION"
