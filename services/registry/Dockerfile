@@ -25,7 +25,8 @@ COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/build/target \
-    cargo build --release --locked -p registry
+    cargo build --release --locked -p registry \
+    && cp /build/target/release/registry /build/registry
 
 # Pure Rust binary, no subprocess/shell use -- distroless: no shell, no
 # package manager, nothing beyond libc and CA certs.
@@ -37,6 +38,6 @@ ENV SYNC_DAEMON_URL=http://sync-daemon:8080
 
 EXPOSE 8444
 
-COPY --from=builder /build/target/release/registry /registry
+COPY --from=builder /build/registry /registry
 
 ENTRYPOINT ["/registry"]

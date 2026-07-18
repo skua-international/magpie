@@ -32,7 +32,8 @@ COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/build/target \
-    cargo build --release --locked -p launcher
+    cargo build --release --locked -p launcher \
+    && cp /build/target/release/launcher /build/launcher
 
 FROM debian:bookworm-slim
 
@@ -84,6 +85,6 @@ VOLUME /arma3/server
 
 STOPSIGNAL SIGINT
 
-COPY --from=builder /build/target/release/launcher /launcher
+COPY --from=builder /build/launcher /launcher
 
 CMD ["/launcher"]

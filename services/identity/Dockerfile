@@ -25,7 +25,8 @@ COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/build/target \
-    cargo build --release --locked -p identity
+    cargo build --release --locked -p identity \
+    && cp /build/target/release/identity /build/identity
 
 # Pure Rust binary, no subprocess/shell use -- distroless: no shell, no
 # package manager, nothing beyond libc and CA certs. This process holds
@@ -38,6 +39,6 @@ ENV LISTEN_ADDR=0.0.0.0:8445
 
 EXPOSE 8445
 
-COPY --from=builder /build/target/release/identity /identity
+COPY --from=builder /build/identity /identity
 
 ENTRYPOINT ["/identity"]

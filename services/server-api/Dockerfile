@@ -25,7 +25,8 @@ COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/build/target \
-    cargo build --release --locked -p server-api
+    cargo build --release --locked -p server-api \
+    && cp /build/target/release/server-api /build/server-api
 
 # Pure Rust binary, no subprocess/shell use -- distroless: no shell, no
 # package manager, nothing beyond libc and CA certs. This is the one
@@ -41,6 +42,6 @@ ENV SYNC_DAEMON_URL=http://sync-daemon:8080
 
 EXPOSE 8443
 
-COPY --from=builder /build/target/release/server-api /server-api
+COPY --from=builder /build/server-api /server-api
 
 ENTRYPOINT ["/server-api"]

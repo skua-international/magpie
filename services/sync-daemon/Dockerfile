@@ -25,7 +25,8 @@ COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/build/target \
-    cargo build --release --locked -p sync-daemon
+    cargo build --release --locked -p sync-daemon \
+    && cp /build/target/release/sync-daemon /build/sync-daemon
 
 FROM debian:bookworm-slim
 
@@ -48,6 +49,6 @@ EXPOSE 8080
 VOLUME /content
 VOLUME /claims
 
-COPY --from=builder /build/target/release/sync-daemon /sync-daemon
+COPY --from=builder /build/sync-daemon /sync-daemon
 
 CMD ["/sync-daemon"]

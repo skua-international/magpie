@@ -25,7 +25,8 @@ COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/build/target \
-    cargo build --release --locked -p controller
+    cargo build --release --locked -p controller \
+    && cp /build/target/release/controller /build/controller
 
 # Pure Rust binary, no subprocess/shell use at all (unlike sync-daemon,
 # which shells out to `cp` for reflink claims) -- distroless gets this one
@@ -41,6 +42,6 @@ ENV SERVER_ROOT_BASE=/srv/arma-servers
 ENV LOCAL_CONTENT_ROOT=/local-content
 ENV LOCAL_CONTENT_HOST_PATH=/var/lib/magpie/local-content
 
-COPY --from=builder /build/target/release/controller /controller
+COPY --from=builder /build/controller /controller
 
 ENTRYPOINT ["/controller"]
