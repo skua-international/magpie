@@ -38,6 +38,9 @@ archives:
 checksum:
   name_template: "checksums.txt"
 
+snapshot:
+  version_template: "{{ .ShortCommit }}"
+
 # semantic-release (see ../../release.config.js) already creates the
 # GitHub Release for this tag with real changelog notes from conventional
 # commits -- append binaries to that existing release rather than

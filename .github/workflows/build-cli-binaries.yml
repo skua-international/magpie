@@ -1,0 +1,46 @@
+name: Build CLI binaries
+
+# Main-branch pushes build snapshot CLI binaries for validation. Publishing
+# remains tag-only in release-cli.yml; this workflow never uploads release
+# assets.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cli/magpie/**"
+      - "generated/go/**"
+      - "proto/**"
+      - ".github/workflows/build-cli-binaries.yml"
+      - ".github/workflows/release.yml"
+      - "release.config.js"
+      - "generated/go/go.mod"
+      - "generated/go/go.sum"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  workflow_dispatch: {}
+
+concurrency:
+  group: build-cli-binaries-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.25"
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: build --clean --snapshot
+          workdir: cli/magpie
