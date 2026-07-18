@@ -73,6 +73,9 @@ const (
 	// AdminServiceGetDiskUsageProcedure is the fully-qualified name of the AdminService's GetDiskUsage
 	// RPC.
 	AdminServiceGetDiskUsageProcedure = "/registry.v1.AdminService/GetDiskUsage"
+	// AdminServiceRefreshSteamAuthProcedure is the fully-qualified name of the AdminService's
+	// RefreshSteamAuth RPC.
+	AdminServiceRefreshSteamAuthProcedure = "/registry.v1.AdminService/RefreshSteamAuth"
 )
 
 // ModSourceServiceClient is a client for the registry.v1.ModSourceService service.
@@ -488,6 +491,14 @@ func (UnimplementedMissionServiceHandler) DeleteMission(context.Context, *connec
 // AdminServiceClient is a client for the registry.v1.AdminService service.
 type AdminServiceClient interface {
 	GetDiskUsage(context.Context, *connect.Request[v1.GetDiskUsageRequest]) (*connect.Response[v1.GetDiskUsageResponse], error)
+	// Establish (or replace) the cluster's Steam session interactively --
+	// proxies straight to sync-daemon's own RPC of the same name (see its
+	// doc for the full flow/guard-code handling). The only way to get a
+	// working Steam session with zero pre-existing credentials anywhere in
+	// the cluster: `password` exists only for the duration of this call.
+	// Its own scope, deliberately separate from and more restricted than
+	// anything else here -- this can authenticate as the Steam account.
+	RefreshSteamAuth(context.Context, *connect.Request[v1.RefreshSteamAuthRequest]) (*connect.Response[v1.RefreshSteamAuthResponse], error)
 }
 
 // NewAdminServiceClient constructs a client for the registry.v1.AdminService service. By default,
@@ -507,12 +518,19 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("GetDiskUsage")),
 			connect.WithClientOptions(opts...),
 		),
+		refreshSteamAuth: connect.NewClient[v1.RefreshSteamAuthRequest, v1.RefreshSteamAuthResponse](
+			httpClient,
+			baseURL+AdminServiceRefreshSteamAuthProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("RefreshSteamAuth")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // adminServiceClient implements AdminServiceClient.
 type adminServiceClient struct {
-	getDiskUsage *connect.Client[v1.GetDiskUsageRequest, v1.GetDiskUsageResponse]
+	getDiskUsage     *connect.Client[v1.GetDiskUsageRequest, v1.GetDiskUsageResponse]
+	refreshSteamAuth *connect.Client[v1.RefreshSteamAuthRequest, v1.RefreshSteamAuthResponse]
 }
 
 // GetDiskUsage calls registry.v1.AdminService.GetDiskUsage.
@@ -520,9 +538,22 @@ func (c *adminServiceClient) GetDiskUsage(ctx context.Context, req *connect.Requ
 	return c.getDiskUsage.CallUnary(ctx, req)
 }
 
+// RefreshSteamAuth calls registry.v1.AdminService.RefreshSteamAuth.
+func (c *adminServiceClient) RefreshSteamAuth(ctx context.Context, req *connect.Request[v1.RefreshSteamAuthRequest]) (*connect.Response[v1.RefreshSteamAuthResponse], error) {
+	return c.refreshSteamAuth.CallUnary(ctx, req)
+}
+
 // AdminServiceHandler is an implementation of the registry.v1.AdminService service.
 type AdminServiceHandler interface {
 	GetDiskUsage(context.Context, *connect.Request[v1.GetDiskUsageRequest]) (*connect.Response[v1.GetDiskUsageResponse], error)
+	// Establish (or replace) the cluster's Steam session interactively --
+	// proxies straight to sync-daemon's own RPC of the same name (see its
+	// doc for the full flow/guard-code handling). The only way to get a
+	// working Steam session with zero pre-existing credentials anywhere in
+	// the cluster: `password` exists only for the duration of this call.
+	// Its own scope, deliberately separate from and more restricted than
+	// anything else here -- this can authenticate as the Steam account.
+	RefreshSteamAuth(context.Context, *connect.Request[v1.RefreshSteamAuthRequest]) (*connect.Response[v1.RefreshSteamAuthResponse], error)
 }
 
 // NewAdminServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -538,10 +569,18 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(adminServiceMethods.ByName("GetDiskUsage")),
 		connect.WithHandlerOptions(opts...),
 	)
+	adminServiceRefreshSteamAuthHandler := connect.NewUnaryHandler(
+		AdminServiceRefreshSteamAuthProcedure,
+		svc.RefreshSteamAuth,
+		connect.WithSchema(adminServiceMethods.ByName("RefreshSteamAuth")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/registry.v1.AdminService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AdminServiceGetDiskUsageProcedure:
 			adminServiceGetDiskUsageHandler.ServeHTTP(w, r)
+		case AdminServiceRefreshSteamAuthProcedure:
+			adminServiceRefreshSteamAuthHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -553,4 +592,8 @@ type UnimplementedAdminServiceHandler struct{}
 
 func (UnimplementedAdminServiceHandler) GetDiskUsage(context.Context, *connect.Request[v1.GetDiskUsageRequest]) (*connect.Response[v1.GetDiskUsageResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.GetDiskUsage is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) RefreshSteamAuth(context.Context, *connect.Request[v1.RefreshSteamAuthRequest]) (*connect.Response[v1.RefreshSteamAuthResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.RefreshSteamAuth is not implemented"))
 }

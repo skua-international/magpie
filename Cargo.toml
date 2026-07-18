@@ -9,4 +9,4 @@ edition = "2024"
 # member below inherits this through `version.workspace = true` rather
 # than carrying its own version, so one release version covers the whole
 # platform. Not meaningful on its own between releases; don't hand-edit.
-version = "1.2.0"
+version = "1.3.0"

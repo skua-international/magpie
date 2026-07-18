@@ -62,6 +62,9 @@ const (
 	// SyncServiceGetSyncStatsProcedure is the fully-qualified name of the SyncService's GetSyncStats
 	// RPC.
 	SyncServiceGetSyncStatsProcedure = "/sync.v1.SyncService/GetSyncStats"
+	// SyncServiceRefreshSteamAuthProcedure is the fully-qualified name of the SyncService's
+	// RefreshSteamAuth RPC.
+	SyncServiceRefreshSteamAuthProcedure = "/sync.v1.SyncService/RefreshSteamAuth"
 )
 
 // SyncServiceClient is a client for the sync.v1.SyncService service.
@@ -121,6 +124,18 @@ type SyncServiceClient interface {
 	// sources, plus base game/CDLC depot size -- for registry's
 	// AdminService.GetDiskUsage.
 	GetSyncStats(context.Context, *connect.Request[v1.GetSyncStatsRequest]) (*connect.Response[v1.GetSyncStatsResponse], error)
+	// Establish (or replace) this cluster's Steam session interactively --
+	// the only way to get a session running with zero pre-existing
+	// credentials anywhere: `password` is used only for the duration of
+	// this call, never persisted anywhere, only the resulting refresh
+	// token is (to a Secret, not disk). If Steam Guard confirmation is
+	// required and `guard_code` wasn't supplied, returns needs_guard=true
+	// without completing the login -- call again with the code from
+	// whatever channel (email/mobile app) Steam sent it to. On success,
+	// the new session is persisted and this process exits to pick it up
+	// fresh on restart (see the handler's own doc for why) -- the response
+	// still reaches the caller first.
+	RefreshSteamAuth(context.Context, *connect.Request[v1.RefreshSteamAuthRequest]) (*connect.Response[v1.RefreshSteamAuthResponse], error)
 }
 
 // NewSyncServiceClient constructs a client for the sync.v1.SyncService service. By default, it uses
@@ -194,6 +209,12 @@ func NewSyncServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(syncServiceMethods.ByName("GetSyncStats")),
 			connect.WithClientOptions(opts...),
 		),
+		refreshSteamAuth: connect.NewClient[v1.RefreshSteamAuthRequest, v1.RefreshSteamAuthResponse](
+			httpClient,
+			baseURL+SyncServiceRefreshSteamAuthProcedure,
+			connect.WithSchema(syncServiceMethods.ByName("RefreshSteamAuth")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -209,6 +230,7 @@ type syncServiceClient struct {
 	invalidateMod    *connect.Client[v1.InvalidateModRequest, v1.InvalidateModResponse]
 	getSyncedMod     *connect.Client[v1.GetSyncedModRequest, v1.GetSyncedModResponse]
 	getSyncStats     *connect.Client[v1.GetSyncStatsRequest, v1.GetSyncStatsResponse]
+	refreshSteamAuth *connect.Client[v1.RefreshSteamAuthRequest, v1.RefreshSteamAuthResponse]
 }
 
 // RegisterSource calls sync.v1.SyncService.RegisterSource.
@@ -259,6 +281,11 @@ func (c *syncServiceClient) GetSyncedMod(ctx context.Context, req *connect.Reque
 // GetSyncStats calls sync.v1.SyncService.GetSyncStats.
 func (c *syncServiceClient) GetSyncStats(ctx context.Context, req *connect.Request[v1.GetSyncStatsRequest]) (*connect.Response[v1.GetSyncStatsResponse], error) {
 	return c.getSyncStats.CallUnary(ctx, req)
+}
+
+// RefreshSteamAuth calls sync.v1.SyncService.RefreshSteamAuth.
+func (c *syncServiceClient) RefreshSteamAuth(ctx context.Context, req *connect.Request[v1.RefreshSteamAuthRequest]) (*connect.Response[v1.RefreshSteamAuthResponse], error) {
+	return c.refreshSteamAuth.CallUnary(ctx, req)
 }
 
 // SyncServiceHandler is an implementation of the sync.v1.SyncService service.
@@ -318,6 +345,18 @@ type SyncServiceHandler interface {
 	// sources, plus base game/CDLC depot size -- for registry's
 	// AdminService.GetDiskUsage.
 	GetSyncStats(context.Context, *connect.Request[v1.GetSyncStatsRequest]) (*connect.Response[v1.GetSyncStatsResponse], error)
+	// Establish (or replace) this cluster's Steam session interactively --
+	// the only way to get a session running with zero pre-existing
+	// credentials anywhere: `password` is used only for the duration of
+	// this call, never persisted anywhere, only the resulting refresh
+	// token is (to a Secret, not disk). If Steam Guard confirmation is
+	// required and `guard_code` wasn't supplied, returns needs_guard=true
+	// without completing the login -- call again with the code from
+	// whatever channel (email/mobile app) Steam sent it to. On success,
+	// the new session is persisted and this process exits to pick it up
+	// fresh on restart (see the handler's own doc for why) -- the response
+	// still reaches the caller first.
+	RefreshSteamAuth(context.Context, *connect.Request[v1.RefreshSteamAuthRequest]) (*connect.Response[v1.RefreshSteamAuthResponse], error)
 }
 
 // NewSyncServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -387,6 +426,12 @@ func NewSyncServiceHandler(svc SyncServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(syncServiceMethods.ByName("GetSyncStats")),
 		connect.WithHandlerOptions(opts...),
 	)
+	syncServiceRefreshSteamAuthHandler := connect.NewUnaryHandler(
+		SyncServiceRefreshSteamAuthProcedure,
+		svc.RefreshSteamAuth,
+		connect.WithSchema(syncServiceMethods.ByName("RefreshSteamAuth")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/sync.v1.SyncService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SyncServiceRegisterSourceProcedure:
@@ -409,6 +454,8 @@ func NewSyncServiceHandler(svc SyncServiceHandler, opts ...connect.HandlerOption
 			syncServiceGetSyncedModHandler.ServeHTTP(w, r)
 		case SyncServiceGetSyncStatsProcedure:
 			syncServiceGetSyncStatsHandler.ServeHTTP(w, r)
+		case SyncServiceRefreshSteamAuthProcedure:
+			syncServiceRefreshSteamAuthHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -456,4 +503,8 @@ func (UnimplementedSyncServiceHandler) GetSyncedMod(context.Context, *connect.Re
 
 func (UnimplementedSyncServiceHandler) GetSyncStats(context.Context, *connect.Request[v1.GetSyncStatsRequest]) (*connect.Response[v1.GetSyncStatsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sync.v1.SyncService.GetSyncStats is not implemented"))
+}
+
+func (UnimplementedSyncServiceHandler) RefreshSteamAuth(context.Context, *connect.Request[v1.RefreshSteamAuthRequest]) (*connect.Response[v1.RefreshSteamAuthResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sync.v1.SyncService.RefreshSteamAuth is not implemented"))
 }
