@@ -9,6 +9,8 @@ go 1.25.5
 replace github.com/skua-international/magpie/generated/go => ../../generated/go
 
 require (
+	charm.land/bubbletea/v2 v2.0.8
+	charm.land/lipgloss/v2 v2.0.5
 	connectrpc.com/connect v1.20.0
 	github.com/skua-international/magpie/generated/go v0.0.0-00010101000000-000000000000
 	github.com/spf13/cobra v1.10.2
@@ -16,9 +18,6 @@ require (
 )
 
 require (
-	charm.land/bubbles/v2 v2.1.1 // indirect
-	charm.land/bubbletea/v2 v2.0.8 // indirect
-	charm.land/lipgloss/v2 v2.0.5 // indirect
 	github.com/charmbracelet/colorprofile v0.4.3 // indirect
 	github.com/charmbracelet/ultraviolet v0.0.0-20260703014108-f5a850f9c2b7 // indirect
 	github.com/charmbracelet/x/ansi v0.11.7 // indirect

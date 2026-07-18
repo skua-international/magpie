@@ -11,10 +11,17 @@ import (
 	"github.com/skua-international/magpie/cli/internal/cmd"
 )
 
+// version is stamped at build time via -ldflags "-X main.version=..."
+// (see .goreleaser.yaml) -- stays "dev" for a plain `go build`/`go run`.
+var version = "dev"
+
 func main() {
+	root := cmd.Root()
+	root.Version = version
+
 	// cobra prints the error itself by default (Execute's own job) --
 	// just need to set a real exit code on failure.
-	if err := cmd.Root().Execute(); err != nil {
+	if err := root.Execute(); err != nil {
 		os.Exit(1)
 	}
 }

@@ -1,0 +1,45 @@
+name: Release CLI binaries
+
+# Tag-triggered, not chained off release.yml the way build-images used to
+# be -- release.yml's own tag (created via the App token, see its own
+# comment on why that matters) already IS the trigger here; no ordering
+# race to worry about since there's only ever one push that creates a
+# given tag, unlike main's branch head which can move again shortly
+# after.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build binaries for (defaults to the ref this is dispatched against)"
+        required: false
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    permissions:
+      # Only uploading assets to a release semantic-release already
+      # created -- the default token's contents:write is enough, no need
+      # for the App token this repo also has (that's reserved for actions
+      # that need to *create* tags/pushes that re-trigger other workflows).
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          ref: ${{ inputs.tag }}
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.25"
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+          workdir: cli/magpie
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

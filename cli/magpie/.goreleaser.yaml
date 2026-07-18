@@ -1,0 +1,52 @@
+version: 2
+
+project_name: magpie
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: magpie
+    main: ./cmd/magpie
+    binary: magpie
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      # Rare enough target to not carry the build-matrix cost.
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - id: magpie
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Os }}_{{ .Arch }}
+
+checksum:
+  name_template: "checksums.txt"
+
+# semantic-release (see ../../release.config.js) already creates the
+# GitHub Release for this tag with real changelog notes from conventional
+# commits -- append binaries to that existing release rather than
+# fighting over its body/notes or creating a second one.
+release:
+  mode: append
+  github:
+    owner: skua-international
+    name: magpie
+
+changelog:
+  disable: true
