@@ -158,11 +158,25 @@ syncDaemon:
     # Anonymous Steam login (no credentials) -- fine for public workshop
     # content, not for private/unlisted mods or collections.
     anonymous: false
-    # Name of an existing Secret with STEAM_USER/STEAM_PASSWORD keys.
-    # Required when steamAuth.anonymous is false. Not created by this
-    # chart -- `kubectl create secret generic <name> --from-literal=...`
-    # ahead of `helm install`, so credentials never live in values.yaml.
+    # Name of an existing Secret with STEAM_USER/STEAM_PASSWORD keys, used
+    # only to bootstrap the *first* session. Genuinely optional -- leave
+    # empty and use the AdminService.RefreshSteamAuth RPC instead (see its
+    # own doc) to establish a session with no long-lived password Secret
+    # anywhere in the cluster at all; the resulting refresh token is all
+    # that's actually needed from then on, and it's revocable independent
+    # of the account's real password. Not created by this chart --
+    # `kubectl create secret generic <name> --from-literal=...` ahead of
+    # `helm install`, so credentials never live in values.yaml.
     existingSecret: ""
+    # This chart creates a Secret by this name, empty, so sync-daemon's
+    # own RBAC can be scoped to get/patch on one specific pre-existing
+    # object (Kubernetes RBAC's resourceNames can't restrict a create
+    # verb at all, since there's no object name to check yet -- see
+    # secrets.rs's own doc). sync-daemon fills it in itself once a
+    # session exists (from existingSecret at first boot, or a later
+    # RefreshSteamAuth call) and reads from it on every subsequent boot,
+    # skipping credentials entirely once it has one.
+    sessionSecretName: arma-steam-session
   resources: {}
 
 # Reconciler only -- watches ArmaServer, creates/deletes launcher

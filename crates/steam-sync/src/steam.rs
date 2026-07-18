@@ -5,17 +5,19 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::{bail, Context, Result};
 use futures::stream::{FuturesUnordered, StreamExt};
+use steamdepot::auth;
 use steamdepot::cdn::CdnPool;
 use steamdepot::connection::CmConnection;
 use steamdepot::depot::{self, DepotPlan, DownloadPlan};
 use steamdepot::download::{self, decrypt_manifest_filenames};
 use steamdepot::error::Error as SteamError;
-use steamdepot::login::{self, GuardType};
+use steamdepot::login;
+pub use steamdepot::login::GuardType;
 use steamdepot::pics;
 use steamdepot::steam_api::cm_list::{self, CmServerType};
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::cache;
 
@@ -27,6 +29,13 @@ use crate::cache;
 pub enum SteamAuth {
     Anonymous,
     Credentials { user: String, password: String },
+    /// Reuse an already-negotiated refresh token directly -- no RSA/
+    /// begin-auth-session/poll negotiation, no password needed at all.
+    /// Used when a session was established out-of-band (e.g. an
+    /// interactive credential+guard-code exchange run once, elsewhere)
+    /// and persisted somewhere this process reads at startup, rather than
+    /// negotiated fresh here.
+    Session { user: String, refresh_token: String },
 }
 
 const ARMA3_SERVER_APP_ID: u32 = 233780;
@@ -136,16 +145,21 @@ pub fn spawn_bounded(
 pub struct CmPool {
     sem: Arc<Semaphore>,
     idle: Mutex<Vec<(usize, CmConnection)>>,
+    /// How to log a single slot back in if it's marked bad and dropped
+    /// (see [`PooledConn::mark_bad`]) -- `None` for anonymous auth (a
+    /// fresh anonymous `ClientLogon` needs no shared state);
+    /// `Some((username, refresh_token))` otherwise, reusing whatever
+    /// token this pool already logged in with, never a password again.
+    relogin: Option<(String, String)>,
 }
 
 impl CmPool {
     /// Log in `n` connections concurrently right away. `install_dir` is
     /// only used to cache/reuse a credentialed login's refresh token across
     /// process restarts (see [`negotiate_or_reuse_refresh_token`]) -- has no
-    /// effect for anonymous auth.
+    /// effect for anonymous or already-tokened auth.
     pub async fn start(n: usize, auth: &SteamAuth, install_dir: &Path) -> Result<Arc<Self>> {
-
-        let conns: Vec<(usize, CmConnection)> = match auth {
+        let (conns, relogin): (Vec<(usize, CmConnection)>, Option<(String, String)>) = match auth {
             SteamAuth::Anonymous => {
                 // Anonymous login is already just one lightweight ClientLogon
                 // per connection -- nothing to negotiate once and reuse.
@@ -154,7 +168,8 @@ impl CmPool {
                     debug!("pool slot {slot} logged in");
                     Ok::<_, anyhow::Error>((slot, conn))
                 });
-                futures::future::try_join_all(logins).await
+                let conns = futures::future::try_join_all(logins).await.context("failed to start connection pool")?;
+                (conns, None)
             }
             SteamAuth::Credentials { user, password } => {
                 // RSA-key/begin-auth-session/poll only needs to happen once
@@ -175,15 +190,74 @@ impl CmPool {
                         Ok::<_, anyhow::Error>((slot, conn))
                     }
                 });
-                futures::future::try_join_all(logins).await
+                let conns = futures::future::try_join_all(logins).await.context("failed to start connection pool")?;
+                (conns, Some((user.clone(), refresh_token)))
             }
-        }
-        .context("failed to start connection pool")?;
+            SteamAuth::Session { user, refresh_token } => {
+                // No negotiation, no disk cache -- the token was already
+                // established elsewhere (an interactive RefreshSteamAuth
+                // call) and handed to us directly.
+                let logins = (0..n).map(|slot| {
+                    let refresh_token = refresh_token.clone();
+                    async move {
+                        let conn = login_with_refresh_token(user, &refresh_token).await?;
+                        debug!("pool slot {slot} logged in");
+                        Ok::<_, anyhow::Error>((slot, conn))
+                    }
+                });
+                let conns = futures::future::try_join_all(logins).await.context("failed to start connection pool")?;
+                (conns, Some((user.clone(), refresh_token.clone())))
+            }
+        };
 
         Ok(Arc::new(Self {
             sem: Arc::new(Semaphore::new(n)),
             idle: Mutex::new(conns),
+            relogin,
         }))
+    }
+
+    /// Re-log-in a single slot after [`PooledConn::mark_bad`] discarded its
+    /// connection, and push the fresh one back into the idle pool. Holds
+    /// `permit` for the whole attempt (including retries) so the
+    /// semaphore's live-permit count never exceeds `idle`'s real length --
+    /// dropping it only once either a replacement connection is in `idle`
+    /// or every attempt has failed, in which case the pool is left
+    /// permanently one slot short until the process restarts (a clear,
+    /// logged, rare-in-practice degradation rather than a silent one).
+    async fn relogin_slot(self: Arc<Self>, slot: usize, permit: tokio::sync::OwnedSemaphorePermit) {
+        const RELOGIN_ATTEMPTS: usize = 3;
+        for attempt in 1..=RELOGIN_ATTEMPTS {
+            let result = match &self.relogin {
+                Some((user, token)) => login_with_refresh_token(user, token).await,
+                None => login_anonymous().await,
+            };
+            match result {
+                Ok(conn) => {
+                    info!("pool slot {slot} reconnected after being marked bad (attempt {attempt}/{RELOGIN_ATTEMPTS})");
+                    self.idle.lock().unwrap().push((slot, conn));
+                    return;
+                }
+                Err(e) if attempt < RELOGIN_ATTEMPTS => {
+                    warn!("pool slot {slot} reconnect attempt {attempt}/{RELOGIN_ATTEMPTS} failed: {e:#}");
+                    tokio::time::sleep(std::time::Duration::from_secs(2 * attempt as u64)).await;
+                }
+                Err(e) => {
+                    error!(
+                        "pool slot {slot} failed to reconnect after {RELOGIN_ATTEMPTS} attempts, giving up -- pool is now permanently short by one slot until process restart: {e:#}"
+                    );
+                }
+            }
+        }
+        drop(permit);
+    }
+
+    /// The (username, refresh_token) this pool is currently logged in
+    /// with, if it's credentialed (`None` for anonymous auth) -- lets a
+    /// caller that just called [`CmPool::start`] persist whatever token
+    /// was used/negotiated, without needing to separately track it itself.
+    pub fn session(&self) -> Option<(&str, &str)> {
+        self.relogin.as_ref().map(|(user, token)| (user.as_str(), token.as_str()))
     }
 
     /// Check out a connection, waiting if all `n` are currently in use.
@@ -200,7 +274,8 @@ impl CmPool {
             slot,
             conn: Some(conn),
             pool: self.clone(),
-            _permit: permit,
+            bad: false,
+            permit: Some(permit),
         }
     }
 
@@ -223,7 +298,24 @@ pub struct PooledConn {
     pub slot: usize,
     conn: Option<CmConnection>,
     pool: Arc<CmPool>,
-    _permit: tokio::sync::OwnedSemaphorePermit,
+    bad: bool,
+    permit: Option<tokio::sync::OwnedSemaphorePermit>,
+}
+
+impl PooledConn {
+    /// Mark this connection as unhealthy. On drop, instead of returning it
+    /// to the idle pool as if nothing happened, the pool discards it and
+    /// spawns a background re-login to replace the slot (see
+    /// [`CmPool::relogin_slot`]). Call this after an operation on this
+    /// connection fails with a transient/connection-level error (see
+    /// `is_transient`) -- `CmPool` has no active health-checking
+    /// otherwise (the heartbeat task just silently stops on a failed
+    /// send, see its own doc), so a connection that's genuinely dead
+    /// would otherwise sit in the idle pool forever, poisoning every
+    /// future `acquire()` that draws it.
+    pub fn mark_bad(&mut self) {
+        self.bad = true;
+    }
 }
 
 impl std::ops::Deref for PooledConn {
@@ -241,9 +333,23 @@ impl std::ops::DerefMut for PooledConn {
 
 impl Drop for PooledConn {
     fn drop(&mut self) {
-        if let Some(conn) = self.conn.take() {
+        let (Some(conn), Some(permit)) = (self.conn.take(), self.permit.take()) else { return };
+        if self.bad {
+            debug!("pool slot {} marked bad, reconnecting in background", self.slot);
+            let pool = self.pool.clone();
+            let slot = self.slot;
+            tokio::spawn(async move {
+                // Best-effort: a connection we already know is bad may
+                // fail to shut down cleanly too -- discarding it either
+                // way, so a shutdown error here isn't worth surfacing.
+                let mut conn = conn;
+                let _ = conn.shutdown().await;
+                pool.relogin_slot(slot, permit).await;
+            });
+        } else {
             debug!("pool slot {} released", self.slot);
             self.pool.idle.lock().unwrap().push((self.slot, conn));
+            drop(permit);
         }
     }
 }
@@ -255,7 +361,7 @@ impl Drop for PooledConn {
 /// "transient" risks retrying something that can never succeed, while
 /// wrongly calling a transient blip "real" just costs one unnecessary
 /// fallback (e.g. a renegotiation) -- the safer direction to be wrong in.
-fn is_transient(e: &anyhow::Error) -> bool {
+pub fn is_transient(e: &anyhow::Error) -> bool {
     let Some(steam_err) = e.chain().find_map(|c| c.downcast_ref::<SteamError>()) else {
         // Didn't even get far enough to produce a typed Steam error at all
         // (e.g. the timeout wrapper in with_timeout) -- treat as transient,
@@ -401,6 +507,53 @@ async fn negotiate_refresh_token(username: &str, password: &str) -> Result<Strin
     let _ = auth_conn.shutdown().await;
 
     Ok(tokens.refresh_token)
+}
+
+/// Outcome of [`negotiate_interactive`] -- unlike [`negotiate_refresh_token`]
+/// (which bails outright if Steam Guard is required, since it's only ever
+/// called from a non-interactive process startup path), this lets the
+/// caller actually complete a guard-gated login by prompting for a code
+/// and calling again.
+pub enum InteractiveAuthResult {
+    /// No code was supplied and one is required -- call again with
+    /// `guard_code` set to complete the login.
+    NeedsGuard { guard_type: GuardType },
+    Success { refresh_token: String },
+}
+
+/// Interactive credential (+ optional Steam Guard code) login, for
+/// establishing a brand new session out-of-band -- an admin action run
+/// once, rather than something a non-interactive process startup can do
+/// on its own. The password is used only for the duration of this call;
+/// nothing about it is persisted anywhere, only the resulting
+/// `refresh_token`.
+pub async fn negotiate_interactive(username: &str, password: &str, guard_code: Option<&str>) -> Result<InteractiveAuthResult> {
+    let (mut conn, session) = auth::begin(username, password).await.context("failed to begin Steam auth session")?;
+
+    let needed_guard_type = if session.needs_guard(GuardType::EmailCode) {
+        Some(GuardType::EmailCode)
+    } else if session.needs_guard(GuardType::DeviceCode) {
+        Some(GuardType::DeviceCode)
+    } else {
+        None
+    };
+
+    if let Some(guard_type) = needed_guard_type {
+        match guard_code {
+            None => {
+                let _ = conn.shutdown().await;
+                return Ok(InteractiveAuthResult::NeedsGuard { guard_type });
+            }
+            Some(code) => {
+                auth::submit_guard(&mut conn, &session, code, guard_type).await.context("failed to submit Steam Guard code")?;
+            }
+        }
+    }
+
+    let tokens = auth::poll(&mut conn, &session).await.context("failed while polling auth session status")?;
+    let _ = conn.shutdown().await;
+
+    Ok(InteractiveAuthResult::Success { refresh_token: tokens.refresh_token })
 }
 
 /// The cheap part: open a fresh connection and log on with an

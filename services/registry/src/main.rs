@@ -35,6 +35,9 @@ fn required_scope(path: &str) -> Option<&'static str> {
         "/registry.v1.MissionService/ListMissions" => Some("missions:read"),
         "/registry.v1.MissionService/GetMission" => Some("missions:read"),
         "/registry.v1.AdminService/GetDiskUsage" => Some("admin:disk-usage"),
+        // Its own scope, deliberately separate from everything else here
+        // -- this can authenticate as the cluster's Steam account.
+        "/registry.v1.AdminService/RefreshSteamAuth" => Some("admin:steam-auth"),
         _ => None,
     }
 }

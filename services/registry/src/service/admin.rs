@@ -6,9 +6,11 @@
 use std::sync::Arc;
 
 use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest, ServiceResult};
-use protocol::proto::registry::v1::{GetDiskUsageRequest, GetDiskUsageResponse};
+use protocol::proto::registry::v1::{
+    GetDiskUsageRequest, GetDiskUsageResponse, RefreshSteamAuthRequest, RefreshSteamAuthResponse,
+};
 use sqlx::PgPool;
-use sync_client::SyncClient;
+use sync_client::{RefreshSteamAuthResult, SyncClient};
 
 pub struct AdminServiceImpl {
     pool: PgPool,
@@ -43,5 +45,25 @@ impl protocol::proto::registry::v1::AdminService for AdminServiceImpl {
         let total_bytes = mods_bytes + missions_bytes + game_files_bytes;
 
         Response::ok(GetDiskUsageResponse { mods_bytes, missions_bytes, game_files_bytes, total_bytes, ..Default::default() })
+    }
+
+    async fn refresh_steam_auth<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        request: ServiceRequest<'_, RefreshSteamAuthRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<RefreshSteamAuthResponse> + Send + use<'a>> {
+        let result = self
+            .sync_client
+            .refresh_steam_auth(request.username, request.password, request.guard_code.as_deref())
+            .await
+            .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
+
+        let response = match result {
+            RefreshSteamAuthResult::NeedsGuard { guard_type } => {
+                RefreshSteamAuthResponse { needs_guard: true, guard_type, ..Default::default() }
+            }
+            RefreshSteamAuthResult::Success => RefreshSteamAuthResponse::default(),
+        };
+        Response::ok(response)
     }
 }

@@ -26,6 +26,15 @@ rules:
   - apiGroups: ["arma.skua.io"]
     resources: ["modsources/status"]
     verbs: ["get", "update", "patch"]
+  # Scoped to exactly one pre-existing, chart-created Secret
+  # (steam-session-secret.yaml) -- resourceNames can't restrict a create
+  # verb at all (no object name to check yet), so no create here; the
+  # chart owns creating the empty object, this only ever reads/updates
+  # its data once a session exists.
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: [{{ .Values.syncDaemon.steamAuth.sessionSecretName | quote }}]
+    verbs: ["get", "patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

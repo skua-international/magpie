@@ -7,15 +7,17 @@ use protocol::proto::sync::v1::{
     ClaimJobState, ClaimRequest, ClaimResponse, DeregisterSourceRequest, DeregisterSourceResponse, GetClaimStatusRequest,
     GetClaimStatusResponse, GetSourceModsRequest, GetSourceModsResponse, GetSyncStatsRequest, GetSyncStatsResponse,
     GetSyncedModRequest, GetSyncedModResponse, InvalidateModRequest, InvalidateModResponse, ListSyncedModsRequest,
-    ListSyncedModsResponse, RefreshSourceRequest, RefreshSourceResponse, RegisterSourceRequest, RegisterSourceResponse,
-    ResolvedMod as ProtoResolvedMod, SyncService, SyncedMod,
+    ListSyncedModsResponse, RefreshSourceRequest, RefreshSourceResponse, RefreshSteamAuthRequest, RefreshSteamAuthResponse,
+    RegisterSourceRequest, RegisterSourceResponse, ResolvedMod as ProtoResolvedMod, SyncService, SyncedMod,
 };
 use steam_sync::cache::SyncState;
-use steam_sync::steam::{self, CmPool, ResolvedMod, SyncTasks};
+use steam_sync::steam::{self, CmPool, GuardType, InteractiveAuthResult, ResolvedMod, SyncTasks};
 use steam_sync::workshop;
 use tokio::sync::Semaphore;
 use tracing::{error, info};
 use uuid::Uuid;
+
+use crate::secrets::{self, Session};
 
 /// A `Claim` job's current state -- `Claim` starts one and returns its ID
 /// immediately rather than blocking for the (potentially minutes-long,
@@ -39,16 +41,54 @@ type Jobs = Mutex<HashMap<String, JobStatus>>;
 /// borrows `&self` per the trait's method signatures) specifically so
 /// spawning doesn't need a self-referential `Arc<Self>`.
 pub struct Shared {
-    pub pool: Arc<CmPool>,
+    /// `None` if no Steam session has ever been established (no stored
+    /// session Secret, no STEAM_USER/STEAM_PASSWORD configured) or the
+    /// last `CmPool::start` attempt failed -- every RPC that needs Steam
+    /// access returns a clear precondition-failed error in that case
+    /// rather than panicking or hanging, and RefreshSteamAuth is the way
+    /// out. A plain field, not something RefreshSteamAuth replaces in
+    /// place -- it persists a freshly established session to the Secret
+    /// and exits the process, letting a restart pick it up fresh (see
+    /// that handler's own doc for why), rather than hot-swapping this.
+    pub pool: Option<Arc<CmPool>>,
     pub sync_state: Arc<SyncState>,
     pub content_root: PathBuf,
     pub claims_root: PathBuf,
+    pub client: kube::Client,
+    pub namespace: String,
+    pub steam_session_secret_name: String,
     jobs: Jobs,
 }
 
 impl Shared {
-    pub fn new(pool: Arc<CmPool>, sync_state: Arc<SyncState>, content_root: PathBuf, claims_root: PathBuf) -> Arc<Self> {
-        Arc::new(Self { pool, sync_state, content_root, claims_root, jobs: Mutex::new(HashMap::new()) })
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        pool: Option<Arc<CmPool>>,
+        sync_state: Arc<SyncState>,
+        content_root: PathBuf,
+        claims_root: PathBuf,
+        client: kube::Client,
+        namespace: String,
+        steam_session_secret_name: String,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            pool,
+            sync_state,
+            content_root,
+            claims_root,
+            client,
+            namespace,
+            steam_session_secret_name,
+            jobs: Mutex::new(HashMap::new()),
+        })
+    }
+
+    /// The active connection pool, or a clear precondition-failed error if
+    /// no Steam session has been established yet -- every RPC needing
+    /// Steam access should go through this instead of touching `self.pool`
+    /// directly, so that error is consistent everywhere.
+    fn pool(&self) -> anyhow::Result<&Arc<CmPool>> {
+        self.pool.as_ref().ok_or_else(|| anyhow::anyhow!("no Steam session established -- call RefreshSteamAuth first"))
     }
 
     /// Resolve `candidate_ids` and persist the result as `source_id`'s
@@ -56,9 +96,15 @@ impl Shared {
     /// background poller (main.rs), which both need exactly this
     /// resolve-then-diff-upsert sequence.
     pub async fn register_source_impl(&self, candidate_ids: &[u64], source_id: &str) -> anyhow::Result<RegisterSourceOutcome> {
-        let mut conn = self.pool.acquire().await;
-        let outcome = steam::resolve_source_ids(&mut conn, candidate_ids).await?;
+        let mut conn = self.pool()?.acquire().await;
+        let result = steam::resolve_source_ids(&mut conn, candidate_ids).await;
+        if let Err(e) = &result {
+            if steam::is_transient(e) {
+                conn.mark_bad();
+            }
+        }
         drop(conn);
+        let outcome = result?;
 
         let mod_ids: Vec<u64> = outcome.mods.iter().map(|m| m.mod_id).collect();
         self.sync_state.upsert_source(source_id, candidate_ids)?;
@@ -104,18 +150,33 @@ impl Shared {
         let sem = Arc::new(Semaphore::new(steam::SYNC_CONCURRENCY));
         let tasks: Mutex<SyncTasks> = Mutex::new(SyncTasks::new());
 
-        let mut conn = self.pool.acquire().await;
+        let mut conn = self.pool()?.acquire().await;
         // Server/CDLC depots aren't part of the source registry -- they're
         // always wanted, same as before this rework.
-        steam::resolve_and_spawn_server(&mut conn, &self.content_root, false, &[], sem.clone(), &tasks, self.sync_state.clone())
-            .await?;
+        let result =
+            steam::resolve_and_spawn_server(&mut conn, &self.content_root, false, &[], sem.clone(), &tasks, self.sync_state.clone())
+                .await;
+        if let Err(e) = &result {
+            if steam::is_transient(e) {
+                conn.mark_bad();
+            }
+        }
         drop(conn);
+        result?;
 
         let desired = self.sync_state.desired_mod_ids()?;
         if !desired.is_empty() {
-            let mut conn = self.pool.acquire().await;
-            workshop::sync_mods(&mut conn, &desired, false, &self.content_root, sem.clone(), &tasks, self.sync_state.clone())
-                .await?;
+            let mut conn = self.pool()?.acquire().await;
+            let result =
+                workshop::sync_mods(&mut conn, &desired, false, &self.content_root, sem.clone(), &tasks, self.sync_state.clone())
+                    .await;
+            if let Err(e) = &result {
+                if steam::is_transient(e) {
+                    conn.mark_bad();
+                }
+            }
+            drop(conn);
+            result?;
         }
 
         let mut tasks = tasks.into_inner().unwrap();
@@ -294,5 +355,57 @@ impl SyncService for SyncServiceImpl {
         let key = format!("107410/{}", request.mod_id);
         self.shared.sync_state.invalidate(&key);
         Response::ok(InvalidateModResponse::default())
+    }
+
+    async fn refresh_steam_auth<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        request: ServiceRequest<'_, RefreshSteamAuthRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<RefreshSteamAuthResponse> + Send + use<'a>> {
+        let username = request.username.to_string();
+        let password = request.password.to_string();
+        let guard_code = request.guard_code.as_deref();
+
+        let result = steam::negotiate_interactive(&username, &password, guard_code)
+            .await
+            .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
+
+        let refresh_token = match result {
+            InteractiveAuthResult::NeedsGuard { guard_type } => {
+                let guard_type = match guard_type {
+                    GuardType::EmailCode => "email",
+                    GuardType::DeviceCode => "device",
+                };
+                return Response::ok(RefreshSteamAuthResponse {
+                    needs_guard: true,
+                    guard_type: guard_type.to_string(),
+                    ..Default::default()
+                });
+            }
+            InteractiveAuthResult::Success { refresh_token } => refresh_token,
+        };
+
+        let session = Session { user: username, refresh_token };
+        secrets::write_session(&self.shared.client, &self.shared.namespace, &self.shared.steam_session_secret_name, &session)
+            .await
+            .map_err(|e| ConnectError::internal(format!("failed to persist new Steam session: {e:#}")))?;
+
+        // The freshly established session isn't picked up by the
+        // already-running CmPool (if any) -- exiting and letting the
+        // Deployment restart this Pod is far simpler and safer than
+        // hot-swapping an in-flight connection pool's auth in place (a
+        // real class of concurrency bugs for very little benefit here,
+        // since establishing a new session is already an infrequent,
+        // deliberate admin action, not something latency-sensitive).
+        // Spawned with a short delay so this response actually reaches
+        // the caller before the process exits, rather than racing the
+        // connection closing against the response being flushed.
+        info!("new Steam session established, restarting to pick it up");
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            std::process::exit(0);
+        });
+
+        Response::ok(RefreshSteamAuthResponse { needs_guard: false, guard_type: String::new(), ..Default::default() })
     }
 }

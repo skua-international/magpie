@@ -4124,6 +4124,7 @@ version = "1.2.0"
 dependencies = [
  "anyhow",
  "axum",
+ "base64 0.22.1",
  "buffa",
  "connectrpc",
  "crd",

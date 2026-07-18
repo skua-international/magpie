@@ -44,19 +44,21 @@ spec:
               value: {{ .Values.syncDaemon.poolSize | quote }}
             - name: POLL_INTERVAL_SECS
               value: {{ .Values.syncDaemon.pollIntervalSecs | quote }}
+            - name: STEAM_SESSION_SECRET_NAME
+              value: {{ .Values.syncDaemon.steamAuth.sessionSecretName | quote }}
             {{- if .Values.syncDaemon.steamAuth.anonymous }}
             - name: ANONYMOUS_LOGIN
               value: "true"
-            {{- else }}
+            {{- else if .Values.syncDaemon.steamAuth.existingSecret }}
             - name: STEAM_USER
               valueFrom:
                 secretKeyRef:
-                  name: {{ required "syncDaemon.steamAuth.existingSecret is required when steamAuth.anonymous is false" .Values.syncDaemon.steamAuth.existingSecret }}
+                  name: {{ .Values.syncDaemon.steamAuth.existingSecret }}
                   key: STEAM_USER
             - name: STEAM_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ required "syncDaemon.steamAuth.existingSecret is required when steamAuth.anonymous is false" .Values.syncDaemon.steamAuth.existingSecret }}
+                  name: {{ .Values.syncDaemon.steamAuth.existingSecret }}
                   key: STEAM_PASSWORD
             {{- end }}
           volumeMounts:

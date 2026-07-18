@@ -211,6 +211,15 @@ message ListMissionsResponse {
 // source).
 service AdminService {
   rpc GetDiskUsage(GetDiskUsageRequest) returns (GetDiskUsageResponse);
+
+  // Establish (or replace) the cluster's Steam session interactively --
+  // proxies straight to sync-daemon's own RPC of the same name (see its
+  // doc for the full flow/guard-code handling). The only way to get a
+  // working Steam session with zero pre-existing credentials anywhere in
+  // the cluster: `password` exists only for the duration of this call.
+  // Its own scope, deliberately separate from and more restricted than
+  // anything else here -- this can authenticate as the Steam account.
+  rpc RefreshSteamAuth(RefreshSteamAuthRequest) returns (RefreshSteamAuthResponse);
 }
 
 message GetDiskUsageRequest {}
@@ -224,6 +233,17 @@ message GetDiskUsageResponse {
   // Base game + selected CDLC depot content (not mod/mission content).
   uint64 game_files_bytes = 3;
   uint64 total_bytes = 4;
+}
+
+message RefreshSteamAuthRequest {
+  string username = 1;
+  string password = 2;
+  optional string guard_code = 3;
+}
+
+message RefreshSteamAuthResponse {
+  bool needs_guard = 1;
+  string guard_type = 2;
 }
 
 message DeleteMissionRequest {
