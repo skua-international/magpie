@@ -13,9 +13,13 @@ pub struct Config {
     pub claims_root: PathBuf,
     pub listen_addr: String,
     pub pool_size: usize,
-    /// How often the background poller re-resolves every registered
-    /// source's candidate IDs, independent of RegisterSource calls.
+    /// How often the ModSource reconciler re-resolves an already-`Synced`
+    /// source's candidate IDs on its own periodic requeue, independent of
+    /// anything re-registering it -- catches upstream collection-membership
+    /// drift even for a source nothing is actively touching right now.
     pub poll_interval_secs: u64,
+    /// Namespace the ModSource reconciler watches.
+    pub namespace: String,
 }
 
 impl Config {
@@ -37,6 +41,7 @@ impl Config {
             listen_addr: env::var("LISTEN_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".into()),
             pool_size: env::var("POOL_SIZE").ok().and_then(|v| v.parse().ok()).unwrap_or(4),
             poll_interval_secs: env::var("POLL_INTERVAL_SECS").ok().and_then(|v| v.parse().ok()).unwrap_or(1800),
+            namespace: env::var("NAMESPACE").unwrap_or_else(|_| "default".into()),
         })
     }
 }

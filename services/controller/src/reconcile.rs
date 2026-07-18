@@ -19,7 +19,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use crd::{ArmaServer, ArmaServerPhase, ArmaServerStatus, DesiredState};
+use crd::{ArmaServer, ArmaServerPhase, ArmaServerStatus, DesiredState, ModSource, ModSourceInput};
 use futures::StreamExt;
 use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec};
 use k8s_openapi::api::core::v1::{
@@ -32,11 +32,8 @@ use kube::runtime::finalizer::{finalizer, Event as FinalizerEvent};
 use kube::runtime::watcher;
 use kube::runtime::Controller;
 use kube::{Client, Resource, ResourceExt};
-use registry_db::{self as db, ModSourceKind};
-use sqlx::PgPool;
 use sync_client::{ClaimStatus, SyncClient};
 use tracing::{error, info, warn};
-use uuid::Uuid;
 
 use crate::config::Config;
 
@@ -56,12 +53,11 @@ struct Ctx {
     client: Client,
     cfg: Arc<Config>,
     sync_client: SyncClient,
-    db: PgPool,
 }
 
-pub fn spawn(client: Client, cfg: Arc<Config>, db: PgPool) -> anyhow::Result<()> {
+pub fn spawn(client: Client, cfg: Arc<Config>) -> anyhow::Result<()> {
     let sync_client = SyncClient::new(&cfg.sync_daemon_url)?;
-    let ctx = Arc::new(Ctx { client: client.clone(), cfg, sync_client, db });
+    let ctx = Arc::new(Ctx { client: client.clone(), cfg, sync_client });
     let api: Api<ArmaServer> = Api::namespaced(client, &ctx.cfg.namespace);
 
     tokio::spawn(async move {
@@ -193,13 +189,16 @@ async fn set_status(ctx: &Ctx, name: &str, status: ArmaServerStatus) -> anyhow::
 /// sources, or an absolute path into the shared local-content volume for
 /// local (zip-uploaded) sources.
 async fn resolve_mod_paths(ctx: &Ctx, obj: &ArmaServer) -> anyhow::Result<Vec<String>> {
+    let mod_sources: Api<ModSource> = Api::namespaced(ctx.client.clone(), &ctx.cfg.namespace);
     let mut paths = Vec::new();
     for source_id in &obj.spec.mod_source_ids {
-        let id = Uuid::parse_str(source_id).map_err(|_| anyhow::anyhow!("mod_source_ids entry is not a valid UUID: {source_id}"))?;
-        let row = db::get_mod_source(&ctx.db, id).await?.ok_or_else(|| anyhow::anyhow!("mod source {source_id} no longer exists"))?;
-        match row.kind {
-            ModSourceKind::Local => paths.push(format!("{}/mods/{}", ctx.cfg.local_content_root, row.reference)),
-            ModSourceKind::Mod | ModSourceKind::Collection | ModSourceKind::Preset => {
+        let source = mod_sources.get(source_id).await.map_err(|e| match e {
+            kube::Error::Api(e) if e.code == 404 => anyhow::anyhow!("mod source {source_id} no longer exists"),
+            e => e.into(),
+        })?;
+        match &source.spec.source {
+            ModSourceInput::Local { unique_id } => paths.push(format!("{}/mods/{}", ctx.cfg.local_content_root, unique_id)),
+            ModSourceInput::SteamUrl(_) | ModSourceInput::HtmlUrl(_) | ModSourceInput::HtmlContent(_) => {
                 let mod_ids = ctx.sync_client.get_source_mods(source_id).await?;
                 paths.extend(mod_ids.into_iter().map(|id| format!("workshop/{id}")));
             }

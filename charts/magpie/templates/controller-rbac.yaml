@@ -26,6 +26,12 @@ rules:
   - apiGroups: ["arma.skua.io"]
     resources: ["armaservers/status"]
     verbs: ["get", "update", "patch"]
+  # Read-only -- resolve_mod_paths reads a referenced ModSource's spec to
+  # build -mod= args. Never creates/deletes/patches one; that's
+  # services/registry's job.
+  - apiGroups: ["arma.skua.io"]
+    resources: ["modsources"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: ["apps"]
     resources: ["deployments"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]

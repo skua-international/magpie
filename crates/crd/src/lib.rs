@@ -109,3 +109,92 @@ pub enum ArmaServerPhase {
     Running,
     Failed,
 }
+
+/// Registers and tracks a *source* of mods -- a single Workshop mod, a
+/// Workshop collection, a preset HTML export, or a locally-uploaded zip --
+/// independent of any `ArmaServer`'s lifecycle. An `ArmaServer` references
+/// zero or more of these by name (`mod_source_ids`); deleting a server does
+/// not delete the sources it referenced (content may be worth keeping
+/// synced/stored with nothing currently using it).
+///
+/// Reconciled by `services/sync-daemon` for every kind except `Local`,
+/// which registry resolves and marks `Synced` synchronously at creation
+/// time (extracting a zip needs no Steam session, so there's nothing to
+/// reconcile). Creating this only resolves what a source *means* (a mod ID,
+/// a collection's expanded members, ...) -- it does not itself trigger a
+/// download; that happens when something actually claims the content (an
+/// `ArmaServer` starting, or an explicit force-sync).
+#[derive(CustomResource, Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[kube(
+    group = "arma.skua.io",
+    version = "v1",
+    kind = "ModSource",
+    namespaced,
+    status = "ModSourceStatus",
+    shortname = "modsrc",
+    printcolumn = r#"{"name":"Phase","type":"string","jsonPath":".status.phase"}"#,
+    printcolumn = r#"{"name":"Kind","type":"string","jsonPath":".status.kind"}"#,
+    printcolumn = r#"{"name":"Size","type":"integer","jsonPath":".status.size_bytes"}"#,
+    printcolumn = r#"{"name":"Age","type":"date","jsonPath":".metadata.creationTimestamp"}"#
+)]
+pub struct ModSourceSpec {
+    pub source: ModSourceInput,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum ModSourceInput {
+    /// A single raw Steam Workshop URL -- a mod or a collection,
+    /// indistinguishable by shape alone. Resolved via sync-daemon's
+    /// authenticated Steam session, which is also what correctly handles
+    /// unlisted/private content a plain HTTP call can't see.
+    SteamUrl(String),
+    /// A URL to a preset HTML export -- fetched and scanned for
+    /// `filedetails/?id=` links.
+    HtmlUrl(String),
+    /// The preset HTML export's content itself, already in hand -- scanned
+    /// directly, no fetch. Preset exports are small (tens of KB), nowhere
+    /// near etcd's per-object size limit.
+    HtmlContent(String),
+    /// A caller-assigned identifier, unique among all local mods -- the
+    /// zip itself is already extracted (by registry, before this object is
+    /// created) under this ID as its on-disk directory name; this is just
+    /// a stable reference to it, never the zip bytes themselves.
+    Local { unique_id: String },
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, PartialEq)]
+pub struct ModSourceStatus {
+    #[serde(default)]
+    pub phase: ModSourcePhase,
+    /// "mod" | "collection" | "local" | "preset" -- empty until resolved.
+    /// A plain string, not a second enum, purely for display/listing; nothing
+    /// reconciles against it (see `ModSourceInput` for the enum that actually
+    /// drives behavior).
+    #[serde(default)]
+    pub kind: String,
+    /// Workshop display name (mod/collection), empty for local and
+    /// multi-mod preset sources where no single title applies.
+    #[serde(default)]
+    pub display_name: String,
+    /// This source's fully-resolved, flat mod ID list (collections
+    /// expanded) -- empty for local sources.
+    #[serde(default)]
+    pub resolved_mod_ids: Vec<u64>,
+    /// Sum of on-disk size across every mod this source currently resolves
+    /// to (local: the extracted zip's own directory size). 0 until synced
+    /// at least once.
+    #[serde(default)]
+    pub size_bytes: u64,
+    #[serde(default)]
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+pub enum ModSourcePhase {
+    #[default]
+    Pending,
+    Resolving,
+    Synced,
+    Failed,
+}

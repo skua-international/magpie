@@ -31,13 +31,6 @@ pub async fn connect(database_url: &str) -> anyhow::Result<PgPool> {
     // supports exactly this multi-statement-string shape.
     sqlx::raw_sql(
         r#"
-        CREATE TABLE IF NOT EXISTS mod_sources (
-            id UUID PRIMARY KEY,
-            kind TEXT NOT NULL,
-            reference TEXT NOT NULL,
-            display_name TEXT NOT NULL DEFAULT '',
-            created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-        );
         CREATE TABLE IF NOT EXISTS missions (
             id UUID PRIMARY KEY,
             name TEXT NOT NULL,
@@ -86,57 +79,6 @@ pub async fn connect(database_url: &str) -> anyhow::Result<PgPool> {
     .execute(&pool)
     .await?;
     Ok(pool)
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, sqlx::Type)]
-#[sqlx(type_name = "text", rename_all = "lowercase")]
-pub enum ModSourceKind {
-    Mod,
-    Collection,
-    Local,
-    Preset,
-}
-
-#[derive(sqlx::FromRow)]
-pub struct ModSourceRow {
-    pub id: Uuid,
-    pub kind: ModSourceKind,
-    pub reference: String,
-    pub display_name: String,
-    pub created_at: chrono::DateTime<chrono::Utc>,
-}
-
-pub async fn insert_mod_source(
-    pool: &PgPool,
-    id: Uuid,
-    kind: ModSourceKind,
-    reference: &str,
-    display_name: &str,
-) -> sqlx::Result<()> {
-    sqlx::query("INSERT INTO mod_sources (id, kind, reference, display_name) VALUES ($1, $2, $3, $4)")
-        .bind(id)
-        .bind(kind)
-        .bind(reference)
-        .bind(display_name)
-        .execute(pool)
-        .await?;
-    Ok(())
-}
-
-pub async fn get_mod_source(pool: &PgPool, id: Uuid) -> sqlx::Result<Option<ModSourceRow>> {
-    sqlx::query_as("SELECT id, kind, reference, display_name, created_at FROM mod_sources WHERE id = $1")
-        .bind(id)
-        .fetch_optional(pool)
-        .await
-}
-
-pub async fn list_mod_sources(pool: &PgPool) -> sqlx::Result<Vec<ModSourceRow>> {
-    sqlx::query_as("SELECT id, kind, reference, display_name, created_at FROM mod_sources ORDER BY created_at").fetch_all(pool).await
-}
-
-pub async fn delete_mod_source(pool: &PgPool, id: Uuid) -> sqlx::Result<bool> {
-    let result = sqlx::query("DELETE FROM mod_sources WHERE id = $1").bind(id).execute(pool).await?;
-    Ok(result.rows_affected() > 0)
 }
 
 #[derive(sqlx::FromRow)]

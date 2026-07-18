@@ -35,10 +35,6 @@ spec:
           ports:
             - name: http
               containerPort: {{ .Values.serverApi.service.port }}
-              {{- if .Values.loopbackOnly }}
-              hostIP: 127.0.0.1
-              hostPort: {{ .Values.serverApi.service.port }}
-              {{- end }}
           env:
             - name: NAMESPACE
               value: {{ include "magpie.serverApiNamespace" . }}

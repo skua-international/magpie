@@ -51,7 +51,7 @@ async fn main() -> Result<()> {
     info!("connected to Kubernetes API");
 
     let sync_client = SyncClient::new(&cfg.sync_daemon_url)?;
-    let server_service = ServerServiceImpl::new(client, cfg.namespace.clone(), pool.clone(), sync_client);
+    let server_service = ServerServiceImpl::new(client, cfg.namespace.clone(), sync_client);
 
     let verifier = JwtVerifier::fetch(&cfg.jwt).await?;
     let auth_state = Arc::new(AuthState { verifier, pool, required_scope });

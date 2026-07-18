@@ -54,7 +54,6 @@ spec:
               value: /local-content
             - name: LOCAL_CONTENT_HOST_PATH
               value: {{ .Values.hostPaths.localContentPath | quote }}
-            {{- include "magpie.postgresEnv" . | nindent 12 }}
           {{- with .Values.controller.resources }}
           resources:
             {{- toYaml . | nindent 12 }}

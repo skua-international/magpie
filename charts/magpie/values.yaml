@@ -21,17 +21,27 @@ imagePullSecrets: []
 # launcher Pod. Not deployed by this chart itself -- just referenced.
 launcherImage: ghcr.io/skua-international/magpie/launcher:latest
 
-# When true, binds services/server-api and services/registry to
-# 127.0.0.1 on the node (hostPort, loopback only) instead of leaving them
-# reachable only via their in-cluster ClusterIP Service -- for operators
-# who want to front them with their own reverse proxy (nginx, Envoy, ...)
-# running directly on the host rather than a Kubernetes Ingress. The
-# ClusterIP Services are still created either way (harmless, and other
-# in-cluster tooling may still want them); this only adds the loopback
-# bind alongside them. Game servers are unaffected -- ArmaServer launcher
-# Pods already use hostNetwork with their own real game ports, which are
-# meant to be reachable, not loopback-only.
-loopbackOnly: false
+# services/server-api, services/identity, and services/registry are
+# ClusterIP-only -- reached from outside the cluster via the Ingress
+# resources this chart also creates (see ingress.* below), fronted by
+# k3s's own bundled Traefik. Deliberately not hostPort: a Deployment that
+# binds a port on the node itself can never do a zero-downtime
+# RollingUpdate on a single-node target (the new Pod can't schedule until
+# the old one, still holding that port, is gone) -- confirmed live, this
+# caused a stuck rollout. Traefik/klipper-lb already solves "reachable
+# from one stable address" correctly and isn't something this chart has
+# to manage the rollout of itself. Game server ports are unaffected --
+# ArmaServer launcher Pods use hostNetwork with their own real game
+# ports directly, which is a different, deliberate exception (see
+# reconcile.rs).
+ingress:
+  enabled: true
+  className: traefik
+  # Each service gets its own hostname: <service>.<baseDomain>. No real
+  # DNS needed for a single-node target -- point these at the node's own
+  # IP via /etc/hosts (or real DNS, if you have it) on whatever machine
+  # needs to reach them.
+  baseDomain: magpie.local
 
 # Node-local directories backing every shared volume in this chart --
 # hostPath, deliberately not PVCs. This whole chart targets single-node

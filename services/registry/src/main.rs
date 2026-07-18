@@ -6,6 +6,7 @@ use authn::jwt::JwtVerifier;
 use axum::routing::get;
 use axum::{middleware, Router};
 use connectrpc::Router as ConnectRouter;
+use kube::Client;
 use registry::config::Config;
 use registry::service::admin::AdminServiceImpl;
 use registry::service::mission::MissionServiceImpl;
@@ -52,8 +53,12 @@ async fn main() -> Result<()> {
     let pool = registry_db::connect(&cfg.database_url).await?;
     info!("connected to Postgres");
 
+    let client = Client::try_default().await?;
+    info!("connected to Kubernetes API");
+
     let sync_client = Arc::new(SyncClient::new(&cfg.sync_daemon_url)?);
-    let mod_source_service = ModSourceServiceImpl::new(pool.clone(), sync_client.clone(), cfg.local_content_root.clone().into());
+    let mod_source_service =
+        ModSourceServiceImpl::new(client, cfg.namespace.clone(), sync_client.clone(), cfg.local_content_root.clone().into());
     let mission_service = MissionServiceImpl::new(pool.clone(), cfg.local_content_root.clone().into());
     let admin_service = AdminServiceImpl::new(pool.clone(), sync_client);
 

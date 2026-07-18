@@ -6,11 +6,18 @@ edition.workspace = true
 [dependencies]
 steam-sync = { path = "../../crates/steam-sync" }
 protocol = { path = "../../crates/protocol" }
+crd = { path = "../../crates/crd" }
 connectrpc = { version = "0.8", features = ["axum"] }
 buffa = "0.8"
 axum = "0.8"
+futures = "0.3.32"
+k8s-openapi = { version = "0.28.0", features = ["latest"] }
+kube = { version = "4.0.0", features = ["runtime", "derive"] }
+workshop-parse = { path = "../../crates/workshop-parse" }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "time"] }
 anyhow = "1"
+serde_json = "1.0.150"
+thiserror = "2.0.18"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1", features = ["v7"] }

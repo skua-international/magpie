@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use buffa::enumeration::EnumValue;
 use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest, ServiceResult};
-use crd::{port_ranges_overlap, ArmaServer, ArmaServerPhase, ArmaServerSpec, DesiredState};
+use crd::{port_ranges_overlap, ArmaServer, ArmaServerPhase, ArmaServerSpec, DesiredState, ModSource, ModSourceInput};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use kube::api::{Api, DeleteParams, ListParams, Patch, PatchParams};
 use kube::{Client, ResourceExt};
@@ -19,20 +19,21 @@ use protocol::proto::controller::v1::{
     CreateServerRequest, DeleteServerRequest, DeleteServerResponse, DesiredState as ProtoDesiredState, GetServerRequest,
     ListServersRequest, ListServersResponse, ServerInfo, ServerPhase, StartServerRequest, StopServerRequest, UpdateServerRequest,
 };
-use registry_db::{self as db, ModSourceKind};
-use sqlx::PgPool;
 use sync_client::SyncClient;
 
 pub struct ServerServiceImpl {
     client: Client,
     namespace: String,
-    db: PgPool,
     sync_client: SyncClient,
 }
 
 impl ServerServiceImpl {
-    pub fn new(client: Client, namespace: String, db: PgPool, sync_client: SyncClient) -> Arc<Self> {
-        Arc::new(Self { client, namespace, db, sync_client })
+    pub fn new(client: Client, namespace: String, sync_client: SyncClient) -> Arc<Self> {
+        Arc::new(Self { client, namespace, sync_client })
+    }
+
+    fn mod_sources(&self) -> Api<ModSource> {
+        Api::namespaced(self.client.clone(), &self.namespace)
     }
 
     fn api(&self) -> Api<ArmaServer> {
@@ -50,9 +51,8 @@ impl ServerServiceImpl {
         let obj = self.api().get(id).await.map_err(|_| ConnectError::not_found(format!("no such server: {id}")))?;
 
         for source_id in &obj.spec.mod_source_ids {
-            let Ok(uuid) = uuid::Uuid::parse_str(source_id) else { continue };
-            let Ok(Some(row)) = db::get_mod_source(&self.db, uuid).await else { continue };
-            if row.kind != ModSourceKind::Local {
+            let Ok(source) = self.mod_sources().get(source_id).await else { continue };
+            if !matches!(source.spec.source, ModSourceInput::Local { .. }) {
                 self.sync_client.refresh_source(source_id).await.map_err(|e| ConnectError::internal(format!("{e:#}")))?;
             }
         }

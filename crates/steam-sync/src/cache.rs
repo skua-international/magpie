@@ -212,8 +212,7 @@ impl SyncState {
             CREATE TABLE IF NOT EXISTS mod_titles (
                 mod_id INTEGER PRIMARY KEY,
                 title TEXT NOT NULL
-            );
-            ALTER TABLE synced ADD COLUMN IF NOT EXISTS size_bytes INTEGER NOT NULL DEFAULT 0;",
+            );",
         )
         .context("failed to initialize sync state schema")?;
         Ok(Arc::new(Self { conn: Mutex::new(conn) }))

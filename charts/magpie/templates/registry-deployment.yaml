@@ -19,9 +19,7 @@ spec:
         app.kubernetes.io/component: registry
     spec:
       {{- include "magpie.imagePullSecrets" . | nindent 6 }}
-      # No ServiceAccount token needed -- this service never talks to the
-      # Kubernetes API, only Postgres and the localContent volume.
-      automountServiceAccountToken: false
+      serviceAccountName: {{ include "magpie.fullname" . }}-registry
       securityContext:
         runAsNonRoot: true
       containers:
@@ -35,13 +33,11 @@ spec:
           ports:
             - name: http
               containerPort: {{ .Values.registry.service.port }}
-              {{- if .Values.loopbackOnly }}
-              hostIP: 127.0.0.1
-              hostPort: {{ .Values.registry.service.port }}
-              {{- end }}
           env:
             - name: LISTEN_ADDR
               value: "0.0.0.0:{{ .Values.registry.service.port }}"
+            - name: NAMESPACE
+              value: {{ .Release.Namespace }}
             - name: LOCAL_CONTENT_ROOT
               value: /local-content
             - name: SYNC_DAEMON_URL

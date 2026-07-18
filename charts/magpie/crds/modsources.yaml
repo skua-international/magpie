@@ -1,0 +1,151 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: modsources.arma.skua.io
+spec:
+  group: arma.skua.io
+  names:
+    categories: []
+    kind: ModSource
+    plural: modsources
+    shortNames:
+    - modsrc
+    singular: modsource
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.kind
+      name: Kind
+      type: string
+    - jsonPath: .status.size_bytes
+      name: Size
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: Auto-generated derived type for ModSourceSpec via `CustomResource`
+        properties:
+          spec:
+            description: |-
+              Registers and tracks a *source* of mods -- a single Workshop mod, a
+              Workshop collection, a preset HTML export, or a locally-uploaded zip --
+              independent of any `ArmaServer`'s lifecycle. An `ArmaServer` references
+              zero or more of these by name (`mod_source_ids`); deleting a server does
+              not delete the sources it referenced (content may be worth keeping
+              synced/stored with nothing currently using it).
+
+              Reconciled by `services/sync-daemon` for every kind except `Local`,
+              which registry resolves and marks `Synced` synchronously at creation
+              time (extracting a zip needs no Steam session, so there's nothing to
+              reconcile). Creating this only resolves what a source *means* (a mod ID,
+              a collection's expanded members, ...) -- it does not itself trigger a
+              download; that happens when something actually claims the content (an
+              `ArmaServer` starting, or an explicit force-sync).
+            properties:
+              source:
+                oneOf:
+                - required:
+                  - steamUrl
+                - required:
+                  - htmlUrl
+                - required:
+                  - htmlContent
+                - required:
+                  - local
+                properties:
+                  htmlContent:
+                    description: |-
+                      The preset HTML export's content itself, already in hand -- scanned
+                      directly, no fetch. Preset exports are small (tens of KB), nowhere
+                      near etcd's per-object size limit.
+                    type: string
+                  htmlUrl:
+                    description: |-
+                      A URL to a preset HTML export -- fetched and scanned for
+                      `filedetails/?id=` links.
+                    type: string
+                  local:
+                    description: |-
+                      A caller-assigned identifier, unique among all local mods -- the
+                      zip itself is already extracted (by registry, before this object is
+                      created) under this ID as its on-disk directory name; this is just
+                      a stable reference to it, never the zip bytes themselves.
+                    properties:
+                      unique_id:
+                        type: string
+                    required:
+                    - unique_id
+                    type: object
+                  steamUrl:
+                    description: |-
+                      A single raw Steam Workshop URL -- a mod or a collection,
+                      indistinguishable by shape alone. Resolved via sync-daemon's
+                      authenticated Steam session, which is also what correctly handles
+                      unlisted/private content a plain HTTP call can't see.
+                    type: string
+                type: object
+            required:
+            - source
+            type: object
+          status:
+            nullable: true
+            properties:
+              display_name:
+                default: ''
+                description: |-
+                  Workshop display name (mod/collection), empty for local and
+                  multi-mod preset sources where no single title applies.
+                type: string
+              kind:
+                default: ''
+                description: |-
+                  "mod" | "collection" | "local" | "preset" -- empty until resolved.
+                  A plain string, not a second enum, purely for display/listing; nothing
+                  reconciles against it (see `ModSourceInput` for the enum that actually
+                  drives behavior).
+                type: string
+              message:
+                default: ''
+                type: string
+              phase:
+                default: Pending
+                enum:
+                - Pending
+                - Resolving
+                - Synced
+                - Failed
+                type: string
+              resolved_mod_ids:
+                default: []
+                description: |-
+                  This source's fully-resolved, flat mod ID list (collections
+                  expanded) -- empty for local sources.
+                items:
+                  format: uint64
+                  minimum: 0.0
+                  type: integer
+                type: array
+              size_bytes:
+                default: 0
+                description: |-
+                  Sum of on-disk size across every mod this source currently resolves
+                  to (local: the extracted zip's own directory size). 0 until synced
+                  at least once.
+                format: uint64
+                minimum: 0.0
+                type: integer
+            type: object
+        required:
+        - spec
+        title: ModSource
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

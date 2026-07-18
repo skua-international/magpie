@@ -24,13 +24,10 @@ async fn main() -> Result<()> {
 
     let cfg = Arc::new(Config::from_env()?);
 
-    let pool = registry_db::connect(&cfg.database_url).await?;
-    info!("connected to Postgres");
-
     let client = Client::try_default().await?;
     info!("connected to Kubernetes API");
 
-    reconcile::spawn(client, cfg, pool)?;
+    reconcile::spawn(client, cfg)?;
 
     // The reconciler runs entirely in its own spawned task; block forever
     // rather than returning immediately.

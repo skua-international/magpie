@@ -12,6 +12,8 @@ pub struct Config {
     pub listen_addr: String,
     pub database_url: String,
     pub sync_daemon_url: String,
+    /// Namespace `ModSource` objects are created/read/deleted in.
+    pub namespace: String,
     pub jwt: JwtConfig,
 }
 
@@ -22,6 +24,7 @@ impl Config {
             listen_addr: env::var("LISTEN_ADDR").unwrap_or_else(|_| "0.0.0.0:8444".into()),
             database_url: require_env("DATABASE_URL")?,
             sync_daemon_url: env::var("SYNC_DAEMON_URL").unwrap_or_else(|_| "http://sync-daemon:8080".into()),
+            namespace: env::var("NAMESPACE").unwrap_or_else(|_| "default".into()),
             jwt: JwtConfig {
                 jwks_url: require_env("JWKS_URL")?,
                 issuer: require_env("JWT_ISSUER")?,

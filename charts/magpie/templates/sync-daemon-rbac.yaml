@@ -1,0 +1,45 @@
+{{- if .Values.rbac.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "magpie.fullname" . }}-sync-daemon
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "magpie.fullname" . }}-sync-daemon
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+rules:
+  # The ModSource reconciler (every kind except Local, which
+  # services/registry resolves synchronously itself) -- resolves a source's
+  # candidate IDs into a mod list and writes status. Never creates/deletes
+  # a ModSource itself (that's registry's job via its own RPCs); "patch" on
+  # the base resource is for the finalizer's own metadata.finalizers merge.
+  - apiGroups: ["arma.skua.io"]
+    resources: ["modsources"]
+    verbs: ["get", "list", "watch", "patch"]
+  - apiGroups: ["arma.skua.io"]
+    resources: ["modsources/status"]
+    verbs: ["get", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "magpie.fullname" . }}-sync-daemon
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "magpie.fullname" . }}-sync-daemon
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "magpie.fullname" . }}-sync-daemon
+    namespace: {{ .Release.Namespace }}
+{{- end }}

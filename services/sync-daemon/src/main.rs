@@ -1,5 +1,5 @@
 mod config;
-mod poller;
+mod reconcile;
 mod service;
 
 use anyhow::Result;
@@ -7,6 +7,7 @@ use axum::routing::get;
 use axum::Router;
 use config::Config;
 use connectrpc::Router as ConnectRouter;
+use kube::Client;
 use service::{Shared, SyncServiceImpl};
 use steam_sync::cache::SyncState;
 use steam_sync::steam::CmPool;
@@ -32,7 +33,9 @@ async fn main() -> Result<()> {
 
     let shared = Shared::new(pool, sync_state, cfg.content_root, cfg.claims_root);
 
-    poller::spawn(shared.clone(), std::time::Duration::from_secs(cfg.poll_interval_secs));
+    let client = Client::try_default().await?;
+    info!("connected to Kubernetes API");
+    reconcile::spawn(client, cfg.namespace.clone(), std::time::Duration::from_secs(cfg.poll_interval_secs), shared.clone());
 
     let sync_service = SyncServiceImpl::new(shared);
     let connect = ConnectRouter::new().add_service(sync_service);

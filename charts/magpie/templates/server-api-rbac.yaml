@@ -26,6 +26,12 @@ rules:
   - apiGroups: ["arma.skua.io"]
     resources: ["armaservers/status"]
     verbs: ["get", "patch"]
+  # Read-only -- resync_and_repending checks a referenced ModSource's kind
+  # (skip refresh_source for local/zip sources). Never writes one; that's
+  # services/registry's job.
+  - apiGroups: ["arma.skua.io"]
+    resources: ["modsources"]
+    verbs: ["get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

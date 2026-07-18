@@ -35,11 +35,6 @@ pub struct Config {
     /// anyway). Bind-mounted by path into every launcher Pod this
     /// reconciler creates.
     pub local_content_host_path: String,
-    /// Read-only access to registry's mod_sources table, to resolve a
-    /// source ID's kind/reference when building a server's -mod= args.
-    /// Shares the cluster's single Postgres instance with
-    /// services/registry and services/server-api.
-    pub database_url: String,
     /// Names of existing docker-registry Secrets to attach to every
     /// launcher Pod this reconciler creates, so it can pull
     /// `launcher_image` from a private registry -- separate from the
@@ -62,15 +57,10 @@ impl Config {
             local_content_root: env::var("LOCAL_CONTENT_ROOT").unwrap_or_else(|_| "/local-content".into()),
             local_content_host_path: env::var("LOCAL_CONTENT_HOST_PATH")
                 .unwrap_or_else(|_| "/var/lib/magpie/local-content".into()),
-            database_url: require_env("DATABASE_URL")?,
             image_pull_secrets: env::var("IMAGE_PULL_SECRETS")
                 .ok()
                 .map(|v| v.split(',').map(str::trim).filter(|s| !s.is_empty()).map(String::from).collect())
                 .unwrap_or_default(),
         })
     }
-}
-
-fn require_env(key: &str) -> anyhow::Result<String> {
-    env::var(key).map_err(|_| anyhow::anyhow!("missing required env var {key}"))
 }
