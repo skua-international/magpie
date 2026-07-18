@@ -106,6 +106,17 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      # No Docker layers here (unlike build-images.yml's services --
+      # steam-login is a plain cross-compiled binary), so the same
+      # cargo-chef-layer-sharing trick doesn't apply -- this is what
+      # actually caches ~/.cargo/registry + target/ across runs instead.
+      # Keys itself on Cargo.lock + the job matrix (target/os), so the 5
+      # legs don't stomp on each other's cache entries.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+          key: steam-login-${{ matrix.target }}
+
       - name: Install cross-linker
         if: matrix.cross-linker
         run: |

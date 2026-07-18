@@ -67,6 +67,12 @@ jobs:
       - name: Install protoc
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends protobuf-compiler
 
+      # bump-version.sh's `cargo check --workspace` builds the whole
+      # workspace outside Docker -- same "redownloads/recompiles every
+      # run" problem the image builds had, cheaper to fix here since this
+      # only runs `check`, not a release build.
+      - uses: Swatinem/rust-cache@v2
+
       - uses: bufbuild/buf-setup-action@v1
         with:
           version: "1.71.0"
