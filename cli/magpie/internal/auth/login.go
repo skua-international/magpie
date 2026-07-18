@@ -34,6 +34,24 @@ const loginTimeout = 5 * time.Minute
 // until the browser round trip completes, times out, or ctx is
 // cancelled.
 func Login(ctx context.Context, baseURL, provider string) (*Credentials, error) {
+	return loginOrLink(ctx, baseURL, provider, "")
+}
+
+// LinkAccount attaches provider as an additional login method on the
+// already-authenticated account behind accessToken -- identity's own
+// start handler reads that bearer token to learn which existing user to
+// link to (see its own doc), rather than creating a new one, exactly the
+// same start/callback/exchange dance as Login otherwise. The returned
+// Credentials are for the same user as before (just a freshly rotated
+// pair), safe to save over the existing session unconditionally.
+func LinkAccount(ctx context.Context, baseURL, provider, accessToken string) (*Credentials, error) {
+	if accessToken == "" {
+		return nil, fmt.Errorf("linking an account requires an existing session -- run `magpie login` first")
+	}
+	return loginOrLink(ctx, baseURL, provider, accessToken)
+}
+
+func loginOrLink(ctx context.Context, baseURL, provider, linkAccessToken string) (*Credentials, error) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open local callback listener: %w", err)
@@ -42,7 +60,7 @@ func Login(ctx context.Context, baseURL, provider string) (*Credentials, error) 
 	redirectURI := fmt.Sprintf("http://127.0.0.1:%d/callback", port)
 
 	startURL := fmt.Sprintf("%s/auth/%s/start?redirect_uri=%s", baseURL, provider, url.QueryEscape(redirectURI))
-	authorizeURL, err := fetchStartURL(ctx, startURL)
+	authorizeURL, err := fetchStartURL(ctx, startURL, linkAccessToken)
 	if err != nil {
 		listener.Close()
 		return nil, err
@@ -64,10 +82,16 @@ func Login(ctx context.Context, baseURL, provider string) (*Credentials, error) 
 // fetchStartURL calls identity's /auth/:provider/start, which returns
 // {"url": "..."} rather than a redirect itself (see that handler's own
 // doc) -- this process is the one that actually opens a browser to it.
-func fetchStartURL(ctx context.Context, startURL string) (string, error) {
+// When accessToken is non-empty, it's sent as a Bearer header so
+// identity's start handler links the new provider onto that existing
+// user instead of creating a fresh one (see LinkAccount's doc).
+func fetchStartURL(ctx context.Context, startURL, accessToken string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, startURL, nil)
 	if err != nil {
 		return "", err
+	}
+	if accessToken != "" {
+		req.Header.Set("Authorization", "Bearer "+accessToken)
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

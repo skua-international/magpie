@@ -245,13 +245,82 @@ pub async fn revoke_refresh_token(pool: &PgPool, token_hash: &str) -> sqlx::Resu
 /// authenticated user (the `ServerService`-style "link a second provider"
 /// flow) -- as opposed to `create_user_and_link`, which mints a brand-new
 /// user for a first-ever login.
+/// Links `provider`/`provider_user_id` to `user_id` -- the account
+/// currently logged in and initiating the link (identity's `callback`
+/// passes its `link_user_id` here). If that external identity was
+/// already linked to a *different* user (it logged in directly via this
+/// provider before ever being linked, creating its own separate account),
+/// that other account is merged into `user_id` rather than the link
+/// simply failing on the (provider, provider_user_id) primary key: every
+/// one of its own linked_accounts rows (not just this one -- if it was
+/// itself a hub of other linked providers, all of them move too) is
+/// re-pointed onto `user_id`, its acl_grants scopes are unioned into
+/// `user_id`'s (so e.g. a stray identity that happened to be the
+/// first-ever superuser doesn't silently lose that scope), and the
+/// now-empty other account is deleted. All under one transaction so a
+/// concurrent login can't observe a half-merged state.
 pub async fn link_account_to_user(pool: &PgPool, provider: &str, provider_user_id: &str, user_id: Uuid, display_name: &str) -> sqlx::Result<()> {
-    sqlx::query("INSERT INTO linked_accounts (provider, provider_user_id, user_id, display_name) VALUES ($1, $2, $3, $4)")
+    let mut tx = pool.begin().await?;
+
+    let other_user_id: Option<Uuid> =
+        sqlx::query_scalar("SELECT user_id FROM linked_accounts WHERE provider = $1 AND provider_user_id = $2 FOR UPDATE")
+            .bind(provider)
+            .bind(provider_user_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+
+    if let Some(other_user_id) = other_user_id {
+        if other_user_id != user_id {
+            // Union other_user_id's scopes into user_id's -- ON CONFLICT
+            // handles user_id not having a row yet (a fresh account with
+            // no explicit grants of its own) the same as it already
+            // having one.
+            sqlx::query(
+                "INSERT INTO acl_grants (subject, scopes)
+                 SELECT $2::text, scopes FROM acl_grants WHERE subject = $1::text
+                 ON CONFLICT (subject) DO UPDATE SET scopes = (
+                     SELECT ARRAY(SELECT DISTINCT unnest(acl_grants.scopes || excluded.scopes))
+                 )",
+            )
+            .bind(other_user_id)
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+            sqlx::query("DELETE FROM acl_grants WHERE subject = $1::text").bind(other_user_id).execute(&mut *tx).await?;
+
+            // Re-point every linked_accounts row other_user_id had (this
+            // one included) onto user_id -- covers the case where the
+            // stray account itself had more than one provider linked.
+            sqlx::query("UPDATE linked_accounts SET user_id = $1 WHERE user_id = $2").bind(user_id).bind(other_user_id).execute(&mut *tx).await?;
+
+            // refresh_tokens for other_user_id are now pointless (nobody
+            // will ever present a token minted for a user_id that no
+            // longer exists) -- ON DELETE CASCADE on the users row below
+            // would clean these up anyway, but being explicit here keeps
+            // this transaction's intent readable end to end.
+            sqlx::query("DELETE FROM refresh_tokens WHERE user_id = $1").bind(other_user_id).execute(&mut *tx).await?;
+            sqlx::query("DELETE FROM users WHERE id = $1").bind(other_user_id).execute(&mut *tx).await?;
+        }
+    } else {
+        sqlx::query("INSERT INTO linked_accounts (provider, provider_user_id, user_id, display_name) VALUES ($1, $2, $3, $4)")
+            .bind(provider)
+            .bind(provider_user_id)
+            .bind(user_id)
+            .bind(display_name)
+            .execute(&mut *tx)
+            .await?;
+    }
+
+    // Whichever branch ran, the (provider, provider_user_id) row now
+    // exists and belongs to user_id -- refresh its display_name to
+    // whatever this login just fetched.
+    sqlx::query("UPDATE linked_accounts SET display_name = $1 WHERE provider = $2 AND provider_user_id = $3")
+        .bind(display_name)
         .bind(provider)
         .bind(provider_user_id)
-        .bind(user_id)
-        .bind(display_name)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
+
+    tx.commit().await?;
     Ok(())
 }
