@@ -11,6 +11,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/skua-international/magpie/cli/internal/actions"
+	"github.com/skua-international/magpie/cli/internal/steamlogin"
 )
 
 func adminCmd() *cobra.Command {
@@ -41,17 +42,23 @@ func adminDiskUsageCmd() *cobra.Command {
 	}
 }
 
-// adminRefreshSteamAuthCmd is the "zero pre-existing Steam credentials
-// anywhere in the cluster" bootstrap path (see identity/sync-daemon's own
-// docs for the full flow) -- prompts for a username/password (password
-// hidden, never echoed or logged) and, if Steam Guard confirmation is
-// needed, prompts for the code and retries automatically.
+// adminRefreshSteamAuthCmd is the "zero Steam credentials anywhere in
+// the cluster" bootstrap path. The interactive login (username/hidden
+// password, Steam Guard code if needed) happens entirely on this
+// machine, via the steam-login helper (see internal/steamlogin) -- only
+// the resulting refresh token is ever sent to the cluster.
 func adminRefreshSteamAuthCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "refresh-steam-auth",
 		Short: "Establish (or replace) the cluster's Steam session interactively",
 		RunE: func(c *cobra.Command, _ []string) error {
-			cl, err := clients(c.Context())
+			ctx := c.Context()
+			cl, err := clients(ctx)
+			if err != nil {
+				return err
+			}
+
+			binPath, err := steamlogin.EnsureBinary(ctx)
 			if err != nil {
 				return err
 			}
@@ -69,7 +76,7 @@ func adminRefreshSteamAuthCmd() *cobra.Command {
 				return err
 			}
 
-			result, err := actions.RefreshSteamAuth(c.Context(), cl, username, password, "")
+			result, err := steamlogin.Negotiate(ctx, binPath, username, password, "")
 			if err != nil {
 				return err
 			}
@@ -80,9 +87,14 @@ func adminRefreshSteamAuthCmd() *cobra.Command {
 					return err
 				}
 				code = strings.TrimSpace(code)
-				if _, err := actions.RefreshSteamAuth(c.Context(), cl, username, password, code); err != nil {
+				result, err = steamlogin.Negotiate(ctx, binPath, username, password, code)
+				if err != nil {
 					return err
 				}
+			}
+
+			if err := actions.RefreshSteamAuth(ctx, cl, username, result.RefreshToken); err != nil {
+				return err
 			}
 
 			fmt.Println("Steam session established. sync-daemon is restarting to pick it up.")

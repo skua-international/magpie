@@ -18,7 +18,7 @@ func configPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "magpie", "credentials.json"), nil
+	return filepath.Join(dir, "magpiectl", "credentials.json"), nil
 }
 
 // Save writes creds to disk, mode 0600 -- these are bearer tokens, not

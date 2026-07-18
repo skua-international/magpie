@@ -1,6 +1,6 @@
 // Package cmd is the cobra command tree -- every subcommand here is a
 // thin wrapper calling into internal/actions, the same functions the TUI
-// (internal/tui) calls. `magpie` with no subcommand launches the TUI;
+// (internal/tui) calls. `magpiectl` with no subcommand launches the TUI;
 // everything else is a direct, scriptable invocation of one action.
 package cmd
 
@@ -37,9 +37,9 @@ var (
 
 func Root() *cobra.Command {
 	root := &cobra.Command{
-		Use:   "magpie",
+		Use:   "magpiectl",
 		Short: "Manage a magpie-orchestrated Arma 3 cluster",
-		Long: "magpie is both a direct CLI and, with no subcommand, an interactive TUI " +
+		Long: "magpiectl is both a direct CLI and, with no subcommand, an interactive TUI " +
 			"for managing servers, mod sources, and missions on a magpie cluster.\n\n" +
 			"You log in to the cluster itself (identity is the cluster's own account system) -- " +
 			"--provider only picks which external OAuth2/OIDC service vouches for who you are. " +
@@ -65,16 +65,16 @@ func Root() *cobra.Command {
 	root.PersistentFlags().StringVar(&registryURL, "registry-url", "http://registry.magpie.local", "base URL of registry")
 	root.PersistentFlags().StringVar(&loginProvider, "provider", "steam", "login provider: steam, discord, github, or google (prompts interactively if omitted on a TTY)")
 
-	root.AddCommand(loginCmd(), authCmd(), accountCmd(), serversCmd(), modsCmd(), missionsCmd(), adminCmd(), completionCmd())
+	root.AddCommand(loginCmd(), authCmd(), accountCmd(), serversCmd(), modsCmd(), missionsCmd(), adminCmd(), completionCmd(), deployCmd(), installCmd(), upgradeCmd())
 	return root
 }
 
-// loginCmd is kept as a top-level shortcut for `magpie auth login` --
+// loginCmd is kept as a top-level shortcut for `magpiectl auth login` --
 // same command, just less to type for the common case.
 func loginCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "login",
-		Short: "Log in to the cluster via your browser (shortcut for `magpie auth login`)",
+		Short: "Log in to the cluster via your browser (shortcut for `magpiectl auth login`)",
 		RunE: func(c *cobra.Command, _ []string) error {
 			return doLogin(c.Context())
 		},
@@ -106,7 +106,7 @@ func promptProvider() (string, error) {
 
 // doLogin is the single entry point every path funnels through --
 // `login`, `auth login`, and ensureCredentials' auto-login fallback (bare
-// `magpie`, or any subcommand run with no stored session yet) -- so the
+// `magpiectl`, or any subcommand run with no stored session yet) -- so the
 // provider prompt below fires exactly once, everywhere, rather than only
 // on the paths that happened to call it explicitly.
 func doLogin(ctx context.Context) error {

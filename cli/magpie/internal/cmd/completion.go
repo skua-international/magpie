@@ -13,14 +13,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const installMarker = "# added by `magpie completion install`"
+const installMarker = "# added by `magpiectl completion install`"
 
 func completionCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:   "completion [bash|zsh|fish|powershell]",
 		Short: "Print or install shell autocompletion",
 		Long: "Print the autocompletion script for the given shell to stdout, or run\n" +
-			"`magpie completion install` to detect your shell and install it automatically.",
+			"`magpiectl completion install` to detect your shell and install it automatically.",
 		DisableFlagsInUseLine: true,
 		ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
 		Args:                  cobra.MatchAll(cobra.MaximumNArgs(1), cobra.OnlyValidArgs),
@@ -58,7 +58,7 @@ func completionInstallCmd() *cobra.Command {
 			shell := detectShell()
 			if shell == "" {
 				return fmt.Errorf("couldn't detect your shell from $SHELL -- run " +
-					"`magpie completion <bash|zsh|fish|powershell>` and install it manually")
+					"`magpiectl completion <bash|zsh|fish|powershell>` and install it manually")
 			}
 			switch shell {
 			case "bash":
@@ -116,7 +116,7 @@ func installBash(root *cobra.Command) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("creating %s: %w", dir, err)
 	}
-	path := filepath.Join(dir, "magpie")
+	path := filepath.Join(dir, "magpiectl")
 	if err := writeCompletionFile(root, "bash", path); err != nil {
 		return err
 	}
@@ -139,7 +139,7 @@ func installFish(root *cobra.Command) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("creating %s: %w", dir, err)
 	}
-	path := filepath.Join(dir, "magpie.fish")
+	path := filepath.Join(dir, "magpiectl.fish")
 	if err := writeCompletionFile(root, "fish", path); err != nil {
 		return err
 	}
@@ -161,7 +161,7 @@ func installZsh(root *cobra.Command) error {
 	}
 
 	if dir := findWritableFpathDir(home); dir != "" {
-		path := filepath.Join(dir, "_magpie")
+		path := filepath.Join(dir, "_magpiectl")
 		if err := writeCompletionFile(root, "zsh", path); err != nil {
 			return err
 		}
@@ -174,7 +174,7 @@ func installZsh(root *cobra.Command) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("creating %s: %w", dir, err)
 	}
-	path := filepath.Join(dir, "_magpie")
+	path := filepath.Join(dir, "_magpiectl")
 	if err := writeCompletionFile(root, "zsh", path); err != nil {
 		return err
 	}
@@ -203,7 +203,7 @@ func findWritableFpathDir(home string) string {
 		if !strings.HasPrefix(dir, home) {
 			continue
 		}
-		probe := filepath.Join(dir, ".magpie-write-test")
+		probe := filepath.Join(dir, ".magpiectl-write-test")
 		f, err := os.OpenFile(probe, os.O_CREATE|os.O_WRONLY, 0o644)
 		if err != nil {
 			continue
@@ -225,7 +225,7 @@ func installPowerShell(root *cobra.Command) error {
 	}
 	if err != nil {
 		return fmt.Errorf("no pwsh/powershell found on PATH -- run " +
-			"`magpie completion powershell > magpie-completion.ps1` and dot-source it from your $PROFILE manually")
+			"`magpiectl completion powershell > magpiectl-completion.ps1` and dot-source it from your $PROFILE manually")
 	}
 
 	out, err := exec.Command(pwsh, "-NoProfile", "-Command", "Write-Output $PROFILE").Output()
@@ -241,7 +241,7 @@ func installPowerShell(root *cobra.Command) error {
 	if err := os.MkdirAll(scriptDir, 0o755); err != nil {
 		return fmt.Errorf("creating %s: %w", scriptDir, err)
 	}
-	scriptPath := filepath.Join(scriptDir, "magpie-completion.ps1")
+	scriptPath := filepath.Join(scriptDir, "magpiectl-completion.ps1")
 	if err := writeCompletionFile(root, "powershell", scriptPath); err != nil {
 		return err
 	}
@@ -270,7 +270,7 @@ func writeCompletionFile(root *cobra.Command, shell, path string) error {
 }
 
 // appendOnceGuarded appends block to path unless installMarker is
-// already present, so repeated `magpie completion install` runs don't
+// already present, so repeated `magpiectl completion install` runs don't
 // pile up duplicate lines.
 func appendOnceGuarded(path, block string) (bool, error) {
 	existing, err := os.ReadFile(path)

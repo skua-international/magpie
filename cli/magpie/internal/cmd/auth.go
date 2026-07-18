@@ -51,7 +51,7 @@ func authStatusCmd() *cobra.Command {
 			creds, err := auth.Load()
 			if errors.Is(err, auth.ErrNotLoggedIn) {
 				fmt.Println("Not logged in to", identityURL)
-				fmt.Println("Run `magpie auth login`.")
+				fmt.Println("Run `magpiectl auth login`.")
 				return nil
 			}
 			if err != nil {

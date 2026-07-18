@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/skua-international/magpie/cli/internal/cmd"
+	"github.com/skua-international/magpie/cli/internal/steamlogin"
 )
 
 // version is stamped at build time via -ldflags "-X main.version=..."
@@ -18,6 +19,7 @@ var version = "dev"
 func main() {
 	root := cmd.Root()
 	root.Version = version
+	steamlogin.Version = version
 
 	// cobra prints the error itself by default (Execute's own job) --
 	// just need to set a real exit code on failure.

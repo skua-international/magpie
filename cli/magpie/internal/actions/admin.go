@@ -17,22 +17,14 @@ func GetDiskUsage(ctx context.Context, c *client.Clients) (*registryv1.GetDiskUs
 	return resp.Msg, nil
 }
 
-// RefreshSteamAuthResult mirrors sync-daemon's own outcome shape (see its
-// proto doc): either the login completed, or Steam Guard confirmation is
-// still needed and the caller should retry with GuardCode set.
-type RefreshSteamAuthResult struct {
-	NeedsGuard bool
-	GuardType  string
-}
-
-func RefreshSteamAuth(ctx context.Context, c *client.Clients, username, password, guardCode string) (RefreshSteamAuthResult, error) {
-	req := &registryv1.RefreshSteamAuthRequest{Username: username, Password: password}
-	if guardCode != "" {
-		req.GuardCode = &guardCode
-	}
-	resp, err := c.Admin.RefreshSteamAuth(ctx, connect.NewRequest(req))
-	if err != nil {
-		return RefreshSteamAuthResult{}, err
-	}
-	return RefreshSteamAuthResult{NeedsGuard: resp.Msg.NeedsGuard, GuardType: resp.Msg.GuardType}, nil
+// RefreshSteamAuth installs the cluster's Steam session from an
+// already-negotiated refresh token -- see internal/steamlogin for how
+// that's obtained (a client-side-only login; this RPC, like every other
+// deployed service, never sees a password).
+func RefreshSteamAuth(ctx context.Context, c *client.Clients, username, refreshToken string) error {
+	_, err := c.Admin.RefreshSteamAuth(ctx, connect.NewRequest(&registryv1.RefreshSteamAuthRequest{
+		Username:     username,
+		RefreshToken: refreshToken,
+	}))
+	return err
 }
