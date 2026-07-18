@@ -86,7 +86,7 @@ jobs:
         if: github.event.before != '0000000000000000000000000000000000000000'
         run: buf breaking proto --against ".git#ref=${{ github.event.before }},subdir=proto"
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: "1.25"
 
