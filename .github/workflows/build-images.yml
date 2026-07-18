@@ -25,12 +25,39 @@ env:
   IMAGE_BASE: ghcr.io/skua-international/magpie
 
 jobs:
-  build:
+  # workflow_run-triggered runs never show up on the triggering commit's
+  # own checks list -- GitHub only associates push/pull_request-triggered
+  # runs with a commit automatically. Posting an explicit commit status
+  # here (pending now, success/failure in report-status below) is what
+  # makes "which build does this commit correspond to" visible on the
+  # commit page/PR checks at all, since the Actions tab alone doesn't show
+  # that association either for a workflow_run chain like this one.
+  resolve:
     runs-on: ubuntu-latest
-    # workflow_run fires for a failed release.yml run too -- only build if
-    # it actually succeeded (or this was a manual workflow_dispatch, which
-    # has no workflow_run event at all).
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    permissions:
+      statuses: write
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
+    steps:
+      - id: sha
+        run: echo "sha=${{ github.event.workflow_run.head_sha || github.sha }}" >> "$GITHUB_OUTPUT"
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: '${{ steps.sha.outputs.sha }}',
+              state: 'pending',
+              context: 'images / build-and-push',
+              target_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              description: 'Building and pushing images + chart...',
+            });
+
+  build:
+    needs: resolve
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
@@ -59,7 +86,7 @@ jobs:
           # usually land on the same commit, but pinning explicitly avoids
           # any window where another push has already landed on main
           # between release.yml finishing and this job starting.
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ needs.resolve.outputs.sha }}
           fetch-tags: true
 
       - uses: docker/setup-buildx-action@v4
@@ -109,15 +136,15 @@ jobs:
   # login/auth this workflow's image builds already do, no separate hosting
   # to stand up.
   publish-chart:
+    needs: resolve
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ needs.resolve.outputs.sha }}
 
       - uses: azure/setup-helm@v4
 
@@ -131,3 +158,27 @@ jobs:
         run: |
           helm package charts/magpie -d /tmp/chart-out
           helm push /tmp/chart-out/magpie-*.tgz oci://${{ env.IMAGE_BASE }}/charts
+
+  # Reports final pass/fail back onto the commit resolve.sha started a
+  # status on -- `if: always()` so a failed build/publish still gets
+  # reported instead of leaving the commit stuck on "pending" forever.
+  report-status:
+    needs: [resolve, build, publish-chart]
+    if: always() && needs.resolve.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      statuses: write
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const ok = '${{ needs.build.result }}' === 'success' && '${{ needs.publish-chart.result }}' === 'success';
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: '${{ needs.resolve.outputs.sha }}',
+              state: ok ? 'success' : 'failure',
+              context: 'images / build-and-push',
+              target_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              description: ok ? 'Images + chart published' : 'Image or chart build failed',
+            });
