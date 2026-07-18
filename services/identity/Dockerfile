@@ -6,26 +6,18 @@ RUN apt-get update \
         git \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/usr/local/cargo/git \
-    cargo install cargo-chef --locked
+RUN cargo install cargo-chef --locked
 WORKDIR /build
 
 FROM chef AS planner
 COPY . .
-RUN cargo chef prepare --recipe-path recipe.json --bin identity
+RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef AS builder
 COPY --from=planner /build/recipe.json recipe.json
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/usr/local/cargo/git \
-    --mount=type=cache,target=/build/target \
-    cargo chef cook --release --recipe-path recipe.json -p identity
+RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/usr/local/cargo/git \
-    --mount=type=cache,target=/build/target \
-    cargo build --release --locked -p identity \
+RUN cargo build --release --locked -p identity \
     && cp /build/target/release/identity /build/identity
 
 # Pure Rust binary, no subprocess/shell use -- distroless: no shell, no

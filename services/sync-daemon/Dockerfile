@@ -6,26 +6,18 @@ RUN apt-get update \
         git \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/usr/local/cargo/git \
-    cargo install cargo-chef --locked
+RUN cargo install cargo-chef --locked
 WORKDIR /build
 
 FROM chef AS planner
 COPY . .
-RUN cargo chef prepare --recipe-path recipe.json --bin sync-daemon
+RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef AS builder
 COPY --from=planner /build/recipe.json recipe.json
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/usr/local/cargo/git \
-    --mount=type=cache,target=/build/target \
-    cargo chef cook --release --recipe-path recipe.json -p sync-daemon
+RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/usr/local/cargo/git \
-    --mount=type=cache,target=/build/target \
-    cargo build --release --locked -p sync-daemon \
+RUN cargo build --release --locked -p sync-daemon \
     && cp /build/target/release/sync-daemon /build/sync-daemon
 
 FROM debian:bookworm-slim
