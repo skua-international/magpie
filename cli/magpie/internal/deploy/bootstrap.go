@@ -38,7 +38,23 @@ const chartNamespace = "magpie"
 // it does, so mirroring this whole process onto the remote host (an
 // earlier version of this design) would've required helm/kubectl to be
 // installed there for no real reason.
-func BootstrapK3s(ctx context.Context, dataDir string) error {
+// kubeletRootDir derives kubelet's own root-dir from dataDir --
+// deterministic (same dataDir always produces the same path), so this
+// is also what magpieCsi.kubeletDir gets set to (see Run()) without
+// needing BootstrapK3s to have actually run an install this specific
+// time (the "k3s already installed" branch below never recomputes it
+// otherwise, but it's the same value either way).
+func kubeletRootDir(dataDir string) string {
+	return filepath.Join(dataDir, "kubelet")
+}
+
+// BootstrapK3s returns kubelet's actual root-dir (see kubeletRootDir)
+// so Run() can pass magpie-csi's own hostPath mounts the same value --
+// they have to agree exactly, or node-driver-registrar registers into a
+// path kubelet never actually watches (confirmed live).
+func BootstrapK3s(ctx context.Context, dataDir string) (string, error) {
+	kubeletDir := kubeletRootDir(dataDir)
+
 	if _, err := exec.LookPath("k3s"); err == nil {
 		fmt.Println("==> k3s already installed, skipping install")
 	} else {
@@ -60,7 +76,6 @@ func BootstrapK3s(ctx context.Context, dataDir string) error {
 		// critical/static pods) to evict everything to reclaim space.
 		// --kubelet-arg=root-dir relocates that too, onto the same disk.
 		k3sDataDir := filepath.Join(dataDir, "k3s")
-		kubeletDir := filepath.Join(dataDir, "kubelet")
 
 		// k3s's own kubeconfig (/etc/rancher/k3s/k3s.yaml) is root-only
 		// by default -- confirmed live: everything downstream of install
@@ -77,7 +92,7 @@ func BootstrapK3s(ctx context.Context, dataDir string) error {
 		// caller at once, not just this function's.
 		kubeconfigGroup, err := currentGroupName()
 		if err != nil {
-			return fmt.Errorf("failed to resolve the current user's group for --write-kubeconfig-group: %w", err)
+			return "", fmt.Errorf("failed to resolve the current user's group for --write-kubeconfig-group: %w", err)
 		}
 
 		fmt.Printf("==> Installing k3s (data-dir: %s, kubelet root-dir: %s, kubeconfig group: %s)...\n", k3sDataDir, kubeletDir, kubeconfigGroup)
@@ -91,7 +106,7 @@ func BootstrapK3s(ctx context.Context, dataDir string) error {
 		cmd.Stderr = os.Stderr
 		cmd.Stdin = os.Stdin
 		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("k3s install failed: %w", err)
+			return "", fmt.Errorf("k3s install failed: %w", err)
 		}
 	}
 
@@ -106,16 +121,19 @@ func BootstrapK3s(ctx context.Context, dataDir string) error {
 		time.Sleep(2 * time.Second)
 	}
 	if !ready {
-		return fmt.Errorf("node did not become Ready in time -- check 'systemctl status k3s' and 'journalctl -u k3s'")
+		return "", fmt.Errorf("node did not become Ready in time -- check 'systemctl status k3s' and 'journalctl -u k3s'")
 	}
 	fmt.Println("==> Node is Ready")
 
 	kubeconfigPath, err := writeKubeconfig(ctx)
 	if err != nil {
-		return err
+		return "", err
 	}
 	fmt.Printf("==> kubeconfig written to %s\n", kubeconfigPath)
-	return os.Setenv("KUBECONFIG", kubeconfigPath)
+	if err := os.Setenv("KUBECONFIG", kubeconfigPath); err != nil {
+		return "", err
+	}
+	return kubeletDir, nil
 }
 
 // currentGroupName resolves the current process's own primary group name

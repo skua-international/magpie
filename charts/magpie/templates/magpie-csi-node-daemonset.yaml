@@ -34,7 +34,7 @@ spec:
           image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.12.0
           args:
             - "--csi-address=/csi/csi.sock"
-            - "--kubelet-registration-path=/var/lib/kubelet/plugins/csi.magpie.skua.io/csi.sock"
+            - "--kubelet-registration-path={{ .Values.magpieCsi.kubeletDir }}/plugins/csi.magpie.skua.io/csi.sock"
           volumeMounts:
             - name: plugin-dir
               mountPath: /csi
@@ -73,7 +73,7 @@ spec:
             - name: plugin-dir
               mountPath: /csi
             - name: pods-mount-dir
-              mountPath: /var/lib/kubelet/pods
+              mountPath: {{ .Values.magpieCsi.kubeletDir }}/pods
               mountPropagation: Bidirectional
             - name: blob-storage
               mountPath: /var/lib/magpie-csi
@@ -90,11 +90,11 @@ spec:
       volumes:
         - name: plugin-dir
           hostPath:
-            path: /var/lib/kubelet/plugins/csi.magpie.skua.io
+            path: {{ .Values.magpieCsi.kubeletDir }}/plugins/csi.magpie.skua.io
             type: DirectoryOrCreate
         - name: registration-dir
           hostPath:
-            path: /var/lib/kubelet/plugins_registry
+            path: {{ .Values.magpieCsi.kubeletDir }}/plugins_registry
             # DirectoryOrCreate, not Directory -- confirmed live:
             # "hostPath type check failed: /var/lib/kubelet/plugins_registry
             # is not a directory" on a node that had never had a CSI
@@ -108,7 +108,7 @@ spec:
             type: DirectoryOrCreate
         - name: pods-mount-dir
           hostPath:
-            path: /var/lib/kubelet/pods
+            path: {{ .Values.magpieCsi.kubeletDir }}/pods
             type: DirectoryOrCreate
         - name: blob-storage
           hostPath:

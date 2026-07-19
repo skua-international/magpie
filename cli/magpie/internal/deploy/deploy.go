@@ -45,6 +45,17 @@ type Options struct {
 	GHCRToken           string
 	IdentityBaseURL     string
 	IngressBaseDomain   string
+	// Set by Run() itself after a local BootstrapK3s call, or by
+	// RunRemoteInstall after k3s was installed on the --ssh target
+	// (kubeletRootDir(opts.DataDir) is deterministic, so it doesn't need
+	// anything fetched back from the remote host to compute) -- Run()'s
+	// Install branch passes this straight through as
+	// --set magpieCsi.kubeletDir=, which has to exactly match wherever
+	// this specific k3s install actually put kubelet's own root-dir, or
+	// node-driver-registrar registers into a path kubelet never
+	// actually watches (confirmed live). Left empty (chart default
+	// applies) when magpiectl didn't bootstrap k3s itself at all.
+	KubeletDir string
 }
 
 // CheckTools verifies helm and kubectl are on PATH, printing an
@@ -202,9 +213,11 @@ func Run(ctx context.Context, opts Options) error {
 		if !opts.Install {
 			return fmt.Errorf("--bootstrap-k3s only makes sense with --install (or via `magpiectl install`)")
 		}
-		if err := BootstrapK3s(ctx, opts.DataDir); err != nil {
+		dir, err := BootstrapK3s(ctx, opts.DataDir)
+		if err != nil {
 			return err
 		}
+		opts.KubeletDir = dir
 	}
 
 	if err := CheckTools(); err != nil {
@@ -300,7 +313,9 @@ func Run(ctx context.Context, opts Options) error {
 		if identityBaseURL != "" {
 			opts.ExtraHelmArgs = append(opts.ExtraHelmArgs, "--set", "identity.baseUrl="+identityBaseURL)
 		}
-
+		if opts.KubeletDir != "" {
+			opts.ExtraHelmArgs = append(opts.ExtraHelmArgs, "--set", "magpieCsi.kubeletDir="+opts.KubeletDir)
+		}
 	}
 
 	if opts.ImageTag != "" {
@@ -395,7 +410,8 @@ func Run(ctx context.Context, opts Options) error {
 // the whole install onto it (which would also mean requiring helm/
 // kubectl to be installed there too, for no real reason).
 func RunNodeSetup(ctx context.Context, dataDir string) error {
-	return BootstrapK3s(ctx, dataDir)
+	_, err := BootstrapK3s(ctx, dataDir)
+	return err
 }
 
 func run(ctx context.Context, name string, args ...string) error {

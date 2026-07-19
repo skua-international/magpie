@@ -284,6 +284,18 @@ magpieCsi:
   image:
     repository: "ghcr.io/skua-international/magpie/magpie-csi"
     tag: ""
+  # kubelet's own root-dir -- the Kubernetes default (/var/lib/kubelet)
+  # only applies if kubelet was never told otherwise. `magpiectl install
+  # --bootstrap-k3s` relocates it (--kubelet-arg=root-dir=<data-dir>/
+  # kubelet, see cli/magpie/internal/deploy/bootstrap.go) and passes the
+  # matching value here automatically -- confirmed live, this needs to
+  # be exactly right or node-driver-registrar registers into a path
+  # kubelet never actually watches, and CSI mounts fail with "driver
+  # name ... not found in the list of registered CSI drivers" despite
+  # the Node plugin itself running fine. Set this by hand if you're
+  # deploying onto a cluster this chart didn't bootstrap itself and its
+  # kubelet root-dir isn't the k8s default either.
+  kubeletDir: /var/lib/kubelet
   resources: {}
 
 # Cluster-wide baseline Arma server config -- every ArmaServer's own

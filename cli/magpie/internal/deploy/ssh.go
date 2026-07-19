@@ -132,6 +132,12 @@ func RunRemoteInstall(ctx context.Context, sshHost, sshIdentity string, opts Opt
 	// kubeconfig above. helm/kubectl only need to be installed on this
 	// machine, never the remote one.
 	opts.BootstrapK3s = false
+	// kubeletRootDir is deterministic (same dataDir -> same path), so
+	// this doesn't need anything fetched back from the remote host --
+	// the k3s install that just happened there (via --node-setup-only)
+	// used this exact same derivation. See Options.KubeletDir's own doc
+	// for why this has to be exactly right.
+	opts.KubeletDir = kubeletRootDir(opts.DataDir)
 	fmt.Println("==> Continuing the install locally against the new cluster...")
 	return Run(ctx, opts)
 }
