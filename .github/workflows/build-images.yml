@@ -29,8 +29,61 @@ jobs:
     uses: ./.github/workflows/pick-runner.yml
     secrets: inherit
 
-  build:
+  # Compiles all 6 service binaries once, natively (no Docker involved),
+  # and hands them to the build matrix below as a job artifact. This
+  # replaced a cargo-chef multi-stage build duplicated across all 6
+  # Dockerfiles after it caused two separate real caching bugs in one
+  # session: a -p-scoping mismatch between `cook` and the final build that
+  # silently defeated the cache even on a cook hit, and a cache-scope race
+  # across the 6 services' concurrent matrix builds where one service's
+  # planner stage imported a stale recipe.json from a different commit.
+  # Compiling once, outside Docker, removes both failure classes outright
+  # -- there's no cross-job Docker cache to race on, and Swatinem/rust-cache
+  # (actions/cache, keyed on Cargo.lock, already reliable elsewhere in this
+  # repo) replaces what cargo-chef was for.
+  build-workspace:
     needs: pick-runner
+    runs-on: ${{ fromJSON(needs.pick-runner.outputs.labels) }}
+    # Compiling on the bare runner links against *its* glibc, which is
+    # newer than the Debian 12 (bookworm) base every final image uses --
+    # confirmed live: a runner-compiled binary failed with "GLIBC_2.39
+    # not found" inside debian:bookworm-slim/distroless-cc-debian12
+    # (glibc 2.36). Building inside this container instead matches the
+    # runtime images' own glibc; GHA handles workspace/cache mounting for
+    # every step below transparently, no manual `docker run` plumbing
+    # needed.
+    container:
+      image: rust:bookworm
+    steps:
+      - uses: actions/checkout@v4
+
+      # crates/protocol's build.rs shells out to a real protoc binary (via
+      # connectrpc-build) at `cargo build` time for every workspace member.
+      - name: Install protoc
+        run: apt-get update && apt-get install -y --no-install-recommends protobuf-compiler
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build all service binaries
+        run: cargo build --release --locked
+
+      - name: Collect binaries
+        run: |
+          mkdir -p dist
+          for bin in launcher sync-daemon controller registry server-api identity; do
+            cp "target/release/${bin}" "dist/${bin}"
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: magpie-binaries
+          path: dist/
+          # Only ever consumed by the `build` job in this same workflow
+          # run -- no reason to keep it around after that.
+          retention-days: 1
+
+  build:
+    needs: [pick-runner, build-workspace]
     runs-on: ${{ fromJSON(needs.pick-runner.outputs.labels) }}
     permissions:
       contents: read
@@ -56,6 +109,11 @@ jobs:
         with:
           fetch-tags: true
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: magpie-binaries
+          path: dist/
+
       # Main-branch pushes produce branch/sha/latest images only; tag
       # promotion is done by the separate tag-only workflow.
       - name: Resolve version
@@ -79,17 +137,12 @@ jobs:
             type=ref,event=branch
             type=sha,prefix=,format=short
 
-      # All Dockerfiles build from the repo root (COPY . . -- every
-      # service needs the whole workspace's Cargo.lock/manifests to
-      # resolve via cargo-chef, see each Dockerfile's own comments), not
-      # from their own service directory.
-      #
-      # One shared cache scope across the whole matrix, not one per
-      # service: most of these share a large chunk of their cargo-chef
-      # dependency layer (tokio, serde, sqlx, connectrpc, ...), so a
-      # per-service scope would rebuild that overlap redundantly in every
-      # job. Make it branch-aware so unrelated refs do not churn the same
-      # cache bucket.
+      # All Dockerfiles build from the repo root (COPY dist/<bin> --
+      # dist/ is the artifact build-workspace produced above), not from
+      # their own service directory. No cargo/Docker cache here at all
+      # any more -- these Dockerfiles are just COPY + a handful of apt
+      # packages now, cheap enough that caching isn't worth the
+      # complexity it kept causing.
       - uses: docker/build-push-action@v6
         with:
           context: .
@@ -97,6 +150,4 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=cargo-${{ github.ref_name }}
-          cache-to: type=gha,mode=max,scope=cargo-${{ github.ref_name }}
 # End of main-branch image build workflow.

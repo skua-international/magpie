@@ -1,41 +1,14 @@
 # syntax=docker/dockerfile:1.7
-# Shared cargo-chef base for every service's Dockerfile in this repo.
-# Replaces the old hand-maintained "stub every workspace member's src,
-# build, delete the stubs" dance -- chef computes a dependency-only
-# "recipe" from the workspace's actual Cargo.lock/manifests, so the
-# expensive dependency-compile layer stays correctly cached across source
-# changes without anyone having to keep a per-Dockerfile stub list in sync
-# every time a crate is added to the workspace.
-FROM rust:bookworm AS chef
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends --no-install-suggests \
-        protobuf-compiler \
-        git \
-        ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-RUN cargo install cargo-chef --locked
-WORKDIR /build
-
-FROM chef AS planner
-COPY . .
-RUN cargo chef prepare --recipe-path recipe.json
-
-FROM chef AS builder
-COPY --from=planner /build/recipe.json recipe.json
-RUN cargo chef cook --release --recipe-path recipe.json
-COPY . .
-# No -p here, deliberately: cargo resolves a narrower, per-target feature
-# set for `-p <crate>` than it does for a whole-workspace build under
-# resolver v2, which doesn't match the feature set `cargo chef cook`
-# (also whole-workspace, no -p) just built above -- that mismatch was
-# silently invalidating and recompiling the *entire* dependency tree on
-# every build even with a fully cache-hit cook layer. Matching cook's
-# scope here means the extra cost is compiling the other services' own
-# (small, workspace-owned) crates/binaries, not re-resolving the
-# expensive third-party tree cook already cached.
-RUN cargo build --release --locked \
-    && cp /build/target/release/launcher /build/launcher
-
+# Compilation happens once, natively, in build-images.yml's build-workspace
+# job (Swatinem/rust-cache, no Docker involved) -- this Dockerfile only
+# packages the already-built binary. Was a cargo-chef multi-stage build
+# until this repo hit two separate real caching bugs from it in one
+# session: a -p-scoping mismatch between `cook` and the final build that
+# silently defeated the cache even on a cook hit, and a cache-scope race
+# across the 6 services' concurrent matrix builds that served one
+# service's planner stage a stale recipe.json from a different commit.
+# Splitting "compile" from "package" into separate jobs removes both
+# failure classes outright instead of patching around them.
 FROM debian:bookworm-slim
 
 LABEL maintainer="Brett - github.com/brettmayson"
@@ -86,6 +59,6 @@ VOLUME /arma3/server
 
 STOPSIGNAL SIGINT
 
-COPY --from=builder /build/launcher /launcher
+COPY --chmod=755 dist/launcher /launcher
 
 CMD ["/launcher"]
