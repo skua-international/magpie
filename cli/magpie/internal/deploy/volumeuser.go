@@ -26,13 +26,20 @@ const (
 // Returns the resulting UID/GID for the chart's
 // volumeManager.runAsUser/runAsGroup values.
 //
-// Idempotent -- safe to re-run against an already-provisioned host.
-// Assumes it's already running as root or via passwordless sudo, same
-// assumption BootstrapK3s makes -- this only makes sense to run on the
-// actual node volume-manager's DaemonSet will land on, which `Run()`
+// Idempotent -- safe to re-run against an already-provisioned host. Uses
+// sudo throughout, deliberately: unlike k3s's own kubeconfig access
+// (fixable by handing out group-readable access instead, see
+// BootstrapK3s), creating a system user/group, writing udev rules, and
+// chowning host directories are inherently root-only operations with no
+// non-root alternative -- confirmed live, this failed outright
+// ("groupadd: Permission denied") without it, running as a real non-root
+// --ssh user the same way BootstrapK3s's own kubeconfig calls used to.
+// Relies on passwordless sudo being available, same assumption
+// BootstrapK3s's own k3s install already makes (its install script
+// self-elevates via sudo internally) -- this only makes sense to run on
+// the actual node volume-manager's DaemonSet will land on, which `Run()`
 // only calls this from when that's true (locally with --bootstrap-k3s,
-// or via RunRemoteInstall, which re-execs this same command on the
-// remote host directly).
+// or via RunNodeSetup on a --ssh target).
 func EnsureVolumeManagerUser(ctx context.Context, blobImagePath, blobMountPath string) (uid, gid int, err error) {
 	if err := ensureGroup(ctx, volumeGroupName); err != nil {
 		return 0, 0, err
@@ -68,16 +75,18 @@ func ensureGroup(ctx context.Context, name string) error {
 	if err := exec.CommandContext(ctx, "getent", "group", name).Run(); err == nil {
 		return nil // already exists
 	}
-	return run(ctx, "groupadd", "--system", name)
+	return run(ctx, "sudo", "groupadd", "--system", name)
 }
 
 func ensureUser(ctx context.Context, name, group string) error {
 	if err := exec.CommandContext(ctx, "id", "-u", name).Run(); err == nil {
 		return nil // already exists
 	}
-	return run(ctx, "useradd", "--system", "--gid", group, "--no-create-home", "--shell", "/usr/sbin/nologin", name)
+	return run(ctx, "sudo", "useradd", "--system", "--gid", group, "--no-create-home", "--shell", "/usr/sbin/nologin", name)
 }
 
+// resolveID doesn't need sudo -- `id` just reads /etc/passwd, no
+// privilege required to look up another user's numeric ID.
 func resolveID(ctx context.Context, args ...string) (int, error) {
 	out, err := exec.CommandContext(ctx, "id", args...).Output()
 	if err != nil {
@@ -99,22 +108,32 @@ func ensureLoopDeviceUdevRule(ctx context.Context, group string) error {
 		"SUBSYSTEM==\"block\", KERNEL==\"loop[0-9]*\", GROUP=\"%s\", MODE=\"0660\"\nKERNEL==\"loop-control\", GROUP=\"%s\", MODE=\"0660\"\n",
 		group, group,
 	)
+	// A plain read, not sudo -- /etc/udev/rules.d/*.rules files are
+	// world-readable by convention (0644), only writing needs root.
 	existing, _ := os.ReadFile(udevRulesPath)
 	if string(existing) == rule {
 		return nil // already correct, nothing to reload
 	}
-	if err := os.WriteFile(udevRulesPath, []byte(rule), 0o644); err != nil {
-		return fmt.Errorf("failed to write %s: %w", udevRulesPath, err)
+
+	// `sudo tee` rather than os.WriteFile: sudo only elevates the
+	// subprocess it spawns, not this Go process's own direct syscalls,
+	// so writing a root-owned path needs to go through a privileged
+	// subprocess, not os.WriteFile itself.
+	write := exec.CommandContext(ctx, "sudo", "tee", udevRulesPath)
+	write.Stdin = strings.NewReader(rule)
+	if out, err := write.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to write %s: %w: %s", udevRulesPath, err, strings.TrimSpace(string(out)))
 	}
-	if err := run(ctx, "udevadm", "control", "--reload-rules"); err != nil {
+
+	if err := run(ctx, "sudo", "udevadm", "control", "--reload-rules"); err != nil {
 		return err
 	}
-	return run(ctx, "udevadm", "trigger", "--subsystem-match=block")
+	return run(ctx, "sudo", "udevadm", "trigger", "--subsystem-match=block")
 }
 
 func ensureOwnedDir(ctx context.Context, dir, user, group string) error {
-	if err := os.MkdirAll(dir, 0o750); err != nil {
+	if err := run(ctx, "sudo", "mkdir", "-p", dir); err != nil {
 		return fmt.Errorf("failed to create %s: %w", dir, err)
 	}
-	return run(ctx, "chown", fmt.Sprintf("%s:%s", user, group), dir)
+	return run(ctx, "sudo", "chown", fmt.Sprintf("%s:%s", user, group), dir)
 }
