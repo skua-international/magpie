@@ -45,33 +45,32 @@ jobs:
     needs: pick-runner
     runs-on: ${{ fromJSON(needs.pick-runner.outputs.labels) }}
     # No `container:` here -- tried that first (rust:bookworm, matching
-    # the Debian 12/glibc 2.36 runtime images), but it broke on elephant
-    # specifically: elephant's runner mounts the *host's* Docker socket
-    # (Docker-outside-of-Docker), and a `container:` job needs the runner
-    # to bind-mount its own /actions-runner/externals (Node.js binaries
-    # for running JS-based actions like checkout) into the spun-up job
-    # container -- but that bind-mount source path only exists inside the
-    # runner's own container filesystem, not on the actual host elephant's
-    # dockerd sees. Confirmed live: checkout inside the container failed
-    # with "/__e/node24/bin/node: no such file or directory" even with a
-    # guaranteed-fresh runner image (real node24 binaries confirmed
-    # present in the image, just not reachable through that mount from
-    # the host's perspective). This isn't fixable by a fresher image or
-    # runner version -- it's structural to socket-mounted DooD.
+    # the runtime images' Debian base at the time), but it broke on
+    # elephant specifically: elephant's runner mounts the *host's* Docker
+    # socket (Docker-outside-of-Docker), and a `container:` job needs the
+    # runner to bind-mount its own /actions-runner/externals (Node.js
+    # binaries for running JS-based actions like checkout) into the
+    # spun-up job container -- but that bind-mount source path only
+    # exists inside the runner's own container filesystem, not on the
+    # actual host elephant's dockerd sees. Confirmed live: checkout
+    # inside the container failed with "/__e/node24/bin/node: no such
+    # file or directory" even with a guaranteed-fresh runner image (real
+    # node24 binaries confirmed present in the image, just not reachable
+    # through that mount from the host's perspective). Not fixable by a
+    # fresher image or runner version -- structural to socket-mounted
+    # DooD.
     #
-    # Building natively on the bare runner instead works out because
-    # elephant's runner happens to be Ubuntu 20.04 (glibc 2.31) --
-    # *older* than bookworm's glibc 2.36, so a binary built there runs
-    # fine on bookworm (glibc is backward-compatible: older-linked runs
-    # on newer, not the other way around -- confirmed live, this is
-    # exactly backwards from the original problem, where a too-new local
-    # sandbox glibc broke the same binaries). This does NOT hold if this
-    # job ever falls back to ubuntu-latest (24.04, glibc 2.39 -- newer
-    # than bookworm, the original problem) -- pick-runner only falls back
-    # when elephant is fully offline, a real but lower-probability case
-    # this doesn't currently handle. Revisit (e.g. a musl target, which
-    # sidesteps glibc-matching entirely) if that fallback path actually
-    # gets exercised.
+    # Building natively on the bare runner instead works out glibc-wise:
+    # elephant's runner is Ubuntu 20.04 (glibc 2.31), and every runtime
+    # image here is now Debian 13/trixie (glibc 2.41) -- both this and
+    # the ubuntu-latest fallback (24.04, glibc 2.39) are older than
+    # trixie, so a binary built on either runs fine on trixie (glibc is
+    # backward-compatible: older-linked runs on newer, not the reverse).
+    # This is what moving the runtime images from bookworm to trixie
+    # actually fixed -- bookworm's glibc 2.36 was *older* than
+    # ubuntu-latest's 2.39, so a build that fell back to ubuntu-latest
+    # would've produced a too-new binary for it, the original problem all
+    # over again for that one fallback path.
     steps:
       - uses: actions/checkout@v7
 

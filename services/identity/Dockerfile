@@ -8,7 +8,7 @@
 # the cluster's only signing key and every OAuth2 client secret -- keeping
 # its runtime surface minimal matters more here than almost anywhere else
 # in the stack.
-FROM gcr.io/distroless/cc-debian12:nonroot
+FROM gcr.io/distroless/cc-debian13:nonroot
 
 ENV LISTEN_ADDR=0.0.0.0:8445
 

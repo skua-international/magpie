@@ -5,7 +5,7 @@
 #
 # Pure Rust binary, no subprocess/shell use -- distroless: no shell, no
 # package manager, nothing beyond libc and CA certs.
-FROM gcr.io/distroless/cc-debian12:nonroot
+FROM gcr.io/distroless/cc-debian13:nonroot
 
 ENV LISTEN_ADDR=0.0.0.0:8444
 ENV LOCAL_CONTENT_ROOT=/local-content

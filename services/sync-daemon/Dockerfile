@@ -2,7 +2,7 @@
 # See services/launcher/Dockerfile's own copy of this comment: compilation
 # happens once, natively, in build-images.yml's build-workspace job, not
 # in Docker -- this Dockerfile only packages the already-built binary.
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 # Needs a real userland, not distroless: steam_sync::claim shells out to
 # `cp --reflink=always` (see crates/steam-sync/src/claim.rs) rather than

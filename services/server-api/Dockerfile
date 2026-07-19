@@ -9,7 +9,7 @@
 # directly, so it also carries the least Kubernetes RBAC of anything in
 # the stack (ArmaServer read/write only, no Deployment access) -- see
 # charts/magpie's RBAC templates.
-FROM gcr.io/distroless/cc-debian12:nonroot
+FROM gcr.io/distroless/cc-debian13:nonroot
 
 ENV NAMESPACE=default
 ENV LISTEN_ADDR=0.0.0.0:8443

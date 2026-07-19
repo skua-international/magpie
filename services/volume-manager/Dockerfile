@@ -11,7 +11,7 @@
 # stack with that toolset installed matters as much as the privileged
 # securityContext itself -- every other service's image genuinely cannot
 # run these commands even if somehow granted the capability to.
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends --no-install-suggests \

@@ -9,7 +9,7 @@
 # service's planner stage a stale recipe.json from a different commit.
 # Splitting "compile" from "package" into separate jobs removes both
 # failure classes outright instead of patching around them.
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 LABEL maintainer="Brett - github.com/brettmayson"
 LABEL org.opencontainers.image.source=https://github.com/brettmayson/arma3server

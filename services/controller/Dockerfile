@@ -6,7 +6,7 @@
 # Pure Rust binary, no subprocess/shell use at all (unlike sync-daemon,
 # which shells out to `cp` for reflink claims) -- distroless gets this one
 # no shell, no package manager, nothing beyond libc and CA certs.
-FROM gcr.io/distroless/cc-debian12:nonroot
+FROM gcr.io/distroless/cc-debian13:nonroot
 
 ENV NAMESPACE=default
 ENV LAUNCHER_IMAGE=arma3-launcher:latest
