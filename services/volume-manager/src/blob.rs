@@ -5,6 +5,26 @@
 //! raw ioctls directly -- same convention crates/steam-sync's own claim()
 //! already established for `cp --reflink=always` (see its doc comment).
 //!
+//! `mount_path` is a *host* path, not a container-local one: every
+//! command that has to see or affect the actual mount (mount, findmnt,
+//! `btrfs filesystem resize`, df, and the mkdir that precedes the first
+//! mount) runs via `nsenter --target 1 --mount` into PID 1's mount
+//! namespace -- i.e. the host's -- rather than the container's own. This
+//! is what lets the DaemonSet run without `privileged: true`: Kubernetes
+//! hard-requires that flag for `mountPropagation: Bidirectional` (no
+//! capability grant substitutes for it, confirmed against a real
+//! cluster), and Bidirectional was only ever needed to leak a mount made
+//! *inside* this container's own namespace back out to the host. Doing
+//! the mount directly in the host's namespace to begin with sidesteps
+//! that requirement entirely -- the same technique node-level CSI
+//! plugins use for exactly this class of problem. Needs `hostPID: true`
+//! (see the chart's DaemonSet) so PID 1 here really is the host's init,
+//! not some other pid namespace's. `truncate`/`losetup`/`mkfs.btrfs`
+//! don't need this: regular files and loop devices aren't scoped to a
+//! mount namespace, so they're already visible identically from inside
+//! the container via the ordinary (non-propagating) blob-image-dir
+//! hostPath mount.
+//!
 //! All mutating operations go through `ensure_capacity`, which holds an
 //! internal lock for its whole duration -- GrowVolume calls never race
 //! each other, even under concurrent RPCs.
@@ -87,8 +107,7 @@ impl BlobManager {
 
     async fn is_mounted(&self) -> Result<bool> {
         let mount_str = self.mount_path.to_string_lossy();
-        let out = Command::new("findmnt")
-            .args(["--noheadings", "--target", &mount_str])
+        let out = host_command("findmnt", &["--noheadings", "--target", &mount_str])
             .output()
             .await
             .context("failed to run findmnt")?;
@@ -127,10 +146,8 @@ impl BlobManager {
             run("mkfs.btrfs", &["-f", &loop_dev]).await?;
         }
 
-        tokio::fs::create_dir_all(&self.mount_path)
-            .await
-            .with_context(|| format!("failed to create {}", self.mount_path.display()))?;
-        run("mount", &[&loop_dev, &path_str(&self.mount_path)]).await?;
+        run_host("mkdir", &["-p", &path_str(&self.mount_path)]).await?;
+        run_host("mount", &[&loop_dev, &path_str(&self.mount_path)]).await?;
 
         Ok(())
     }
@@ -148,7 +165,7 @@ impl BlobManager {
         let loop_dev = self.attach_loop_device().await?;
         // Tells the kernel to re-read the backing file's now-larger size.
         run("losetup", &["-c", &loop_dev]).await?;
-        run(
+        run_host(
             "btrfs",
             &["filesystem", "resize", "max", &path_str(&self.mount_path)],
         )
@@ -189,15 +206,17 @@ impl BlobManager {
     /// binding statvfs(2) directly, same reasoning as everything else in
     /// this file.
     async fn statvfs(&self) -> Result<(u64, u64)> {
-        let out = Command::new("df")
-            .args([
+        let out = host_command(
+            "df",
+            &[
                 "--output=size,avail",
                 "--block-size=1",
                 &path_str(&self.mount_path),
-            ])
-            .output()
-            .await
-            .context("failed to run df")?;
+            ],
+        )
+        .output()
+        .await
+        .context("failed to run df")?;
         if !out.status.success() {
             bail!(
                 "df {} failed: {}",
@@ -236,6 +255,35 @@ async fn run(cmd: &str, args: &[&str]) -> Result<()> {
     if !out.status.success() {
         bail!(
             "{cmd} {} failed: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+    Ok(())
+}
+
+/// Builds a `cmd` invocation that actually runs inside PID 1's mount
+/// namespace (see this module's doc) instead of this container's own --
+/// requires `hostPID: true`. Returns the unspawned `Command` so callers
+/// that need raw `.output()` (to inspect stdout, e.g. `findmnt`/`df`) can
+/// still do so directly, same as the plain `Command::new` calls
+/// elsewhere in this file.
+fn host_command(cmd: &str, args: &[&str]) -> Command {
+    let mut nsenter = Command::new("nsenter");
+    nsenter
+        .args(["--target", "1", "--mount", "--", cmd])
+        .args(args);
+    nsenter
+}
+
+async fn run_host(cmd: &str, args: &[&str]) -> Result<()> {
+    let out = host_command(cmd, args)
+        .output()
+        .await
+        .with_context(|| format!("failed to run {cmd} (host mount ns)"))?;
+    if !out.status.success() {
+        bail!(
+            "{cmd} {} failed (host mount ns): {}",
             args.join(" "),
             String::from_utf8_lossy(&out.stderr)
         );

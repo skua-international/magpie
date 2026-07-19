@@ -15,6 +15,18 @@
 # whose only host-side access is what the install-time provisioning
 # explicitly grants (the blob paths below, and the loop control/device
 # nodes via a dedicated udev rule).
+#
+# hostPID: true is the other half of staying unprivileged -- Kubernetes
+# hard-requires privileged: true for mountPropagation: Bidirectional (no
+# capability grant substitutes, confirmed against a real cluster), which
+# this used to rely on to leak its own mount out to the host. Instead,
+# src/blob.rs runs mount/findmnt/btrfs-resize/df directly inside PID 1's
+# mount namespace via `nsenter --target 1 --mount` -- hostPID is what
+# makes PID 1 here actually be the host's init rather than some other pid
+# namespace's. There's therefore no blob-mount volume/mount in this pod
+# spec at all any more: every command that touches the mount goes
+# straight at the real host path (hostPaths.blobMountPath), never a
+# container-local view of it.
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -35,6 +47,7 @@ spec:
         {{- include "magpie.labels" . | nindent 8 }}
         app.kubernetes.io/component: volume-manager
     spec:
+      hostPID: true
       {{- include "magpie.imagePullSecrets" . | nindent 6 }}
       containers:
         - name: volume-manager
@@ -55,8 +68,12 @@ spec:
               value: "0.0.0.0:8446"
             - name: BLOB_IMAGE_PATH
               value: "/blob/{{ base .Values.hostPaths.blobImage }}"
+            # A real host path, not a container-local one -- src/blob.rs
+            # runs every command that touches it via nsenter into PID 1's
+            # (the host's, thanks to hostPID above) mount namespace. See
+            # this file's own header comment.
             - name: BLOB_MOUNT_PATH
-              value: /mnt/blob
+              value: {{ .Values.hostPaths.blobMountPath | quote }}
             - name: INITIAL_SIZE_BYTES
               value: {{ mul .Values.volumeManager.initialSizeGiB 1073741824 | quote }}
             - name: AUTH_TOKEN
@@ -65,20 +82,12 @@ spec:
                   name: volume-manager-token
                   key: token
           volumeMounts:
+            # Just the backing image file -- ordinary files aren't scoped
+            # to a mount namespace, so this needs no propagation setting.
+            # The mount itself (BLOB_MOUNT_PATH) is never bind-mounted
+            # into this container at all -- see this file's own header.
             - name: blob-image-dir
               mountPath: /blob
-            - name: blob-mount
-              mountPath: /mnt/blob
-              # Bidirectional: the mount this container performs *inside*
-              # /mnt/blob propagates out to the host's own mount namespace
-              # at hostPaths.blobMountPath -- that's what lets
-              # sync-daemon's own (unprivileged, ordinary) hostPath mount
-              # of the same host path see the loop-mounted btrfs content,
-              # without sync-daemon needing any special propagation or
-              # privilege itself. Requires the capability grant above;
-              # this alone is why volume-manager can't be fully
-              # unprivileged the way every other service in this chart is.
-              mountPropagation: Bidirectional
           readinessProbe:
             httpGet:
               path: /healthz
@@ -92,10 +101,6 @@ spec:
         - name: blob-image-dir
           hostPath:
             path: {{ dir .Values.hostPaths.blobImage }}
-            type: Directory
-        - name: blob-mount
-          hostPath:
-            path: {{ .Values.hostPaths.blobMountPath }}
             type: Directory
 ---
 apiVersion: v1

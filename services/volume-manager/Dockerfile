@@ -4,13 +4,15 @@
 # in Docker -- this Dockerfile only packages the already-built binary.
 #
 # Unlike every other service's Dockerfile, this one isn't distroless/slim
-# -- it shells out to truncate/losetup/mkfs.btrfs/btrfs/mount/findmnt/df
-# at runtime (see src/blob.rs), all of which need real host block-device
-# privilege (securityContext.privileged: true in the chart's DaemonSet)
-# to do anything useful at all. Keeping this the *only* image in the
-# stack with that toolset installed matters as much as the privileged
-# securityContext itself -- every other service's image genuinely cannot
-# run these commands even if somehow granted the capability to.
+# -- it shells out to truncate/losetup/mkfs.btrfs/btrfs/mount/findmnt/df/
+# nsenter at runtime (see src/blob.rs), which need CAP_SYS_ADMIN and
+# hostPID: true (not privileged: true -- see the chart's DaemonSet and
+# blob.rs's own doc for why that's no longer required) to do anything
+# useful at all. Keeping this the *only* image in the stack with that
+# toolset installed matters as much as the capability grant itself --
+# every other service's image genuinely cannot run these commands even
+# if somehow granted the same privilege. nsenter itself ships as part of
+# util-linux, already installed below.
 FROM debian:trixie-slim
 
 RUN apt-get update \

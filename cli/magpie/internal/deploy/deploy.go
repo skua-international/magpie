@@ -274,6 +274,22 @@ func Run(ctx context.Context, opts Options) error {
 		// templates/namespace.yaml, properly Helm-owned), then a second
 		// pass below creates secrets into it and actually waits for a
 		// healthy rollout, once pods have what they need to start.
+		//
+		// --create-namespace is required here too, confirmed live against
+		// a genuinely fresh cluster: Helm creates its own release-tracking
+		// Secret in the target namespace as an internal bookkeeping step
+		// *before* it ever applies the chart's own templates (including
+		// templates/namespace.yaml) -- "Error: create: failed to create:
+		// namespaces \"magpie\" not found", not a transient/eventual-
+		// consistency race (retrying the same command against the same
+		// cluster ten minutes later reproduced it identically). This does
+		// *not* reintroduce the earlier "invalid ownership metadata"
+		// conflict -- that was specifically from a namespace pre-created
+		// via plain kubectl, which carries none of Helm's own ownership
+		// annotations; --create-namespace sets meta.helm.sh/release-name
+		// and release-namespace itself (confirmed live), so the chart's
+		// own namespace.yaml adopts it cleanly on the same install.
+		helmArgs = append(helmArgs, "--create-namespace")
 		// Phase 1 still has to satisfy the chart's own `required` guard on
 		// postgres.existingSecret whenever postgres.enabled is true (its
 		// default) -- the secret itself doesn't exist yet (that's phase 2),
