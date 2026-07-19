@@ -35,6 +35,16 @@ type Options struct {
 	Install       bool
 	DryRun        bool
 	ExtraHelmArgs []string
+
+	// Only meaningful with Install -- see BootstrapK3s/EnsureInstallSecrets
+	// for what each actually does.
+	BootstrapK3s        bool
+	DataDir             string
+	ExternalPostgresURL string
+	GHCRUser            string
+	GHCRToken           string
+	IdentityBaseURL     string
+	IngressBaseDomain   string
 }
 
 // CheckTools verifies helm and kubectl are on PATH, printing an
@@ -188,6 +198,15 @@ func ghToken() (string, error) {
 // --install if requested) -- streaming helm/kubectl's own output
 // straight through, same as running them by hand would.
 func Run(ctx context.Context, opts Options) error {
+	if opts.BootstrapK3s {
+		if !opts.Install {
+			return fmt.Errorf("--bootstrap-k3s only makes sense with --install (or via `magpiectl install`)")
+		}
+		if err := BootstrapK3s(ctx, opts.DataDir); err != nil {
+			return err
+		}
+	}
+
 	if err := CheckTools(); err != nil {
 		return err
 	}
@@ -230,8 +249,25 @@ func Run(ctx context.Context, opts Options) error {
 		}
 		helmArgs = append(helmArgs, "-f", valuesFile)
 	} else {
-		fmt.Println("==> --install: no prior release, only using --set/-f values passed after --")
+		fmt.Println("==> --install: no prior release, resolving secrets + values")
 		helmArgs = append(helmArgs, "--create-namespace")
+
+		secretArgs, err := EnsureInstallSecrets(ctx, opts.ExternalPostgresURL, opts.GHCRUser, opts.GHCRToken)
+		if err != nil {
+			return err
+		}
+		opts.ExtraHelmArgs = append(opts.ExtraHelmArgs, secretArgs...)
+
+		if opts.IngressBaseDomain != "" {
+			opts.ExtraHelmArgs = append(opts.ExtraHelmArgs, "--set", "ingress.baseDomain="+opts.IngressBaseDomain)
+		}
+		identityBaseURL := opts.IdentityBaseURL
+		if identityBaseURL == "" && opts.IngressBaseDomain != "" {
+			identityBaseURL = "http://identity." + opts.IngressBaseDomain
+		}
+		if identityBaseURL != "" {
+			opts.ExtraHelmArgs = append(opts.ExtraHelmArgs, "--set", "identity.baseUrl="+identityBaseURL)
+		}
 	}
 
 	if opts.ImageTag != "" {

@@ -253,12 +253,23 @@ fi
 # install with COPY_KUBECONFIG=false).
 DEPLOY_SET_ARGS=()
 
+# Must match the chart's own values.yaml `namespace` default -- every
+# resource it creates lands here regardless of what namespace `helm
+# install` itself was invoked with (see _helpers.tpl's magpie.namespace),
+# so secrets created ahead of the chart need to target this same fixed
+# name explicitly, not whatever the kubeconfig's current context defaults
+# to.
+CHART_NAMESPACE="magpie"
+
 if [[ -n "$KUBECONFIG_PATH" ]]; then
     kctl() { KUBECONFIG="$KUBECONFIG_PATH" kubectl "$@"; }
 
+    log "ensuring namespace $CHART_NAMESPACE exists..."
+    kctl create namespace "$CHART_NAMESPACE" --dry-run=client -o yaml | kctl apply -f - >/dev/null
+
     if [[ -z "$EXTERNAL_POSTGRES_URL" ]]; then
         log "creating arma-postgres-creds (random password)..."
-        kctl create secret generic arma-postgres-creds \
+        kctl create secret generic arma-postgres-creds -n "$CHART_NAMESPACE" \
             --from-literal=POSTGRES_PASSWORD="$(openssl rand -base64 24)" \
             --dry-run=client -o yaml | kctl apply -f - >/dev/null
         DEPLOY_SET_ARGS+=(--set postgres.existingSecret=arma-postgres-creds)
@@ -270,7 +281,7 @@ if [[ -n "$KUBECONFIG_PATH" ]]; then
 
     if [[ -n "$GHCR_USER" && -n "$GHCR_TOKEN" ]]; then
         log "creating ghcr-pull-secret..."
-        kctl create secret docker-registry ghcr-pull-secret \
+        kctl create secret docker-registry ghcr-pull-secret -n "$CHART_NAMESPACE" \
             --docker-server=ghcr.io --docker-username="$GHCR_USER" --docker-password="$GHCR_TOKEN" \
             --dry-run=client -o yaml | kctl apply -f - >/dev/null
         DEPLOY_SET_ARGS+=(--set "imagePullSecrets={ghcr-pull-secret}")
