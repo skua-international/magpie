@@ -31,6 +31,42 @@ use uuid::Uuid;
 use super::admin::AdminServiceImpl;
 use super::mod_source::to_mod_source_info;
 
+/// The join key used for both `id_to_reference` (export) and
+/// `reference_to_new_id` (import) -- almost always just `reference`
+/// itself, except every PRESET source registered from inline HTML
+/// content shares the literal, non-unique string "(uploaded HTML)" (see
+/// `reference_for` in mod_source.rs), which would collide across
+/// distinct sources. Folding in `resolved_mod_ids` (sorted/deduped, so
+/// the same mod set always produces the same key) disambiguates those
+/// without needing the original HTML markup at all -- a preset's real
+/// identity is the mod set it resolves to, not its wrapper HTML.
+fn match_key(kind: ProtoKind, reference: &str, resolved_mod_ids: &[u64]) -> String {
+    if kind == ProtoKind::Preset && reference == "(uploaded HTML)" {
+        let mut ids = resolved_mod_ids.to_vec();
+        ids.sort_unstable();
+        ids.dedup();
+        let ids = ids.iter().map(u64::to_string).collect::<Vec<_>>().join(",");
+        format!("(uploaded HTML: {ids})")
+    } else {
+        reference.to_string()
+    }
+}
+
+/// Synthesizes minimal HTML content containing one `filedetails/?id=`
+/// link per mod ID -- workshop_parse::parse_preset_html only ever scans
+/// raw text for that pattern (see its own doc), so this parses back to
+/// exactly `mod_ids` regardless of the fact that it isn't the original
+/// markup.
+fn synthetic_preset_html(mod_ids: &[u64]) -> String {
+    mod_ids
+        .iter()
+        .map(|id| {
+            format!("<a href=\"https://steamcommunity.com/sharedfiles/filedetails/?id={id}\"></a>")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 impl AdminServiceImpl {
     fn mod_source_api(&self) -> Api<ModSource> {
         Api::namespaced(self.client.clone(), &self.namespace)
@@ -51,18 +87,34 @@ impl AdminServiceImpl {
             .await
             .map_err(|e| ConnectError::internal(format!("failed to list mod sources: {e:#}")))?;
 
-        // id (the ModSource object's own name) -> its human reference,
-        // so servers below can be exported by reference instead of an ID
-        // that means nothing on a different cluster.
-        let mut id_to_reference = HashMap::new();
+        // id (the ModSource object's own name) -> its match_key, so
+        // servers below can be exported by that instead of an ID that
+        // means nothing on a different cluster. Not the same as
+        // ExportedModSource.reference itself -- see match_key's own doc
+        // for why those need to differ for PRESET-from-HTML-content.
+        let mut id_to_key = HashMap::new();
         let mut exported_mod_sources = Vec::new();
         for obj in &mod_sources.items {
             let info = to_mod_source_info(obj);
-            id_to_reference.insert(info.id.clone(), info.reference.clone());
+            let kind = info.kind.as_known().unwrap_or(ProtoKind::Unspecified);
+            // Only actually needed for the PRESET/"(uploaded HTML)" case
+            // (see ExportedModSource.resolved_mod_ids's own doc) -- kept
+            // regardless of kind since it costs nothing and status is
+            // already in hand.
+            let resolved_mod_ids = obj
+                .status
+                .as_ref()
+                .map(|s| s.resolved_mod_ids.clone())
+                .unwrap_or_default();
+            id_to_key.insert(
+                info.id.clone(),
+                match_key(kind, &info.reference, &resolved_mod_ids),
+            );
             exported_mod_sources.push(ExportedModSource {
                 kind: info.kind,
                 reference: info.reference,
                 display_name: info.display_name,
+                resolved_mod_ids,
                 ..Default::default()
             });
         }
@@ -81,8 +133,8 @@ impl AdminServiceImpl {
             let name = obj.name_any();
             let mut mod_source_references = Vec::new();
             for id in &obj.spec.mod_source_ids {
-                match id_to_reference.get(id) {
-                    Some(reference) => mod_source_references.push(reference.clone()),
+                match id_to_key.get(id) {
+                    Some(key) => mod_source_references.push(key.clone()),
                     None => warnings.push(format!(
                         "server {name}: mod source {id} no longer exists, dropped from export"
                     )),
@@ -147,11 +199,14 @@ impl AdminServiceImpl {
     ) -> Result<ImportStateResponse, ConnectError> {
         let mut warnings = Vec::new();
 
-        // reference -> the freshly-created ModSource's own new ID, so
+        // match_key -> the freshly-created ModSource's own new ID, so
         // servers below can remap mod_source_references onto it. Only
-        // MOD/COLLECTION (a Steam URL) and PRESET-from-URL are ever
-        // creatable here -- see ExportedModSource's own doc for why
-        // LOCAL and PRESET-from-inline-content never reach this map.
+        // LOCAL (a unique_id, whose actual zip content was never part of
+        // this export) and a PRESET that was never resolved before
+        // export (empty resolved_mod_ids, nothing to reconstruct from)
+        // never reach this map -- everything else, including inline-
+        // HTML-content presets, is reconstructible. See match_key's own
+        // doc for why the map key isn't just `source.reference` as-is.
         let mut reference_to_new_id = HashMap::new();
         for source in &req.mod_sources {
             let kind = source.kind.as_known().unwrap_or(ProtoKind::Unspecified);
@@ -162,6 +217,9 @@ impl AdminServiceImpl {
                 ProtoKind::Preset if source.reference != "(uploaded HTML)" => {
                     Some(ModSourceInput::HtmlUrl(source.reference.clone()))
                 }
+                ProtoKind::Preset if !source.resolved_mod_ids.is_empty() => Some(
+                    ModSourceInput::HtmlContent(synthetic_preset_html(&source.resolved_mod_ids)),
+                ),
                 _ => None,
             };
             let Some(input) = input else {
@@ -187,7 +245,8 @@ impl AdminServiceImpl {
                 .await
             {
                 Ok(_) => {
-                    reference_to_new_id.insert(source.reference.clone(), new_id);
+                    let key = match_key(kind, &source.reference, &source.resolved_mod_ids);
+                    reference_to_new_id.insert(key, new_id);
                 }
                 Err(e) => warnings.push(format!(
                     "mod source {}: failed to create: {e:#}",

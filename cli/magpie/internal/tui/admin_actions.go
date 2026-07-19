@@ -53,6 +53,14 @@ func (m Model) handleAdminKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	case "r":
 		m.status = ""
 		return m, m.refreshSteamAuthCmd(), true
+	case "x":
+		m.screen = screenAdminExportState
+		m.adminState = adminStateState{path: "magpie-state.json"}
+		return m, nil, true
+	case "m":
+		m.screen = screenAdminImportState
+		m.adminState = adminStateState{}
+		return m, nil, true
 	}
 	return m, nil, false
 }

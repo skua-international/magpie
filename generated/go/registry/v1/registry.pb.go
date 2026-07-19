@@ -1295,16 +1295,26 @@ type ExportedModSource struct {
 	Kind  ModSourceKind          `protobuf:"varint,1,opt,name=kind,proto3,enum=registry.v1.ModSourceKind" json:"kind,omitempty"`
 	// Reusable on import for MOD/COLLECTION (a Steam URL) and PRESET
 	// registered from a URL -- ImportState re-registers these directly
-	// against a fresh ModSource object. LOCAL (a unique_id, not a URL) and
-	// PRESET registered from inline HTML content (reference is literally
-	// "(uploaded HTML)" -- the content itself was never captured here) are
-	// *not* reusable: their actual mod content/HTML was never part of this
-	// export in the first place, so ImportState always skips them and
-	// reports why in ImportStateResponse.warnings.
-	Reference     string `protobuf:"bytes,2,opt,name=reference,proto3" json:"reference,omitempty"`
-	DisplayName   string `protobuf:"bytes,3,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// against a fresh ModSource object. Empty (well, literally
+	// "(uploaded HTML)") for PRESET registered from inline HTML content --
+	// see resolved_mod_ids below for how that case is still reconstructed.
+	Reference   string `protobuf:"bytes,2,opt,name=reference,proto3" json:"reference,omitempty"`
+	DisplayName string `protobuf:"bytes,3,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	// PRESET sources registered from inline HTML content (reference ==
+	// "(uploaded HTML)") have no URL to re-register from, but a preset is
+	// ultimately just a list of mod IDs either way -- workshop_parse scans
+	// raw text for `filedetails/?id=<n>` links regardless of markup, so
+	// this is exactly what it already extracted from the original content
+	// at resolve time (ModSourceStatus.resolved_mod_ids). ImportState
+	// synthesizes equivalent minimal HTML content from this list and
+	// registers *that*, rather than skipping -- reconstructs the same mod
+	// set even though the original markup itself was never captured.
+	// Empty (and thus still skipped, with a warning) only for a source
+	// that was never actually resolved before export, or for LOCAL, whose
+	// actual zip content was never part of this export at all.
+	ResolvedModIds []uint64 `protobuf:"varint,4,rep,packed,name=resolved_mod_ids,json=resolvedModIds,proto3" json:"resolved_mod_ids,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ExportedModSource) Reset() {
@@ -1356,6 +1366,13 @@ func (x *ExportedModSource) GetDisplayName() string {
 		return x.DisplayName
 	}
 	return ""
+}
+
+func (x *ExportedModSource) GetResolvedModIds() []uint64 {
+	if x != nil {
+		return x.ResolvedModIds
+	}
+	return nil
 }
 
 type ExportedConfigMap struct {
@@ -2080,11 +2097,12 @@ const file_registry_v1_registry_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x15\n" +
 	"\x13ListMissionsRequest\"L\n" +
 	"\x14ListMissionsResponse\x124\n" +
-	"\bmissions\x18\x01 \x03(\v2\x18.registry.v1.MissionInfoR\bmissions\"\x84\x01\n" +
+	"\bmissions\x18\x01 \x03(\v2\x18.registry.v1.MissionInfoR\bmissions\"\xae\x01\n" +
 	"\x11ExportedModSource\x12.\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x1a.registry.v1.ModSourceKindR\x04kind\x12\x1c\n" +
 	"\treference\x18\x02 \x01(\tR\treference\x12!\n" +
-	"\fdisplay_name\x18\x03 \x01(\tR\vdisplayName\"\x9e\x01\n" +
+	"\fdisplay_name\x18\x03 \x01(\tR\vdisplayName\x12(\n" +
+	"\x10resolved_mod_ids\x18\x04 \x03(\x04R\x0eresolvedModIds\"\x9e\x01\n" +
 	"\x11ExportedConfigMap\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12<\n" +
 	"\x04data\x18\x02 \x03(\v2(.registry.v1.ExportedConfigMap.DataEntryR\x04data\x1a7\n" +

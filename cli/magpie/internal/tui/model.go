@@ -31,6 +31,8 @@ const (
 	screenMissions
 	screenMissionsUpload
 	screenAdmin
+	screenAdminExportState
+	screenAdminImportState
 	screenAccount
 )
 
@@ -71,6 +73,7 @@ type Model struct {
 	confirm       confirmState
 	addMod        addModSourceState
 	uploadMission uploadMissionState
+	adminState    adminStateState
 	account       accountState
 }
 
@@ -215,6 +218,33 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.screen = screenMissions
 		return m, m.loadMissionsCmd()
 
+	case stateExportedMsg:
+		if msg.err != nil {
+			m.adminState.err = msg.err
+			return m, nil
+		}
+		m.screen, m.adminState = screenAdmin, adminStateState{}
+		m.status, m.statusErr = fmt.Sprintf(
+			"exported %d mod source(s), %d ConfigMap(s), %d server(s) to %s",
+			msg.modSources, msg.configMaps, msg.servers, msg.path,
+		), false
+		for _, w := range msg.warnings {
+			m.status += "\n  warning: " + w
+		}
+		return m, nil
+
+	case stateImportedMsg:
+		if msg.err != nil {
+			m.adminState.err = msg.err
+			return m, nil
+		}
+		m.screen, m.adminState = screenAdmin, adminStateState{}
+		m.status, m.statusErr = "import complete.", false
+		for _, w := range msg.warnings {
+			m.status += "\n  warning: " + w
+		}
+		return m, nil
+
 	case adminActionDoneMsg:
 		if msg.err != nil {
 			m.status, m.statusErr = msg.err.Error(), true
@@ -279,6 +309,16 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m.handleMissionsUploadKey(msg)
+
+	case screenAdminExportState, screenAdminImportState:
+		switch msg.String() {
+		case "ctrl+c":
+			return m, tea.Quit
+		case "esc":
+			m.screen, m.adminState = screenAdmin, adminStateState{}
+			return m, nil
+		}
+		return m.handleAdminStateKey(msg)
 
 	case screenAccount:
 		switch msg.String() {
@@ -496,7 +536,13 @@ func (m Model) View() tea.View {
 			b.WriteString(fmt.Sprintf("game files: %d bytes\n", m.diskUsage.GameFilesBytes))
 			b.WriteString(fmt.Sprintf("total:      %d bytes\n", m.diskUsage.TotalBytes))
 		}
-		b.WriteString("\n" + dimStyle.Render("e: edit baseline config, r: refresh Steam auth, esc to go back"))
+		b.WriteString("\n" + dimStyle.Render("e: edit baseline config, r: refresh Steam auth, x: export state, m: import state, esc to go back"))
+
+	case screenAdminExportState:
+		b.WriteString(m.viewAdminExportState())
+
+	case screenAdminImportState:
+		b.WriteString(m.viewAdminImportState())
 
 	case screenAccount:
 		b.WriteString(m.viewAccount())
