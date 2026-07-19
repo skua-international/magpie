@@ -74,7 +74,7 @@ jobs:
             cp "target/release/${bin}" "dist/${bin}"
           done
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: magpie-binaries
           path: dist/
