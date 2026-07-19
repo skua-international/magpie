@@ -9,7 +9,7 @@ steam-sync = { path = "../../crates/steam-sync" }
 protocol = { path = "../../crates/protocol" }
 crd = { path = "../../crates/crd" }
 connectrpc = { version = "0.8", features = ["axum"] }
-buffa = "0.8"
+buffa = "0.9"
 axum = "0.8"
 futures = "0.3.32"
 k8s-openapi = { version = "0.28.0", features = ["latest"] }
