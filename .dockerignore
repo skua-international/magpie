@@ -1,4 +1,35 @@
-.git
+# Deny-all, explicit includes only -- keeps every Docker build context to
+# exactly what's actually needed: Dockerfile.workspace (the Cargo
+# workspace: Cargo.toml/Cargo.lock, crates/, services/, proto/, since
+# crates/protocol's build.rs shells out to protoc against ../../proto/
+# relative paths) and every service's packaging Dockerfile (just dist/,
+# the binaries Dockerfile.workspace produces -- see services/*/Dockerfile,
+# none of them touch Rust source directly any more). Everything else in
+# this monorepo (cli/, charts/, deploy/, scripts/, configs/, generated/,
+# docs, .git, any local target/) was never part of either build to begin
+# with; excluding it by default means a new top-level directory doesn't
+# silently end up in the build context just because nobody thought to
+# deny it.
+*
+
+!Cargo.toml
+!Cargo.lock
+
+!crates
+!crates/**
+
+!services
+!services/**
+
+!proto
+!proto/**
+
+!dist
+!dist/**
+
+# Re-excluded even though the directories above are allowed -- local
+# build artifacts nobody wants uploaded as build context, matching what
+# the old deny-list .dockerignore already excluded explicitly.
 target
 crates/*/target
 services/*/target
