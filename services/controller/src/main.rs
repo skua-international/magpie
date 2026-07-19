@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use controller::config::Config;
+use controller::postgres_bootstrap::{self, AppPostgresConfig};
 use controller::reconcile;
 use kube::Client;
 use tracing::info;
@@ -28,6 +29,18 @@ async fn main() -> Result<()> {
 
     let client = Client::try_default().await?;
     info!("connected to Kubernetes API");
+
+    postgres_bootstrap::ensure_app_role(
+        &client,
+        &cfg.namespace,
+        AppPostgresConfig {
+            database_url: &cfg.database_url,
+            role: &cfg.app_postgres_role,
+            database: &cfg.app_postgres_database,
+            secret_name: &cfg.app_postgres_secret_name,
+        },
+    )
+    .await?;
 
     reconcile::spawn(client, cfg)?;
 

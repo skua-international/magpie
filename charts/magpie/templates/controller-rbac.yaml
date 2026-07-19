@@ -35,6 +35,15 @@ rules:
   - apiGroups: ["apps"]
     resources: ["deployments"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Read-only, scoped to just the one Secret the controller needs the
+  # plaintext password out of to run its Postgres GRANT/ALTER ROLE
+  # bootstrap (see postgres_bootstrap.rs) -- the chart itself creates the
+  # object (app-postgres-secret.yaml, same lookup+randAlphaNum idiom as
+  # volume-manager-token), so no create/patch verb is needed here at all.
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: [{{ .Values.postgres.appSecretName | quote }}]
+    verbs: ["get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

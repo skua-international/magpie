@@ -54,6 +54,23 @@ spec:
               value: /local-content
             - name: LOCAL_CONTENT_HOST_PATH
               value: {{ .Values.hostPaths.localContentPath | quote }}
+            # Admin-level Postgres connection -- used only to provision
+            # the technical role below on startup (see
+            # postgres_bootstrap.rs); the controller otherwise never
+            # touches this database itself.
+            {{- include "magpie.postgresEnv" . | nindent 12 }}
+            - name: APP_POSTGRES_ROLE
+              value: {{ .Values.postgres.appUser | quote }}
+            - name: APP_POSTGRES_SECRET_NAME
+              value: {{ .Values.postgres.appSecretName | quote }}
+            - name: APP_POSTGRES_DATABASE
+              value: {{ .Values.postgres.database | quote }}
+            # Passed straight through into every launcher Pod's own
+            # DATABASE_HOST/PORT env vars -- see ensure_deployment.
+            - name: APP_POSTGRES_HOST
+              value: {{ include "magpie.postgresHost" . | quote }}
+            - name: APP_POSTGRES_PORT
+              value: {{ .Values.postgres.port | quote }}
           {{- with .Values.controller.resources }}
           resources:
             {{- toYaml . | nindent 12 }}

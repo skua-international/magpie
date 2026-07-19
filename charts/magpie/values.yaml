@@ -169,6 +169,27 @@ postgres:
   # false. Full connection string, e.g.
   # postgres://user:pass@host:5432/dbname.
   externalUrl: ""
+  # Only used when enabled: false -- a discrete host, paired with the
+  # port/database fields above (also used by the chart-managed case).
+  # Needed alongside externalUrl (rather than parsing it apart) because
+  # the launcher's DATABASE_HOST/PORT/USER/PASSWORD/NAME env vars
+  # (consumed by whatever Arma-side extension the launcher process runs,
+  # see postgres_bootstrap.rs) need discrete values, not one connection
+  # URL.
+  host: ""
+  # Role name for the technical Postgres user launcher's Arma process
+  # itself connects as -- separate from postgres.user (magpie's own Rust
+  # services) so the two never share privileges. The controller
+  # provisions this role itself on startup (CREATE ROLE + GRANT CONNECT,
+  # CREATE ON DATABASE only, REVOKE ALL ON SCHEMA public) -- it never
+  # gets access to anything magpie's own services already own.
+  # Provisioned even when postgres.enabled is false, against whatever
+  # externalUrl points at.
+  appUser: arma_app
+  # See templates/app-postgres-secret.yaml -- created by the chart
+  # itself (stable across upgrades), read by the controller for the
+  # plaintext password it needs to run the SQL above.
+  appSecretName: arma-app-postgres-creds
   resources: {}
 
 syncDaemon:

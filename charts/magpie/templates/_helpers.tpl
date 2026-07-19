@@ -78,6 +78,20 @@ never appears in a template-rendered value). Called as:
 {{- end -}}
 
 {{/*
+Discrete Postgres host, for env vars that need HOST/PORT/USER/PASSWORD
+separately rather than one connection URL (see postgres.appUser/
+appSecretName and postgres_bootstrap.rs). Called as:
+  include "magpie.postgresHost" .
+*/}}
+{{- define "magpie.postgresHost" -}}
+{{- if .Values.postgres.enabled -}}
+{{- printf "%s-postgres" (include "magpie.fullname" .) -}}
+{{- else -}}
+{{- required "postgres.host is required when postgres.enabled is false" .Values.postgres.host -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 JWKS URL -- defaults to this chart's own services/identity, since that's
 the issuer this chart actually deploys; only overridden if jwt.jwksUrl is
 explicitly set to point at something else.

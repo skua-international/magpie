@@ -43,6 +43,24 @@ pub struct Config {
     /// launcher Pod spec itself, in Rust, bypassing those templates
     /// entirely, so it needs the same list wired in here too).
     pub image_pull_secrets: Vec<String>,
+    /// Admin-level connection to the cluster's shared Postgres -- used
+    /// only by `postgres_bootstrap` to provision `app_postgres_role` on
+    /// startup. Never touched by reconcile.rs itself.
+    pub database_url: String,
+    /// Role name for the technical Postgres user launcher's own Arma
+    /// process connects as (distinct from whatever role `database_url`
+    /// authenticates as). See `postgres_bootstrap`.
+    pub app_postgres_role: String,
+    /// Secret (chart-created, see app-postgres-secret.yaml) holding
+    /// `app_postgres_role`'s password under a `POSTGRES_PASSWORD` key --
+    /// read once on startup to provision the role, and referenced again
+    /// per-launcher-Pod as a `secretKeyRef` for `DATABASE_PASSWORD`.
+    pub app_postgres_secret_name: String,
+    pub app_postgres_database: String,
+    /// Passed straight through into every launcher Pod's own
+    /// `DATABASE_HOST`/`DATABASE_PORT` env vars.
+    pub app_postgres_host: String,
+    pub app_postgres_port: String,
 }
 
 impl Config {
@@ -72,6 +90,14 @@ impl Config {
                         .collect()
                 })
                 .unwrap_or_default(),
+            database_url: env::var("DATABASE_URL").unwrap_or_default(),
+            app_postgres_role: env::var("APP_POSTGRES_ROLE").unwrap_or_else(|_| "arma_app".into()),
+            app_postgres_secret_name: env::var("APP_POSTGRES_SECRET_NAME")
+                .unwrap_or_else(|_| "arma-app-postgres-creds".into()),
+            app_postgres_database: env::var("APP_POSTGRES_DATABASE")
+                .unwrap_or_else(|_| "arma".into()),
+            app_postgres_host: env::var("APP_POSTGRES_HOST").unwrap_or_default(),
+            app_postgres_port: env::var("APP_POSTGRES_PORT").unwrap_or_else(|_| "5432".into()),
         })
     }
 }

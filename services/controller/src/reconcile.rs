@@ -23,8 +23,8 @@ use crd::{ArmaServer, ArmaServerPhase, ArmaServerStatus, DesiredState, ModSource
 use futures::StreamExt;
 use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec};
 use k8s_openapi::api::core::v1::{
-    Container, EnvVar, HostPathVolumeSource, LocalObjectReference, PodSpec, PodTemplateSpec,
-    Volume, VolumeMount,
+    Container, EnvVar, EnvVarSource, HostPathVolumeSource, LocalObjectReference, PodSpec,
+    PodTemplateSpec, SecretKeySelector, Volume, VolumeMount,
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
 use kube::api::{Api, DeleteParams, Patch, PatchParams};
@@ -301,6 +301,42 @@ async fn ensure_deployment(
         EnvVar {
             name: "NETWORK_CONFIG".into(),
             value: Some(obj.spec.network_config.clone()),
+            ..Default::default()
+        },
+        // Consumed by whatever Postgres-backed extension the Arma server
+        // process itself loads (not anything this repo owns) -- role
+        // provisioned once on controller startup, see
+        // postgres_bootstrap.rs.
+        EnvVar {
+            name: "DATABASE_HOST".into(),
+            value: Some(ctx.cfg.app_postgres_host.clone()),
+            ..Default::default()
+        },
+        EnvVar {
+            name: "DATABASE_PORT".into(),
+            value: Some(ctx.cfg.app_postgres_port.clone()),
+            ..Default::default()
+        },
+        EnvVar {
+            name: "DATABASE_USER".into(),
+            value: Some(ctx.cfg.app_postgres_role.clone()),
+            ..Default::default()
+        },
+        EnvVar {
+            name: "DATABASE_NAME".into(),
+            value: Some(ctx.cfg.app_postgres_database.clone()),
+            ..Default::default()
+        },
+        EnvVar {
+            name: "DATABASE_PASSWORD".into(),
+            value_from: Some(EnvVarSource {
+                secret_key_ref: Some(SecretKeySelector {
+                    name: ctx.cfg.app_postgres_secret_name.clone(),
+                    key: "POSTGRES_PASSWORD".into(),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
             ..Default::default()
         },
     ];
