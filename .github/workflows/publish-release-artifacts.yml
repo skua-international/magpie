@@ -55,8 +55,32 @@ jobs:
           set -euo pipefail
           source_tag="${{ steps.source.outputs.sha }}"
           release_version="${{ steps.version.outputs.version }}"
+
+          # This tag push (and release.yml's --create-tag) can land before
+          # build-images.yml's own push of the sha-tagged source images
+          # finishes -- confirmed live: retag-images failed with "not
+          # found" ~2 minutes before build-images.yml actually pushed
+          # that commit's images. wait-and-release.sh exists to prevent
+          # this by construction, but nothing stops a release from being
+          # triggered without it, so make this job itself robust to the
+          # race instead of relying on whoever triggers a release to
+          # remember the right order.
+          wait_for_image() {
+            local ref="$1" elapsed=0 timeout=600
+            until docker buildx imagetools inspect "$ref" >/dev/null 2>&1; do
+              if [ "$elapsed" -ge "$timeout" ]; then
+                echo "timed out after ${timeout}s waiting for $ref to exist" >&2
+                return 1
+              fi
+              echo "  waiting for $ref to exist (${elapsed}/${timeout}s)..."
+              sleep 10
+              elapsed=$((elapsed + 10))
+            done
+          }
+
           for service in launcher sync-daemon controller registry server-api identity volume-manager; do
             image_ref="${IMAGE_BASE}/${service}"
+            wait_for_image "${image_ref}:${source_tag}"
             docker buildx imagetools create \
               --tag "${image_ref}:${release_version}" \
               --tag "${image_ref}:latest" \
