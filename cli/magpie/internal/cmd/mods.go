@@ -39,7 +39,7 @@ func modsListCmd() *cobra.Command {
 				return nil
 			}
 			for _, s := range sources {
-				fmt.Printf("%-38s kind=%-11s size=%-10s %s\n", s.Id, s.Kind.String(), humanBytes(s.SizeBytes), s.Reference)
+				fmt.Printf("%-38s kind=%-11s size=%-10s %s\n", s.Id, s.Kind.String(), actions.HumanBytes(s.SizeBytes), s.Reference)
 			}
 			return nil
 		},
@@ -146,7 +146,7 @@ func modsListSyncedCmd() *cobra.Command {
 				return nil
 			}
 			for _, m := range mods {
-				fmt.Printf("%-12d size=%-10s %s\n", m.ModId, humanBytes(m.SizeBytes), m.Title)
+				fmt.Printf("%-12d size=%-10s %s\n", m.ModId, actions.HumanBytes(m.SizeBytes), m.Title)
 			}
 			return nil
 		},
@@ -174,17 +174,4 @@ func modsInvalidateCmd() *cobra.Command {
 			return nil
 		},
 	}
-}
-
-func humanBytes(n uint64) string {
-	const unit = 1024
-	if n < unit {
-		return fmt.Sprintf("%dB", n)
-	}
-	div, exp := uint64(unit), 0
-	for n2 := n / unit; n2 >= unit; n2 /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f%ciB", float64(n)/float64(div), "KMGTPE"[exp])
 }

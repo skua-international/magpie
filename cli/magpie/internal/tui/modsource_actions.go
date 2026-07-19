@@ -9,14 +9,34 @@ import (
 	"github.com/skua-international/magpie/cli/internal/actions"
 )
 
-// addModSourceState is a one-field wizard (just a Steam Workshop URL) --
-// the CLI's `mods add` also supports --preset-url/--local-zip, but those
-// need either a browser export or a local file path with a separate
-// --local-id, awkward enough as a single text field that they're left to
-// the CLI for now rather than forcing them through one.
+// addModSourceKind picks which of AddModSourceSteamURL/HTMLURL/LocalZip
+// the wizard submits to -- mirrors `mods add`'s three mutually exclusive
+// flags (--steam-url/--preset-url/--local-zip+--local-id).
+type addModSourceKind int
+
+const (
+	addModSteam addModSourceKind = iota
+	addModPreset
+	addModLocalZip
+)
+
+var addModKindLabels = []string{"Steam Workshop URL", "Preset HTML export URL", "Local zip file"}
+
+type addModSourceStep int
+
+const (
+	addModStepKind    addModSourceStep = iota // pick which of the three
+	addModStepValue                           // URL, or local zip path
+	addModStepLocalID                         // only reached for addModLocalZip
+)
+
 type addModSourceState struct {
-	url string
-	err error
+	step       addModSourceStep
+	kind       addModSourceKind
+	kindCursor int
+	value      string // steam URL, preset URL, or local zip path depending on kind
+	localID    string
+	err        error
 }
 
 type modSourceActionDoneMsg struct {
@@ -25,9 +45,19 @@ type modSourceActionDoneMsg struct {
 	err  error
 }
 
-func (m Model) addModSourceCmd(steamURL string) tea.Cmd {
+func (m Model) addModSourceCmd() tea.Cmd {
+	kind, value, localID := m.addMod.kind, strings.TrimSpace(m.addMod.value), strings.TrimSpace(m.addMod.localID)
 	return func() tea.Msg {
-		id, err := actions.AddModSourceSteamURL(m.ctx, m.clients, steamURL)
+		var id string
+		var err error
+		switch kind {
+		case addModSteam:
+			id, err = actions.AddModSourceSteamURL(m.ctx, m.clients, value)
+		case addModPreset:
+			id, err = actions.AddModSourceHTMLURL(m.ctx, m.clients, value)
+		case addModLocalZip:
+			id, err = actions.AddModSourceLocalZip(m.ctx, m.clients, localID, value)
+		}
 		return modSourceActionDoneMsg{verb: "added", id: id, err: err}
 	}
 }
@@ -78,26 +108,59 @@ func (m Model) handleModSourcesKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	return m, nil, false
 }
 
-// handleModSourcesAddKey drives screenModSourcesAdd's single text field.
+// handleModSourcesAddKey drives screenModSourcesAdd's little kind-then-
+// value(-then-local-id) wizard.
 func (m Model) handleModSourcesAddKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "ctrl+c":
-		return m, tea.Quit
-	case "esc":
-		m.screen = screenModSources
-		return m, nil
-	case "enter":
-		url := strings.TrimSpace(m.addMod.url)
-		if url == "" {
-			return m, nil
+	switch m.addMod.step {
+	case addModStepKind:
+		switch msg.String() {
+		case "up", "k":
+			if m.addMod.kindCursor > 0 {
+				m.addMod.kindCursor--
+			}
+		case "down", "j":
+			if m.addMod.kindCursor < len(addModKindLabels)-1 {
+				m.addMod.kindCursor++
+			}
+		case "enter":
+			m.addMod.kind = addModSourceKind(m.addMod.kindCursor)
+			m.addMod.step = addModStepValue
 		}
-		m.status = ""
-		return m, m.addModSourceCmd(url)
-	case "backspace":
-		m.addMod.url = trimLastRune(m.addMod.url)
-	default:
-		if msg.Text != "" {
-			m.addMod.url += msg.Text
+
+	case addModStepValue:
+		switch msg.String() {
+		case "enter":
+			if strings.TrimSpace(m.addMod.value) == "" {
+				return m, nil
+			}
+			if m.addMod.kind == addModLocalZip {
+				m.addMod.step = addModStepLocalID
+				return m, nil
+			}
+			m.status = ""
+			return m, m.addModSourceCmd()
+		case "backspace":
+			m.addMod.value = trimLastRune(m.addMod.value)
+		default:
+			if msg.Text != "" {
+				m.addMod.value += msg.Text
+			}
+		}
+
+	case addModStepLocalID:
+		switch msg.String() {
+		case "enter":
+			if strings.TrimSpace(m.addMod.localID) == "" {
+				return m, nil
+			}
+			m.status = ""
+			return m, m.addModSourceCmd()
+		case "backspace":
+			m.addMod.localID = trimLastRune(m.addMod.localID)
+		default:
+			if msg.Text != "" {
+				m.addMod.localID += msg.Text
+			}
 		}
 	}
 	return m, nil
@@ -106,10 +169,32 @@ func (m Model) handleModSourcesAddKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) 
 func (m Model) viewModSourcesAdd() string {
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("Add Mod Source") + "\n\n")
-	fmt.Fprintf(&b, "steam workshop URL (mod or collection): %s%s\n", m.addMod.url, cursorSuffix(true))
+
+	if m.addMod.step == addModStepKind {
+		for i, label := range addModKindLabels {
+			b.WriteString(renderLine(label, i == m.addMod.kindCursor) + "\n")
+		}
+		b.WriteString("\n" + dimStyle.Render("enter to select, esc to cancel"))
+		return b.String()
+	}
+
+	fmt.Fprintf(&b, "kind: %s\n", addModKindLabels[m.addMod.kind])
+	valueLabel := "steam workshop URL (mod or collection)"
+	switch m.addMod.kind {
+	case addModPreset:
+		valueLabel = "preset HTML export URL"
+	case addModLocalZip:
+		valueLabel = "local path to .zip"
+	}
+	fmt.Fprintf(&b, "%s: %s%s\n", valueLabel, m.addMod.value, cursorSuffix(m.addMod.step == addModStepValue))
+
+	if m.addMod.step >= addModStepLocalID {
+		fmt.Fprintf(&b, "local ID (stable, unique to this mod): %s%s\n", m.addMod.localID, cursorSuffix(true))
+	}
+
 	if m.addMod.err != nil {
 		b.WriteString("\n" + errorStyle.Render(m.addMod.err.Error()) + "\n")
 	}
-	b.WriteString("\n" + dimStyle.Render("enter to add, esc to cancel"))
+	b.WriteString("\n" + dimStyle.Render("enter to continue, esc to cancel"))
 	return b.String()
 }

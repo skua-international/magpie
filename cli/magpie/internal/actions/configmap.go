@@ -7,6 +7,17 @@ import (
 	"strings"
 )
 
+// BaselineConfigMapName mirrors the chart's own naming
+// (magpie.fullname-arma-config-baseline, see charts/magpie/templates/
+// arma-config-baseline-configmap.yaml) -- fullname is just the Helm
+// release name in this chart, so this needs no live cluster lookup.
+// Shared by cmd/armaconfig.go (direct CLI) and the TUI's Admin screen
+// (see tui/admin_actions.go) so both compute the same name from the
+// same release string instead of duplicating the convention.
+func BaselineConfigMapName(release string) string {
+	return release + "-arma-config-baseline"
+}
+
 // EnsureConfigMapExists creates an empty ConfigMap if one by this name
 // doesn't already exist -- `kubectl edit` (unlike `kubectl apply`) fails
 // outright against a nonexistent object, and neither a fresh per-server

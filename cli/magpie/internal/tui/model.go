@@ -27,6 +27,7 @@ const (
 	screenServersCreate
 	screenModSources
 	screenModSourcesAdd
+	screenSyncedMods
 	screenMissions
 	screenMissionsUpload
 	screenAdmin
@@ -39,6 +40,7 @@ var menuItems = []struct {
 }{
 	{"Servers", screenServers},
 	{"Mod Sources", screenModSources},
+	{"Synced Mods", screenSyncedMods},
 	{"Missions", screenMissions},
 	{"Admin", screenAdmin},
 	{"Account", screenAccount},
@@ -48,6 +50,7 @@ type Model struct {
 	ctx         context.Context
 	clients     *client.Clients
 	namespace   string
+	release     string
 	identityURL string
 	accessToken string
 
@@ -60,6 +63,7 @@ type Model struct {
 
 	servers    []*controllerv1.ServerInfo
 	modSources []*registryv1.ModSourceInfo
+	syncedMods []*registryv1.SyncedMod
 	missions   []*registryv1.MissionInfo
 	diskUsage  *registryv1.GetDiskUsageResponse
 
@@ -70,16 +74,17 @@ type Model struct {
 	account       accountState
 }
 
-// New builds the TUI's top-level model. namespace is only used for the
-// "create server" flow's per-server ConfigMap kubectl calls (see
-// create_server.go) -- every RPC-backed screen gets its namespace from
-// server-api's own config instead, never from here. identityURL/
-// accessToken are only used by the Account screen's link flow (see
-// account.go) -- accessToken is a point-in-time snapshot, not refreshed
-// for the life of the TUI session.
-func New(ctx context.Context, clients *client.Clients, namespace, identityURL, accessToken string) Model {
+// New builds the TUI's top-level model. namespace/release are only used
+// for kubectl-based ConfigMap calls that bypass server-api entirely --
+// the "create server" flow's per-server override (create_server.go) and
+// the Admin screen's baseline edit (admin_actions.go) -- every RPC-backed
+// screen gets its namespace from server-api's own config instead, never
+// from here. identityURL/accessToken are only used by the Account
+// screen's link flow (see account.go) -- accessToken is a point-in-time
+// snapshot, not refreshed for the life of the TUI session.
+func New(ctx context.Context, clients *client.Clients, namespace, release, identityURL, accessToken string) Model {
 	return Model{
-		ctx: ctx, clients: clients, namespace: namespace,
+		ctx: ctx, clients: clients, namespace: namespace, release: release,
 		identityURL: identityURL, accessToken: accessToken,
 		screen: screenMenu, create: newCreateServerState(),
 	}
@@ -162,6 +167,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case diskUsageLoadedMsg:
 		m.loaded, m.err, m.diskUsage = true, msg.err, msg.usage
 		return m, nil
+	case syncedModsLoadedMsg:
+		m.loaded, m.err, m.syncedMods = true, msg.err, msg.mods
+		return m, nil
+
+	case invalidateModDoneMsg:
+		if msg.err != nil {
+			m.status, m.statusErr = msg.err.Error(), true
+			return m, nil
+		}
+		m.status, m.statusErr = fmt.Sprintf("%d invalidated", msg.modID), false
+		return m, m.loadSyncedModsCmd()
 
 	case serverActionDoneMsg:
 		if msg.err != nil {
@@ -198,6 +214,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.status, m.statusErr = fmt.Sprintf("%s %s", msg.name, msg.verb), false
 		m.screen = screenMissions
 		return m, m.loadMissionsCmd()
+
+	case adminActionDoneMsg:
+		if msg.err != nil {
+			m.status, m.statusErr = msg.err.Error(), true
+			return m, nil
+		}
+		m.status, m.statusErr = msg.verb, false
+		return m, nil
 
 	case accountLinkedMsg:
 		m.account.linking = false
@@ -300,6 +324,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if next, cmd, handled := m.handleMissionsKey(msg); handled {
 			return next, cmd
 		}
+	case screenAdmin:
+		if next, cmd, handled := m.handleAdminKey(msg); handled {
+			return next, cmd
+		}
+	case screenSyncedMods:
+		if next, cmd, handled := m.handleSyncedModsKey(msg); handled {
+			return next, cmd
+		}
 	}
 
 	if m.screen == screenMenu {
@@ -320,6 +352,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				return m, m.loadServersCmd()
 			case screenModSources:
 				return m, m.loadModSourcesCmd()
+			case screenSyncedMods:
+				return m, m.loadSyncedModsCmd()
 			case screenMissions:
 				return m, m.loadMissionsCmd()
 			case screenAdmin:
@@ -351,6 +385,8 @@ func (m Model) currentListLen() int {
 		return len(m.servers)
 	case screenModSources:
 		return len(m.modSources)
+	case screenSyncedMods:
+		return len(m.syncedMods)
 	case screenMissions:
 		return len(m.missions)
 	default:
@@ -426,6 +462,9 @@ func (m Model) View() tea.View {
 	case screenModSourcesAdd:
 		b.WriteString(m.viewModSourcesAdd())
 
+	case screenSyncedMods:
+		b.WriteString(m.viewSyncedMods())
+
 	case screenMissions:
 		b.WriteString(titleStyle.Render("Missions") + "\n\n")
 		if !m.loaded {
@@ -457,7 +496,7 @@ func (m Model) View() tea.View {
 			b.WriteString(fmt.Sprintf("game files: %d bytes\n", m.diskUsage.GameFilesBytes))
 			b.WriteString(fmt.Sprintf("total:      %d bytes\n", m.diskUsage.TotalBytes))
 		}
-		b.WriteString("\n" + dimStyle.Render("esc to go back"))
+		b.WriteString("\n" + dimStyle.Render("e: edit baseline config, r: refresh Steam auth, esc to go back"))
 
 	case screenAccount:
 		b.WriteString(m.viewAccount())

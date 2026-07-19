@@ -11,19 +11,11 @@ import (
 	"github.com/skua-international/magpie/cli/internal/actions"
 )
 
-// baselineConfigMapName mirrors the chart's own naming
-// (magpie.fullname-arma-config-baseline, see charts/magpie/templates/
-// arma-config-baseline-configmap.yaml) -- fullname is just the Helm
-// release name in this chart, so this needs no live cluster lookup.
-func baselineConfigMapName(release string) string {
-	return release + "-arma-config-baseline"
-}
-
 // editBaselineConfigMap runs actions.ConfigMapEditCmd (kubectl edit)
 // directly -- the plain CLI path, as opposed to the TUI's, which hands
 // the same *exec.Cmd to tea.ExecProcess instead (see tui/create_server.go).
 func editBaselineConfigMap(ctx context.Context, namespace, release string) error {
-	return editConfigMap(ctx, namespace, baselineConfigMapName(release))
+	return editConfigMap(ctx, namespace, actions.BaselineConfigMapName(release))
 }
 
 // editConfigMap wires actions.ConfigMapEditCmd's unstarted *exec.Cmd to
@@ -42,7 +34,7 @@ func editConfigMap(ctx context.Context, namespace, name string) error {
 // terminal -- CI/scripted `magpiectl install` runs must never block
 // waiting for input.
 func maybePromptEditBaselineConfigMap(ctx context.Context, namespace, release string) {
-	name := baselineConfigMapName(release)
+	name := actions.BaselineConfigMapName(release)
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
 		fmt.Printf("==> Edit the cluster-wide Arma config baseline any time via: kubectl edit configmap %s -n %s\n", name, namespace)
 		return

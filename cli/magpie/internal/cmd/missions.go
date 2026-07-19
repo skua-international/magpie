@@ -34,7 +34,7 @@ func missionsListCmd() *cobra.Command {
 			}
 			for _, m := range missions {
 				age := time.Since(time.UnixMilli(m.CreatedAtUnixMs)).Round(time.Second)
-				fmt.Printf("%-38s size=%-10s uploaded %s ago by %s  %s\n", m.Id, humanBytes(m.Filesize), age, m.CreatedBy, m.Name)
+				fmt.Printf("%-38s size=%-10s uploaded %s ago by %s  %s\n", m.Id, actions.HumanBytes(m.Filesize), age, m.CreatedBy, m.Name)
 			}
 			return nil
 		},

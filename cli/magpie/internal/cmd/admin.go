@@ -28,10 +28,10 @@ func adminDiskUsageCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("mods:      %s\n", humanBytes(usage.ModsBytes))
-			fmt.Printf("missions:  %s\n", humanBytes(usage.MissionsBytes))
-			fmt.Printf("game files: %s\n", humanBytes(usage.GameFilesBytes))
-			fmt.Printf("total:     %s\n", humanBytes(usage.TotalBytes))
+			fmt.Printf("mods:      %s\n", actions.HumanBytes(usage.ModsBytes))
+			fmt.Printf("missions:  %s\n", actions.HumanBytes(usage.MissionsBytes))
+			fmt.Printf("game files: %s\n", actions.HumanBytes(usage.GameFilesBytes))
+			fmt.Printf("total:     %s\n", actions.HumanBytes(usage.TotalBytes))
 			return nil
 		},
 	}
