@@ -22,6 +22,26 @@ updates:
       # traits, see services/identity/Cargo.toml.
       - dependency-name: "reqwest"
         versions: [">=0.13.0"]
+      # All three below were merged once already (#11) and broke the
+      # workspace build outright -- confirmed live, not theoretical:
+      # buffa 0.9 changed BufMut's trait shape in a way connectrpc-build
+      # 0.8.0's generated code (crates/protocol's build.rs output) isn't
+      # compatible with, and no newer connectrpc-build exists yet to
+      # bump to instead; bincode 3.0.0 is a known-broken/joke release on
+      # crates.io (a bare compile_error!, not a real crate); prost 0.14
+      # doesn't implement the same Message trait steamdepot's own
+      # (externally pinned, not ours to bump) prost 0.13.5 vendored code
+      # expects, so the two coexist as incompatible types in the
+      # dependency graph. Revisit each independently once its actual
+      # blocker resolves (a new connectrpc-build release, bincode's real
+      # maintainer publishing past 3.0.0, or steamdepot itself moving to
+      # prost 0.14) rather than re-bumping all three together again.
+      - dependency-name: "buffa"
+        versions: [">=0.9.0"]
+      - dependency-name: "bincode"
+        versions: [">=2.0.0"]
+      - dependency-name: "prost"
+        versions: [">=0.14.0"]
 
   - package-ecosystem: github-actions
     directory: /
