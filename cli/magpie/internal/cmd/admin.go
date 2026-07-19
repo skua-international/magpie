@@ -1,14 +1,9 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
-	"os"
-	"strings"
-	"syscall"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
 	"github.com/skua-international/magpie/cli/internal/actions"
 	"github.com/skua-international/magpie/cli/internal/steamlogin"
@@ -43,14 +38,15 @@ func adminDiskUsageCmd() *cobra.Command {
 }
 
 // adminRefreshSteamAuthCmd is the "zero Steam credentials anywhere in
-// the cluster" bootstrap path. The interactive login (username/hidden
-// password, Steam Guard code if needed) happens entirely on this
-// machine, via the steam-login helper (see internal/steamlogin) -- only
-// the resulting refresh token is ever sent to the cluster.
+// the cluster" bootstrap path. The QR-code login (see internal/steamlogin
+// and steam-login.rs) happens entirely on this machine, with no password
+// ever typed in anywhere -- scan the printed QR code with the Steam
+// account you want the cluster to use, and only the resulting refresh
+// token is ever sent to the cluster.
 func adminRefreshSteamAuthCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "refresh-steam-auth",
-		Short: "Establish (or replace) the cluster's Steam session interactively",
+		Short: "Establish (or replace) the cluster's Steam session via QR-code login",
 		RunE: func(c *cobra.Command, _ []string) error {
 			ctx := c.Context()
 			cl, err := clients(ctx)
@@ -63,37 +59,12 @@ func adminRefreshSteamAuthCmd() *cobra.Command {
 				return err
 			}
 
-			reader := bufio.NewReader(os.Stdin)
-			fmt.Print("Steam username: ")
-			username, err := reader.ReadString('\n')
-			if err != nil {
-				return err
-			}
-			username = strings.TrimSpace(username)
-
-			password, err := readPassword("Steam password: ")
+			result, err := steamlogin.Negotiate(ctx, binPath)
 			if err != nil {
 				return err
 			}
 
-			result, err := steamlogin.Negotiate(ctx, binPath, username, password, "")
-			if err != nil {
-				return err
-			}
-			if result.NeedsGuard {
-				fmt.Printf("Steam Guard (%s) code: ", result.GuardType)
-				code, err := reader.ReadString('\n')
-				if err != nil {
-					return err
-				}
-				code = strings.TrimSpace(code)
-				result, err = steamlogin.Negotiate(ctx, binPath, username, password, code)
-				if err != nil {
-					return err
-				}
-			}
-
-			if err := actions.RefreshSteamAuth(ctx, cl, username, result.RefreshToken); err != nil {
+			if err := actions.RefreshSteamAuth(ctx, cl, result.SteamUser, result.RefreshToken); err != nil {
 				return err
 			}
 
@@ -101,14 +72,4 @@ func adminRefreshSteamAuthCmd() *cobra.Command {
 			return nil
 		},
 	}
-}
-
-func readPassword(prompt string) (string, error) {
-	fmt.Print(prompt)
-	bytes, err := term.ReadPassword(int(syscall.Stdin))
-	fmt.Println()
-	if err != nil {
-		return "", err
-	}
-	return string(bytes), nil
 }

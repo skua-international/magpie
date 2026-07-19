@@ -1,26 +1,23 @@
-//! A local-only operator tool: negotiates a Steam session (interactive
-//! username+password, optional Guard code) and prints the resulting
-//! refresh token as one line of JSON. Never run as a deployed service --
-//! invoked by `magpie admin refresh-steam-auth` (cli/magpie), which owns
-//! everything downstream of the negotiation itself (writing the cluster's
-//! Secret via kubectl, restarting sync-daemon to pick it up). Lives as a
-//! `src/bin/` target on the existing steam-sync crate rather than its own
-//! workspace member -- it's a thin wrapper around `negotiate_interactive`,
-//! which already lives here, not enough surface to justify a whole
-//! separate package.
+//! A local-only operator tool: does a QR-code Steam login (no password
+//! ever typed into, or handled by, this or any other process) and prints
+//! the resulting refresh token as one line of JSON. Never run as a
+//! deployed service -- invoked by `magpiectl admin refresh-steam-auth`
+//! (cli/magpie), which owns everything downstream of the negotiation
+//! itself (writing the cluster's Secret via kubectl, restarting
+//! sync-daemon to pick it up). Lives as a `src/bin/` target on the
+//! existing steam-sync crate rather than its own workspace member --
+//! it's a thin wrapper around `begin_qr_login`/`poll_qr_login`, which
+//! already live here, not enough surface to justify a whole separate
+//! package.
 //!
 //! The point of routing this through a local process at all, rather than
-//! an RPC to a deployed service (the old design): the password is used
-//! only for the duration of this process's own run, sent directly to
-//! Steam, and never reaches anything we deploy to the cluster -- not even
-//! transiently in a request handler's memory. Only the resulting refresh
-//! token, which is what actually gets persisted, ever crosses into the
-//! cluster at all.
-
-use std::io::Write;
+//! an RPC to a deployed service: even a QR flow still needs an
+//! authenticated CM session negotiated somewhere, and that should never
+//! be a deployed service's job -- only the resulting refresh token, which
+//! is what actually gets persisted, ever crosses into the cluster at all.
 
 use anyhow::{Context, Result};
-use steam_sync::steam::{GuardType, InteractiveAuthResult, negotiate_interactive};
+use steam_sync::steam::{begin_qr_login, poll_qr_login};
 
 fn main() -> Result<()> {
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -30,59 +27,36 @@ fn main() -> Result<()> {
 }
 
 async fn run() -> Result<()> {
-    let mut user = None;
-    let mut password = None;
-    let mut guard_code = None;
+    let (qr, challenge_url) = begin_qr_login().await.context("failed to start Steam QR login")?;
 
-    let mut args = std::env::args().skip(1);
-    while let Some(arg) = args.next() {
-        match arg.as_str() {
-            "--user" => user = args.next(),
-            "--password" => password = args.next(),
-            "--guard-code" => guard_code = args.next(),
-            other => anyhow::bail!("unrecognized argument '{other}' (expected --user/--password/--guard-code)"),
-        }
-    }
+    // s.team/q/1/... links only do anything meaningful either scanned as
+    // an actual QR image by a phone camera (the Steam app intercepts it)
+    // or opened directly on a device that already has the app installed
+    // (app-link registration) -- opening it in a desktop browser just
+    // redirects to a generic /about page, confirmed live. A real QR code
+    // in the terminal is the only reliable path here, not a browser.
+    print_qr(&challenge_url)?;
+    eprintln!("Scan the QR code above with the Steam mobile app to confirm login.");
+    eprintln!("(Or, on a device that already has the app installed: {challenge_url})");
+    eprintln!("Waiting for confirmation...");
 
-    let user = match user {
-        Some(u) => u,
-        None => prompt("Steam username: ")?,
-    };
-    let password = match password {
-        Some(p) => p,
-        None => rpassword::prompt_password("Steam password: ").context("failed to read password")?,
-    };
+    let (username, refresh_token) = poll_qr_login(qr).await.context("Steam login failed")?;
 
-    let result = negotiate_interactive(&user, &password, guard_code.as_deref())
-        .await
-        .context("Steam login failed")?;
-
-    match result {
-        InteractiveAuthResult::NeedsGuard { guard_type } => {
-            let guard_type = match guard_type {
-                GuardType::EmailCode => "email",
-                GuardType::DeviceCode => "device",
-            };
-            println!(
-                "{}",
-                serde_json::json!({"needs_guard": true, "guard_type": guard_type, "steam_user": user})
-            );
-        }
-        InteractiveAuthResult::Success { refresh_token } => {
-            println!(
-                "{}",
-                serde_json::json!({"needs_guard": false, "steam_user": user, "refresh_token": refresh_token})
-            );
-        }
-    }
+    eprintln!("Confirmed, logged in as {username}.");
+    println!(
+        "{}",
+        serde_json::json!({"steam_user": username, "refresh_token": refresh_token})
+    );
 
     Ok(())
 }
 
-fn prompt(label: &str) -> Result<String> {
-    print!("{label}");
-    std::io::stdout().flush()?;
-    let mut line = String::new();
-    std::io::stdin().read_line(&mut line)?;
-    Ok(line.trim().to_string())
+fn print_qr(data: &str) -> Result<()> {
+    use qrcode::QrCode;
+    use qrcode::render::unicode;
+
+    let code = QrCode::new(data).context("failed to encode QR code")?;
+    let image = code.render::<unicode::Dense1x2>().build();
+    println!("{image}");
+    Ok(())
 }

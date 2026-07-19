@@ -615,6 +615,40 @@ pub async fn negotiate_interactive(
     })
 }
 
+/// An in-progress QR login -- holds the CM connection the challenge was
+/// issued on, since [`poll_qr_login`] polls over that same connection.
+pub struct QrLoginSession {
+    conn: CmConnection,
+    session: steamdepot::login::AuthSession,
+}
+
+/// Begin a QR-code login: no password ever handled by this (or any other)
+/// process at all. Returns the challenge URL to display/open alongside
+/// the session -- scanning it with the Steam mobile app (or opening it
+/// directly on a device that has the app installed, which deep-links)
+/// confirms the login; [`poll_qr_login`] blocks until that happens.
+pub async fn begin_qr_login() -> Result<(QrLoginSession, String)> {
+    let (conn, session, challenge_url) = auth::begin_qr()
+        .await
+        .context("failed to begin Steam QR auth session")?;
+    Ok((QrLoginSession { conn, session }, challenge_url))
+}
+
+/// Block until a QR login started by [`begin_qr_login`] is confirmed.
+/// Returns `(account_name, refresh_token)` -- the account name is only
+/// ever learned this way for a QR session (nothing was typed in to
+/// already know it), unlike the credentials flow.
+pub async fn poll_qr_login(mut qr: QrLoginSession) -> Result<(String, String)> {
+    let tokens = auth::poll(&mut qr.conn, &qr.session)
+        .await
+        .context("failed while polling QR auth session status")?;
+    let _ = qr.conn.shutdown().await;
+    let username = tokens
+        .account_name
+        .ok_or_else(|| anyhow::anyhow!("Steam didn't return an account name after QR login"))?;
+    Ok((username, tokens.refresh_token))
+}
+
 /// The cheap part: open a fresh connection and log on with an
 /// already-negotiated refresh token -- one `ClientLogon`, no RSA/auth-
 /// session/poll round-trips.

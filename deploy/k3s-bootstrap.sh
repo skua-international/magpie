@@ -46,16 +46,12 @@
 # Secrets:
 #   - arma-postgres-creds: always auto-generated (a random password --
 #     nothing to prompt for) unless --external-postgres-url is given.
-#   - arma-steam-creds: optional, bootstraps only the *first* Steam
-#     session (see syncDaemon.steamAuth.existingSecret's own doc in
-#     values.yaml) -- skip entirely for anonymous-only workshop access,
-#     or seed one later with `magpiectl admin refresh-steam-auth` instead,
-#     which needs no long-lived password Secret in the cluster at all.
-#     Prompts interactively (hidden password input) unless
-#     --steam-user/--steam-password (or STEAM_USER/STEAM_PASSWORD env
-#     vars) are given, and skips automatically with no prompt at all when
-#     neither is set and stdin isn't a TTY -- never hangs a non-
-#     interactive run.
+#   - Steam auth: no password-based bootstrap Secret at all -- a Steam
+#     password should never reach a deployed service, not even
+#     transiently. Run `magpiectl admin refresh-steam-auth` after install
+#     instead (QR-code login: scan it with the Steam mobile app, no
+#     password typed anywhere), or --set syncDaemon.steamAuth.anonymous=true
+#     for anonymous-only (public workshop content only) access.
 #   - ghcr-pull-secret: only created if --ghcr-user/--ghcr-token (or
 #     GHCR_USER/GHCR_TOKEN) are given -- optional, only needed if the
 #     images live in a private registry (the default,
@@ -77,8 +73,6 @@ COPY_KUBECONFIG="${COPY_KUBECONFIG:-true}"
 SSH_HOST=""
 SSH_IDENTITY=""
 EXISTING_KUBECONFIG=""
-STEAM_USER="${STEAM_USER:-}"
-STEAM_PASSWORD="${STEAM_PASSWORD:-}"
 GHCR_USER="${GHCR_USER:-}"
 GHCR_TOKEN="${GHCR_TOKEN:-}"
 IDENTITY_BASE_URL="${IDENTITY_BASE_URL:-}"
@@ -90,8 +84,6 @@ while [[ $# -gt 0 ]]; do
         --ssh) SSH_HOST="$2"; shift 2 ;;
         --ssh-identity) SSH_IDENTITY="$2"; shift 2 ;;
         --kubeconfig) EXISTING_KUBECONFIG="$2"; shift 2 ;;
-        --steam-user) STEAM_USER="$2"; shift 2 ;;
-        --steam-password) STEAM_PASSWORD="$2"; shift 2 ;;
         --ghcr-user) GHCR_USER="$2"; shift 2 ;;
         --ghcr-token) GHCR_TOKEN="$2"; shift 2 ;;
         --identity-base-url) IDENTITY_BASE_URL="$2"; shift 2 ;;
@@ -274,23 +266,7 @@ if [[ -n "$KUBECONFIG_PATH" ]]; then
         DEPLOY_SET_ARGS+=(--set "postgres.enabled=false" --set "postgres.externalUrl=$EXTERNAL_POSTGRES_URL")
     fi
 
-    if [[ -z "$STEAM_USER" && -t 0 ]]; then
-        read -r -p "[k3s-bootstrap] Seed a Steam login now for arma-steam-creds? Steam username (leave blank to skip): " STEAM_USER
-    fi
-    if [[ -n "$STEAM_USER" ]]; then
-        if [[ -z "$STEAM_PASSWORD" ]]; then
-            read -r -s -p "[k3s-bootstrap] Steam password for $STEAM_USER: " STEAM_PASSWORD
-            echo
-        fi
-        log "creating arma-steam-creds..."
-        kctl create secret generic arma-steam-creds \
-            --from-literal=STEAM_USER="$STEAM_USER" \
-            --from-literal=STEAM_PASSWORD="$STEAM_PASSWORD" \
-            --dry-run=client -o yaml | kctl apply -f - >/dev/null
-        DEPLOY_SET_ARGS+=(--set syncDaemon.steamAuth.existingSecret=arma-steam-creds)
-    else
-        log "skipping Steam credentials -- use 'magpiectl admin refresh-steam-auth' after install, or --set syncDaemon.steamAuth.anonymous=true for anonymous-only access"
-    fi
+    log "Steam auth: no password-based bootstrap Secret to create -- run 'magpiectl admin refresh-steam-auth' after install (QR-code login, no password ever touches the cluster), or --set syncDaemon.steamAuth.anonymous=true for anonymous-only access"
 
     if [[ -n "$GHCR_USER" && -n "$GHCR_TOKEN" ]]; then
         log "creating ghcr-pull-secret..."

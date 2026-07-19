@@ -38,13 +38,15 @@
 #                         scripts/deploy.sh --install -- \
 #                           --set identity.baseUrl=http://identity.magpie.local \
 #                           --set postgres.existingSecret=arma-postgres-creds \
-#                           --set syncDaemon.steamAuth.existingSecret=arma-steam-creds \
 #                           --set imagePullSecrets='{ghcr-pull-secret}'
-#                       (syncDaemon.steamAuth.existingSecret is optional --
-#                       omit it and bootstrap Steam auth after install with
-#                       `magpiectl admin refresh-steam-auth` instead. ingress.
-#                       baseDomain defaults to magpie.local; override it too
-#                       if your host uses a different one.)
+#                       (No Steam auth flag needed at install time at all --
+#                       there's no password-based bootstrap Secret anymore.
+#                       Run `magpiectl admin refresh-steam-auth` after install
+#                       instead (QR-code login, no password ever touches the
+#                       cluster), or --set syncDaemon.steamAuth.anonymous=true
+#                       for anonymous-only access. ingress.baseDomain defaults
+#                       to magpie.local; override it too if your host uses a
+#                       different one.)
 #   --dry-run          Render and diff without actually applying anything
 #   --debug            Pass Helm's verbose/debug output through for chart
 #                      pull, values fetch, and upgrade

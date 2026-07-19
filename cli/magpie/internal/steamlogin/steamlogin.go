@@ -79,22 +79,19 @@ func EnsureBinary(ctx context.Context) (string, error) {
 
 // NegotiateResult mirrors steam-login's own JSON output shape.
 type NegotiateResult struct {
-	NeedsGuard   bool
-	GuardType    string
+	SteamUser    string
 	RefreshToken string
 }
 
-// Negotiate runs the (already-downloaded) helper binary once. Password
-// and guardCode are passed as process arguments rather than piped in --
-// acceptable here since this process and its direct child are both
-// short-lived and local-only; neither is logged or persisted by either
-// side.
-func Negotiate(ctx context.Context, binPath, user, password, guardCode string) (*NegotiateResult, error) {
-	args := []string{"--user", user, "--password", password}
-	if guardCode != "" {
-		args = append(args, "--guard-code", guardCode)
-	}
-	cmd := exec.CommandContext(ctx, binPath, args...)
+// Negotiate runs the (already-downloaded) helper binary once, with no
+// arguments at all -- it does a QR-code login (see steam-login.rs), so
+// there's no password or guard code to pass in, and nothing to prompt
+// the operator for here either. Stderr is inherited so the QR code and
+// "waiting for confirmation" status render directly in the operator's
+// own terminal in real time; only the final JSON line on stdout is
+// captured.
+func Negotiate(ctx context.Context, binPath string) (*NegotiateResult, error) {
+	cmd := exec.CommandContext(ctx, binPath)
 	cmd.Stderr = os.Stderr
 	out, err := cmd.Output()
 	if err != nil {
@@ -102,14 +99,13 @@ func Negotiate(ctx context.Context, binPath, user, password, guardCode string) (
 	}
 
 	var raw struct {
-		NeedsGuard   bool   `json:"needs_guard"`
-		GuardType    string `json:"guard_type"`
+		SteamUser    string `json:"steam_user"`
 		RefreshToken string `json:"refresh_token"`
 	}
 	if err := json.Unmarshal(out, &raw); err != nil {
 		return nil, fmt.Errorf("failed to parse steam-login output: %w", err)
 	}
-	return &NegotiateResult{NeedsGuard: raw.NeedsGuard, GuardType: raw.GuardType, RefreshToken: raw.RefreshToken}, nil
+	return &NegotiateResult{SteamUser: raw.SteamUser, RefreshToken: raw.RefreshToken}, nil
 }
 
 func cacheDir() (string, error) {

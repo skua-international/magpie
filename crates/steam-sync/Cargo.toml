@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-steamdepot = { git = "https://github.com/LinkIsGrim/steamdepot", rev = "2986921" }
+steamdepot = { git = "https://github.com/LinkIsGrim/steamdepot", rev = "fec00ce" }
 tokio = { version = "1", features = ["rt", "sync", "time"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 regex = "1"
@@ -16,8 +16,4 @@ bincode = "1"
 rusqlite = { version = "0.31", features = ["bundled"] }
 prost = "0.13"
 walkdir = "2.5.0"
-
-# Only used by src/bin/steam-login.rs's hidden password prompt -- see that
-# file's own doc for why it lives here (a bin target on this crate)
-# instead of as a separate workspace member.
-rpassword = "7"
+qrcode = { version = "0.14.1", default-features = false }
