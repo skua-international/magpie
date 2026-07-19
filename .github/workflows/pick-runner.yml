@@ -2,11 +2,15 @@ name: Pick runner
 
 # Reusable: every Linux-capable job in this repo calls this first and uses
 # its `labels` output for `runs-on`, instead of hardcoding ubuntu-latest.
-# Prefers elephant (the org's self-hosted runner) when it's registered,
-# online, and idle; falls back to ubuntu-latest otherwise -- offline,
-# busy running something else, or not registered at all. Centralized here
-# so every caller applies the same availability check and picks
-# consistently, rather than each workflow re-implementing its own.
+# Prefers elephant (the org's self-hosted runner) whenever at least one of
+# its runners is online, busy or not -- elephant runs 6 replicas (see
+# gha-runner-elephant's docker-compose.yml), so "busy" just means the job
+# queues for a free one instead of running immediately, which is still
+# preferable to paying for a GitHub-hosted runner. Only falls back to
+# ubuntu-latest if elephant has no runner online at all (fully down/
+# unreachable) or isn't registered. Centralized here so every caller
+# applies the same check and picks consistently, rather than each
+# workflow re-implementing its own.
 #
 # Needs the ORG_RUNNERS_TOKEN secret: a PAT scoped to this org's
 # "Self-hosted runners: Read-only" (fine-grained). Deliberately narrower
@@ -34,14 +38,18 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${GH_TOKEN:-}" ]; then
-            echo "ORG_RUNNERS_TOKEN not set -- falling back to ubuntu-latest" >&2
+            echo "ORG_RUNNERS_TOKEN not set -- falling back to ubuntu-latest"
             echo 'labels=["ubuntu-latest"]' >> "$GITHUB_OUTPUT"
             exit 0
           fi
           online=$(gh api /orgs/skua-international/actions/runners --jq \
+            '[.runners[] | select(.status == "online" and any(.labels[]; .name == "elephant"))] | length')
+          idle=$(gh api /orgs/skua-international/actions/runners --jq \
             '[.runners[] | select(.status == "online" and .busy == false and any(.labels[]; .name == "elephant"))] | length')
           if [ "$online" -gt 0 ]; then
+            echo "elephant: $online runner(s) online ($idle idle) -- picked [self-hosted, elephant]"
             echo 'labels=["self-hosted","elephant"]' >> "$GITHUB_OUTPUT"
           else
+            echo "elephant: none online -- falling back to ubuntu-latest"
             echo 'labels=["ubuntu-latest"]' >> "$GITHUB_OUTPUT"
           fi
