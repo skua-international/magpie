@@ -6,35 +6,37 @@ Kubernetes-native orchestration for Arma 3 dedicated servers: mod/collection syn
 
 ## Architecture
 
-```
-                         ┌──────────────┐
-   Discord bot, etc. ───▶│  server-api  │───▶ ArmaServer (CRD)
-                         └──────────────┘           │
-                                                      ▼
-                         ┌──────────────┐     ┌──────────────┐
-                    ───▶│   registry   │     │  controller  │
-                         └──────┬───────┘     │ (reconciler) │
-                                │              └──────┬───────┘
-                                ▼                     ▼
-                         ┌──────────────┐     launcher Deployment
-                    ───▶│  sync-daemon │◀───────────┘
-                         └──────────────┘
-                                │
-                    Steam CM session, reflink claims
+```mermaid
+flowchart LR
+    bot["Discord bot, etc."] --> serverapi["server-api"]
+    serverapi -->|creates/updates| armaserver[("ArmaServer<br/>(CRD)")]
 
-                         ┌──────────────┐
-                    ───▶│   identity   │──▶ issues the JWTs every
-                         └──────────────┘    JWT-gated service above verifies
+    client["magpiectl / any client"] --> registry["registry"]
+    registry --> syncdaemon["sync-daemon"]
+
+    controller["controller<br/>(reconciler)"] -->|watches| armaserver
+    controller -->|creates| launcher["launcher<br/>Deployment"]
+    controller -->|RegisterSource, Claim| syncdaemon
+
+    syncdaemon -->|GrowVolume| volumemanager["volume-manager<br/>(DaemonSet, privileged)"]
+    volumemanager -->|loop-mount, btrfs| blob[("blob-backed content<br/>(reflink claims)")]
+    launcher -->|reads its claim| blob
+
+    identity["identity"] -->|issues JWTs| serverapi
+    identity -->|issues JWTs| registry
+
+    syncdaemon -->|authenticated CM session| steam(["Steam"])
 ```
 
 - **`launcher`** — launches the game server (and headless clients) from an already-synced claim plus an operator-provided server config. No Steam logic of its own.
-- **`sync-daemon`** — owns all Steam depot/workshop mechanics: authenticated CM session, mod/collection resolution (including private/unlisted content), and reflink (copy-on-write) claims of one shared golden content tree, so every server gets its own cheap, isolated snapshot instead of sharing live state.
+- **`sync-daemon`** — owns all Steam depot/workshop mechanics: authenticated CM session, mod/collection resolution (including private/unlisted content), and reflink (copy-on-write) claims of one shared golden content tree, so every server gets its own cheap, isolated snapshot instead of sharing live state. Asks `volume-manager` to grow the underlying volume ahead of a sync whenever newly-registered mods need more room than is currently free.
+- **`volume-manager`** — the only privileged component in the stack (one per node, DaemonSet): owns a loop-mounted btrfs blob that `sync-daemon`'s content/claims live on, so reflink works regardless of what filesystem the host actually has, and grows the blob on request instead of needing a size chosen up front. Runs as a dedicated, minimally-privileged host user (`CAP_SYS_ADMIN` only, not full root), provisioned by `magpiectl install` itself.
 - **`controller`** — a `kube-runtime` reconciler that turns `ArmaServer` custom resources into launcher `Deployment`s. No external listener, no auth surface, no Kubernetes RBAC beyond `ArmaServer` + `Deployment`.
 - **`server-api`** — JWT-authenticated `ArmaServer` CRUD plus deployment-like lifecycle (`Create`/`Start`/`Stop`/`Update`). Deliberately carries the least Kubernetes RBAC of anything here (no `Deployment` access at all) — it's the one process a stolen bearer token can reach directly.
 - **`registry`** — JWT-authenticated mod source registry (a Steam mod, a collection, a preset export, or a locally-uploaded zip mod) and mission (`.pbo`) storage. Never touches the Kubernetes API.
 - **`identity`** — OAuth2 login (Discord/GitHub/Google) and Steam login (OpenID 2.0 — Steam never adopted OIDC), account linking, and JWT issuance for every JWT-gated service above to verify. The first person to ever sign in is automatically granted every permission.
 
-All inter-service and client-facing APIs are [ConnectRPC](https://connectrpc.com/) (`proto/`). Mod sources (`ModSource`) and servers (`ArmaServer`) are Kubernetes CRDs, not database rows — `kubectl get modsources`/`kubectl get armaservers` shows live state directly, and `sync-daemon`/`controller` reconcile them the same way any other operator would. Postgres holds what's left: missions, ACL grants, and identities. Everything sits on `hostPath` volumes sized for this project's single-node k3s target — see `charts/magpie/values.yaml`'s `hostPaths` comment for why that's a deliberate choice, not just the easy one.
+All inter-service and client-facing APIs are [ConnectRPC](https://connectrpc.com/) (`proto/`). Mod sources (`ModSource`) and servers (`ArmaServer`) are Kubernetes CRDs, not database rows — `kubectl get modsources`/`kubectl get armaservers` shows live state directly, and `sync-daemon`/`controller` reconcile them the same way any other operator would. Postgres holds what's left: missions, ACL grants, and identities. `sync-daemon`'s content/claims live on a `volume-manager`-owned, loop-mounted btrfs blob rather than a plain `hostPath` directly on the host's own filesystem — see `charts/magpie/values.yaml`'s `hostPaths` comment for why (reflink CoW claims need a real btrfs/reflink-enabled filesystem underneath, which the host itself may not have).
 
 ## Deploying
 
@@ -55,6 +57,8 @@ curl -sSf -H "Authorization: token $(gh auth token)" \
 
 Both are the same script -- piping it in just skips needing a clone first, and it fetches `scripts/deploy.sh` (and, for `--ssh`, itself) fresh from GitHub the same way when it can't find a local copy. It ends by actually running `scripts/deploy.sh --install` for you, with every `--set` it resolved along the way.
 
+`magpiectl install --bootstrap-k3s` (see "Installing the CLI" below) does the same first-install job as a single Go binary instead of a shell script -- installs k3s itself (data-dir and kubelet's own root-dir both pointed at wherever the reflink-capable disk actually is, not the OS disk), provisions the host user `volume-manager` needs, resolves/creates every bootstrap Secret, and runs the equivalent of `deploy --install`. `--ssh user@host` runs the whole thing on a remote host instead of the local one -- it detects the remote's architecture and downloads the matching Linux release binary directly onto it (never assumes the controlling machine's own platform matches the target's), so it works the same whether you're driving it from Linux, macOS, or Windows.
+
 Upgrades (including the very first install, via `--install`) all go through one script, same pattern:
 
 ```bash
@@ -72,7 +76,7 @@ It pulls the chart from its OCI publish (`oci://ghcr.io/skua-international/magpi
 
 ### Steam authentication
 
-There's no password-based bootstrap Secret at all -- a Steam password should never reach a deployed service, not even transiently, and it should never reach *this* CLI either. Run `magpiectl admin refresh-steam-auth` instead: it prints a QR code (and the equivalent `https://s.team/q/1/...` URL, for a device that already has the Steam app installed) and does the login entirely client-side, on your own machine. Scan it with the Steam mobile app on whichever account you want the cluster to use. Only the resulting refresh token ever reaches the cluster (written to the `arma-steam-session` Secret via the `RefreshSteamAuth` RPC, which only ever accepts a refresh token, never a password), and that's what sync-daemon uses as the cluster's Steam identity for every workshop/depot operation from then on.
+There's no password-based bootstrap Secret at all -- a Steam password should never reach a deployed service, not even transiently. Run `magpiectl admin refresh-steam-auth` instead: it does a QR-code login against Steam directly from `magpiectl` itself (a native Go Steam client, `cli/magpie/internal/steamlogin` -- no separate helper binary), prints the QR code (and the equivalent `https://s.team/q/1/...` URL, for a device that already has the Steam app installed), and does the whole login client-side, on your own machine. Scan it with the Steam mobile app on whichever account you want the cluster to use. Only the resulting refresh token ever reaches the cluster (written to the `arma-steam-session` Secret via the `RefreshSteamAuth` RPC, which only ever accepts a refresh token, never a password), and that's what sync-daemon uses as the cluster's Steam identity for every workshop/depot operation from then on.
 
 This isn't elevated access — visibility into private/unlisted mods and collections is scoped to whatever that specific Steam account can actually see (its own subscriptions, friends-only shares, etc.), same as browsing the Workshop as that account normally would. Use an account that's actually subscribed to / has visibility into whatever private content the servers need.
 
@@ -113,14 +117,15 @@ Building from source instead (e.g. to run an unreleased commit): `cd cli/magpie 
 ## Repo layout
 
 ```
-crates/            shared library crates (steam-sync, registry-db, authn, protocol, crd, ...)
-services/          the six binaries described above
-cli/magpie/        the magpie CLI/TUI (Go)
-proto/             ConnectRPC service definitions
-charts/magpie/      the Helm chart
-deploy/            k3s-bootstrap.sh
-scripts/           deploy.sh, bump-version.sh
-configs/           example main.cfg/basic.cfg to seed a server's operator-provided config directory
+crates/                shared library crates (steam-sync, registry-db, authn, protocol, crd, volume-client, ...)
+services/              the seven binaries described above
+cli/magpie/            the magpie CLI/TUI (Go)
+proto/                 ConnectRPC service definitions
+charts/magpie/         the Helm chart
+deploy/                k3s-bootstrap.sh
+scripts/               deploy.sh
+configs/               example main.cfg/basic.cfg to seed a server's operator-provided config directory
+Dockerfile.workspace   compiles every service binary in one build (see Development below)
 ```
 
 ## Development
@@ -131,4 +136,4 @@ cargo test --workspace
 cargo clippy --workspace --all-targets
 ```
 
-Each service has its own `Dockerfile` (via `cargo-chef`, built from the repo root as build context — every service needs the full workspace's `Cargo.lock`/manifests to resolve). Images are built and pushed to `ghcr.io/skua-international/magpie/*` by `.github/workflows/build-images.yml` on push to `main` and on version tags.
+All 7 service binaries are compiled once, together, by `Dockerfile.workspace` (`cargo-chef` for dependency-layer caching, built from the repo root — every service needs the full workspace's `Cargo.lock`/manifests to resolve), rather than each service having its own multi-stage Rust build. Each `services/*/Dockerfile` is just a thin packaging step on top of that -- `COPY` the already-built binary plus whatever runtime `apt` packages it needs, nothing else. `.github/workflows/build-images.yml` runs `Dockerfile.workspace` once (`build-workspace`) on push to `main`, hands the resulting binaries to the 7 packaging builds as a job artifact, and pushes every image to `ghcr.io/skua-international/magpie/*`. Release tags are a separate, manually-triggered promotion step (`.github/workflows/release.yml`) that retags/republishes what a passing commit already built, rather than rebuilding anything.
