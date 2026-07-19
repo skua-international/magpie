@@ -1,0 +1,65 @@
+# syntax=docker/dockerfile:1.7
+# Compiles all 7 service binaries in one place, for build-images.yml's
+# build-workspace job to export locally (buildx --output=type=local, not
+# push/pull) rather than run `cargo build` on the bare runner directly.
+#
+# Two real, separate problems on elephant's self-hosted runner drove this:
+# (1) `container: image: rust:trixie` (GHA's job-container feature)
+#     breaks under elephant's Docker-outside-of-Docker setup -- checkout
+#     needs the runner to bind-mount its own /actions-runner/externals
+#     into the spun-up job container, but that source path only resolves
+#     inside the runner's own container filesystem, not on the actual
+#     host. `docker build` doesn't have this problem: buildx streams the
+#     build context over the Docker API instead of bind-mounting host
+#     paths, which is exactly why the packaging Dockerfiles' own
+#     docker/build-push-action steps already work fine on this runner.
+# (2) Building natively on the bare runner instead (no Docker at all)
+#     traded that for a *different* real problem: elephant's runner is
+#     Ubuntu 20.04, whose default gcc (9.4) is one aws-lc-sys explicitly
+#     refuses to build with -- a genuine known miscompilation bug
+#     (gcc.gnu.org/bugzilla 95189, memcmp-related), not just an overly
+#     cautious version gate.
+#
+# rust:trixie sidesteps both: a modern gcc, and (now that every runtime
+# image is also trixie, see services/*/Dockerfile) a matching glibc.
+#
+# cargo-chef splits dependency compilation into its own layer, cached
+# separately from source changes -- safe to use here in a way it wasn't
+# for the old per-service Dockerfiles: this is the *only* job/Dockerfile
+# doing this build now, so there's no cross-job cache-scope race, and
+# both `cook` and the final `cargo build` below share the exact same
+# whole-workspace (no -p) scope, so there's no scope mismatch to silently
+# defeat the cache either -- both real bugs the old 6-Dockerfile chef
+# setup hit are structurally impossible with only one caller.
+FROM rust:trixie AS chef
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        protobuf-compiler \
+        git \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+RUN cargo install cargo-chef --locked
+WORKDIR /build
+
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS builder
+COPY --from=planner /build/recipe.json recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
+COPY . .
+RUN cargo build --release --locked
+
+# Nothing but the 7 binaries themselves end up in the exported output --
+# build-workspace's `docker build --target dist --output type=local`
+# only ever wants dist/, not a whole rust:trixie image's worth of layers.
+FROM scratch AS dist
+COPY --from=builder \
+    /build/target/release/launcher \
+    /build/target/release/sync-daemon \
+    /build/target/release/controller \
+    /build/target/release/registry \
+    /build/target/release/server-api \
+    /build/target/release/identity \
+    /build/target/release/volume-manager \
+    /

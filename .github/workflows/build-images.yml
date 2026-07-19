@@ -29,69 +29,62 @@ jobs:
     uses: ./.github/workflows/pick-runner.yml
     secrets: inherit
 
-  # Compiles all 6 service binaries once, natively (no Docker involved),
-  # and hands them to the build matrix below as a job artifact. This
-  # replaced a cargo-chef multi-stage build duplicated across all 6
-  # Dockerfiles after it caused two separate real caching bugs in one
-  # session: a -p-scoping mismatch between `cook` and the final build that
-  # silently defeated the cache even on a cook hit, and a cache-scope race
-  # across the 6 services' concurrent matrix builds where one service's
-  # planner stage imported a stale recipe.json from a different commit.
-  # Compiling once, outside Docker, removes both failure classes outright
-  # -- there's no cross-job Docker cache to race on, and Swatinem/rust-cache
-  # (actions/cache, keyed on Cargo.lock, already reliable elsewhere in this
-  # repo) replaces what cargo-chef was for.
+  # Compiles all 7 service binaries once (Dockerfile.workspace, exported
+  # locally via buildx rather than run/pushed), and hands them to the
+  # build matrix below as a job artifact.
+  #
+  # Landed on "build in Docker, export locally" after two other
+  # approaches each hit a real, different problem on elephant's
+  # self-hosted runner:
+  # - `container: image: rust:trixie` (GHA's job-container feature)
+  #   breaks under elephant's Docker-outside-of-Docker setup: checkout
+  #   needs the runner to bind-mount its own /actions-runner/externals
+  #   into the spun-up job container, but that source path only resolves
+  #   inside the runner's own container filesystem, not on the actual
+  #   host -- confirmed live, "/__e/node24/bin/node: no such file or
+  #   directory" even with a guaranteed-fresh runner image.
+  # - Building natively on the bare runner (no Docker at all) traded
+  #   that for a different real problem: elephant's runner is Ubuntu
+  #   20.04, whose default gcc (9.4) aws-lc-sys explicitly refuses to
+  #   build with -- a genuine known miscompilation bug (gcc.gnu.org/
+  #   bugzilla 95189), not just an overly cautious version gate.
+  # `docker build` doesn't have either problem: buildx streams the build
+  # context over the Docker API rather than bind-mounting host paths
+  # (exactly why the packaging steps' own docker/build-push-action calls
+  # already work fine on this runner), and Dockerfile.workspace's
+  # rust:trixie gives a modern gcc + a glibc matching every runtime
+  # image (also trixie now) regardless of which runner actually built it.
+  #
+  # This also replaced an earlier cargo-chef multi-stage build duplicated
+  # across all 7 Dockerfiles, dropped after two separate real caching
+  # bugs in one session: a -p-scoping mismatch between `cook` and the
+  # final build that silently defeated the cache even on a cook hit, and
+  # a cache-scope race across concurrent matrix builds where one
+  # service's planner stage imported a stale recipe.json from a
+  # different commit. Compiling once removes both failure classes
+  # outright -- there's only one job now, nothing to race.
   build-workspace:
     needs: pick-runner
     runs-on: ${{ fromJSON(needs.pick-runner.outputs.labels) }}
-    # No `container:` here -- tried that first (rust:bookworm, matching
-    # the runtime images' Debian base at the time), but it broke on
-    # elephant specifically: elephant's runner mounts the *host's* Docker
-    # socket (Docker-outside-of-Docker), and a `container:` job needs the
-    # runner to bind-mount its own /actions-runner/externals (Node.js
-    # binaries for running JS-based actions like checkout) into the
-    # spun-up job container -- but that bind-mount source path only
-    # exists inside the runner's own container filesystem, not on the
-    # actual host elephant's dockerd sees. Confirmed live: checkout
-    # inside the container failed with "/__e/node24/bin/node: no such
-    # file or directory" even with a guaranteed-fresh runner image (real
-    # node24 binaries confirmed present in the image, just not reachable
-    # through that mount from the host's perspective). Not fixable by a
-    # fresher image or runner version -- structural to socket-mounted
-    # DooD.
-    #
-    # Building natively on the bare runner instead works out glibc-wise:
-    # elephant's runner is Ubuntu 20.04 (glibc 2.31), and every runtime
-    # image here is now Debian 13/trixie (glibc 2.41) -- both this and
-    # the ubuntu-latest fallback (24.04, glibc 2.39) are older than
-    # trixie, so a binary built on either runs fine on trixie (glibc is
-    # backward-compatible: older-linked runs on newer, not the reverse).
-    # This is what moving the runtime images from bookworm to trixie
-    # actually fixed -- bookworm's glibc 2.36 was *older* than
-    # ubuntu-latest's 2.39, so a build that fell back to ubuntu-latest
-    # would've produced a too-new binary for it, the original problem all
-    # over again for that one fallback path.
     steps:
       - uses: actions/checkout@v7
 
-      # crates/protocol's build.rs shells out to a real protoc binary (via
-      # connectrpc-build) at `cargo build` time for every workspace member.
-      - name: Install protoc
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends protobuf-compiler
+      - uses: docker/setup-buildx-action@v4
 
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-
+      # Single job, single Dockerfile -- one cache scope, nothing else
+      # ever writes to or races on it (see Dockerfile.workspace's own
+      # comment on why that's what makes cargo-chef safe to use here at
+      # all).
       - name: Build all service binaries
-        run: cargo build --release --locked
-
-      - name: Collect binaries
-        run: |
-          mkdir -p dist
-          for bin in launcher sync-daemon controller registry server-api identity volume-manager; do
-            cp "target/release/${bin}" "dist/${bin}"
-          done
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.workspace
+          target: dist
+          push: false
+          outputs: type=local,dest=dist
+          cache-from: type=gha,scope=workspace-build
+          cache-to: type=gha,mode=max,scope=workspace-build
 
       - uses: actions/upload-artifact@v7
         with:
