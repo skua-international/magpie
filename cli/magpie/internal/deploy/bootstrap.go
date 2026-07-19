@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"strings"
 	"time"
@@ -63,10 +64,31 @@ func BootstrapK3s(ctx context.Context, dataDir string) error {
 		// --kubelet-arg=root-dir relocates that too, onto the same disk.
 		k3sDataDir := filepath.Join(dataDir, "k3s")
 		kubeletDir := filepath.Join(dataDir, "kubelet")
-		fmt.Printf("==> Installing k3s (data-dir: %s, kubelet root-dir: %s)...\n", k3sDataDir, kubeletDir)
+
+		// k3s's own kubeconfig (/etc/rancher/k3s/k3s.yaml) is root-only
+		// by default -- confirmed live: everything downstream of install
+		// (this function's own Ready-polling, writeKubeconfig, and any
+		// bare `k3s kubectl`/`kubectl` an operator runs by hand) hit
+		// permission-denied reading it, since --ssh runs as a real
+		// non-root user, and only the install script itself
+		// self-elevates via sudo internally. Rather than sprinkling sudo
+		// through every subsequent call (this process's own and anyone
+		// else's), have k3s hand out group-readable access to whichever
+		// user is actually running this at install time -- the standard,
+		// k3s-documented way to solve this (the install's own warning
+		// output names both flags directly), and it fixes every future
+		// caller at once, not just this function's.
+		kubeconfigGroup, err := currentGroupName()
+		if err != nil {
+			return fmt.Errorf("failed to resolve the current user's group for --write-kubeconfig-group: %w", err)
+		}
+
+		fmt.Printf("==> Installing k3s (data-dir: %s, kubelet root-dir: %s, kubeconfig group: %s)...\n", k3sDataDir, kubeletDir, kubeconfigGroup)
 		cmd := exec.CommandContext(ctx, "sh", "-c", "curl -sfL https://get.k3s.io | sh -")
 		cmd.Env = append(os.Environ(),
-			"INSTALL_K3S_EXEC=server --data-dir="+k3sDataDir+" --kubelet-arg=root-dir="+kubeletDir,
+			"INSTALL_K3S_EXEC=server --data-dir="+k3sDataDir+
+				" --kubelet-arg=root-dir="+kubeletDir+
+				" --write-kubeconfig-mode=640 --write-kubeconfig-group="+kubeconfigGroup,
 		)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -99,6 +121,24 @@ func BootstrapK3s(ctx context.Context, dataDir string) error {
 	}
 	fmt.Printf("==> kubeconfig written to %s\n", kubeconfigPath)
 	return os.Setenv("KUBECONFIG", kubeconfigPath)
+}
+
+// currentGroupName resolves the current process's own primary group name
+// (not just GID) -- what --write-kubeconfig-group actually needs, since
+// k3s matches by name, not numeric ID. Relies on the standard useradd/
+// cloud-init convention of a per-user primary group sharing the
+// username, which every target this runs against (a fresh Debian/Ubuntu
+// k3s node) follows.
+func currentGroupName() (string, error) {
+	u, err := user.Current()
+	if err != nil {
+		return "", err
+	}
+	g, err := user.LookupGroupId(u.Gid)
+	if err != nil {
+		return "", err
+	}
+	return g.Name, nil
 }
 
 func writeKubeconfig(ctx context.Context) (string, error) {
