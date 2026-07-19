@@ -38,6 +38,8 @@ type installFlags struct {
 	ghcrToken           string
 	identityBaseURL     string
 	ingressBaseDomain   string
+	blobImagePath       string
+	blobMountPath       string
 }
 
 func addInstallFlags(c *cobra.Command, f *installFlags) {
@@ -52,6 +54,10 @@ func addInstallFlags(c *cobra.Command, f *installFlags) {
 	c.Flags().StringVar(&f.identityBaseURL, "identity-base-url", "",
 		"identity's externally-reachable base URL (default: http://identity.<ingress-base-domain>)")
 	c.Flags().StringVar(&f.ingressBaseDomain, "ingress-base-domain", "magpie.local", "base domain every service's Ingress hostname is built from")
+	c.Flags().StringVar(&f.blobImagePath, "blob-image-path", "/var/lib/magpie-blob/content.img",
+		"path to volume-manager's loop-mounted btrfs blob image file -- must match charts/magpie's hostPaths.blobImage unless both are overridden together")
+	c.Flags().StringVar(&f.blobMountPath, "blob-mount-path", "/var/lib/magpie/data",
+		"where volume-manager mounts the blob (content/claims live under here) -- must match charts/magpie's hostPaths.blobMountPath unless both are overridden together")
 }
 
 // extraArgsAfterDash returns whatever was passed after a literal `--` on
@@ -149,6 +155,8 @@ func installCmd() *cobra.Command {
 				GHCRToken:           i.ghcrToken,
 				IdentityBaseURL:     i.identityBaseURL,
 				IngressBaseDomain:   i.ingressBaseDomain,
+				BlobImagePath:       i.blobImagePath,
+				BlobMountPath:       i.blobMountPath,
 			})
 		},
 	}

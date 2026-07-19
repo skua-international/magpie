@@ -1,0 +1,124 @@
+# One per node (DaemonSet, not a Deployment) -- loop-device/btrfs
+# management is inherently node-local, and this sets up cleanly for an
+# eventual multi-node cluster where each node has its own blob (see
+# proto/volume/v1/volume.proto's own doc: btrfs isn't a cluster
+# filesystem, so this is never one blob shared live across nodes).
+#
+# Runs as a dedicated, non-root magpie-volume user/group -- provisioned on
+# the host by `magpiectl install` (see cli/magpie/internal/deploy/
+# volumeuser.go), not privileged: true. Loop-device attach, mount(2), and
+# btrfs's resize ioctl all genuinely need CAP_SYS_ADMIN (there's no
+# finer-grained capability for any of the three in mainline Linux), so
+# that one capability is still granted -- but nothing else `privileged:
+# true` would also hand over (CAP_SYS_MODULE, CAP_NET_ADMIN, disabled
+# seccomp/AppArmor confinement, ...), and it runs as a real non-root UID
+# whose only host-side access is what the install-time provisioning
+# explicitly grants (the blob paths below, and the loop control/device
+# nodes via a dedicated udev rule).
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "magpie.fullname" . }}-volume-manager
+  namespace: {{ include "magpie.namespace" . }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+    app.kubernetes.io/component: volume-manager
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "magpie.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: volume-manager
+  template:
+    metadata:
+      labels:
+        {{- include "magpie.labels" . | nindent 8 }}
+        app.kubernetes.io/component: volume-manager
+    spec:
+      {{- include "magpie.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: volume-manager
+          image: {{ include "magpie.image" (dict "root" $ "override" .Values.volumeManager.image) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            runAsUser: {{ required "volumeManager.runAsUser is required -- set by `magpiectl install` from the host user it provisions, see volumeuser.go" .Values.volumeManager.runAsUser }}
+            runAsGroup: {{ required "volumeManager.runAsGroup is required -- set by `magpiectl install` from the host group it provisions, see volumeuser.go" .Values.volumeManager.runAsGroup }}
+            allowPrivilegeEscalation: true
+            capabilities:
+              drop: ["ALL"]
+              add: ["SYS_ADMIN"]
+          ports:
+            - name: http
+              containerPort: 8446
+          env:
+            - name: LISTEN_ADDR
+              value: "0.0.0.0:8446"
+            - name: BLOB_IMAGE_PATH
+              value: "/blob/{{ base .Values.hostPaths.blobImage }}"
+            - name: BLOB_MOUNT_PATH
+              value: /mnt/blob
+            - name: INITIAL_SIZE_BYTES
+              value: {{ mul .Values.volumeManager.initialSizeGiB 1073741824 | quote }}
+            - name: AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: volume-manager-token
+                  key: token
+          volumeMounts:
+            - name: blob-image-dir
+              mountPath: /blob
+            - name: blob-mount
+              mountPath: /mnt/blob
+              # Bidirectional: the mount this container performs *inside*
+              # /mnt/blob propagates out to the host's own mount namespace
+              # at hostPaths.blobMountPath -- that's what lets
+              # sync-daemon's own (unprivileged, ordinary) hostPath mount
+              # of the same host path see the loop-mounted btrfs content,
+              # without sync-daemon needing any special propagation or
+              # privilege itself. Requires the capability grant above;
+              # this alone is why volume-manager can't be fully
+              # unprivileged the way every other service in this chart is.
+              mountPropagation: Bidirectional
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+          {{- with .Values.volumeManager.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: blob-image-dir
+          hostPath:
+            path: {{ dir .Values.hostPaths.blobImage }}
+            type: Directory
+        - name: blob-mount
+          hostPath:
+            path: {{ .Values.hostPaths.blobMountPath }}
+            type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "magpie.fullname" . }}-volume-manager
+  namespace: {{ include "magpie.namespace" . }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+    app.kubernetes.io/component: volume-manager
+spec:
+  # Internal only -- sync-daemon is its sole caller (also enforced by the
+  # NetworkPolicy below, on clusters whose CNI actually enforces
+  # NetworkPolicy -- k3s's bundled default, flannel, does not; Calico/
+  # Cilium do. The bearer-token check in volume-manager itself is the
+  # real, always-enforced boundary -- this is defense in depth on top of
+  # it, not instead of it).
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: {{ include "magpie.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: volume-manager
+  ports:
+    - name: http
+      port: 8446
+      targetPort: http

@@ -1776,7 +1776,8 @@ pub async fn resolve_source_ids(
     conn: &mut CmConnection,
     candidate_ids: &[u64],
 ) -> Result<ResolveOutcome> {
-    let mut resolved: std::collections::HashMap<u64, String> = std::collections::HashMap::new();
+    let mut resolved: std::collections::HashMap<u64, (String, u64)> =
+        std::collections::HashMap::new();
     // The originally-requested candidates' own titles (a mod's own title,
     // or a collection's -- collections carry their own `title` even though
     // `children` is what actually gets expanded). Only ever populated from
@@ -1845,7 +1846,15 @@ pub async fn resolve_source_ids(
             }
             let file_type = details.file_type.unwrap_or(0);
             if file_type != WORKSHOP_FILE_TYPE_COLLECTION {
-                resolved.insert(id, title);
+                // 0 (not just missing) for a collection's own entry, which
+                // never reaches here anyway -- only genuinely unset for a
+                // handful of legacy items GetDetails doesn't report a size
+                // for at all, treated as "unknown" (0) by callers doing
+                // pre-download disk-space estimates (see sync-daemon's
+                // RegisterSource, which sums this to call volume-manager's
+                // GrowVolume before syncing).
+                let file_size = details.file_size.unwrap_or(0);
+                resolved.insert(id, (title, file_size));
             }
             for child in details.children {
                 if let Some(child_id) = child.publishedfileid {
@@ -1859,7 +1868,11 @@ pub async fn resolve_source_ids(
     Ok(ResolveOutcome {
         mods: resolved
             .into_iter()
-            .map(|(mod_id, title)| ResolvedMod { mod_id, title })
+            .map(|(mod_id, (title, file_size))| ResolvedMod {
+                mod_id,
+                title,
+                file_size,
+            })
             .collect(),
         candidate_titles,
     })
@@ -1868,6 +1881,9 @@ pub async fn resolve_source_ids(
 pub struct ResolvedMod {
     pub mod_id: u64,
     pub title: String,
+    /// From PublishedFileDetails.file_size -- 0 if Steam didn't report one
+    /// (see resolve_source_ids' own comment on this field).
+    pub file_size: u64,
 }
 
 pub struct ResolveOutcome {

@@ -1,0 +1,53 @@
+syntax = "proto3";
+package volume.v1;
+
+option go_package = "github.com/skua-international/magpie/generated/go/volume/v1;volumev1";
+
+// Node-local privileged blob/filesystem lifecycle -- the only component in
+// this stack with host block-device access (loop devices, btrfs resize).
+// Content and claims live on a loop-mounted btrfs blob (not the host's
+// native filesystem directly) specifically so reflink CoW claims work
+// regardless of what filesystem the host actually has -- see
+// charts/magpie's values.yaml hostPaths.blobImage/blobMountPath. Every
+// other service that needs that filesystem to grow calls this instead of
+// holding host block-device privilege itself; see the volume-manager
+// DaemonSet's securityContext and NetworkPolicy for what's actually
+// granted and to whom.
+service VolumeManager {
+  // Ensures at least bytes_needed of free space exists on the managed
+  // blob-backed filesystem, growing it (truncate the backing file bigger,
+  // re-read the loop device's size, btrfs filesystem resize) if not.
+  // Idempotent -- a no-op if free space already covers the request.
+  //
+  // Also responsible for first-time bootstrap: if the blob image doesn't
+  // exist yet at all, this creates it (at the chart's configured initial
+  // size, or bytes_needed if that's larger), formats it btrfs, and mounts
+  // it, before the size check above even applies. Safe to call
+  // concurrently with itself -- internally serialized, never two resizes
+  // in flight at once.
+  rpc GrowVolume(GrowVolumeRequest) returns (GrowVolumeResponse);
+
+  // Current total/used/free bytes on the managed filesystem -- a plain
+  // read, no mutation.
+  rpc GetVolumeStatus(GetVolumeStatusRequest) returns (GetVolumeStatusResponse);
+}
+
+message GrowVolumeRequest {
+  uint64 bytes_needed = 1;
+}
+
+message GrowVolumeResponse {
+  uint64 total_bytes = 1;
+  uint64 free_bytes = 2;
+  // True if this call actually grew (or first-time bootstrapped) the
+  // filesystem -- false if existing free space already covered
+  // bytes_needed.
+  bool grew = 3;
+}
+
+message GetVolumeStatusRequest {}
+
+message GetVolumeStatusResponse {
+  uint64 total_bytes = 1;
+  uint64 free_bytes = 2;
+}

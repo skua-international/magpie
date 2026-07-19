@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -45,6 +46,13 @@ type Options struct {
 	GHCRToken           string
 	IdentityBaseURL     string
 	IngressBaseDomain   string
+	// Only meaningful with Install -- see EnsureVolumeManagerUser. Must
+	// match charts/magpie's values.yaml hostPaths.blobImage/
+	// blobMountPath defaults unless both are overridden together (the
+	// chart and this provisioning step have to agree on where the blob
+	// actually lives).
+	BlobImagePath string
+	BlobMountPath string
 }
 
 // CheckTools verifies helm and kubectl are on PATH, printing an
@@ -268,6 +276,25 @@ func Run(ctx context.Context, opts Options) error {
 		if identityBaseURL != "" {
 			opts.ExtraHelmArgs = append(opts.ExtraHelmArgs, "--set", "identity.baseUrl="+identityBaseURL)
 		}
+
+		fmt.Println("==> Provisioning the magpie-volume host user for volume-manager")
+		uid, gid, err := EnsureVolumeManagerUser(ctx, opts.BlobImagePath, opts.BlobMountPath)
+		if err != nil {
+			return fmt.Errorf("failed to provision volume-manager's host user: %w", err)
+		}
+		// contentPath/claimsPath must stay nested under blobMountPath for
+		// the same reason they always have to be on one real filesystem
+		// (see values.yaml's own comment) -- deriving them here instead
+		// of leaving the chart's own hardcoded defaults means overriding
+		// --blob-mount-path can't silently break that invariant.
+		opts.ExtraHelmArgs = append(opts.ExtraHelmArgs,
+			"--set", fmt.Sprintf("volumeManager.runAsUser=%d", uid),
+			"--set", fmt.Sprintf("volumeManager.runAsGroup=%d", gid),
+			"--set", "hostPaths.blobImage="+opts.BlobImagePath,
+			"--set", "hostPaths.blobMountPath="+opts.BlobMountPath,
+			"--set", "hostPaths.contentPath="+path.Join(opts.BlobMountPath, "content"),
+			"--set", "hostPaths.claimsPath="+path.Join(opts.BlobMountPath, "claims"),
+		)
 	}
 
 	if opts.ImageTag != "" {

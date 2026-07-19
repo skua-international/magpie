@@ -72,14 +72,28 @@ ingress:
 # concurrent mounts with zero extra infrastructure. It's also the
 # *correct* choice, not just the simplest one: contentPath and claimsPath
 # must be on the very same real filesystem for sync-daemon's reflink
-# claims to work (`cp --reflink=always` can't CoW across filesystems) --
-# an NFS-backed RWX PVC would silently degrade every claim to a slow real
-# copy instead. All three default under one parent directory so that's
-# true without the operator having to think about it; if you move any of
-# these, keep contentPath and claimsPath together on one filesystem.
+# claims to work (`cp --reflink=always` can't CoW across filesystems).
+#
+# That "same real filesystem" requirement is now enforced by construction
+# rather than by convention: contentPath/claimsPath live under
+# blobMountPath, a loop-mounted btrfs blob volume-manager owns (see
+# proto/volume/v1/volume.proto) specifically so reflink works regardless
+# of what filesystem the host itself actually has, and can grow itself as
+# content is added instead of needing a fixed size chosen up front.
+# blobImage is the blob's own backing file -- necessarily outside
+# blobMountPath, since a filesystem's backing file can't live inside the
+# filesystem it backs. Both directories must already exist, owned by the
+# magpie-volume user `magpiectl install` provisions (see
+# cli/magpie/internal/deploy/volumeuser.go) -- the chart deliberately
+# does not create them itself (hostPath type: Directory, not
+# DirectoryOrCreate), so a missing provisioning step fails loudly instead
+# of kubelet silently creating root-owned directories the non-root
+# volume-manager pod then can't write to.
 hostPaths:
-  contentPath: /var/lib/magpie/content
-  claimsPath: /var/lib/magpie/claims
+  blobImage: /var/lib/magpie-blob/content.img
+  blobMountPath: /var/lib/magpie/data
+  contentPath: /var/lib/magpie/data/content
+  claimsPath: /var/lib/magpie/data/claims
   localContentPath: /var/lib/magpie/local-content
 
 # JWT verification config, shared by services/registry and
@@ -231,6 +245,31 @@ registry:
   service:
     type: ClusterIP
     port: 8444
+  resources: {}
+
+# Node-local privileged blob/filesystem lifecycle -- see
+# proto/volume/v1/volume.proto and hostPaths' own comment above for why
+# this exists. runAsUser/runAsGroup have no default: `magpiectl install`
+# provisions the magpie-volume system user/group on the host and sets
+# these via --set (see cli/magpie/internal/deploy/volumeuser.go) --
+# there's no sensible generic default UID/GID to ship here, and shipping
+# a wrong one silently would be worse than the chart refusing to render
+# without it (see the DaemonSet template's own `required`).
+volumeManager:
+  image:
+    repository: "ghcr.io/skua-international/magpie/volume-manager"
+    tag: ""
+  runAsUser: ""
+  runAsGroup: ""
+  # Initial blob size, the very first time it's ever created -- every grow
+  # after that is driven by actual usage (sync-daemon calling GrowVolume
+  # ahead of a sync), never re-reads this value again.
+  initialSizeGiB: 60
+  # Added on top of new mods' summed size before sync-daemon calls
+  # GrowVolume -- headroom for the *next* registration, and for file_size
+  # being Steam's own reported size rather than exactly what lands on
+  # disk.
+  growGraceGiB: 10
   resources: {}
 
 rbac:

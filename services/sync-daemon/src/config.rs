@@ -46,6 +46,12 @@ pub struct Config {
     /// `steam_user`/`refresh_token` keys once a session has been
     /// established via RefreshSteamAuth.
     pub steam_session_secret_name: String,
+    /// Empty if volume-manager isn't configured -- RegisterSource just
+    /// skips its pre-emptive grow check in that case rather than
+    /// requiring it. The chart's default values.yaml always sets this.
+    pub volume_manager_url: String,
+    pub volume_manager_token: String,
+    pub volume_grow_grace_bytes: u64,
 }
 
 impl Config {
@@ -76,6 +82,12 @@ impl Config {
             namespace: env::var("NAMESPACE").unwrap_or_else(|_| "default".into()),
             steam_session_secret_name: env::var("STEAM_SESSION_SECRET_NAME")
                 .unwrap_or_else(|_| "arma-steam-session".into()),
+            volume_manager_url: env::var("VOLUME_MANAGER_URL").unwrap_or_default(),
+            volume_manager_token: env::var("VOLUME_MANAGER_TOKEN").unwrap_or_default(),
+            volume_grow_grace_bytes: env::var("VOLUME_GROW_GRACE_BYTES")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(10 * 1024 * 1024 * 1024), // 10GiB
         })
     }
 }

@@ -70,7 +70,7 @@ jobs:
       - name: Collect binaries
         run: |
           mkdir -p dist
-          for bin in launcher sync-daemon controller registry server-api identity; do
+          for bin in launcher sync-daemon controller registry server-api identity volume-manager; do
             cp "target/release/${bin}" "dist/${bin}"
           done
 
@@ -104,6 +104,8 @@ jobs:
             dockerfile: services/server-api/Dockerfile
           - name: identity
             dockerfile: services/identity/Dockerfile
+          - name: volume-manager
+            dockerfile: services/volume-manager/Dockerfile
     steps:
       - uses: actions/checkout@v4
         with:

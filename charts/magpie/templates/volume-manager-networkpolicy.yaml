@@ -1,0 +1,32 @@
+# Defense in depth, not the real boundary -- only enforced by CNIs that
+# actually implement NetworkPolicy (Calico, Cilium, ...). k3s's bundled
+# default, flannel, does not, so this is inert on an out-of-the-box
+# deploy/k3s-bootstrap.sh cluster; volume-manager's own bearer-token check
+# (see charts/magpie/templates/volume-manager-secret.yaml) is what
+# actually restricts callers regardless of CNI.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "magpie.fullname" . }}-volume-manager
+  namespace: {{ include "magpie.namespace" . }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+    app.kubernetes.io/component: volume-manager
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "magpie.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: volume-manager
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ include "magpie.name" . }}
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: sync-daemon
+      ports:
+        - port: http
+          protocol: TCP

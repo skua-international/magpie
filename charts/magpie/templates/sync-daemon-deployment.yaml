@@ -24,6 +24,38 @@ spec:
     spec:
       {{- include "magpie.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "magpie.fullname" . }}-sync-daemon
+      # /content's hostPath is contentPath, a subdirectory of
+      # blobMountPath -- a plain directory on the host's bare filesystem
+      # until volume-manager (a DaemonSet, no ordering guarantee relative
+      # to this Deployment) actually loop-mounts the btrfs blob there.
+      # Starting sync-daemon before that happens would mean it silently
+      # reflink-claims against the host's real filesystem instead of the
+      # blob -- exactly the reflink degradation this whole design exists
+      # to avoid, and no different sync-daemon can detect from the inside
+      # once it's already running. This blocks startup until /content is
+      # genuinely btrfs, using the same image (no extra pull) as the main
+      # container.
+      initContainers:
+        - name: wait-for-content-volume
+          image: {{ include "magpie.image" (dict "root" $ "override" .Values.syncDaemon.image) }}
+          command:
+            - sh
+            - -c
+            - |
+              echo "waiting for /content to be a real (btrfs) mount..."
+              for i in $(seq 1 60); do
+                fstype=$(stat -f -c %T /content 2>/dev/null || true)
+                if [ "$fstype" = "btrfs" ]; then
+                  echo "/content is btrfs, proceeding"
+                  exit 0
+                fi
+                sleep 2
+              done
+              echo "/content never became btrfs -- is volume-manager running/healthy? (kubectl logs -l app.kubernetes.io/component=volume-manager -n {{ include "magpie.namespace" . }})" >&2
+              exit 1
+          volumeMounts:
+            - name: content
+              mountPath: /content
       containers:
         - name: sync-daemon
           image: {{ include "magpie.image" (dict "root" $ "override" .Values.syncDaemon.image) }}
@@ -50,6 +82,15 @@ spec:
             - name: ANONYMOUS_LOGIN
               value: "true"
             {{- end }}
+            - name: VOLUME_MANAGER_URL
+              value: "http://{{ include "magpie.fullname" . }}-volume-manager:8446"
+            - name: VOLUME_MANAGER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: volume-manager-token
+                  key: token
+            - name: VOLUME_GROW_GRACE_BYTES
+              value: {{ mul .Values.volumeManager.growGraceGiB 1073741824 | quote }}
           volumeMounts:
             - name: content
               mountPath: /content
