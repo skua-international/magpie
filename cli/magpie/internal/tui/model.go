@@ -26,8 +26,11 @@ const (
 	screenServers
 	screenServersCreate
 	screenModSources
+	screenModSourcesAdd
 	screenMissions
+	screenMissionsUpload
 	screenAdmin
+	screenAccount
 )
 
 var menuItems = []struct {
@@ -38,32 +41,48 @@ var menuItems = []struct {
 	{"Mod Sources", screenModSources},
 	{"Missions", screenMissions},
 	{"Admin", screenAdmin},
+	{"Account", screenAccount},
 }
 
 type Model struct {
-	ctx       context.Context
-	clients   *client.Clients
-	namespace string
+	ctx         context.Context
+	clients     *client.Clients
+	namespace   string
+	identityURL string
+	accessToken string
 
-	screen screen
-	cursor int
-	err    error
-	loaded bool
+	screen    screen
+	cursor    int
+	err       error // list-load failure only -- replaces the whole screen's content
+	loaded    bool
+	status    string // ephemeral one-line result of the last action (start/stop/delete/sync/...)
+	statusErr bool   // true if status is an action failure, not a success message
 
 	servers    []*controllerv1.ServerInfo
 	modSources []*registryv1.ModSourceInfo
 	missions   []*registryv1.MissionInfo
 	diskUsage  *registryv1.GetDiskUsageResponse
 
-	create createServerState
+	create        createServerState
+	confirm       confirmState
+	addMod        addModSourceState
+	uploadMission uploadMissionState
+	account       accountState
 }
 
 // New builds the TUI's top-level model. namespace is only used for the
 // "create server" flow's per-server ConfigMap kubectl calls (see
 // create_server.go) -- every RPC-backed screen gets its namespace from
-// server-api's own config instead, never from here.
-func New(ctx context.Context, clients *client.Clients, namespace string) Model {
-	return Model{ctx: ctx, clients: clients, namespace: namespace, screen: screenMenu, create: newCreateServerState()}
+// server-api's own config instead, never from here. identityURL/
+// accessToken are only used by the Account screen's link flow (see
+// account.go) -- accessToken is a point-in-time snapshot, not refreshed
+// for the life of the TUI session.
+func New(ctx context.Context, clients *client.Clients, namespace, identityURL, accessToken string) Model {
+	return Model{
+		ctx: ctx, clients: clients, namespace: namespace,
+		identityURL: identityURL, accessToken: accessToken,
+		screen: screenMenu, create: newCreateServerState(),
+	}
 }
 
 func (m Model) Init() tea.Cmd {
@@ -143,17 +162,70 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case diskUsageLoadedMsg:
 		m.loaded, m.err, m.diskUsage = true, msg.err, msg.usage
 		return m, nil
+
+	case serverActionDoneMsg:
+		if msg.err != nil {
+			m.status, m.statusErr = msg.err.Error(), true
+			return m, nil
+		}
+		m.status, m.statusErr = fmt.Sprintf("%s %s", msg.id, msg.verb), false
+		return m, m.loadServersCmd()
+
+	case modSourceActionDoneMsg:
+		if msg.err != nil {
+			if m.screen == screenModSourcesAdd {
+				m.addMod.err = msg.err
+			} else {
+				m.status, m.statusErr = msg.err.Error(), true
+			}
+			return m, nil
+		}
+		m.addMod = addModSourceState{}
+		m.status, m.statusErr = fmt.Sprintf("%s %s", msg.id, msg.verb), false
+		m.screen = screenModSources
+		return m, m.loadModSourcesCmd()
+
+	case missionActionDoneMsg:
+		if msg.err != nil {
+			if m.screen == screenMissionsUpload {
+				m.uploadMission.err = msg.err
+			} else {
+				m.status, m.statusErr = msg.err.Error(), true
+			}
+			return m, nil
+		}
+		m.uploadMission = uploadMissionState{}
+		m.status, m.statusErr = fmt.Sprintf("%s %s", msg.name, msg.verb), false
+		m.screen = screenMissions
+		return m, m.loadMissionsCmd()
+
+	case accountLinkedMsg:
+		m.account.linking = false
+		if msg.err != nil {
+			m.account.err = msg.err
+			return m, nil
+		}
+		m.account.err, m.account.result = nil, "Linked "+msg.provider+"."
+		return m, nil
 	}
 	return m, nil
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	// The create-server wizard has text-entry steps where "q"/"esc" would
-	// otherwise be swallowed as global back/quit keys instead of typed
-	// characters -- routed separately, before any of that, with only
-	// ctrl+c/esc treated specially (back to the servers list, not all the
-	// way out to the menu, since that's the natural "cancel" target here).
-	if m.screen == screenServersCreate {
+	// A pending delete confirmation always wins, on any screen -- see
+	// confirm.go.
+	if m.confirm.kind != confirmNone {
+		return m.handleConfirmKey(msg)
+	}
+
+	// Every text-entry wizard screen has the same shape: "q"/plain esc
+	// would otherwise be swallowed as global back/quit keys instead of
+	// typed characters, so each gets routed here first, before any of
+	// that, with only ctrl+c/esc treated specially (back to the
+	// underlying list screen, not all the way out to the menu, since
+	// that's the natural "cancel" target for all of these).
+	switch m.screen {
+	case screenServersCreate:
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
@@ -163,6 +235,38 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m.handleCreateServerKey(msg)
+
+	case screenModSourcesAdd:
+		switch msg.String() {
+		case "ctrl+c":
+			return m, tea.Quit
+		case "esc":
+			m.screen, m.addMod = screenModSources, addModSourceState{}
+			return m, nil
+		}
+		return m.handleModSourcesAddKey(msg)
+
+	case screenMissionsUpload:
+		switch msg.String() {
+		case "ctrl+c":
+			return m, tea.Quit
+		case "esc":
+			m.screen, m.uploadMission = screenMissions, uploadMissionState{}
+			return m, nil
+		}
+		return m.handleMissionsUploadKey(msg)
+
+	case screenAccount:
+		switch msg.String() {
+		case "ctrl+c":
+			return m, tea.Quit
+		case "esc":
+			if !m.account.linking {
+				m.screen, m.cursor, m.loaded, m.err = screenMenu, 0, false, nil
+			}
+			return m, nil
+		}
+		return m.handleAccountKey(msg)
 	}
 
 	switch msg.String() {
@@ -170,21 +274,31 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.screen == screenMenu {
 			return m, tea.Quit
 		}
-		m.screen, m.cursor, m.loaded, m.err = screenMenu, 0, false, nil
+		m.screen, m.cursor, m.loaded, m.err, m.status = screenMenu, 0, false, nil, ""
 		return m, nil
 	case "esc":
 		if m.screen != screenMenu {
-			m.screen, m.cursor, m.loaded, m.err = screenMenu, 0, false, nil
+			m.screen, m.cursor, m.loaded, m.err, m.status = screenMenu, 0, false, nil, ""
 		}
 		return m, nil
 	}
 
-	if m.screen == screenServers {
-		if msg.String() == "n" {
-			m.screen = screenServersCreate
-			m.cursor = 0
-			m.create = newCreateServerState()
-			return m, nil
+	// Per-screen action keys (start/stop/delete/... -- see
+	// server_actions.go/modsource_actions.go/mission_actions.go) take
+	// priority over the generic list nav below, since they share some of
+	// the same keys the vi-style nav doesn't use ("s", "d", etc).
+	switch m.screen {
+	case screenServers:
+		if next, cmd, handled := m.handleServersKey(msg); handled {
+			return next, cmd
+		}
+	case screenModSources:
+		if next, cmd, handled := m.handleModSourcesKey(msg); handled {
+			return next, cmd
+		}
+	case screenMissions:
+		if next, cmd, handled := m.handleMissionsKey(msg); handled {
+			return next, cmd
 		}
 	}
 
@@ -200,7 +314,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 		case "enter":
 			m.screen = menuItems[m.cursor].screen
-			m.cursor, m.loaded, m.err = 0, false, nil
+			m.cursor, m.loaded, m.err, m.status = 0, false, nil, ""
 			switch m.screen {
 			case screenServers:
 				return m, m.loadServersCmd()
@@ -216,8 +330,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// Any other screen: up/down just moves a cursor over whatever list is
-	// loaded -- selection/actions (start/stop/delete/...) land in a later
-	// pass once the read-only shell here is proven out.
+	// loaded.
 	n := m.currentListLen()
 	switch msg.String() {
 	case "up", "k":
@@ -255,6 +368,14 @@ var (
 func (m Model) View() tea.View {
 	var b strings.Builder
 
+	if m.status != "" {
+		style := dimStyle
+		if m.statusErr {
+			style = errorStyle
+		}
+		b.WriteString(style.Render(m.status) + "\n\n")
+	}
+
 	switch m.screen {
 	case screenMenu:
 		b.WriteString(titleStyle.Render("magpie") + "\n\n")
@@ -281,7 +402,7 @@ func (m Model) View() tea.View {
 				b.WriteString(renderLine(line, i == m.cursor) + "\n")
 			}
 		}
-		b.WriteString("\n" + dimStyle.Render("n: new server, esc to go back"))
+		b.WriteString("\n" + dimStyle.Render("n: new, s: start, x: stop, u: resync, d: delete, esc to go back"))
 
 	case screenServersCreate:
 		b.WriteString(m.viewCreateServer())
@@ -300,7 +421,10 @@ func (m Model) View() tea.View {
 				b.WriteString(renderLine(line, i == m.cursor) + "\n")
 			}
 		}
-		b.WriteString("\n" + dimStyle.Render("esc to go back"))
+		b.WriteString("\n" + dimStyle.Render("a: add, s: sync, d: delete, esc to go back"))
+
+	case screenModSourcesAdd:
+		b.WriteString(m.viewModSourcesAdd())
 
 	case screenMissions:
 		b.WriteString(titleStyle.Render("Missions") + "\n\n")
@@ -316,7 +440,10 @@ func (m Model) View() tea.View {
 				b.WriteString(renderLine(line, i == m.cursor) + "\n")
 			}
 		}
-		b.WriteString("\n" + dimStyle.Render("esc to go back"))
+		b.WriteString("\n" + dimStyle.Render("u: upload, d: delete, esc to go back"))
+
+	case screenMissionsUpload:
+		b.WriteString(m.viewMissionsUpload())
 
 	case screenAdmin:
 		b.WriteString(titleStyle.Render("Admin") + "\n\n")
@@ -331,6 +458,13 @@ func (m Model) View() tea.View {
 			b.WriteString(fmt.Sprintf("total:      %d bytes\n", m.diskUsage.TotalBytes))
 		}
 		b.WriteString("\n" + dimStyle.Render("esc to go back"))
+
+	case screenAccount:
+		b.WriteString(m.viewAccount())
+	}
+
+	if m.confirm.kind != confirmNone {
+		b.WriteString("\n\n" + errorStyle.Render(m.confirm.prompt))
 	}
 
 	return tea.NewView(b.String())
