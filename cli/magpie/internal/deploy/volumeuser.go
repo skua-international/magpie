@@ -3,7 +3,6 @@ package deploy
 import (
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -108,17 +107,30 @@ func ensureLoopDeviceUdevRule(ctx context.Context, group string) error {
 		"SUBSYSTEM==\"block\", KERNEL==\"loop[0-9]*\", GROUP=\"%s\", MODE=\"0660\"\nKERNEL==\"loop-control\", GROUP=\"%s\", MODE=\"0660\"\n",
 		group, group,
 	)
-	// A plain read, not sudo -- /etc/udev/rules.d/*.rules files are
-	// world-readable by convention (0644), only writing needs root.
-	existing, _ := os.ReadFile(udevRulesPath)
-	if string(existing) == rule {
-		return nil // already correct, nothing to reload
+
+	// `modprobe loop` *before* writing/triggering anything: /dev/loop-
+	// control (and any /dev/loopN nodes) only exist in sysfs once the
+	// loop kernel module is actually loaded, which isn't guaranteed on a
+	// fresh boot -- some distros lazy-load it on first use. `udevadm
+	// trigger` only re-applies rules to devices that already have a
+	// sysfs entry to re-trigger a uevent for, so triggering before the
+	// module is loaded finds nothing and silently does nothing.
+	if err := run(ctx, "sudo", "modprobe", "loop"); err != nil {
+		return err
 	}
 
 	// `sudo tee` rather than os.WriteFile: sudo only elevates the
 	// subprocess it spawns, not this Go process's own direct syscalls,
 	// so writing a root-owned path needs to go through a privileged
-	// subprocess, not os.WriteFile itself.
+	// subprocess, not os.WriteFile itself. Always writes + reloads +
+	// retriggers, even if the rules file already has this exact content
+	// -- a previous run (possibly by an older magpiectl binary, or one
+	// that hit this same race) can leave the file correct on disk while
+	// the actual device permissions were never successfully retriggered,
+	// and silently skipping based on file content alone means this
+	// function can never self-heal that on a later run. Confirmed live:
+	// this is exactly what happened on a VM re-provisioned across
+	// multiple install attempts.
 	write := exec.CommandContext(ctx, "sudo", "tee", udevRulesPath)
 	write.Stdin = strings.NewReader(rule)
 	if out, err := write.CombinedOutput(); err != nil {
