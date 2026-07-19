@@ -55,7 +55,7 @@ jobs:
           set -euo pipefail
           source_tag="${{ steps.source.outputs.sha }}"
           release_version="${{ steps.version.outputs.version }}"
-          for service in launcher sync-daemon controller registry server-api identity; do
+          for service in launcher sync-daemon controller registry server-api identity volume-manager; do
             image_ref="${IMAGE_BASE}/${service}"
             docker buildx imagetools create \
               --tag "${image_ref}:${release_version}" \

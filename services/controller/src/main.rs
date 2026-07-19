@@ -27,6 +27,14 @@ async fn main() -> Result<()> {
 
     let cfg = Arc::new(Config::from_env()?);
 
+    // Must happen before Client::try_default() -- see
+    // registry_db::install_crypto_provider's own doc. This process is
+    // the one service that needs a kube::Client before it can call
+    // registry_db::connect() itself (postgres_bootstrap reads a Secret
+    // through it first), so it can't rely on connect() to install this
+    // implicitly the way every other service does.
+    registry_db::install_crypto_provider();
+
     let client = Client::try_default().await?;
     info!("connected to Kubernetes API");
 

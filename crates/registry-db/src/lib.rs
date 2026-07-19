@@ -13,14 +13,23 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-pub async fn connect(database_url: &str) -> anyhow::Result<PgPool> {
-    // rustls 0.23 (pulled in transitively by kube/reqwest, a separate
-    // dependency line from sqlx's own bundled rustls 0.21) needs a
-    // process-level CryptoProvider installed before its first use, or any
-    // TLS handshake through it panics. Every service calls this connect()
-    // on startup before touching kube::Client or reqwest, so installing it
-    // here covers all of them from one place.
+/// rustls 0.23 (pulled in transitively by kube/reqwest, a separate
+/// dependency line from sqlx's own bundled rustls 0.21) needs a
+/// process-level CryptoProvider installed before its first use, or any
+/// TLS handshake through it panics. [`connect`] calls this itself, so
+/// services that call it before creating a `kube::Client` (the usual
+/// order) get this for free -- but a service that needs a `kube::Client`
+/// *before* it can call [`connect`] (e.g. to read a Secret holding
+/// `database_url` itself) must call this explicitly first instead,
+/// confirmed live: `kube::Client::try_default()` + its first real
+/// request happens to not need TLS immediately, but the first actual API
+/// call through it does, and by then it's too late.
+pub fn install_crypto_provider() {
     let _ = rustls::crypto::ring::default_provider().install_default();
+}
+
+pub async fn connect(database_url: &str) -> anyhow::Result<PgPool> {
+    install_crypto_provider();
 
     let pool = sqlx::postgres::PgPoolOptions::new()
         .max_connections(10)
