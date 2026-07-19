@@ -252,9 +252,10 @@ func Run(ctx context.Context, opts Options) error {
 	}
 	chartDir := filepath.Join(tmpDir, "magpie")
 
-	helmArgs := []string{"--namespace", opts.Namespace, "--wait", "--timeout", opts.Timeout}
+	helmArgs := []string{"--namespace", opts.Namespace, "--timeout", opts.Timeout}
 
 	if !opts.Install {
+		helmArgs = append(helmArgs, "--wait")
 		fmt.Printf("==> Carrying over %s's existing user-supplied values\n", opts.Release)
 		values, err := runCaptured(ctx, "helm", "get", "values", opts.Release, "-n", opts.Namespace, "-o", "yaml")
 		if err != nil {
@@ -266,15 +267,13 @@ func Run(ctx context.Context, opts Options) error {
 		}
 		helmArgs = append(helmArgs, "-f", valuesFile)
 	} else {
-		fmt.Println("==> --install: no prior release, resolving secrets + values")
-		helmArgs = append(helmArgs, "--create-namespace")
-
-		secretArgs, err := EnsureInstallSecrets(ctx, opts.ExternalPostgresURL, opts.GHCRUser, opts.GHCRToken)
-		if err != nil {
-			return err
-		}
-		opts.ExtraHelmArgs = append(opts.ExtraHelmArgs, secretArgs...)
-
+		fmt.Println("==> --install: no prior release")
+		// Deliberately no --wait, and no secrets resolved yet, either --
+		// see EnsureInstallSecrets' own doc for why: this first pass just
+		// lets Helm create the namespace itself (its own
+		// templates/namespace.yaml, properly Helm-owned), then a second
+		// pass below creates secrets into it and actually waits for a
+		// healthy rollout, once pods have what they need to start.
 		if opts.IngressBaseDomain != "" {
 			opts.ExtraHelmArgs = append(opts.ExtraHelmArgs, "--set", "ingress.baseDomain="+opts.IngressBaseDomain)
 		}
@@ -287,6 +286,7 @@ func Run(ctx context.Context, opts Options) error {
 		}
 
 		var uid, gid int
+		var err error
 		if opts.SkipVolumeManagerProvisioning {
 			// Already done -- RunRemoteInstall ran this on the actual
 			// --ssh target (the only place it can correctly happen: it's
@@ -356,6 +356,38 @@ func Run(ctx context.Context, opts Options) error {
 	fmt.Printf("==> helm %s %s -> %s\n", verb, opts.Release, version)
 	if err := run(ctx, "helm", args...); err != nil {
 		return err
+	}
+
+	// Phase 2 of a first install: now that the chart's own
+	// templates/namespace.yaml has actually created the namespace
+	// (Helm-owned, not kubectl's), the secrets a first install has no
+	// prior release to carry over into it can be created without the
+	// ownership conflict pre-creating the namespace via kubectl used to
+	// cause -- see EnsureInstallSecrets' own doc. --reuse-values carries
+	// forward everything the first pass above already set (ingress,
+	// identity, volume-manager, any operator --set/-f); only the new
+	// secret args need to be added here. This second upgrade is also
+	// what actually --waits for a healthy rollout -- the first pass
+	// deliberately didn't, since pods referencing these secrets couldn't
+	// have become Ready before they existed. Skipped for --dry-run:
+	// nothing real was created for secrets to complete against.
+	if opts.Install && !opts.DryRun {
+		fmt.Println("==> Namespace created -- resolving secrets")
+		secretArgs, err := EnsureInstallSecrets(ctx, opts.ExternalPostgresURL, opts.GHCRUser, opts.GHCRToken)
+		if err != nil {
+			return err
+		}
+		secondArgs := []string{
+			"upgrade", opts.Release, chartDir,
+			"--namespace", opts.Namespace,
+			"--reuse-values",
+			"--wait", "--timeout", opts.Timeout,
+		}
+		secondArgs = append(secondArgs, secretArgs...)
+		fmt.Printf("==> helm upgrade %s -> %s (secrets applied)\n", opts.Release, version)
+		if err := run(ctx, "helm", secondArgs...); err != nil {
+			return err
+		}
 	}
 
 	if !opts.DryRun {

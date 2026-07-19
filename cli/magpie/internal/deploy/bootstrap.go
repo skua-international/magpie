@@ -200,12 +200,23 @@ func checkReflink(dataDir string) {
 // comments for the full rationale on why Steam auth needs no secret
 // created here at all anymore). Returns the --set args needed to wire
 // the results into the chart. Only ever called for a first install.
+//
+// Deliberately does NOT create the namespace itself any more (used to,
+// via kubectl, so secrets had somewhere to land before helm ran at all)
+// -- the chart's own templates/namespace.yaml already creates it as a
+// normal Helm-owned resource, and creating it twice through two
+// different paths is exactly what caused two separate real conflicts:
+// kubectl's version has none of Helm's own ownership labels/annotations,
+// so both `--create-namespace` and the chart's own namespace template
+// refused to proceed against it ("exists and cannot be imported into
+// the current release: invalid ownership metadata"), confirmed live
+// against a real cluster both ways. Run()'s Install branch now runs an
+// initial `helm upgrade --install` (no --wait -- pods referencing
+// secrets that don't exist yet can't become Ready) to let Helm create
+// the namespace itself, *then* calls this, *then* runs a second
+// `helm upgrade --wait` so it actually confirms a healthy rollout now
+// that the secrets these create actually exist.
 func EnsureInstallSecrets(ctx context.Context, externalPostgresURL, ghcrUser, ghcrToken string) ([]string, error) {
-	fmt.Printf("==> Ensuring namespace %s exists...\n", chartNamespace)
-	if err := kubectlApplyNamespace(ctx, chartNamespace); err != nil {
-		return nil, err
-	}
-
 	var setArgs []string
 
 	if externalPostgresURL == "" {
@@ -239,12 +250,6 @@ func EnsureInstallSecrets(ctx context.Context, externalPostgresURL, ghcrUser, gh
 	fmt.Println("==> Steam auth: no password-based bootstrap secret to create -- run 'magpiectl admin refresh-steam-auth' after install (QR-code login, no password ever touches the cluster), or --set syncDaemon.steamAuth.anonymous=true for anonymous-only access")
 
 	return setArgs, nil
-}
-
-func kubectlApplyNamespace(ctx context.Context, namespace string) error {
-	return applyPiped(ctx,
-		[]string{"create", "namespace", namespace, "--dry-run=client", "-o", "yaml"},
-	)
 }
 
 func kubectlApplySecret(ctx context.Context, kind, name string, extraArgs []string) error {
