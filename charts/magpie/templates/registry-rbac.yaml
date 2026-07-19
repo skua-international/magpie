@@ -43,4 +43,50 @@ subjects:
   - kind: ServiceAccount
     name: {{ include "magpie.fullname" . }}-registry
     namespace: {{ include "magpie.namespace" . }}
+---
+# Cross-namespace: AdminService's ExportState/ImportState (service/
+# admin.rs) read/write ArmaServer objects and ConfigMaps in
+# controllerNamespace, which can diverge from registry's own namespace
+# above the same way services/controller's own Role does (see that
+# file's own comment on the same pattern) -- a separate Role/RoleBinding
+# pair living in the *target* namespace, bound to the same ServiceAccount.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "magpie.fullname" . }}-registry-armaserver
+  namespace: {{ include "magpie.controllerNamespace" . }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+rules:
+  # ImportState creates ArmaServer objects directly (bypassing server-
+  # api's own CreateServer -- see admin.rs's own doc for why: CreateServer
+  # can't set cdlc/profiling/params, and this needs full-fidelity
+  # round-tripping). ExportState only reads. No delete -- an import never
+  # removes a server that already exists, only skips it with a warning.
+  - apiGroups: ["arma.skua.io"]
+    resources: ["armaservers"]
+    verbs: ["get", "list", "create"]
+  # ConfigMaps holding Arma server config -- read for export, write for
+  # import. Unrestricted by resourceNames, same reasoning as controller's
+  # own read-only rule on the same resource (per-server override names
+  # are operator-chosen).
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "create", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "magpie.fullname" . }}-registry-armaserver
+  namespace: {{ include "magpie.controllerNamespace" . }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "magpie.fullname" . }}-registry-armaserver
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "magpie.fullname" . }}-registry
+    namespace: {{ include "magpie.namespace" . }}
 {{- end }}

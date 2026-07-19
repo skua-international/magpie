@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file registry/v1/registry.proto.
  */
 export const file_registry_v1_registry: GenFile = /*@__PURE__*/
-  fileDesc("ChpyZWdpc3RyeS92MS9yZWdpc3RyeS5wcm90bxILcmVnaXN0cnkudjEikgEKE0FkZE1vZFNvdXJjZVJlcXVlc3QSEgoIaHRtbF91cmwYASABKAlIABIWCgxodG1sX2NvbnRlbnQYAiABKAlIABITCglzdGVhbV91cmwYAyABKAlIABIwCglsb2NhbF9tb2QYBCABKAsyGy5yZWdpc3RyeS52MS5Mb2NhbE1vZFVwbG9hZEgAQggKBnNvdXJjZSI4Cg5Mb2NhbE1vZFVwbG9hZBIRCgl1bmlxdWVfaWQYASABKAkSEwoLemlwX2NvbnRlbnQYAiABKAwiIgoUQWRkTW9kU291cmNlUmVzcG9uc2USCgoCaWQYASABKAkiJAoWRGVsZXRlTW9kU291cmNlUmVxdWVzdBIKCgJpZBgBIAEoCSIZChdEZWxldGVNb2RTb3VyY2VSZXNwb25zZSIiChRTeW5jTW9kU291cmNlUmVxdWVzdBIKCgJpZBgBIAEoCSInChVTeW5jTW9kU291cmNlUmVzcG9uc2USDgoGam9iX2lkGAEgASgJIhcKFUxpc3RTeW5jZWRNb2RzUmVxdWVzdCJTCglTeW5jZWRNb2QSDgoGbW9kX2lkGAEgASgEEhMKC21hbmlmZXN0X2lkGAIgASgEEhIKCnNpemVfYnl0ZXMYAyABKAQSDQoFdGl0bGUYBCABKAkiPgoWTGlzdFN5bmNlZE1vZHNSZXNwb25zZRIkCgRtb2RzGAEgAygLMhYucmVnaXN0cnkudjEuU3luY2VkTW9kIiYKFEludmFsaWRhdGVNb2RSZXF1ZXN0Eg4KBm1vZF9pZBgBIAEoBCIXChVJbnZhbGlkYXRlTW9kUmVzcG9uc2UiJQoTR2V0U3luY2VkTW9kUmVxdWVzdBIOCgZtb2RfaWQYASABKAQieQoUR2V0U3luY2VkTW9kUmVzcG9uc2USKAoDbW9kGAEgASgLMhYucmVnaXN0cnkudjEuU3luY2VkTW9kSACIAQESLwoLbW9kX3NvdXJjZXMYAiADKAsyGi5yZWdpc3RyeS52MS5Nb2RTb3VyY2VJbmZvQgYKBF9tb2QingEKDU1vZFNvdXJjZUluZm8SCgoCaWQYASABKAkSKAoEa2luZBgCIAEoDjIaLnJlZ2lzdHJ5LnYxLk1vZFNvdXJjZUtpbmQSEQoJcmVmZXJlbmNlGAMgASgJEhQKDGRpc3BsYXlfbmFtZRgEIAEoCRIaChJjcmVhdGVkX2F0X3VuaXhfbXMYBSABKAMSEgoKc2l6ZV9ieXRlcxgGIAEoBCIXChVMaXN0TW9kU291cmNlc1JlcXVlc3QiRQoWTGlzdE1vZFNvdXJjZXNSZXNwb25zZRIrCgdzb3VyY2VzGAEgAygLMhoucmVnaXN0cnkudjEuTW9kU291cmNlSW5mbyJRChRVcGxvYWRNaXNzaW9uUmVxdWVzdBIMCgRuYW1lGAEgASgJEhMKC3Bib19jb250ZW50GAIgASgMEg8KAmlkGAMgASgJSACIAQFCBQoDX2lkImkKC01pc3Npb25JbmZvEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSEAoIZmlsZXNpemUYAyABKAQSGgoSY3JlYXRlZF9hdF91bml4X21zGAQgASgDEhIKCmNyZWF0ZWRfYnkYBSABKAkiHwoRR2V0TWlzc2lvblJlcXVlc3QSCgoCaWQYASABKAkiFQoTTGlzdE1pc3Npb25zUmVxdWVzdCJCChRMaXN0TWlzc2lvbnNSZXNwb25zZRIqCghtaXNzaW9ucxgBIAMoCzIYLnJlZ2lzdHJ5LnYxLk1pc3Npb25JbmZvIhUKE0dldERpc2tVc2FnZVJlcXVlc3QicQoUR2V0RGlza1VzYWdlUmVzcG9uc2USEgoKbW9kc19ieXRlcxgBIAEoBBIWCg5taXNzaW9uc19ieXRlcxgCIAEoBBIYChBnYW1lX2ZpbGVzX2J5dGVzGAMgASgEEhMKC3RvdGFsX2J5dGVzGAQgASgEIkIKF1JlZnJlc2hTdGVhbUF1dGhSZXF1ZXN0EhAKCHVzZXJuYW1lGAEgASgJEhUKDXJlZnJlc2hfdG9rZW4YAiABKAkiGgoYUmVmcmVzaFN0ZWFtQXV0aFJlc3BvbnNlIiIKFERlbGV0ZU1pc3Npb25SZXF1ZXN0EgoKAmlkGAEgASgJIhcKFURlbGV0ZU1pc3Npb25SZXNwb25zZSqgAQoNTW9kU291cmNlS2luZBIfChtNT0RfU09VUkNFX0tJTkRfVU5TUEVDSUZJRUQQABIXChNNT0RfU09VUkNFX0tJTkRfTU9EEAESHgoaTU9EX1NPVVJDRV9LSU5EX0NPTExFQ1RJT04QAhIZChVNT0RfU09VUkNFX0tJTkRfTE9DQUwQAxIaChZNT0RfU09VUkNFX0tJTkRfUFJFU0VUEAQygAUKEE1vZFNvdXJjZVNlcnZpY2USUwoMQWRkTW9kU291cmNlEiAucmVnaXN0cnkudjEuQWRkTW9kU291cmNlUmVxdWVzdBohLnJlZ2lzdHJ5LnYxLkFkZE1vZFNvdXJjZVJlc3BvbnNlElwKD0RlbGV0ZU1vZFNvdXJjZRIjLnJlZ2lzdHJ5LnYxLkRlbGV0ZU1vZFNvdXJjZVJlcXVlc3QaJC5yZWdpc3RyeS52MS5EZWxldGVNb2RTb3VyY2VSZXNwb25zZRJZCg5MaXN0TW9kU291cmNlcxIiLnJlZ2lzdHJ5LnYxLkxpc3RNb2RTb3VyY2VzUmVxdWVzdBojLnJlZ2lzdHJ5LnYxLkxpc3RNb2RTb3VyY2VzUmVzcG9uc2USVgoNU3luY01vZFNvdXJjZRIhLnJlZ2lzdHJ5LnYxLlN5bmNNb2RTb3VyY2VSZXF1ZXN0GiIucmVnaXN0cnkudjEuU3luY01vZFNvdXJjZVJlc3BvbnNlElkKDkxpc3RTeW5jZWRNb2RzEiIucmVnaXN0cnkudjEuTGlzdFN5bmNlZE1vZHNSZXF1ZXN0GiMucmVnaXN0cnkudjEuTGlzdFN5bmNlZE1vZHNSZXNwb25zZRJWCg1JbnZhbGlkYXRlTW9kEiEucmVnaXN0cnkudjEuSW52YWxpZGF0ZU1vZFJlcXVlc3QaIi5yZWdpc3RyeS52MS5JbnZhbGlkYXRlTW9kUmVzcG9uc2USUwoMR2V0U3luY2VkTW9kEiAucmVnaXN0cnkudjEuR2V0U3luY2VkTW9kUmVxdWVzdBohLnJlZ2lzdHJ5LnYxLkdldFN5bmNlZE1vZFJlc3BvbnNlMtMCCg5NaXNzaW9uU2VydmljZRJMCg1VcGxvYWRNaXNzaW9uEiEucmVnaXN0cnkudjEuVXBsb2FkTWlzc2lvblJlcXVlc3QaGC5yZWdpc3RyeS52MS5NaXNzaW9uSW5mbxJGCgpHZXRNaXNzaW9uEh4ucmVnaXN0cnkudjEuR2V0TWlzc2lvblJlcXVlc3QaGC5yZWdpc3RyeS52MS5NaXNzaW9uSW5mbxJTCgxMaXN0TWlzc2lvbnMSIC5yZWdpc3RyeS52MS5MaXN0TWlzc2lvbnNSZXF1ZXN0GiEucmVnaXN0cnkudjEuTGlzdE1pc3Npb25zUmVzcG9uc2USVgoNRGVsZXRlTWlzc2lvbhIhLnJlZ2lzdHJ5LnYxLkRlbGV0ZU1pc3Npb25SZXF1ZXN0GiIucmVnaXN0cnkudjEuRGVsZXRlTWlzc2lvblJlc3BvbnNlMsQBCgxBZG1pblNlcnZpY2USUwoMR2V0RGlza1VzYWdlEiAucmVnaXN0cnkudjEuR2V0RGlza1VzYWdlUmVxdWVzdBohLnJlZ2lzdHJ5LnYxLkdldERpc2tVc2FnZVJlc3BvbnNlEl8KEFJlZnJlc2hTdGVhbUF1dGgSJC5yZWdpc3RyeS52MS5SZWZyZXNoU3RlYW1BdXRoUmVxdWVzdBolLnJlZ2lzdHJ5LnYxLlJlZnJlc2hTdGVhbUF1dGhSZXNwb25zZUJKWkhnaXRodWIuY29tL3NrdWEtaW50ZXJuYXRpb25hbC9tYWdwaWUvZ2VuZXJhdGVkL2dvL3JlZ2lzdHJ5L3YxO3JlZ2lzdHJ5djFiBnByb3RvMw");
+  fileDesc("ChpyZWdpc3RyeS92MS9yZWdpc3RyeS5wcm90bxILcmVnaXN0cnkudjEikgEKE0FkZE1vZFNvdXJjZVJlcXVlc3QSEgoIaHRtbF91cmwYASABKAlIABIWCgxodG1sX2NvbnRlbnQYAiABKAlIABITCglzdGVhbV91cmwYAyABKAlIABIwCglsb2NhbF9tb2QYBCABKAsyGy5yZWdpc3RyeS52MS5Mb2NhbE1vZFVwbG9hZEgAQggKBnNvdXJjZSI4Cg5Mb2NhbE1vZFVwbG9hZBIRCgl1bmlxdWVfaWQYASABKAkSEwoLemlwX2NvbnRlbnQYAiABKAwiIgoUQWRkTW9kU291cmNlUmVzcG9uc2USCgoCaWQYASABKAkiJAoWRGVsZXRlTW9kU291cmNlUmVxdWVzdBIKCgJpZBgBIAEoCSIZChdEZWxldGVNb2RTb3VyY2VSZXNwb25zZSIiChRTeW5jTW9kU291cmNlUmVxdWVzdBIKCgJpZBgBIAEoCSInChVTeW5jTW9kU291cmNlUmVzcG9uc2USDgoGam9iX2lkGAEgASgJIhcKFUxpc3RTeW5jZWRNb2RzUmVxdWVzdCJTCglTeW5jZWRNb2QSDgoGbW9kX2lkGAEgASgEEhMKC21hbmlmZXN0X2lkGAIgASgEEhIKCnNpemVfYnl0ZXMYAyABKAQSDQoFdGl0bGUYBCABKAkiPgoWTGlzdFN5bmNlZE1vZHNSZXNwb25zZRIkCgRtb2RzGAEgAygLMhYucmVnaXN0cnkudjEuU3luY2VkTW9kIiYKFEludmFsaWRhdGVNb2RSZXF1ZXN0Eg4KBm1vZF9pZBgBIAEoBCIXChVJbnZhbGlkYXRlTW9kUmVzcG9uc2UiJQoTR2V0U3luY2VkTW9kUmVxdWVzdBIOCgZtb2RfaWQYASABKAQieQoUR2V0U3luY2VkTW9kUmVzcG9uc2USKAoDbW9kGAEgASgLMhYucmVnaXN0cnkudjEuU3luY2VkTW9kSACIAQESLwoLbW9kX3NvdXJjZXMYAiADKAsyGi5yZWdpc3RyeS52MS5Nb2RTb3VyY2VJbmZvQgYKBF9tb2QingEKDU1vZFNvdXJjZUluZm8SCgoCaWQYASABKAkSKAoEa2luZBgCIAEoDjIaLnJlZ2lzdHJ5LnYxLk1vZFNvdXJjZUtpbmQSEQoJcmVmZXJlbmNlGAMgASgJEhQKDGRpc3BsYXlfbmFtZRgEIAEoCRIaChJjcmVhdGVkX2F0X3VuaXhfbXMYBSABKAMSEgoKc2l6ZV9ieXRlcxgGIAEoBCIXChVMaXN0TW9kU291cmNlc1JlcXVlc3QiRQoWTGlzdE1vZFNvdXJjZXNSZXNwb25zZRIrCgdzb3VyY2VzGAEgAygLMhoucmVnaXN0cnkudjEuTW9kU291cmNlSW5mbyJRChRVcGxvYWRNaXNzaW9uUmVxdWVzdBIMCgRuYW1lGAEgASgJEhMKC3Bib19jb250ZW50GAIgASgMEg8KAmlkGAMgASgJSACIAQFCBQoDX2lkImkKC01pc3Npb25JbmZvEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSEAoIZmlsZXNpemUYAyABKAQSGgoSY3JlYXRlZF9hdF91bml4X21zGAQgASgDEhIKCmNyZWF0ZWRfYnkYBSABKAkiHwoRR2V0TWlzc2lvblJlcXVlc3QSCgoCaWQYASABKAkiFQoTTGlzdE1pc3Npb25zUmVxdWVzdCJCChRMaXN0TWlzc2lvbnNSZXNwb25zZRIqCghtaXNzaW9ucxgBIAMoCzIYLnJlZ2lzdHJ5LnYxLk1pc3Npb25JbmZvImYKEUV4cG9ydGVkTW9kU291cmNlEigKBGtpbmQYASABKA4yGi5yZWdpc3RyeS52MS5Nb2RTb3VyY2VLaW5kEhEKCXJlZmVyZW5jZRgCIAEoCRIUCgxkaXNwbGF5X25hbWUYAyABKAkihgEKEUV4cG9ydGVkQ29uZmlnTWFwEgwKBG5hbWUYASABKAkSNgoEZGF0YRgCIAMoCzIoLnJlZ2lzdHJ5LnYxLkV4cG9ydGVkQ29uZmlnTWFwLkRhdGFFbnRyeRorCglEYXRhRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASLeAQoORXhwb3J0ZWRTZXJ2ZXISDAoEbmFtZRgBIAEoCRIMCgRwb3J0GAIgASgNEh0KFW1vZF9zb3VyY2VfcmVmZXJlbmNlcxgDIAMoCRIXCgpjb25maWdfbWFwGAQgASgJSACIAQESDAoEY2RsYxgFIAMoCRIRCglwcm9maWxpbmcYBiABKAgSDgoGcGFyYW1zGAcgAygJEjgKDWRlc2lyZWRfc3RhdGUYCCABKA4yIS5yZWdpc3RyeS52MS5FeHBvcnRlZERlc2lyZWRTdGF0ZUINCgtfY29uZmlnX21hcCIUChJFeHBvcnRTdGF0ZVJlcXVlc3Qi3AEKE0V4cG9ydFN0YXRlUmVzcG9uc2USGwoTZXhwb3J0ZWRfYXRfcmZjMzMzORgBIAEoCRIzCgttb2Rfc291cmNlcxgCIAMoCzIeLnJlZ2lzdHJ5LnYxLkV4cG9ydGVkTW9kU291cmNlEjMKC2NvbmZpZ19tYXBzGAMgAygLMh4ucmVnaXN0cnkudjEuRXhwb3J0ZWRDb25maWdNYXASLAoHc2VydmVycxgEIAMoCzIbLnJlZ2lzdHJ5LnYxLkV4cG9ydGVkU2VydmVyEhAKCHdhcm5pbmdzGAUgAygJIqwBChJJbXBvcnRTdGF0ZVJlcXVlc3QSMwoLbW9kX3NvdXJjZXMYASADKAsyHi5yZWdpc3RyeS52MS5FeHBvcnRlZE1vZFNvdXJjZRIzCgtjb25maWdfbWFwcxgCIAMoCzIeLnJlZ2lzdHJ5LnYxLkV4cG9ydGVkQ29uZmlnTWFwEiwKB3NlcnZlcnMYAyADKAsyGy5yZWdpc3RyeS52MS5FeHBvcnRlZFNlcnZlciInChNJbXBvcnRTdGF0ZVJlc3BvbnNlEhAKCHdhcm5pbmdzGAEgAygJIhUKE0dldERpc2tVc2FnZVJlcXVlc3QicQoUR2V0RGlza1VzYWdlUmVzcG9uc2USEgoKbW9kc19ieXRlcxgBIAEoBBIWCg5taXNzaW9uc19ieXRlcxgCIAEoBBIYChBnYW1lX2ZpbGVzX2J5dGVzGAMgASgEEhMKC3RvdGFsX2J5dGVzGAQgASgEIkIKF1JlZnJlc2hTdGVhbUF1dGhSZXF1ZXN0EhAKCHVzZXJuYW1lGAEgASgJEhUKDXJlZnJlc2hfdG9rZW4YAiABKAkiGgoYUmVmcmVzaFN0ZWFtQXV0aFJlc3BvbnNlIiIKFERlbGV0ZU1pc3Npb25SZXF1ZXN0EgoKAmlkGAEgASgJIhcKFURlbGV0ZU1pc3Npb25SZXNwb25zZSqgAQoNTW9kU291cmNlS2luZBIfChtNT0RfU09VUkNFX0tJTkRfVU5TUEVDSUZJRUQQABIXChNNT0RfU09VUkNFX0tJTkRfTU9EEAESHgoaTU9EX1NPVVJDRV9LSU5EX0NPTExFQ1RJT04QAhIZChVNT0RfU09VUkNFX0tJTkRfTE9DQUwQAxIaChZNT0RfU09VUkNFX0tJTkRfUFJFU0VUEAQqhgEKFEV4cG9ydGVkRGVzaXJlZFN0YXRlEiYKIkVYUE9SVEVEX0RFU0lSRURfU1RBVEVfVU5TUEVDSUZJRUQQABIiCh5FWFBPUlRFRF9ERVNJUkVEX1NUQVRFX1JVTk5JTkcQARIiCh5FWFBPUlRFRF9ERVNJUkVEX1NUQVRFX1NUT1BQRUQQAjKABQoQTW9kU291cmNlU2VydmljZRJTCgxBZGRNb2RTb3VyY2USIC5yZWdpc3RyeS52MS5BZGRNb2RTb3VyY2VSZXF1ZXN0GiEucmVnaXN0cnkudjEuQWRkTW9kU291cmNlUmVzcG9uc2USXAoPRGVsZXRlTW9kU291cmNlEiMucmVnaXN0cnkudjEuRGVsZXRlTW9kU291cmNlUmVxdWVzdBokLnJlZ2lzdHJ5LnYxLkRlbGV0ZU1vZFNvdXJjZVJlc3BvbnNlElkKDkxpc3RNb2RTb3VyY2VzEiIucmVnaXN0cnkudjEuTGlzdE1vZFNvdXJjZXNSZXF1ZXN0GiMucmVnaXN0cnkudjEuTGlzdE1vZFNvdXJjZXNSZXNwb25zZRJWCg1TeW5jTW9kU291cmNlEiEucmVnaXN0cnkudjEuU3luY01vZFNvdXJjZVJlcXVlc3QaIi5yZWdpc3RyeS52MS5TeW5jTW9kU291cmNlUmVzcG9uc2USWQoOTGlzdFN5bmNlZE1vZHMSIi5yZWdpc3RyeS52MS5MaXN0U3luY2VkTW9kc1JlcXVlc3QaIy5yZWdpc3RyeS52MS5MaXN0U3luY2VkTW9kc1Jlc3BvbnNlElYKDUludmFsaWRhdGVNb2QSIS5yZWdpc3RyeS52MS5JbnZhbGlkYXRlTW9kUmVxdWVzdBoiLnJlZ2lzdHJ5LnYxLkludmFsaWRhdGVNb2RSZXNwb25zZRJTCgxHZXRTeW5jZWRNb2QSIC5yZWdpc3RyeS52MS5HZXRTeW5jZWRNb2RSZXF1ZXN0GiEucmVnaXN0cnkudjEuR2V0U3luY2VkTW9kUmVzcG9uc2Uy0wIKDk1pc3Npb25TZXJ2aWNlEkwKDVVwbG9hZE1pc3Npb24SIS5yZWdpc3RyeS52MS5VcGxvYWRNaXNzaW9uUmVxdWVzdBoYLnJlZ2lzdHJ5LnYxLk1pc3Npb25JbmZvEkYKCkdldE1pc3Npb24SHi5yZWdpc3RyeS52MS5HZXRNaXNzaW9uUmVxdWVzdBoYLnJlZ2lzdHJ5LnYxLk1pc3Npb25JbmZvElMKDExpc3RNaXNzaW9ucxIgLnJlZ2lzdHJ5LnYxLkxpc3RNaXNzaW9uc1JlcXVlc3QaIS5yZWdpc3RyeS52MS5MaXN0TWlzc2lvbnNSZXNwb25zZRJWCg1EZWxldGVNaXNzaW9uEiEucmVnaXN0cnkudjEuRGVsZXRlTWlzc2lvblJlcXVlc3QaIi5yZWdpc3RyeS52MS5EZWxldGVNaXNzaW9uUmVzcG9uc2Uy6AIKDEFkbWluU2VydmljZRJTCgxHZXREaXNrVXNhZ2USIC5yZWdpc3RyeS52MS5HZXREaXNrVXNhZ2VSZXF1ZXN0GiEucmVnaXN0cnkudjEuR2V0RGlza1VzYWdlUmVzcG9uc2USXwoQUmVmcmVzaFN0ZWFtQXV0aBIkLnJlZ2lzdHJ5LnYxLlJlZnJlc2hTdGVhbUF1dGhSZXF1ZXN0GiUucmVnaXN0cnkudjEuUmVmcmVzaFN0ZWFtQXV0aFJlc3BvbnNlElAKC0V4cG9ydFN0YXRlEh8ucmVnaXN0cnkudjEuRXhwb3J0U3RhdGVSZXF1ZXN0GiAucmVnaXN0cnkudjEuRXhwb3J0U3RhdGVSZXNwb25zZRJQCgtJbXBvcnRTdGF0ZRIfLnJlZ2lzdHJ5LnYxLkltcG9ydFN0YXRlUmVxdWVzdBogLnJlZ2lzdHJ5LnYxLkltcG9ydFN0YXRlUmVzcG9uc2VCSlpIZ2l0aHViLmNvbS9za3VhLWludGVybmF0aW9uYWwvbWFncGllL2dlbmVyYXRlZC9nby9yZWdpc3RyeS92MTtyZWdpc3RyeXYxYgZwcm90bzM");
 
 /**
  * @generated from message registry.v1.AddModSourceRequest
@@ -521,6 +521,218 @@ export const ListMissionsResponseSchema: GenMessage<ListMissionsResponse> = /*@_
   messageDesc(file_registry_v1_registry, 21);
 
 /**
+ * @generated from message registry.v1.ExportedModSource
+ */
+export type ExportedModSource = Message<"registry.v1.ExportedModSource"> & {
+  /**
+   * @generated from field: registry.v1.ModSourceKind kind = 1;
+   */
+  kind: ModSourceKind;
+
+  /**
+   * Reusable on import for MOD/COLLECTION (a Steam URL) and PRESET
+   * registered from a URL -- ImportState re-registers these directly
+   * against a fresh ModSource object. LOCAL (a unique_id, not a URL) and
+   * PRESET registered from inline HTML content (reference is literally
+   * "(uploaded HTML)" -- the content itself was never captured here) are
+   * *not* reusable: their actual mod content/HTML was never part of this
+   * export in the first place, so ImportState always skips them and
+   * reports why in ImportStateResponse.warnings.
+   *
+   * @generated from field: string reference = 2;
+   */
+  reference: string;
+
+  /**
+   * @generated from field: string display_name = 3;
+   */
+  displayName: string;
+};
+
+/**
+ * Describes the message registry.v1.ExportedModSource.
+ * Use `create(ExportedModSourceSchema)` to create a new message.
+ */
+export const ExportedModSourceSchema: GenMessage<ExportedModSource> = /*@__PURE__*/
+  messageDesc(file_registry_v1_registry, 22);
+
+/**
+ * @generated from message registry.v1.ExportedConfigMap
+ */
+export type ExportedConfigMap = Message<"registry.v1.ExportedConfigMap"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: map<string, string> data = 2;
+   */
+  data: { [key: string]: string };
+};
+
+/**
+ * Describes the message registry.v1.ExportedConfigMap.
+ * Use `create(ExportedConfigMapSchema)` to create a new message.
+ */
+export const ExportedConfigMapSchema: GenMessage<ExportedConfigMap> = /*@__PURE__*/
+  messageDesc(file_registry_v1_registry, 23);
+
+/**
+ * @generated from message registry.v1.ExportedServer
+ */
+export type ExportedServer = Message<"registry.v1.ExportedServer"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: uint32 port = 2;
+   */
+  port: number;
+
+  /**
+   * ExportedModSource.reference strings this server's mod_source_ids
+   * resolved to at export time -- not IDs, see ImportState's own doc.
+   *
+   * @generated from field: repeated string mod_source_references = 3;
+   */
+  modSourceReferences: string[];
+
+  /**
+   * @generated from field: optional string config_map = 4;
+   */
+  configMap?: string | undefined;
+
+  /**
+   * @generated from field: repeated string cdlc = 5;
+   */
+  cdlc: string[];
+
+  /**
+   * @generated from field: bool profiling = 6;
+   */
+  profiling: boolean;
+
+  /**
+   * @generated from field: repeated string params = 7;
+   */
+  params: string[];
+
+  /**
+   * @generated from field: registry.v1.ExportedDesiredState desired_state = 8;
+   */
+  desiredState: ExportedDesiredState;
+};
+
+/**
+ * Describes the message registry.v1.ExportedServer.
+ * Use `create(ExportedServerSchema)` to create a new message.
+ */
+export const ExportedServerSchema: GenMessage<ExportedServer> = /*@__PURE__*/
+  messageDesc(file_registry_v1_registry, 24);
+
+/**
+ * @generated from message registry.v1.ExportStateRequest
+ */
+export type ExportStateRequest = Message<"registry.v1.ExportStateRequest"> & {
+};
+
+/**
+ * Describes the message registry.v1.ExportStateRequest.
+ * Use `create(ExportStateRequestSchema)` to create a new message.
+ */
+export const ExportStateRequestSchema: GenMessage<ExportStateRequest> = /*@__PURE__*/
+  messageDesc(file_registry_v1_registry, 25);
+
+/**
+ * @generated from message registry.v1.ExportStateResponse
+ */
+export type ExportStateResponse = Message<"registry.v1.ExportStateResponse"> & {
+  /**
+   * @generated from field: string exported_at_rfc3339 = 1;
+   */
+  exportedAtRfc3339: string;
+
+  /**
+   * @generated from field: repeated registry.v1.ExportedModSource mod_sources = 2;
+   */
+  modSources: ExportedModSource[];
+
+  /**
+   * @generated from field: repeated registry.v1.ExportedConfigMap config_maps = 3;
+   */
+  configMaps: ExportedConfigMap[];
+
+  /**
+   * @generated from field: repeated registry.v1.ExportedServer servers = 4;
+   */
+  servers: ExportedServer[];
+
+  /**
+   * E.g. a server referencing a mod source ID that no longer resolves
+   * (deleted between the mod source list and server list reads) --
+   * dropped from that server's mod_source_references rather than
+   * failing the whole export.
+   *
+   * @generated from field: repeated string warnings = 5;
+   */
+  warnings: string[];
+};
+
+/**
+ * Describes the message registry.v1.ExportStateResponse.
+ * Use `create(ExportStateResponseSchema)` to create a new message.
+ */
+export const ExportStateResponseSchema: GenMessage<ExportStateResponse> = /*@__PURE__*/
+  messageDesc(file_registry_v1_registry, 26);
+
+/**
+ * @generated from message registry.v1.ImportStateRequest
+ */
+export type ImportStateRequest = Message<"registry.v1.ImportStateRequest"> & {
+  /**
+   * @generated from field: repeated registry.v1.ExportedModSource mod_sources = 1;
+   */
+  modSources: ExportedModSource[];
+
+  /**
+   * @generated from field: repeated registry.v1.ExportedConfigMap config_maps = 2;
+   */
+  configMaps: ExportedConfigMap[];
+
+  /**
+   * @generated from field: repeated registry.v1.ExportedServer servers = 3;
+   */
+  servers: ExportedServer[];
+};
+
+/**
+ * Describes the message registry.v1.ImportStateRequest.
+ * Use `create(ImportStateRequestSchema)` to create a new message.
+ */
+export const ImportStateRequestSchema: GenMessage<ImportStateRequest> = /*@__PURE__*/
+  messageDesc(file_registry_v1_registry, 27);
+
+/**
+ * @generated from message registry.v1.ImportStateResponse
+ */
+export type ImportStateResponse = Message<"registry.v1.ImportStateResponse"> & {
+  /**
+   * @generated from field: repeated string warnings = 1;
+   */
+  warnings: string[];
+};
+
+/**
+ * Describes the message registry.v1.ImportStateResponse.
+ * Use `create(ImportStateResponseSchema)` to create a new message.
+ */
+export const ImportStateResponseSchema: GenMessage<ImportStateResponse> = /*@__PURE__*/
+  messageDesc(file_registry_v1_registry, 28);
+
+/**
  * @generated from message registry.v1.GetDiskUsageRequest
  */
 export type GetDiskUsageRequest = Message<"registry.v1.GetDiskUsageRequest"> & {
@@ -531,7 +743,7 @@ export type GetDiskUsageRequest = Message<"registry.v1.GetDiskUsageRequest"> & {
  * Use `create(GetDiskUsageRequestSchema)` to create a new message.
  */
 export const GetDiskUsageRequestSchema: GenMessage<GetDiskUsageRequest> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 22);
+  messageDesc(file_registry_v1_registry, 29);
 
 /**
  * @generated from message registry.v1.GetDiskUsageResponse
@@ -570,7 +782,7 @@ export type GetDiskUsageResponse = Message<"registry.v1.GetDiskUsageResponse"> &
  * Use `create(GetDiskUsageResponseSchema)` to create a new message.
  */
 export const GetDiskUsageResponseSchema: GenMessage<GetDiskUsageResponse> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 23);
+  messageDesc(file_registry_v1_registry, 30);
 
 /**
  * @generated from message registry.v1.RefreshSteamAuthRequest
@@ -592,7 +804,7 @@ export type RefreshSteamAuthRequest = Message<"registry.v1.RefreshSteamAuthReque
  * Use `create(RefreshSteamAuthRequestSchema)` to create a new message.
  */
 export const RefreshSteamAuthRequestSchema: GenMessage<RefreshSteamAuthRequest> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 24);
+  messageDesc(file_registry_v1_registry, 31);
 
 /**
  * @generated from message registry.v1.RefreshSteamAuthResponse
@@ -605,7 +817,7 @@ export type RefreshSteamAuthResponse = Message<"registry.v1.RefreshSteamAuthResp
  * Use `create(RefreshSteamAuthResponseSchema)` to create a new message.
  */
 export const RefreshSteamAuthResponseSchema: GenMessage<RefreshSteamAuthResponse> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 25);
+  messageDesc(file_registry_v1_registry, 32);
 
 /**
  * @generated from message registry.v1.DeleteMissionRequest
@@ -622,7 +834,7 @@ export type DeleteMissionRequest = Message<"registry.v1.DeleteMissionRequest"> &
  * Use `create(DeleteMissionRequestSchema)` to create a new message.
  */
 export const DeleteMissionRequestSchema: GenMessage<DeleteMissionRequest> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 26);
+  messageDesc(file_registry_v1_registry, 33);
 
 /**
  * @generated from message registry.v1.DeleteMissionResponse
@@ -635,7 +847,7 @@ export type DeleteMissionResponse = Message<"registry.v1.DeleteMissionResponse">
  * Use `create(DeleteMissionResponseSchema)` to create a new message.
  */
 export const DeleteMissionResponseSchema: GenMessage<DeleteMissionResponse> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 27);
+  messageDesc(file_registry_v1_registry, 34);
 
 /**
  * @generated from enum registry.v1.ModSourceKind
@@ -676,6 +888,32 @@ export enum ModSourceKind {
  */
 export const ModSourceKindSchema: GenEnum<ModSourceKind> = /*@__PURE__*/
   enumDesc(file_registry_v1_registry, 0);
+
+/**
+ * @generated from enum registry.v1.ExportedDesiredState
+ */
+export enum ExportedDesiredState {
+  /**
+   * @generated from enum value: EXPORTED_DESIRED_STATE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: EXPORTED_DESIRED_STATE_RUNNING = 1;
+   */
+  RUNNING = 1,
+
+  /**
+   * @generated from enum value: EXPORTED_DESIRED_STATE_STOPPED = 2;
+   */
+  STOPPED = 2,
+}
+
+/**
+ * Describes the enum registry.v1.ExportedDesiredState.
+ */
+export const ExportedDesiredStateSchema: GenEnum<ExportedDesiredState> = /*@__PURE__*/
+  enumDesc(file_registry_v1_registry, 1);
 
 /**
  * Registers and tracks *sources* of mods -- a single Workshop mod, a
@@ -846,6 +1084,40 @@ export const AdminService: GenService<{
     methodKind: "unary";
     input: typeof RefreshSteamAuthRequestSchema;
     output: typeof RefreshSteamAuthResponseSchema;
+  },
+  /**
+   * Everything declarative about this cluster's Arma fleet: mod source
+   * registrations (not their synced file content -- see
+   * ExportedModSource's own doc), the ConfigMaps servers reference (the
+   * baseline plus every per-server override), and ArmaServer specs.
+   * Deliberately excludes Postgres application data, synced mod/mission
+   * file content, ACL grants, and any live credential (Steam session,
+   * linked OAuth accounts) -- none of that is "declarative config" in
+   * the same sense, and copying live credentials between clusters is
+   * its own hazard rather than a convenience.
+   *
+   * @generated from rpc registry.v1.AdminService.ExportState
+   */
+  exportState: {
+    methodKind: "unary";
+    input: typeof ExportStateRequestSchema;
+    output: typeof ExportStateResponseSchema;
+  },
+  /**
+   * Re-creates whatever ExportState produced. Idempotent per item, not
+   * transactional: each mod source/ConfigMap/server is applied
+   * independently, and one failing doesn't roll back the others -- the
+   * response's `warnings` reports exactly what was skipped and why.
+   * Servers are matched to their mod sources by `reference` (the
+   * original Steam/preset URL), never by ID -- ModSource IDs are
+   * regenerated on every import and never match the export's own.
+   *
+   * @generated from rpc registry.v1.AdminService.ImportState
+   */
+  importState: {
+    methodKind: "unary";
+    input: typeof ImportStateRequestSchema;
+    output: typeof ImportStateResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_registry_v1_registry, 2);

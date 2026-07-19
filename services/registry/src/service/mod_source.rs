@@ -60,7 +60,7 @@ impl ModSourceServiceImpl {
 /// Steam URL, a marker for uploaded HTML, or a local mod's unique_id.
 /// Always derivable from `spec` alone, never from `status` (which may not
 /// have resolved yet).
-fn reference_for(spec: &ModSourceInput) -> String {
+pub(crate) fn reference_for(spec: &ModSourceInput) -> String {
     match spec {
         ModSourceInput::SteamUrl(url) | ModSourceInput::HtmlUrl(url) => url.clone(),
         ModSourceInput::HtmlContent(_) => "(uploaded HTML)".to_string(),
@@ -68,7 +68,7 @@ fn reference_for(spec: &ModSourceInput) -> String {
     }
 }
 
-fn kind_str_to_proto(kind: &str) -> ProtoKind {
+pub(crate) fn kind_str_to_proto(kind: &str) -> ProtoKind {
     match kind {
         "mod" => ProtoKind::Mod,
         "collection" => ProtoKind::Collection,
@@ -78,7 +78,7 @@ fn kind_str_to_proto(kind: &str) -> ProtoKind {
     }
 }
 
-fn to_mod_source_info(obj: &ModSource) -> ModSourceInfo {
+pub(crate) fn to_mod_source_info(obj: &ModSource) -> ModSourceInfo {
     let status = obj.status.clone().unwrap_or_default();
     let created_at_unix_ms = obj
         .creation_timestamp()

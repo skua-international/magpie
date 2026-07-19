@@ -17,6 +17,7 @@ registry-db = { path = "../../crates/registry-db" }
 serde_json = "1.0.150"
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "chrono", "macros"] }
 sync-client = { path = "../../crates/sync-client" }
+time = { version = "0.3", features = ["formatting"] }
 tokio = { version = "1.53.0", features = ["rt-multi-thread", "macros", "net"] }
 tower = "0.5.3"
 tracing = "0.1.44"

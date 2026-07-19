@@ -1,13 +1,13 @@
-//! `AdminService`: cluster-wide storage accounting. See the proto's own
-//! doc comment for why this exists as a separate, single-figure answer
-//! rather than making callers sum `ModSourceInfo.size_bytes` themselves
-//! (which double-counts any mod referenced by more than one source).
+//! `AdminService`: cluster-wide storage accounting, Steam session
+//! refresh, and (see state.rs) declarative cluster state export/import.
 
 use std::sync::Arc;
 
 use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest, ServiceResult};
+use kube::Client;
 use protocol::proto::registry::v1::{
-    GetDiskUsageRequest, GetDiskUsageResponse, RefreshSteamAuthRequest, RefreshSteamAuthResponse,
+    ExportStateRequest, ExportStateResponse, GetDiskUsageRequest, GetDiskUsageResponse,
+    ImportStateRequest, ImportStateResponse, RefreshSteamAuthRequest, RefreshSteamAuthResponse,
 };
 use sqlx::PgPool;
 use sync_client::SyncClient;
@@ -15,11 +15,33 @@ use sync_client::SyncClient;
 pub struct AdminServiceImpl {
     pool: PgPool,
     sync_client: Arc<SyncClient>,
+    pub(crate) client: Client,
+    /// Namespace for ModSource objects -- see Config::namespace's own doc.
+    pub(crate) namespace: String,
+    /// Namespace for ArmaServer objects and ConfigMaps -- see
+    /// Config::armaserver_namespace's own doc for why this is kept
+    /// distinct from `namespace` above.
+    pub(crate) armaserver_namespace: String,
+    pub(crate) arma_config_baseline: String,
 }
 
 impl AdminServiceImpl {
-    pub fn new(pool: PgPool, sync_client: Arc<SyncClient>) -> Arc<Self> {
-        Arc::new(Self { pool, sync_client })
+    pub fn new(
+        pool: PgPool,
+        sync_client: Arc<SyncClient>,
+        client: Client,
+        namespace: String,
+        armaserver_namespace: String,
+        arma_config_baseline: String,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            pool,
+            sync_client,
+            client,
+            namespace,
+            armaserver_namespace,
+            arma_config_baseline,
+        })
     }
 }
 
@@ -69,5 +91,28 @@ impl protocol::proto::registry::v1::AdminService for AdminServiceImpl {
             .await
             .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
         Response::ok(RefreshSteamAuthResponse::default())
+    }
+
+    async fn export_state<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        _request: ServiceRequest<'_, ExportStateRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<ExportStateResponse> + Send + use<'a>> {
+        let resp = self.export_state_impl().await?;
+        Response::ok(resp)
+    }
+
+    async fn import_state<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        request: ServiceRequest<'_, ImportStateRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<ImportStateResponse> + Send + use<'a>> {
+        // The handler below builds/holds owned ExportedModSource/
+        // ExportedConfigMap/ExportedServer values across several awaits
+        // (K8s API calls) -- easier as one owned ImportStateRequest than
+        // threading the zero-copy view's lifetime through all of that.
+        let owned = request.to_owned_message();
+        let resp = self.import_state_impl(owned).await?;
+        Response::ok(resp)
     }
 }

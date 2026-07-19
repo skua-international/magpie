@@ -42,6 +42,15 @@ spec:
               value: "0.0.0.0:{{ .Values.registry.service.port }}"
             - name: NAMESPACE
               value: {{ include "magpie.namespace" . }}
+            # AdminService's ExportState/ImportState read/write ArmaServer
+            # objects and ConfigMaps -- controllerNamespace, not plain
+            # namespace above, so this always matches wherever
+            # services/controller actually manages those (see
+            # config.rs's own doc on why the two can diverge).
+            - name: ARMASERVER_NAMESPACE
+              value: {{ include "magpie.controllerNamespace" . }}
+            - name: ARMA_CONFIG_BASELINE_CONFIGMAP
+              value: {{ printf "%s-arma-config-baseline" (include "magpie.fullname" .) | quote }}
             - name: LOCAL_CONTENT_ROOT
               value: /local-content
             - name: SYNC_DAEMON_URL

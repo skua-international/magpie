@@ -28,3 +28,27 @@ func RefreshSteamAuth(ctx context.Context, c *client.Clients, username, refreshT
 	}))
 	return err
 }
+
+// ExportState returns everything declarative about this cluster's Arma
+// fleet -- mod source registrations, ConfigMaps, ArmaServer specs. See
+// the RPC's own proto doc for exactly what's excluded (Postgres data,
+// synced file content, ACL grants, live credentials) and why.
+func ExportState(ctx context.Context, c *client.Clients) (*registryv1.ExportStateResponse, error) {
+	resp, err := c.Admin.ExportState(ctx, connect.NewRequest(&registryv1.ExportStateRequest{}))
+	if err != nil {
+		return nil, err
+	}
+	return resp.Msg, nil
+}
+
+// ImportState re-creates whatever ExportState produced, scoped to
+// exactly the sections state.go's Bundle carries (mod sources,
+// ConfigMaps, servers) -- see ImportState's own proto doc for why this
+// is per-item best-effort rather than transactional.
+func ImportState(ctx context.Context, c *client.Clients, req *registryv1.ImportStateRequest) (*registryv1.ImportStateResponse, error) {
+	resp, err := c.Admin.ImportState(ctx, connect.NewRequest(req))
+	if err != nil {
+		return nil, err
+	}
+	return resp.Msg, nil
+}

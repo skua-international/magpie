@@ -79,6 +79,55 @@ func (ModSourceKind) EnumDescriptor() ([]byte, []int) {
 	return file_registry_v1_registry_proto_rawDescGZIP(), []int{0}
 }
 
+type ExportedDesiredState int32
+
+const (
+	ExportedDesiredState_EXPORTED_DESIRED_STATE_UNSPECIFIED ExportedDesiredState = 0
+	ExportedDesiredState_EXPORTED_DESIRED_STATE_RUNNING     ExportedDesiredState = 1
+	ExportedDesiredState_EXPORTED_DESIRED_STATE_STOPPED     ExportedDesiredState = 2
+)
+
+// Enum value maps for ExportedDesiredState.
+var (
+	ExportedDesiredState_name = map[int32]string{
+		0: "EXPORTED_DESIRED_STATE_UNSPECIFIED",
+		1: "EXPORTED_DESIRED_STATE_RUNNING",
+		2: "EXPORTED_DESIRED_STATE_STOPPED",
+	}
+	ExportedDesiredState_value = map[string]int32{
+		"EXPORTED_DESIRED_STATE_UNSPECIFIED": 0,
+		"EXPORTED_DESIRED_STATE_RUNNING":     1,
+		"EXPORTED_DESIRED_STATE_STOPPED":     2,
+	}
+)
+
+func (x ExportedDesiredState) Enum() *ExportedDesiredState {
+	p := new(ExportedDesiredState)
+	*p = x
+	return p
+}
+
+func (x ExportedDesiredState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ExportedDesiredState) Descriptor() protoreflect.EnumDescriptor {
+	return file_registry_v1_registry_proto_enumTypes[1].Descriptor()
+}
+
+func (ExportedDesiredState) Type() protoreflect.EnumType {
+	return &file_registry_v1_registry_proto_enumTypes[1]
+}
+
+func (x ExportedDesiredState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ExportedDesiredState.Descriptor instead.
+func (ExportedDesiredState) EnumDescriptor() ([]byte, []int) {
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{1}
+}
+
 type AddModSourceRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Source:
@@ -1241,6 +1290,448 @@ func (x *ListMissionsResponse) GetMissions() []*MissionInfo {
 	return nil
 }
 
+type ExportedModSource struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Kind  ModSourceKind          `protobuf:"varint,1,opt,name=kind,proto3,enum=registry.v1.ModSourceKind" json:"kind,omitempty"`
+	// Reusable on import for MOD/COLLECTION (a Steam URL) and PRESET
+	// registered from a URL -- ImportState re-registers these directly
+	// against a fresh ModSource object. LOCAL (a unique_id, not a URL) and
+	// PRESET registered from inline HTML content (reference is literally
+	// "(uploaded HTML)" -- the content itself was never captured here) are
+	// *not* reusable: their actual mod content/HTML was never part of this
+	// export in the first place, so ImportState always skips them and
+	// reports why in ImportStateResponse.warnings.
+	Reference     string `protobuf:"bytes,2,opt,name=reference,proto3" json:"reference,omitempty"`
+	DisplayName   string `protobuf:"bytes,3,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExportedModSource) Reset() {
+	*x = ExportedModSource{}
+	mi := &file_registry_v1_registry_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExportedModSource) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExportedModSource) ProtoMessage() {}
+
+func (x *ExportedModSource) ProtoReflect() protoreflect.Message {
+	mi := &file_registry_v1_registry_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExportedModSource.ProtoReflect.Descriptor instead.
+func (*ExportedModSource) Descriptor() ([]byte, []int) {
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *ExportedModSource) GetKind() ModSourceKind {
+	if x != nil {
+		return x.Kind
+	}
+	return ModSourceKind_MOD_SOURCE_KIND_UNSPECIFIED
+}
+
+func (x *ExportedModSource) GetReference() string {
+	if x != nil {
+		return x.Reference
+	}
+	return ""
+}
+
+func (x *ExportedModSource) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+type ExportedConfigMap struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Data          map[string]string      `protobuf:"bytes,2,rep,name=data,proto3" json:"data,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExportedConfigMap) Reset() {
+	*x = ExportedConfigMap{}
+	mi := &file_registry_v1_registry_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExportedConfigMap) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExportedConfigMap) ProtoMessage() {}
+
+func (x *ExportedConfigMap) ProtoReflect() protoreflect.Message {
+	mi := &file_registry_v1_registry_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExportedConfigMap.ProtoReflect.Descriptor instead.
+func (*ExportedConfigMap) Descriptor() ([]byte, []int) {
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *ExportedConfigMap) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ExportedConfigMap) GetData() map[string]string {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+type ExportedServer struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Port  uint32                 `protobuf:"varint,2,opt,name=port,proto3" json:"port,omitempty"`
+	// ExportedModSource.reference strings this server's mod_source_ids
+	// resolved to at export time -- not IDs, see ImportState's own doc.
+	ModSourceReferences []string             `protobuf:"bytes,3,rep,name=mod_source_references,json=modSourceReferences,proto3" json:"mod_source_references,omitempty"`
+	ConfigMap           *string              `protobuf:"bytes,4,opt,name=config_map,json=configMap,proto3,oneof" json:"config_map,omitempty"`
+	Cdlc                []string             `protobuf:"bytes,5,rep,name=cdlc,proto3" json:"cdlc,omitempty"`
+	Profiling           bool                 `protobuf:"varint,6,opt,name=profiling,proto3" json:"profiling,omitempty"`
+	Params              []string             `protobuf:"bytes,7,rep,name=params,proto3" json:"params,omitempty"`
+	DesiredState        ExportedDesiredState `protobuf:"varint,8,opt,name=desired_state,json=desiredState,proto3,enum=registry.v1.ExportedDesiredState" json:"desired_state,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *ExportedServer) Reset() {
+	*x = ExportedServer{}
+	mi := &file_registry_v1_registry_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExportedServer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExportedServer) ProtoMessage() {}
+
+func (x *ExportedServer) ProtoReflect() protoreflect.Message {
+	mi := &file_registry_v1_registry_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExportedServer.ProtoReflect.Descriptor instead.
+func (*ExportedServer) Descriptor() ([]byte, []int) {
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *ExportedServer) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ExportedServer) GetPort() uint32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *ExportedServer) GetModSourceReferences() []string {
+	if x != nil {
+		return x.ModSourceReferences
+	}
+	return nil
+}
+
+func (x *ExportedServer) GetConfigMap() string {
+	if x != nil && x.ConfigMap != nil {
+		return *x.ConfigMap
+	}
+	return ""
+}
+
+func (x *ExportedServer) GetCdlc() []string {
+	if x != nil {
+		return x.Cdlc
+	}
+	return nil
+}
+
+func (x *ExportedServer) GetProfiling() bool {
+	if x != nil {
+		return x.Profiling
+	}
+	return false
+}
+
+func (x *ExportedServer) GetParams() []string {
+	if x != nil {
+		return x.Params
+	}
+	return nil
+}
+
+func (x *ExportedServer) GetDesiredState() ExportedDesiredState {
+	if x != nil {
+		return x.DesiredState
+	}
+	return ExportedDesiredState_EXPORTED_DESIRED_STATE_UNSPECIFIED
+}
+
+type ExportStateRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExportStateRequest) Reset() {
+	*x = ExportStateRequest{}
+	mi := &file_registry_v1_registry_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExportStateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExportStateRequest) ProtoMessage() {}
+
+func (x *ExportStateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_registry_v1_registry_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExportStateRequest.ProtoReflect.Descriptor instead.
+func (*ExportStateRequest) Descriptor() ([]byte, []int) {
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{25}
+}
+
+type ExportStateResponse struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	ExportedAtRfc3339 string                 `protobuf:"bytes,1,opt,name=exported_at_rfc3339,json=exportedAtRfc3339,proto3" json:"exported_at_rfc3339,omitempty"`
+	ModSources        []*ExportedModSource   `protobuf:"bytes,2,rep,name=mod_sources,json=modSources,proto3" json:"mod_sources,omitempty"`
+	ConfigMaps        []*ExportedConfigMap   `protobuf:"bytes,3,rep,name=config_maps,json=configMaps,proto3" json:"config_maps,omitempty"`
+	Servers           []*ExportedServer      `protobuf:"bytes,4,rep,name=servers,proto3" json:"servers,omitempty"`
+	// E.g. a server referencing a mod source ID that no longer resolves
+	// (deleted between the mod source list and server list reads) --
+	// dropped from that server's mod_source_references rather than
+	// failing the whole export.
+	Warnings      []string `protobuf:"bytes,5,rep,name=warnings,proto3" json:"warnings,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExportStateResponse) Reset() {
+	*x = ExportStateResponse{}
+	mi := &file_registry_v1_registry_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExportStateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExportStateResponse) ProtoMessage() {}
+
+func (x *ExportStateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_registry_v1_registry_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExportStateResponse.ProtoReflect.Descriptor instead.
+func (*ExportStateResponse) Descriptor() ([]byte, []int) {
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *ExportStateResponse) GetExportedAtRfc3339() string {
+	if x != nil {
+		return x.ExportedAtRfc3339
+	}
+	return ""
+}
+
+func (x *ExportStateResponse) GetModSources() []*ExportedModSource {
+	if x != nil {
+		return x.ModSources
+	}
+	return nil
+}
+
+func (x *ExportStateResponse) GetConfigMaps() []*ExportedConfigMap {
+	if x != nil {
+		return x.ConfigMaps
+	}
+	return nil
+}
+
+func (x *ExportStateResponse) GetServers() []*ExportedServer {
+	if x != nil {
+		return x.Servers
+	}
+	return nil
+}
+
+func (x *ExportStateResponse) GetWarnings() []string {
+	if x != nil {
+		return x.Warnings
+	}
+	return nil
+}
+
+type ImportStateRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ModSources    []*ExportedModSource   `protobuf:"bytes,1,rep,name=mod_sources,json=modSources,proto3" json:"mod_sources,omitempty"`
+	ConfigMaps    []*ExportedConfigMap   `protobuf:"bytes,2,rep,name=config_maps,json=configMaps,proto3" json:"config_maps,omitempty"`
+	Servers       []*ExportedServer      `protobuf:"bytes,3,rep,name=servers,proto3" json:"servers,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ImportStateRequest) Reset() {
+	*x = ImportStateRequest{}
+	mi := &file_registry_v1_registry_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImportStateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImportStateRequest) ProtoMessage() {}
+
+func (x *ImportStateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_registry_v1_registry_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImportStateRequest.ProtoReflect.Descriptor instead.
+func (*ImportStateRequest) Descriptor() ([]byte, []int) {
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *ImportStateRequest) GetModSources() []*ExportedModSource {
+	if x != nil {
+		return x.ModSources
+	}
+	return nil
+}
+
+func (x *ImportStateRequest) GetConfigMaps() []*ExportedConfigMap {
+	if x != nil {
+		return x.ConfigMaps
+	}
+	return nil
+}
+
+func (x *ImportStateRequest) GetServers() []*ExportedServer {
+	if x != nil {
+		return x.Servers
+	}
+	return nil
+}
+
+type ImportStateResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Warnings      []string               `protobuf:"bytes,1,rep,name=warnings,proto3" json:"warnings,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ImportStateResponse) Reset() {
+	*x = ImportStateResponse{}
+	mi := &file_registry_v1_registry_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImportStateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImportStateResponse) ProtoMessage() {}
+
+func (x *ImportStateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_registry_v1_registry_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImportStateResponse.ProtoReflect.Descriptor instead.
+func (*ImportStateResponse) Descriptor() ([]byte, []int) {
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *ImportStateResponse) GetWarnings() []string {
+	if x != nil {
+		return x.Warnings
+	}
+	return nil
+}
+
 type GetDiskUsageRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -1249,7 +1740,7 @@ type GetDiskUsageRequest struct {
 
 func (x *GetDiskUsageRequest) Reset() {
 	*x = GetDiskUsageRequest{}
-	mi := &file_registry_v1_registry_proto_msgTypes[22]
+	mi := &file_registry_v1_registry_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1261,7 +1752,7 @@ func (x *GetDiskUsageRequest) String() string {
 func (*GetDiskUsageRequest) ProtoMessage() {}
 
 func (x *GetDiskUsageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[22]
+	mi := &file_registry_v1_registry_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1274,7 +1765,7 @@ func (x *GetDiskUsageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDiskUsageRequest.ProtoReflect.Descriptor instead.
 func (*GetDiskUsageRequest) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{22}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{29}
 }
 
 type GetDiskUsageResponse struct {
@@ -1293,7 +1784,7 @@ type GetDiskUsageResponse struct {
 
 func (x *GetDiskUsageResponse) Reset() {
 	*x = GetDiskUsageResponse{}
-	mi := &file_registry_v1_registry_proto_msgTypes[23]
+	mi := &file_registry_v1_registry_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1305,7 +1796,7 @@ func (x *GetDiskUsageResponse) String() string {
 func (*GetDiskUsageResponse) ProtoMessage() {}
 
 func (x *GetDiskUsageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[23]
+	mi := &file_registry_v1_registry_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1318,7 +1809,7 @@ func (x *GetDiskUsageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDiskUsageResponse.ProtoReflect.Descriptor instead.
 func (*GetDiskUsageResponse) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{23}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *GetDiskUsageResponse) GetModsBytes() uint64 {
@@ -1359,7 +1850,7 @@ type RefreshSteamAuthRequest struct {
 
 func (x *RefreshSteamAuthRequest) Reset() {
 	*x = RefreshSteamAuthRequest{}
-	mi := &file_registry_v1_registry_proto_msgTypes[24]
+	mi := &file_registry_v1_registry_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1371,7 +1862,7 @@ func (x *RefreshSteamAuthRequest) String() string {
 func (*RefreshSteamAuthRequest) ProtoMessage() {}
 
 func (x *RefreshSteamAuthRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[24]
+	mi := &file_registry_v1_registry_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1384,7 +1875,7 @@ func (x *RefreshSteamAuthRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshSteamAuthRequest.ProtoReflect.Descriptor instead.
 func (*RefreshSteamAuthRequest) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{24}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *RefreshSteamAuthRequest) GetUsername() string {
@@ -1409,7 +1900,7 @@ type RefreshSteamAuthResponse struct {
 
 func (x *RefreshSteamAuthResponse) Reset() {
 	*x = RefreshSteamAuthResponse{}
-	mi := &file_registry_v1_registry_proto_msgTypes[25]
+	mi := &file_registry_v1_registry_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1421,7 +1912,7 @@ func (x *RefreshSteamAuthResponse) String() string {
 func (*RefreshSteamAuthResponse) ProtoMessage() {}
 
 func (x *RefreshSteamAuthResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[25]
+	mi := &file_registry_v1_registry_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1434,7 +1925,7 @@ func (x *RefreshSteamAuthResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshSteamAuthResponse.ProtoReflect.Descriptor instead.
 func (*RefreshSteamAuthResponse) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{25}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{32}
 }
 
 type DeleteMissionRequest struct {
@@ -1446,7 +1937,7 @@ type DeleteMissionRequest struct {
 
 func (x *DeleteMissionRequest) Reset() {
 	*x = DeleteMissionRequest{}
-	mi := &file_registry_v1_registry_proto_msgTypes[26]
+	mi := &file_registry_v1_registry_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1458,7 +1949,7 @@ func (x *DeleteMissionRequest) String() string {
 func (*DeleteMissionRequest) ProtoMessage() {}
 
 func (x *DeleteMissionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[26]
+	mi := &file_registry_v1_registry_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1471,7 +1962,7 @@ func (x *DeleteMissionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteMissionRequest.ProtoReflect.Descriptor instead.
 func (*DeleteMissionRequest) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{26}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *DeleteMissionRequest) GetId() string {
@@ -1489,7 +1980,7 @@ type DeleteMissionResponse struct {
 
 func (x *DeleteMissionResponse) Reset() {
 	*x = DeleteMissionResponse{}
-	mi := &file_registry_v1_registry_proto_msgTypes[27]
+	mi := &file_registry_v1_registry_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1501,7 +1992,7 @@ func (x *DeleteMissionResponse) String() string {
 func (*DeleteMissionResponse) ProtoMessage() {}
 
 func (x *DeleteMissionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[27]
+	mi := &file_registry_v1_registry_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1514,7 +2005,7 @@ func (x *DeleteMissionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteMissionResponse.ProtoReflect.Descriptor instead.
 func (*DeleteMissionResponse) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{27}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{34}
 }
 
 var File_registry_v1_registry_proto protoreflect.FileDescriptor
@@ -1589,7 +2080,45 @@ const file_registry_v1_registry_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x15\n" +
 	"\x13ListMissionsRequest\"L\n" +
 	"\x14ListMissionsResponse\x124\n" +
-	"\bmissions\x18\x01 \x03(\v2\x18.registry.v1.MissionInfoR\bmissions\"\x15\n" +
+	"\bmissions\x18\x01 \x03(\v2\x18.registry.v1.MissionInfoR\bmissions\"\x84\x01\n" +
+	"\x11ExportedModSource\x12.\n" +
+	"\x04kind\x18\x01 \x01(\x0e2\x1a.registry.v1.ModSourceKindR\x04kind\x12\x1c\n" +
+	"\treference\x18\x02 \x01(\tR\treference\x12!\n" +
+	"\fdisplay_name\x18\x03 \x01(\tR\vdisplayName\"\x9e\x01\n" +
+	"\x11ExportedConfigMap\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12<\n" +
+	"\x04data\x18\x02 \x03(\v2(.registry.v1.ExportedConfigMap.DataEntryR\x04data\x1a7\n" +
+	"\tDataEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xb1\x02\n" +
+	"\x0eExportedServer\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
+	"\x04port\x18\x02 \x01(\rR\x04port\x122\n" +
+	"\x15mod_source_references\x18\x03 \x03(\tR\x13modSourceReferences\x12\"\n" +
+	"\n" +
+	"config_map\x18\x04 \x01(\tH\x00R\tconfigMap\x88\x01\x01\x12\x12\n" +
+	"\x04cdlc\x18\x05 \x03(\tR\x04cdlc\x12\x1c\n" +
+	"\tprofiling\x18\x06 \x01(\bR\tprofiling\x12\x16\n" +
+	"\x06params\x18\a \x03(\tR\x06params\x12F\n" +
+	"\rdesired_state\x18\b \x01(\x0e2!.registry.v1.ExportedDesiredStateR\fdesiredStateB\r\n" +
+	"\v_config_map\"\x14\n" +
+	"\x12ExportStateRequest\"\x9a\x02\n" +
+	"\x13ExportStateResponse\x12.\n" +
+	"\x13exported_at_rfc3339\x18\x01 \x01(\tR\x11exportedAtRfc3339\x12?\n" +
+	"\vmod_sources\x18\x02 \x03(\v2\x1e.registry.v1.ExportedModSourceR\n" +
+	"modSources\x12?\n" +
+	"\vconfig_maps\x18\x03 \x03(\v2\x1e.registry.v1.ExportedConfigMapR\n" +
+	"configMaps\x125\n" +
+	"\aservers\x18\x04 \x03(\v2\x1b.registry.v1.ExportedServerR\aservers\x12\x1a\n" +
+	"\bwarnings\x18\x05 \x03(\tR\bwarnings\"\xcd\x01\n" +
+	"\x12ImportStateRequest\x12?\n" +
+	"\vmod_sources\x18\x01 \x03(\v2\x1e.registry.v1.ExportedModSourceR\n" +
+	"modSources\x12?\n" +
+	"\vconfig_maps\x18\x02 \x03(\v2\x1e.registry.v1.ExportedConfigMapR\n" +
+	"configMaps\x125\n" +
+	"\aservers\x18\x03 \x03(\v2\x1b.registry.v1.ExportedServerR\aservers\"1\n" +
+	"\x13ImportStateResponse\x12\x1a\n" +
+	"\bwarnings\x18\x01 \x03(\tR\bwarnings\"\x15\n" +
 	"\x13GetDiskUsageRequest\"\xa7\x01\n" +
 	"\x14GetDiskUsageResponse\x12\x1d\n" +
 	"\n" +
@@ -1610,7 +2139,11 @@ const file_registry_v1_registry_proto_rawDesc = "" +
 	"\x13MOD_SOURCE_KIND_MOD\x10\x01\x12\x1e\n" +
 	"\x1aMOD_SOURCE_KIND_COLLECTION\x10\x02\x12\x19\n" +
 	"\x15MOD_SOURCE_KIND_LOCAL\x10\x03\x12\x1a\n" +
-	"\x16MOD_SOURCE_KIND_PRESET\x10\x042\x80\x05\n" +
+	"\x16MOD_SOURCE_KIND_PRESET\x10\x04*\x86\x01\n" +
+	"\x14ExportedDesiredState\x12&\n" +
+	"\"EXPORTED_DESIRED_STATE_UNSPECIFIED\x10\x00\x12\"\n" +
+	"\x1eEXPORTED_DESIRED_STATE_RUNNING\x10\x01\x12\"\n" +
+	"\x1eEXPORTED_DESIRED_STATE_STOPPED\x10\x022\x80\x05\n" +
 	"\x10ModSourceService\x12S\n" +
 	"\fAddModSource\x12 .registry.v1.AddModSourceRequest\x1a!.registry.v1.AddModSourceResponse\x12\\\n" +
 	"\x0fDeleteModSource\x12#.registry.v1.DeleteModSourceRequest\x1a$.registry.v1.DeleteModSourceResponse\x12Y\n" +
@@ -1624,10 +2157,12 @@ const file_registry_v1_registry_proto_rawDesc = "" +
 	"\n" +
 	"GetMission\x12\x1e.registry.v1.GetMissionRequest\x1a\x18.registry.v1.MissionInfo\x12S\n" +
 	"\fListMissions\x12 .registry.v1.ListMissionsRequest\x1a!.registry.v1.ListMissionsResponse\x12V\n" +
-	"\rDeleteMission\x12!.registry.v1.DeleteMissionRequest\x1a\".registry.v1.DeleteMissionResponse2\xc4\x01\n" +
+	"\rDeleteMission\x12!.registry.v1.DeleteMissionRequest\x1a\".registry.v1.DeleteMissionResponse2\xe8\x02\n" +
 	"\fAdminService\x12S\n" +
 	"\fGetDiskUsage\x12 .registry.v1.GetDiskUsageRequest\x1a!.registry.v1.GetDiskUsageResponse\x12_\n" +
-	"\x10RefreshSteamAuth\x12$.registry.v1.RefreshSteamAuthRequest\x1a%.registry.v1.RefreshSteamAuthResponseBJZHgithub.com/skua-international/magpie/generated/go/registry/v1;registryv1b\x06proto3"
+	"\x10RefreshSteamAuth\x12$.registry.v1.RefreshSteamAuthRequest\x1a%.registry.v1.RefreshSteamAuthResponse\x12P\n" +
+	"\vExportState\x12\x1f.registry.v1.ExportStateRequest\x1a .registry.v1.ExportStateResponse\x12P\n" +
+	"\vImportState\x12\x1f.registry.v1.ImportStateRequest\x1a .registry.v1.ImportStateResponseBJZHgithub.com/skua-international/magpie/generated/go/registry/v1;registryv1b\x06proto3"
 
 var (
 	file_registry_v1_registry_proto_rawDescOnce sync.Once
@@ -1641,78 +2176,100 @@ func file_registry_v1_registry_proto_rawDescGZIP() []byte {
 	return file_registry_v1_registry_proto_rawDescData
 }
 
-var file_registry_v1_registry_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_registry_v1_registry_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
+var file_registry_v1_registry_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_registry_v1_registry_proto_msgTypes = make([]protoimpl.MessageInfo, 36)
 var file_registry_v1_registry_proto_goTypes = []any{
 	(ModSourceKind)(0),               // 0: registry.v1.ModSourceKind
-	(*AddModSourceRequest)(nil),      // 1: registry.v1.AddModSourceRequest
-	(*LocalModUpload)(nil),           // 2: registry.v1.LocalModUpload
-	(*AddModSourceResponse)(nil),     // 3: registry.v1.AddModSourceResponse
-	(*DeleteModSourceRequest)(nil),   // 4: registry.v1.DeleteModSourceRequest
-	(*DeleteModSourceResponse)(nil),  // 5: registry.v1.DeleteModSourceResponse
-	(*SyncModSourceRequest)(nil),     // 6: registry.v1.SyncModSourceRequest
-	(*SyncModSourceResponse)(nil),    // 7: registry.v1.SyncModSourceResponse
-	(*ListSyncedModsRequest)(nil),    // 8: registry.v1.ListSyncedModsRequest
-	(*SyncedMod)(nil),                // 9: registry.v1.SyncedMod
-	(*ListSyncedModsResponse)(nil),   // 10: registry.v1.ListSyncedModsResponse
-	(*InvalidateModRequest)(nil),     // 11: registry.v1.InvalidateModRequest
-	(*InvalidateModResponse)(nil),    // 12: registry.v1.InvalidateModResponse
-	(*GetSyncedModRequest)(nil),      // 13: registry.v1.GetSyncedModRequest
-	(*GetSyncedModResponse)(nil),     // 14: registry.v1.GetSyncedModResponse
-	(*ModSourceInfo)(nil),            // 15: registry.v1.ModSourceInfo
-	(*ListModSourcesRequest)(nil),    // 16: registry.v1.ListModSourcesRequest
-	(*ListModSourcesResponse)(nil),   // 17: registry.v1.ListModSourcesResponse
-	(*UploadMissionRequest)(nil),     // 18: registry.v1.UploadMissionRequest
-	(*MissionInfo)(nil),              // 19: registry.v1.MissionInfo
-	(*GetMissionRequest)(nil),        // 20: registry.v1.GetMissionRequest
-	(*ListMissionsRequest)(nil),      // 21: registry.v1.ListMissionsRequest
-	(*ListMissionsResponse)(nil),     // 22: registry.v1.ListMissionsResponse
-	(*GetDiskUsageRequest)(nil),      // 23: registry.v1.GetDiskUsageRequest
-	(*GetDiskUsageResponse)(nil),     // 24: registry.v1.GetDiskUsageResponse
-	(*RefreshSteamAuthRequest)(nil),  // 25: registry.v1.RefreshSteamAuthRequest
-	(*RefreshSteamAuthResponse)(nil), // 26: registry.v1.RefreshSteamAuthResponse
-	(*DeleteMissionRequest)(nil),     // 27: registry.v1.DeleteMissionRequest
-	(*DeleteMissionResponse)(nil),    // 28: registry.v1.DeleteMissionResponse
+	(ExportedDesiredState)(0),        // 1: registry.v1.ExportedDesiredState
+	(*AddModSourceRequest)(nil),      // 2: registry.v1.AddModSourceRequest
+	(*LocalModUpload)(nil),           // 3: registry.v1.LocalModUpload
+	(*AddModSourceResponse)(nil),     // 4: registry.v1.AddModSourceResponse
+	(*DeleteModSourceRequest)(nil),   // 5: registry.v1.DeleteModSourceRequest
+	(*DeleteModSourceResponse)(nil),  // 6: registry.v1.DeleteModSourceResponse
+	(*SyncModSourceRequest)(nil),     // 7: registry.v1.SyncModSourceRequest
+	(*SyncModSourceResponse)(nil),    // 8: registry.v1.SyncModSourceResponse
+	(*ListSyncedModsRequest)(nil),    // 9: registry.v1.ListSyncedModsRequest
+	(*SyncedMod)(nil),                // 10: registry.v1.SyncedMod
+	(*ListSyncedModsResponse)(nil),   // 11: registry.v1.ListSyncedModsResponse
+	(*InvalidateModRequest)(nil),     // 12: registry.v1.InvalidateModRequest
+	(*InvalidateModResponse)(nil),    // 13: registry.v1.InvalidateModResponse
+	(*GetSyncedModRequest)(nil),      // 14: registry.v1.GetSyncedModRequest
+	(*GetSyncedModResponse)(nil),     // 15: registry.v1.GetSyncedModResponse
+	(*ModSourceInfo)(nil),            // 16: registry.v1.ModSourceInfo
+	(*ListModSourcesRequest)(nil),    // 17: registry.v1.ListModSourcesRequest
+	(*ListModSourcesResponse)(nil),   // 18: registry.v1.ListModSourcesResponse
+	(*UploadMissionRequest)(nil),     // 19: registry.v1.UploadMissionRequest
+	(*MissionInfo)(nil),              // 20: registry.v1.MissionInfo
+	(*GetMissionRequest)(nil),        // 21: registry.v1.GetMissionRequest
+	(*ListMissionsRequest)(nil),      // 22: registry.v1.ListMissionsRequest
+	(*ListMissionsResponse)(nil),     // 23: registry.v1.ListMissionsResponse
+	(*ExportedModSource)(nil),        // 24: registry.v1.ExportedModSource
+	(*ExportedConfigMap)(nil),        // 25: registry.v1.ExportedConfigMap
+	(*ExportedServer)(nil),           // 26: registry.v1.ExportedServer
+	(*ExportStateRequest)(nil),       // 27: registry.v1.ExportStateRequest
+	(*ExportStateResponse)(nil),      // 28: registry.v1.ExportStateResponse
+	(*ImportStateRequest)(nil),       // 29: registry.v1.ImportStateRequest
+	(*ImportStateResponse)(nil),      // 30: registry.v1.ImportStateResponse
+	(*GetDiskUsageRequest)(nil),      // 31: registry.v1.GetDiskUsageRequest
+	(*GetDiskUsageResponse)(nil),     // 32: registry.v1.GetDiskUsageResponse
+	(*RefreshSteamAuthRequest)(nil),  // 33: registry.v1.RefreshSteamAuthRequest
+	(*RefreshSteamAuthResponse)(nil), // 34: registry.v1.RefreshSteamAuthResponse
+	(*DeleteMissionRequest)(nil),     // 35: registry.v1.DeleteMissionRequest
+	(*DeleteMissionResponse)(nil),    // 36: registry.v1.DeleteMissionResponse
+	nil,                              // 37: registry.v1.ExportedConfigMap.DataEntry
 }
 var file_registry_v1_registry_proto_depIdxs = []int32{
-	2,  // 0: registry.v1.AddModSourceRequest.local_mod:type_name -> registry.v1.LocalModUpload
-	9,  // 1: registry.v1.ListSyncedModsResponse.mods:type_name -> registry.v1.SyncedMod
-	9,  // 2: registry.v1.GetSyncedModResponse.mod:type_name -> registry.v1.SyncedMod
-	15, // 3: registry.v1.GetSyncedModResponse.mod_sources:type_name -> registry.v1.ModSourceInfo
+	3,  // 0: registry.v1.AddModSourceRequest.local_mod:type_name -> registry.v1.LocalModUpload
+	10, // 1: registry.v1.ListSyncedModsResponse.mods:type_name -> registry.v1.SyncedMod
+	10, // 2: registry.v1.GetSyncedModResponse.mod:type_name -> registry.v1.SyncedMod
+	16, // 3: registry.v1.GetSyncedModResponse.mod_sources:type_name -> registry.v1.ModSourceInfo
 	0,  // 4: registry.v1.ModSourceInfo.kind:type_name -> registry.v1.ModSourceKind
-	15, // 5: registry.v1.ListModSourcesResponse.sources:type_name -> registry.v1.ModSourceInfo
-	19, // 6: registry.v1.ListMissionsResponse.missions:type_name -> registry.v1.MissionInfo
-	1,  // 7: registry.v1.ModSourceService.AddModSource:input_type -> registry.v1.AddModSourceRequest
-	4,  // 8: registry.v1.ModSourceService.DeleteModSource:input_type -> registry.v1.DeleteModSourceRequest
-	16, // 9: registry.v1.ModSourceService.ListModSources:input_type -> registry.v1.ListModSourcesRequest
-	6,  // 10: registry.v1.ModSourceService.SyncModSource:input_type -> registry.v1.SyncModSourceRequest
-	8,  // 11: registry.v1.ModSourceService.ListSyncedMods:input_type -> registry.v1.ListSyncedModsRequest
-	11, // 12: registry.v1.ModSourceService.InvalidateMod:input_type -> registry.v1.InvalidateModRequest
-	13, // 13: registry.v1.ModSourceService.GetSyncedMod:input_type -> registry.v1.GetSyncedModRequest
-	18, // 14: registry.v1.MissionService.UploadMission:input_type -> registry.v1.UploadMissionRequest
-	20, // 15: registry.v1.MissionService.GetMission:input_type -> registry.v1.GetMissionRequest
-	21, // 16: registry.v1.MissionService.ListMissions:input_type -> registry.v1.ListMissionsRequest
-	27, // 17: registry.v1.MissionService.DeleteMission:input_type -> registry.v1.DeleteMissionRequest
-	23, // 18: registry.v1.AdminService.GetDiskUsage:input_type -> registry.v1.GetDiskUsageRequest
-	25, // 19: registry.v1.AdminService.RefreshSteamAuth:input_type -> registry.v1.RefreshSteamAuthRequest
-	3,  // 20: registry.v1.ModSourceService.AddModSource:output_type -> registry.v1.AddModSourceResponse
-	5,  // 21: registry.v1.ModSourceService.DeleteModSource:output_type -> registry.v1.DeleteModSourceResponse
-	17, // 22: registry.v1.ModSourceService.ListModSources:output_type -> registry.v1.ListModSourcesResponse
-	7,  // 23: registry.v1.ModSourceService.SyncModSource:output_type -> registry.v1.SyncModSourceResponse
-	10, // 24: registry.v1.ModSourceService.ListSyncedMods:output_type -> registry.v1.ListSyncedModsResponse
-	12, // 25: registry.v1.ModSourceService.InvalidateMod:output_type -> registry.v1.InvalidateModResponse
-	14, // 26: registry.v1.ModSourceService.GetSyncedMod:output_type -> registry.v1.GetSyncedModResponse
-	19, // 27: registry.v1.MissionService.UploadMission:output_type -> registry.v1.MissionInfo
-	19, // 28: registry.v1.MissionService.GetMission:output_type -> registry.v1.MissionInfo
-	22, // 29: registry.v1.MissionService.ListMissions:output_type -> registry.v1.ListMissionsResponse
-	28, // 30: registry.v1.MissionService.DeleteMission:output_type -> registry.v1.DeleteMissionResponse
-	24, // 31: registry.v1.AdminService.GetDiskUsage:output_type -> registry.v1.GetDiskUsageResponse
-	26, // 32: registry.v1.AdminService.RefreshSteamAuth:output_type -> registry.v1.RefreshSteamAuthResponse
-	20, // [20:33] is the sub-list for method output_type
-	7,  // [7:20] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	16, // 5: registry.v1.ListModSourcesResponse.sources:type_name -> registry.v1.ModSourceInfo
+	20, // 6: registry.v1.ListMissionsResponse.missions:type_name -> registry.v1.MissionInfo
+	0,  // 7: registry.v1.ExportedModSource.kind:type_name -> registry.v1.ModSourceKind
+	37, // 8: registry.v1.ExportedConfigMap.data:type_name -> registry.v1.ExportedConfigMap.DataEntry
+	1,  // 9: registry.v1.ExportedServer.desired_state:type_name -> registry.v1.ExportedDesiredState
+	24, // 10: registry.v1.ExportStateResponse.mod_sources:type_name -> registry.v1.ExportedModSource
+	25, // 11: registry.v1.ExportStateResponse.config_maps:type_name -> registry.v1.ExportedConfigMap
+	26, // 12: registry.v1.ExportStateResponse.servers:type_name -> registry.v1.ExportedServer
+	24, // 13: registry.v1.ImportStateRequest.mod_sources:type_name -> registry.v1.ExportedModSource
+	25, // 14: registry.v1.ImportStateRequest.config_maps:type_name -> registry.v1.ExportedConfigMap
+	26, // 15: registry.v1.ImportStateRequest.servers:type_name -> registry.v1.ExportedServer
+	2,  // 16: registry.v1.ModSourceService.AddModSource:input_type -> registry.v1.AddModSourceRequest
+	5,  // 17: registry.v1.ModSourceService.DeleteModSource:input_type -> registry.v1.DeleteModSourceRequest
+	17, // 18: registry.v1.ModSourceService.ListModSources:input_type -> registry.v1.ListModSourcesRequest
+	7,  // 19: registry.v1.ModSourceService.SyncModSource:input_type -> registry.v1.SyncModSourceRequest
+	9,  // 20: registry.v1.ModSourceService.ListSyncedMods:input_type -> registry.v1.ListSyncedModsRequest
+	12, // 21: registry.v1.ModSourceService.InvalidateMod:input_type -> registry.v1.InvalidateModRequest
+	14, // 22: registry.v1.ModSourceService.GetSyncedMod:input_type -> registry.v1.GetSyncedModRequest
+	19, // 23: registry.v1.MissionService.UploadMission:input_type -> registry.v1.UploadMissionRequest
+	21, // 24: registry.v1.MissionService.GetMission:input_type -> registry.v1.GetMissionRequest
+	22, // 25: registry.v1.MissionService.ListMissions:input_type -> registry.v1.ListMissionsRequest
+	35, // 26: registry.v1.MissionService.DeleteMission:input_type -> registry.v1.DeleteMissionRequest
+	31, // 27: registry.v1.AdminService.GetDiskUsage:input_type -> registry.v1.GetDiskUsageRequest
+	33, // 28: registry.v1.AdminService.RefreshSteamAuth:input_type -> registry.v1.RefreshSteamAuthRequest
+	27, // 29: registry.v1.AdminService.ExportState:input_type -> registry.v1.ExportStateRequest
+	29, // 30: registry.v1.AdminService.ImportState:input_type -> registry.v1.ImportStateRequest
+	4,  // 31: registry.v1.ModSourceService.AddModSource:output_type -> registry.v1.AddModSourceResponse
+	6,  // 32: registry.v1.ModSourceService.DeleteModSource:output_type -> registry.v1.DeleteModSourceResponse
+	18, // 33: registry.v1.ModSourceService.ListModSources:output_type -> registry.v1.ListModSourcesResponse
+	8,  // 34: registry.v1.ModSourceService.SyncModSource:output_type -> registry.v1.SyncModSourceResponse
+	11, // 35: registry.v1.ModSourceService.ListSyncedMods:output_type -> registry.v1.ListSyncedModsResponse
+	13, // 36: registry.v1.ModSourceService.InvalidateMod:output_type -> registry.v1.InvalidateModResponse
+	15, // 37: registry.v1.ModSourceService.GetSyncedMod:output_type -> registry.v1.GetSyncedModResponse
+	20, // 38: registry.v1.MissionService.UploadMission:output_type -> registry.v1.MissionInfo
+	20, // 39: registry.v1.MissionService.GetMission:output_type -> registry.v1.MissionInfo
+	23, // 40: registry.v1.MissionService.ListMissions:output_type -> registry.v1.ListMissionsResponse
+	36, // 41: registry.v1.MissionService.DeleteMission:output_type -> registry.v1.DeleteMissionResponse
+	32, // 42: registry.v1.AdminService.GetDiskUsage:output_type -> registry.v1.GetDiskUsageResponse
+	34, // 43: registry.v1.AdminService.RefreshSteamAuth:output_type -> registry.v1.RefreshSteamAuthResponse
+	28, // 44: registry.v1.AdminService.ExportState:output_type -> registry.v1.ExportStateResponse
+	30, // 45: registry.v1.AdminService.ImportState:output_type -> registry.v1.ImportStateResponse
+	31, // [31:46] is the sub-list for method output_type
+	16, // [16:31] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_registry_v1_registry_proto_init() }
@@ -1728,13 +2285,14 @@ func file_registry_v1_registry_proto_init() {
 	}
 	file_registry_v1_registry_proto_msgTypes[13].OneofWrappers = []any{}
 	file_registry_v1_registry_proto_msgTypes[17].OneofWrappers = []any{}
+	file_registry_v1_registry_proto_msgTypes[24].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_registry_v1_registry_proto_rawDesc), len(file_registry_v1_registry_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   28,
+			NumEnums:      2,
+			NumMessages:   36,
 			NumExtensions: 0,
 			NumServices:   3,
 		},

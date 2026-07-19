@@ -38,6 +38,8 @@ fn required_scope(path: &str) -> Option<&'static str> {
         // Its own scope, deliberately separate from everything else here
         // -- this can authenticate as the cluster's Steam account.
         "/registry.v1.AdminService/RefreshSteamAuth" => Some("admin:steam-auth"),
+        "/registry.v1.AdminService/ExportState" => Some("admin:export"),
+        "/registry.v1.AdminService/ImportState" => Some("admin:import"),
         _ => None,
     }
 }
@@ -63,14 +65,21 @@ async fn main() -> Result<()> {
 
     let sync_client = Arc::new(SyncClient::new(&cfg.sync_daemon_url)?);
     let mod_source_service = ModSourceServiceImpl::new(
-        client,
+        client.clone(),
         cfg.namespace.clone(),
         sync_client.clone(),
         cfg.local_content_root.clone().into(),
     );
     let mission_service =
         MissionServiceImpl::new(pool.clone(), cfg.local_content_root.clone().into());
-    let admin_service = AdminServiceImpl::new(pool.clone(), sync_client);
+    let admin_service = AdminServiceImpl::new(
+        pool.clone(),
+        sync_client,
+        client,
+        cfg.namespace.clone(),
+        cfg.armaserver_namespace.clone(),
+        cfg.arma_config_baseline.clone(),
+    );
 
     let verifier = JwtVerifier::fetch(&cfg.jwt).await?;
     let auth_state = Arc::new(AuthState {

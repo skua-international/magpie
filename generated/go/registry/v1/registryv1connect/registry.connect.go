@@ -76,6 +76,12 @@ const (
 	// AdminServiceRefreshSteamAuthProcedure is the fully-qualified name of the AdminService's
 	// RefreshSteamAuth RPC.
 	AdminServiceRefreshSteamAuthProcedure = "/registry.v1.AdminService/RefreshSteamAuth"
+	// AdminServiceExportStateProcedure is the fully-qualified name of the AdminService's ExportState
+	// RPC.
+	AdminServiceExportStateProcedure = "/registry.v1.AdminService/ExportState"
+	// AdminServiceImportStateProcedure is the fully-qualified name of the AdminService's ImportState
+	// RPC.
+	AdminServiceImportStateProcedure = "/registry.v1.AdminService/ImportState"
 )
 
 // ModSourceServiceClient is a client for the registry.v1.ModSourceService service.
@@ -499,6 +505,24 @@ type AdminServiceClient interface {
 	// and more restricted than anything else here -- this can authenticate
 	// as the Steam account.
 	RefreshSteamAuth(context.Context, *connect.Request[v1.RefreshSteamAuthRequest]) (*connect.Response[v1.RefreshSteamAuthResponse], error)
+	// Everything declarative about this cluster's Arma fleet: mod source
+	// registrations (not their synced file content -- see
+	// ExportedModSource's own doc), the ConfigMaps servers reference (the
+	// baseline plus every per-server override), and ArmaServer specs.
+	// Deliberately excludes Postgres application data, synced mod/mission
+	// file content, ACL grants, and any live credential (Steam session,
+	// linked OAuth accounts) -- none of that is "declarative config" in
+	// the same sense, and copying live credentials between clusters is
+	// its own hazard rather than a convenience.
+	ExportState(context.Context, *connect.Request[v1.ExportStateRequest]) (*connect.Response[v1.ExportStateResponse], error)
+	// Re-creates whatever ExportState produced. Idempotent per item, not
+	// transactional: each mod source/ConfigMap/server is applied
+	// independently, and one failing doesn't roll back the others -- the
+	// response's `warnings` reports exactly what was skipped and why.
+	// Servers are matched to their mod sources by `reference` (the
+	// original Steam/preset URL), never by ID -- ModSource IDs are
+	// regenerated on every import and never match the export's own.
+	ImportState(context.Context, *connect.Request[v1.ImportStateRequest]) (*connect.Response[v1.ImportStateResponse], error)
 }
 
 // NewAdminServiceClient constructs a client for the registry.v1.AdminService service. By default,
@@ -524,6 +548,18 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("RefreshSteamAuth")),
 			connect.WithClientOptions(opts...),
 		),
+		exportState: connect.NewClient[v1.ExportStateRequest, v1.ExportStateResponse](
+			httpClient,
+			baseURL+AdminServiceExportStateProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ExportState")),
+			connect.WithClientOptions(opts...),
+		),
+		importState: connect.NewClient[v1.ImportStateRequest, v1.ImportStateResponse](
+			httpClient,
+			baseURL+AdminServiceImportStateProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ImportState")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -531,6 +567,8 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 type adminServiceClient struct {
 	getDiskUsage     *connect.Client[v1.GetDiskUsageRequest, v1.GetDiskUsageResponse]
 	refreshSteamAuth *connect.Client[v1.RefreshSteamAuthRequest, v1.RefreshSteamAuthResponse]
+	exportState      *connect.Client[v1.ExportStateRequest, v1.ExportStateResponse]
+	importState      *connect.Client[v1.ImportStateRequest, v1.ImportStateResponse]
 }
 
 // GetDiskUsage calls registry.v1.AdminService.GetDiskUsage.
@@ -541,6 +579,16 @@ func (c *adminServiceClient) GetDiskUsage(ctx context.Context, req *connect.Requ
 // RefreshSteamAuth calls registry.v1.AdminService.RefreshSteamAuth.
 func (c *adminServiceClient) RefreshSteamAuth(ctx context.Context, req *connect.Request[v1.RefreshSteamAuthRequest]) (*connect.Response[v1.RefreshSteamAuthResponse], error) {
 	return c.refreshSteamAuth.CallUnary(ctx, req)
+}
+
+// ExportState calls registry.v1.AdminService.ExportState.
+func (c *adminServiceClient) ExportState(ctx context.Context, req *connect.Request[v1.ExportStateRequest]) (*connect.Response[v1.ExportStateResponse], error) {
+	return c.exportState.CallUnary(ctx, req)
+}
+
+// ImportState calls registry.v1.AdminService.ImportState.
+func (c *adminServiceClient) ImportState(ctx context.Context, req *connect.Request[v1.ImportStateRequest]) (*connect.Response[v1.ImportStateResponse], error) {
+	return c.importState.CallUnary(ctx, req)
 }
 
 // AdminServiceHandler is an implementation of the registry.v1.AdminService service.
@@ -554,6 +602,24 @@ type AdminServiceHandler interface {
 	// and more restricted than anything else here -- this can authenticate
 	// as the Steam account.
 	RefreshSteamAuth(context.Context, *connect.Request[v1.RefreshSteamAuthRequest]) (*connect.Response[v1.RefreshSteamAuthResponse], error)
+	// Everything declarative about this cluster's Arma fleet: mod source
+	// registrations (not their synced file content -- see
+	// ExportedModSource's own doc), the ConfigMaps servers reference (the
+	// baseline plus every per-server override), and ArmaServer specs.
+	// Deliberately excludes Postgres application data, synced mod/mission
+	// file content, ACL grants, and any live credential (Steam session,
+	// linked OAuth accounts) -- none of that is "declarative config" in
+	// the same sense, and copying live credentials between clusters is
+	// its own hazard rather than a convenience.
+	ExportState(context.Context, *connect.Request[v1.ExportStateRequest]) (*connect.Response[v1.ExportStateResponse], error)
+	// Re-creates whatever ExportState produced. Idempotent per item, not
+	// transactional: each mod source/ConfigMap/server is applied
+	// independently, and one failing doesn't roll back the others -- the
+	// response's `warnings` reports exactly what was skipped and why.
+	// Servers are matched to their mod sources by `reference` (the
+	// original Steam/preset URL), never by ID -- ModSource IDs are
+	// regenerated on every import and never match the export's own.
+	ImportState(context.Context, *connect.Request[v1.ImportStateRequest]) (*connect.Response[v1.ImportStateResponse], error)
 }
 
 // NewAdminServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -575,12 +641,28 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(adminServiceMethods.ByName("RefreshSteamAuth")),
 		connect.WithHandlerOptions(opts...),
 	)
+	adminServiceExportStateHandler := connect.NewUnaryHandler(
+		AdminServiceExportStateProcedure,
+		svc.ExportState,
+		connect.WithSchema(adminServiceMethods.ByName("ExportState")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceImportStateHandler := connect.NewUnaryHandler(
+		AdminServiceImportStateProcedure,
+		svc.ImportState,
+		connect.WithSchema(adminServiceMethods.ByName("ImportState")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/registry.v1.AdminService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AdminServiceGetDiskUsageProcedure:
 			adminServiceGetDiskUsageHandler.ServeHTTP(w, r)
 		case AdminServiceRefreshSteamAuthProcedure:
 			adminServiceRefreshSteamAuthHandler.ServeHTTP(w, r)
+		case AdminServiceExportStateProcedure:
+			adminServiceExportStateHandler.ServeHTTP(w, r)
+		case AdminServiceImportStateProcedure:
+			adminServiceImportStateHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -596,4 +678,12 @@ func (UnimplementedAdminServiceHandler) GetDiskUsage(context.Context, *connect.R
 
 func (UnimplementedAdminServiceHandler) RefreshSteamAuth(context.Context, *connect.Request[v1.RefreshSteamAuthRequest]) (*connect.Response[v1.RefreshSteamAuthResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.RefreshSteamAuth is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ExportState(context.Context, *connect.Request[v1.ExportStateRequest]) (*connect.Response[v1.ExportStateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.ExportState is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ImportState(context.Context, *connect.Request[v1.ImportStateRequest]) (*connect.Response[v1.ImportStateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.ImportState is not implemented"))
 }
