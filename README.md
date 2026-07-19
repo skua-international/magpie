@@ -59,6 +59,8 @@ Both are the same script -- piping it in just skips needing a clone first, and i
 
 `magpiectl install --bootstrap-k3s` (see "Installing the CLI" below) does the same first-install job as a single Go binary instead of a shell script -- installs k3s itself (data-dir and kubelet's own root-dir both pointed at wherever the reflink-capable disk actually is, not the OS disk), provisions the host user `volume-manager` needs, resolves/creates every bootstrap Secret, and runs the equivalent of `deploy --install`. `--ssh user@host` keeps the remote host's own footprint to just what genuinely has to run there: it detects the remote's architecture and downloads the matching Linux release binary directly onto it (never assumes the controlling machine's own platform matches the target's), runs *only* k3s install + volume-manager's host-user provisioning remotely, then fetches the resulting kubeconfig back and runs everything else -- secrets, `helm pull`/`upgrade` -- locally against it. helm/kubectl only need to be installed on whichever machine you're actually running `magpiectl` from, never the remote target.
 
+`--bootstrap-k3s` requires passwordless sudo (locally, or for the `--ssh` user on the remote target) -- installing k3s, creating the `magpie-volume` system user/group, writing its udev rule, and chowning the blob's host directories are all genuinely root-only operations with no non-root alternative. There's no interactive password prompt (none of this works over a non-interactive `--ssh` session anyway), so a user that needs one will just fail outright rather than hang.
+
 Upgrades (including the very first install, via `--install`) all go through one script, same pattern:
 
 ```bash
