@@ -40,6 +40,17 @@ spec:
               mountPath: /csi
             - name: registration-dir
               mountPath: /registration
+        # See magpie-csi-controller-deployment.yaml's own comment on why
+        # this is here: pod health should reflect whether the driver
+        # actually responds over its CSI socket (Identity.Probe), not
+        # just "the process is up".
+        - name: liveness-probe
+          image: registry.k8s.io/sig-storage/livenessprobe:v2.14.0
+          args:
+            - "--csi-address=/csi/csi.sock"
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /csi
         - name: magpie-csi
           image: {{ include "magpie.image" (dict "root" $ "override" .Values.magpieCsi.image) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -66,6 +77,12 @@ spec:
               mountPropagation: Bidirectional
             - name: blob-storage
               mountPath: /var/lib/magpie-csi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 9808
+            initialDelaySeconds: 5
+            timeoutSeconds: 5
           {{- with .Values.magpieCsi.resources }}
           resources:
             {{- toYaml . | nindent 12 }}

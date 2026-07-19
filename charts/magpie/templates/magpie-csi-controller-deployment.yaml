@@ -42,6 +42,19 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
+        # Standard CSI sidecar: calls the driver's own Identity.Probe RPC
+        # over the shared socket and exposes a real /healthz kubelet can
+        # check -- without this, the magpie-csi container's own liveness
+        # was just "the process is up", which stayed green even while
+        # csi-provisioner sat retrying forever on an RBAC error
+        # (confirmed live -- the Pod showed healthy the whole time).
+        - name: liveness-probe
+          image: registry.k8s.io/sig-storage/livenessprobe:v2.14.0
+          args:
+            - "--csi-address=/csi/csi.sock"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
         - name: magpie-csi
           image: {{ include "magpie.image" (dict "root" $ "override" .Values.magpieCsi.image) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -51,6 +64,16 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
+          # livenessprobe's own default port -- served by the sidecar
+          # above, not this container, but Pod containers share one
+          # network namespace so kubelet reaching it via this
+          # container's own probe stanza works the same either way.
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 9808
+            initialDelaySeconds: 5
+            timeoutSeconds: 5
           {{- with .Values.magpieCsi.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
