@@ -18,9 +18,13 @@ flowchart LR
     controller -->|creates| launcher["launcher<br/>Deployment"]
     controller -->|RegisterSource, Claim| syncdaemon
 
-    syncdaemon -->|GrowVolume| volumemanager["volume-manager<br/>(DaemonSet, privileged)"]
+    syncdaemon -->|GrowVolume| volumemanager["volume-manager<br/>(DaemonSet)"]
     volumemanager -->|loop-mount, btrfs| blob[("blob-backed content<br/>(reflink claims)")]
     launcher -->|reads its claim| blob
+
+    armaconfig[("Arma config<br/>ConfigMaps")] -->|baseline + per-server| controller
+    postgres[("Postgres<br/>acl_grants/linked_accounts")] -->|arma:admin / arma:filepatch| controller
+    controller -->|renders main.cfg/basic.cfg| launcher
 
     identity["identity"] -->|issues JWTs| serverapi
     identity -->|issues JWTs| registry
@@ -28,10 +32,10 @@ flowchart LR
     syncdaemon -->|authenticated CM session| steam(["Steam"])
 ```
 
-- **`launcher`** — launches the game server (and headless clients) from an already-synced claim plus an operator-provided server config. No Steam logic of its own.
+- **`launcher`** — launches the game server (and headless clients) from an already-synced claim plus a controller-rendered server config. No Steam logic of its own.
 - **`sync-daemon`** — owns all Steam depot/workshop mechanics: authenticated CM session, mod/collection resolution (including private/unlisted content), and reflink (copy-on-write) claims of one shared golden content tree, so every server gets its own cheap, isolated snapshot instead of sharing live state. Asks `volume-manager` to grow the underlying volume ahead of a sync whenever newly-registered mods need more room than is currently free.
-- **`volume-manager`** — the only privileged component in the stack (one per node, DaemonSet): owns a loop-mounted btrfs blob that `sync-daemon`'s content/claims live on, so reflink works regardless of what filesystem the host actually has, and grows the blob on request instead of needing a size chosen up front. Runs as a dedicated, minimally-privileged host user (`CAP_SYS_ADMIN` only, not full root), provisioned by `magpiectl install` itself.
-- **`controller`** — a `kube-runtime` reconciler that turns `ArmaServer` custom resources into launcher `Deployment`s. No external listener, no auth surface, no Kubernetes RBAC beyond `ArmaServer` + `Deployment`.
+- **`volume-manager`** — the one component in the stack with real host block-device access (one per node, DaemonSet): owns a loop-mounted btrfs blob that `sync-daemon`'s content/claims live on, so reflink works regardless of what filesystem the host actually has, and grows the blob on request instead of needing a size chosen up front. Runs as a dedicated, minimally-privileged host user (`CAP_SYS_ADMIN` + `hostPID: true`, not `privileged: true`), provisioned by `magpiectl install` itself — mounts/formats/resizes directly in the host's own mount namespace via `nsenter` rather than needing `mountPropagation: Bidirectional` (which Kubernetes hard-requires `privileged: true` for).
+- **`controller`** — a `kube-runtime` reconciler that turns `ArmaServer` custom resources into launcher `Deployment`s, rendering each one's `main.cfg`/`basic.cfg` along the way (see "Arma server config" below) and provisioning the technical Postgres role `launcher`'s own Arma-side extensions connect as. No external listener, no auth surface.
 - **`server-api`** — JWT-authenticated `ArmaServer` CRUD plus deployment-like lifecycle (`Create`/`Start`/`Stop`/`Update`). Deliberately carries the least Kubernetes RBAC of anything here (no `Deployment` access at all) — it's the one process a stolen bearer token can reach directly.
 - **`registry`** — JWT-authenticated mod source registry (a Steam mod, a collection, a preset export, or a locally-uploaded zip mod) and mission (`.pbo`) storage. Never touches the Kubernetes API.
 - **`identity`** — OAuth2 login (Discord/GitHub/Google) and Steam login (OpenID 2.0 — Steam never adopted OIDC), account linking, and JWT issuance for every JWT-gated service above to verify. The first person to ever sign in is automatically granted every permission.
@@ -82,6 +86,51 @@ There's no password-based bootstrap Secret at all -- a Steam password should nev
 
 This isn't elevated access — visibility into private/unlisted mods and collections is scoped to whatever that specific Steam account can actually see (its own subscriptions, friends-only shares, etc.), same as browsing the Workshop as that account normally would. Use an account that's actually subscribed to / has visibility into whatever private content the servers need.
 
+### Arma server config
+
+`controller` renders every `ArmaServer`'s `main.cfg`/`basic.cfg` from a cluster-wide baseline ConfigMap (`charts/magpie/values.yaml`'s `armaConfig` block, one per install) merged with an optional per-server override ConfigMap (`ArmaServer.spec.configMap`, same key names, per-server wins key-by-key). The rendered files land as plain files under the server's own `SERVER_ROOT/configs/` on the host — not a mounted, read-only ConfigMap volume — so they stay hand-editable in place afterward if you need to.
+
+Right after a successful `magpiectl install`/`deploy`/`upgrade`, you'll be prompted to open the baseline ConfigMap in `$EDITOR` (`kubectl edit`, under the hood). Edit it again any time with:
+
+```bash
+magpiectl admin armaconfig
+```
+
+**ConfigMap keys → `main.cfg`** (see `services/controller/src/arma_config.rs` for the exact rendering):
+
+| Key | Type | Default | main.cfg field |
+|---|---|---|---|
+| `hostname` | string, placeholders | *(computed, see below)* | `hostname` |
+| `prefix` / `suffix` | string | `""` / `"Powered by MAGPIE"` | *(placeholders only)* |
+| `max_players` | number | `64` | `maxPlayers` |
+| `force_difficulty` / `forced_difficulty` | bool / string | `false` / `"veteran"` | `forcedDifficulty` (omitted unless forced) |
+| `missions_whitelist` | comma-separated list | *(empty)* | `missionWhitelist[]` |
+| `persist_without_players` | bool | `false` | `persistent` |
+| `use_battleEye` | bool | `false` | `BattlEye` |
+| `verify_signatures` | bool | `true` | `verifySignatures` (2/0) |
+| `skip_lobby` | bool | `false` | `skipLobby` |
+| `allow_zeus_composition_scripts` | bool | `true` | `zeusCompositionScriptLevel` (2/0) |
+| `allow_custom_glasses` | bool | `false` | `allowProfileGlasses` |
+| `max_ping` | number | `300` | `MaxPing` |
+| `max_packet_loss` / `max_desync` | number | *unset* | `maxPacketLoss` / `maxDesync` |
+| `password_admin` / `password` / `server_command_password` | string, placeholders + secrets | `""` | same-named fields |
+| `motd` | comma-separated list, placeholders | *(empty)* | `motd[]` |
+| `motd_interval` | number | *unset* | `motdInterval` |
+| `other_properties` | raw text | `""` | appended verbatim at the end |
+
+`admins[]`/`filePatchingExceptions[]` are **never** ConfigMap keys — computed on every reconcile from identities holding the `arma:admin`/`arma:filepatch` scopes (`magpiectl` doesn't grant scopes today; use `registry_db::grant_scopes` directly, or the first-ever login, which gets `*`). This reads `linked_accounts`' Steam OpenID `provider_user_id`, already the exact SteamID64 string Arma wants.
+
+**ConfigMap keys → `basic.cfg`**: `max_msg_send`, `max_size_guaranteed`, `max_size_nonguaranteed`, `min_bandwidth`, `max_bandwidth`, `min_error_to_send`, `min_error_to_send_near`, `basic_other_properties` — all default **unset** (omitted from the file entirely, not written as `0`).
+
+**Placeholders**, usable in `hostname`, `password`/`password_admin`/`server_command_password`, and each `motd` entry:
+- `{{server_name}}` — the `ArmaServer`'s own object name
+- `{{prefix}}` / `{{suffix}}` — the merged config's own `prefix`/`suffix` keys
+- Sane default: `hostname = "{{prefix}}{{server_name}}{{suffix}}"` (only applied when `hostname` is entirely absent from the merge, not when it's present-but-empty)
+
+**Secret references**: `password`-family fields and any `env.<NAME>` key (see below) may be `{{secret:<name>/<key>}}` instead of a literal value, resolved via a live lookup — but *not* against the chart's own namespace. Secrets referenceable this way live in a dedicated `magpie-user-secrets` namespace (`userSecretsNamespace` in `values.yaml`, chart-created), kept separate on purpose: an operator-controlled ConfigMap value naming a Secret to read would otherwise be able to reach `arma-postgres-creds`/`ghcr-pull-secret`/etc. alongside it. Create your own Secrets there for anything you want referenceable this way.
+
+**Extra env vars**: any merged-config key of the form `env.<NAME>` becomes an extra `<NAME>` env var on the launcher container (same placeholder/`{{secret:...}}` support), e.g. `env.SOME_API_KEY = "{{secret:my-secret/key}}"`.
+
 ## Installing the CLI
 
 `magpiectl` is both a direct CLI (`magpiectl servers list`, `magpiectl deploy`, ...) and, run with no subcommand, an interactive TUI — everything the TUI can do is also a direct invocation, and vice versa (see `cli/magpie/internal/actions`, the one implementation both surfaces call into). It can also drive the cluster's own lifecycle directly (`magpiectl deploy`/`upgrade`/`install`, shelling out to `helm`/`kubectl` the same way `scripts/deploy.sh` does) and establish the cluster's Steam session (`magpiectl admin refresh-steam-auth`, see "Steam authentication" above) without needing a repo checkout at all.
@@ -126,7 +175,7 @@ proto/                 ConnectRPC service definitions
 charts/magpie/         the Helm chart
 deploy/                k3s-bootstrap.sh
 scripts/               deploy.sh
-configs/               example main.cfg/basic.cfg to seed a server's operator-provided config directory
+configs/               reference main.cfg/basic.cfg showing every field controller's arma_config.rs can render (see "Arma server config")
 Dockerfile.workspace   compiles every service binary in one build (see Development below)
 ```
 
