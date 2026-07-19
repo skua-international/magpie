@@ -1,6 +1,13 @@
+# version/appVersion below are placeholders, not the real published
+# version -- publish-release-artifacts.yml always overrides both via
+# `helm package --version/--app-version` at release-promotion time, from
+# the release tag semantic-release created. Nothing in this repo ever
+# commits a real version back here (see release.yml's own comment on why
+# a release doesn't create a bump commit); check GHCR or GitHub Releases
+# for the actual current version, not this file.
 apiVersion: v2
 name: magpie
 description: MAGPIE -- Managed Arma General Pile of Intricate Engineering. Kubernetes-native orchestration for Arma 3 dedicated servers.
 type: application
-version: 1.5.3
-appVersion: "1.5.3"
+version: 0.0.0-unreleased
+appVersion: "0.0.0-unreleased"
