@@ -1,7 +1,9 @@
 # syntax=docker/dockerfile:1.7
-# Compiles all 7 service binaries in one place, for build-images.yml's
+# Compiles all 6 Rust service binaries in one place, for build-images.yml's
 # build-workspace job to export locally (buildx --output=type=local, not
 # push/pull) rather than run `cargo build` on the bare runner directly.
+# magpie-csi is Go, not part of this build at all -- it has its own
+# self-contained Dockerfile (services/magpie-csi/Dockerfile).
 #
 # Two real, separate problems on elephant's self-hosted runner drove this:
 # (1) `container: image: rust:trixie` (GHA's job-container feature)
@@ -50,7 +52,7 @@ RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .
 RUN cargo build --release --locked
 
-# Nothing but the 7 binaries themselves end up in the exported output --
+# Nothing but the 6 binaries themselves end up in the exported output --
 # build-workspace's `docker build --target dist --output type=local`
 # only ever wants dist/, not a whole rust:trixie image's worth of layers.
 FROM scratch AS dist
@@ -61,5 +63,4 @@ COPY --from=builder \
     /build/target/release/registry \
     /build/target/release/server-api \
     /build/target/release/identity \
-    /build/target/release/volume-manager \
     /
