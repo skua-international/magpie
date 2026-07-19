@@ -17,7 +17,10 @@ FROM chef AS builder
 COPY --from=planner /build/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .
-RUN cargo build --release --locked -p registry \
+# No -p here, deliberately -- see services/launcher/Dockerfile's own copy
+# of this comment: a -p-scoped build resolves a narrower feature set than
+# cook's whole-workspace one, defeating the cache even on a cook hit.
+RUN cargo build --release --locked \
     && cp /build/target/release/registry /build/registry
 
 # Pure Rust binary, no subprocess/shell use -- distroless: no shell, no

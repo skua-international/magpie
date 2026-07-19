@@ -24,7 +24,16 @@ FROM chef AS builder
 COPY --from=planner /build/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .
-RUN cargo build --release --locked -p launcher \
+# No -p here, deliberately: cargo resolves a narrower, per-target feature
+# set for `-p <crate>` than it does for a whole-workspace build under
+# resolver v2, which doesn't match the feature set `cargo chef cook`
+# (also whole-workspace, no -p) just built above -- that mismatch was
+# silently invalidating and recompiling the *entire* dependency tree on
+# every build even with a fully cache-hit cook layer. Matching cook's
+# scope here means the extra cost is compiling the other services' own
+# (small, workspace-owned) crates/binaries, not re-resolving the
+# expensive third-party tree cook already cached.
+RUN cargo build --release --locked \
     && cp /build/target/release/launcher /build/launcher
 
 FROM debian:bookworm-slim
