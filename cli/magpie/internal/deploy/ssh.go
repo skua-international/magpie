@@ -105,9 +105,17 @@ func RunRemoteInstall(ctx context.Context, sshHost, sshIdentity string, opts Opt
 		return fmt.Errorf("failed to fetch kubeconfig from %s: %w", sshHost, err)
 	}
 
-	remoteHost := sshHost
-	if idx := strings.Index(remoteHost, "@"); idx >= 0 {
-		remoteHost = remoteHost[idx+1:]
+	// Not just sshHost's own hostname part: it may be a bare alias
+	// defined in ~/.ssh/config (a `Host` block with its own `HostName`),
+	// which only ssh itself knows how to resolve -- confirmed live,
+	// kubectl (a separate tool, doesn't read ~/.ssh/config at all) failed
+	// outright trying to literally resolve "magpie-vm" as a real
+	// hostname. `ssh -G` resolves the same way an actual ssh connection
+	// would, alias or not, so use that instead of assuming sshHost is
+	// already a real hostname/IP.
+	remoteHost, err := resolveSSHHostname(ctx, sshHost, sshArgs)
+	if err != nil {
+		return fmt.Errorf("failed to resolve %s's real hostname via ssh -G: %w", sshHost, err)
 	}
 	rewritten := strings.NewReplacer(
 		"https://127.0.0.1:", "https://"+remoteHost+":",
@@ -166,6 +174,29 @@ func parseVolumeManagerIDs(output string) (uid, gid int, err error) {
 		return 0, 0, fmt.Errorf("no MAGPIECTL_VOLUME_UID/GID found in remote output")
 	}
 	return uid, gid, nil
+}
+
+// resolveSSHHostname returns whatever `ssh -G` says it would actually
+// connect to for host -- if host is a plain hostname/IP this is just
+// host itself, but if it's a ~/.ssh/config alias, this resolves that
+// alias's HostName the same way a real ssh connection would, instead of
+// assuming the literal string passed to --ssh is already something
+// other tools (kubectl, not ssh) can resolve on their own.
+func resolveSSHHostname(ctx context.Context, host string, sshArgs []string) (string, error) {
+	target := host
+	if idx := strings.Index(target, "@"); idx >= 0 {
+		target = target[idx+1:]
+	}
+	out, err := exec.CommandContext(ctx, "ssh", append(append([]string{}, sshArgs...), "-G", target)...).Output()
+	if err != nil {
+		return "", err
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		if name, ok := strings.CutPrefix(line, "hostname "); ok {
+			return strings.TrimSpace(name), nil
+		}
+	}
+	return "", fmt.Errorf("no hostname in `ssh -G %s` output", target)
 }
 
 // archToGoArch maps `uname -m`'s output to the Go/goreleaser arch names
