@@ -105,6 +105,19 @@ impl BlobManager {
         self.statvfs().await
     }
 
+    /// For /healthz -- true only once the blob is actually mounted (not
+    /// just "the process is up and listening"), so a readiness/liveness
+    /// check against this service means something: sync-daemon's own
+    /// wait-for-content-volume initContainer polls the filesystem
+    /// directly rather than this, but anything checking *this* service's
+    /// own health should see the same reality. Collapses any findmnt
+    /// error into "not ready" rather than propagating it -- a health
+    /// check has nothing more useful to do with an error than report
+    /// unhealthy anyway.
+    pub async fn is_ready(&self) -> bool {
+        self.is_mounted().await.unwrap_or(false)
+    }
+
     async fn is_mounted(&self) -> Result<bool> {
         let mount_str = self.mount_path.to_string_lossy();
         let out = host_command("findmnt", &["--noheadings", "--target", &mount_str])

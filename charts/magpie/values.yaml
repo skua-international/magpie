@@ -285,7 +285,7 @@ volumeManager:
   # Initial blob size, the very first time it's ever created -- every grow
   # after that is driven by actual usage (sync-daemon calling GrowVolume
   # ahead of a sync), never re-reads this value again.
-  initialSizeGiB: 60
+  initialSizeGiB: 40
   # Added on top of new mods' summed size before sync-daemon calls
   # GrowVolume -- headroom for the *next* registration, and for file_size
   # being Steam's own reported size rather than exactly what lands on

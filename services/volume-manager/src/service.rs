@@ -14,6 +14,12 @@ impl VolumeManagerImpl {
     pub fn new(blob: BlobManager) -> Self {
         Self { blob }
     }
+
+    /// See BlobManager::is_ready -- exposed here so main.rs's /healthz
+    /// handler doesn't need its own separate handle on the BlobManager.
+    pub async fn is_ready(&self) -> bool {
+        self.blob.is_ready().await
+    }
 }
 
 impl VolumeManager for VolumeManagerImpl {

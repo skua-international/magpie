@@ -60,6 +60,16 @@ spec:
             capabilities:
               drop: ["ALL"]
               add: ["SYS_ADMIN"]
+            # CAP_SYS_ADMIN alone isn't enough for setns(CLONE_NEWNS) into
+            # PID 1's mount namespace -- confirmed live: "nsenter:
+            # reassociate to namespaces failed: Operation not permitted"
+            # even with the capability granted. AppArmor is a separate MAC
+            # layer capabilities don't bypass, and containerd's default
+            # profile denies this; unconfined only for this one container,
+            # which is already the one place in the chart with elevated
+            # capabilities to begin with.
+            appArmorProfile:
+              type: Unconfined
           ports:
             - name: http
               containerPort: 8446
