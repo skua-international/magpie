@@ -18,7 +18,6 @@ use steam_sync::workshop;
 use tokio::sync::Semaphore;
 use tracing::{error, info};
 use uuid::Uuid;
-use volume_client::VolumeClient;
 
 use crate::secrets::{self, Session};
 
@@ -60,23 +59,10 @@ pub struct Shared {
     pub client: kube::Client,
     pub namespace: String,
     pub steam_session_secret_name: String,
-    /// `None` if VOLUME_MANAGER_URL isn't configured -- RegisterSource
-    /// just skips the pre-emptive grow check in that case (logs once,
-    /// doesn't fail) rather than requiring every deployment to have
-    /// volume-manager wired up. The chart's default values.yaml always
-    /// sets this, so this is a "not configured at all" escape hatch, not
-    /// something a real deployment is expected to leave unset.
-    pub volume_client: Option<Arc<VolumeClient>>,
-    /// Added on top of the sum of newly-resolved mods' file_size before
-    /// calling GrowVolume -- covers estimate error (file_size is Steam's
-    /// own reported size, not necessarily exactly what lands on disk) and
-    /// gives headroom for the *next* RegisterSource before growing again.
-    pub volume_grow_grace_bytes: u64,
     jobs: Jobs,
 }
 
 impl Shared {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         pool: Option<Arc<CmPool>>,
         sync_state: Arc<SyncState>,
@@ -85,8 +71,6 @@ impl Shared {
         client: kube::Client,
         namespace: String,
         steam_session_secret_name: String,
-        volume_client: Option<Arc<volume_client::VolumeClient>>,
-        volume_grow_grace_bytes: u64,
     ) -> Arc<Self> {
         Arc::new(Self {
             pool,
@@ -96,8 +80,6 @@ impl Shared {
             client,
             namespace,
             steam_session_secret_name,
-            volume_client,
-            volume_grow_grace_bytes,
             jobs: Mutex::new(HashMap::new()),
         })
     }
@@ -138,8 +120,6 @@ impl Shared {
             self.sync_state.record_mod_title(m.mod_id, &m.title);
         }
 
-        self.grow_volume_for_new_mods(&outcome.mods).await;
-
         let root_title = match candidate_ids {
             [single] => outcome
                 .candidate_titles
@@ -153,46 +133,6 @@ impl Shared {
             mods: outcome.mods,
             root_title,
         })
-    }
-
-    /// Sums file_size for whichever of `mods` aren't already tracked as
-    /// synced (a mod referenced by another source, or already downloaded
-    /// for this same source in a prior call, doesn't need new space) and
-    /// asks volume-manager to grow ahead of the actual download -- see
-    /// proto/volume/v1/volume.proto for why sync-daemon doesn't do this
-    /// itself. Best-effort: a failure here is logged, not propagated --
-    /// RegisterSource itself has already succeeded (Steam-side resolution
-    /// and the local registry are both durable at this point), and Claim
-    /// will still hit a real disk-space error later if growth genuinely
-    /// can't keep up, rather than this silently truncating downloads.
-    async fn grow_volume_for_new_mods(&self, mods: &[ResolvedMod]) {
-        let Some(volume_client) = &self.volume_client else {
-            return;
-        };
-
-        let new_bytes: u64 = mods
-            .iter()
-            .filter(|m| self.sync_state.get_synced_mod(m.mod_id).is_none())
-            .map(|m| m.file_size)
-            .sum();
-
-        if new_bytes == 0 {
-            return;
-        }
-
-        let bytes_needed = new_bytes + self.volume_grow_grace_bytes;
-        match volume_client.grow_volume(bytes_needed).await {
-            Ok(result) if result.grew => {
-                info!(
-                    "grew content volume for {new_bytes} bytes of new mods + grace -- now {} total, {} free",
-                    result.total_bytes, result.free_bytes
-                );
-            }
-            Ok(_) => {}
-            Err(e) => {
-                error!("failed to grow content volume ahead of sync: {e:#}");
-            }
-        }
     }
 
     /// Re-resolve `source_id` against whatever candidate IDs it was last

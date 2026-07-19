@@ -23,8 +23,9 @@ use crd::{ArmaServer, ArmaServerPhase, ArmaServerStatus, DesiredState, ModSource
 use futures::StreamExt;
 use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec};
 use k8s_openapi::api::core::v1::{
-    Container, EnvVar, EnvVarSource, HostPathVolumeSource, LocalObjectReference, PodSpec,
-    PodTemplateSpec, SecretKeySelector, Volume, VolumeMount,
+    Container, EnvVar, EnvVarSource, HostPathVolumeSource, LocalObjectReference,
+    PersistentVolumeClaimVolumeSource, PodSpec, PodTemplateSpec, SecretKeySelector, Volume,
+    VolumeMount,
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
 use kube::api::{Api, DeleteParams, Patch, PatchParams};
@@ -435,6 +436,7 @@ async fn ensure_deployment(
                             VolumeMount {
                                 name: "claims".into(),
                                 mount_path: ctx.cfg.claims_root.clone(),
+                                sub_path: Some("claims".into()),
                                 read_only: Some(true),
                                 ..Default::default()
                             },
@@ -466,9 +468,9 @@ async fn ensure_deployment(
                     volumes: Some(vec![
                         Volume {
                             name: "claims".into(),
-                            host_path: Some(HostPathVolumeSource {
-                                path: ctx.cfg.claims_host_path.clone(),
-                                type_: Some("DirectoryOrCreate".into()),
+                            persistent_volume_claim: Some(PersistentVolumeClaimVolumeSource {
+                                claim_name: ctx.cfg.reflink_pvc_name.clone(),
+                                read_only: Some(true),
                             }),
                             ..Default::default()
                         },

@@ -4,7 +4,6 @@ fn main() {
             "../../proto/sync/v1/sync.proto",
             "../../proto/controller/v1/controller.proto",
             "../../proto/registry/v1/registry.proto",
-            "../../proto/volume/v1/volume.proto",
         ])
         .includes(&["../../proto"])
         .include_file("_connectrpc.rs")

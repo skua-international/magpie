@@ -46,8 +46,8 @@ spec:
               value: {{ join "," .Values.imagePullSecrets | quote }}
             - name: SYNC_DAEMON_URL
               value: "http://{{ include "magpie.fullname" . }}-sync-daemon:8080"
-            - name: CLAIMS_HOST_PATH
-              value: {{ .Values.hostPaths.claimsPath | quote }}
+            - name: REFLINK_PVC_NAME
+              value: {{ printf "%s-reflink-content" (include "magpie.fullname" .) | quote }}
             - name: CLAIMS_ROOT
               value: /claims
             - name: SERVER_ROOT_BASE

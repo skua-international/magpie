@@ -38,8 +38,8 @@ rules:
   # Read-only, scoped to just the one Secret the controller needs the
   # plaintext password out of to run its Postgres GRANT/ALTER ROLE
   # bootstrap (see postgres_bootstrap.rs) -- the chart itself creates the
-  # object (app-postgres-secret.yaml, same lookup+randAlphaNum idiom as
-  # volume-manager-token), so no create/patch verb is needed here at all.
+  # object (app-postgres-secret.yaml, via lookup+randAlphaNum), so no
+  # create/patch verb is needed here at all.
   - apiGroups: [""]
     resources: ["secrets"]
     resourceNames: [{{ .Values.postgres.appSecretName | quote }}]

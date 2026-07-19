@@ -7,15 +7,17 @@ pub struct Config {
     pub launcher_image: String,
     /// Base URL of sync-daemon's Connect API.
     pub sync_daemon_url: String,
-    /// Host directory (hostPath, not a PVC -- see the chart's values.yaml
-    /// for why: reflink claims need `content`/`claims` on the very same
-    /// real filesystem, which only a direct hostPath pass-through
-    /// guarantees on this project's single-node k3s target) sync-daemon
-    /// writes claims to, bind-mounted at the same in-container path
-    /// (matching sync-daemon's own `CLAIMS_ROOT`) into every launcher Pod
-    /// -- the claim path `Claim` returns is an absolute path under that
-    /// shared tree, so it's directly usable as `CLAIM_PATH` unmodified.
-    pub claims_host_path: String,
+    /// PersistentVolumeClaim (magpie-reflink StorageClass, see
+    /// magpie-csi) sync-daemon writes claims to, mounted read-only (via
+    /// its `claims` subPath -- `content` is the other) into every
+    /// launcher Pod at the same in-container path (matching
+    /// sync-daemon's own `CLAIMS_ROOT`) -- the claim path `Claim`
+    /// returns is an absolute path under that shared tree, so it's
+    /// directly usable as `CLAIM_PATH` unmodified. Same PVC sync-daemon
+    /// itself mounts, so `content`/`claims` always land on the very same
+    /// real filesystem (required for `cp --reflink=always` to CoW at
+    /// all) without either side having to reason about it.
+    pub reflink_pvc_name: String,
     pub claims_root: String,
     /// Host directory holding each server's own operator-provided content
     /// (configs/profiles/keys) -- `<server_root_base>/<ArmaServer name>` is
@@ -86,8 +88,8 @@ impl Config {
                 .unwrap_or_else(|_| "arma3-launcher:latest".into()),
             sync_daemon_url: env::var("SYNC_DAEMON_URL")
                 .unwrap_or_else(|_| "http://sync-daemon:8080".into()),
-            claims_host_path: env::var("CLAIMS_HOST_PATH")
-                .unwrap_or_else(|_| "/var/lib/magpie/claims".into()),
+            reflink_pvc_name: env::var("REFLINK_PVC_NAME")
+                .unwrap_or_else(|_| "magpie-reflink-content".into()),
             claims_root: env::var("CLAIMS_ROOT").unwrap_or_else(|_| "/claims".into()),
             server_root_base: env::var("SERVER_ROOT_BASE")
                 .unwrap_or_else(|_| "/srv/arma-servers".into()),

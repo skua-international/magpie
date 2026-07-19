@@ -1849,10 +1849,7 @@ pub async fn resolve_source_ids(
                 // 0 (not just missing) for a collection's own entry, which
                 // never reaches here anyway -- only genuinely unset for a
                 // handful of legacy items GetDetails doesn't report a size
-                // for at all, treated as "unknown" (0) by callers doing
-                // pre-download disk-space estimates (see sync-daemon's
-                // RegisterSource, which sums this to call volume-manager's
-                // GrowVolume before syncing).
+                // for at all, treated as "unknown" (0).
                 let file_size = details.file_size.unwrap_or(0);
                 resolved.insert(id, (title, file_size));
             }

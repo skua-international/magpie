@@ -1,0 +1,17 @@
+# One PVC, shared by sync-daemon (read-write) and every launcher Pod
+# (read-only) -- content and claims are subPaths of this one volume
+# rather than two separate PVCs, since they must live on the very same
+# real filesystem for reflink CoW claims to work at all.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "magpie.fullname" . }}-reflink-content
+  namespace: {{ include "magpie.namespace" . }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: magpie-reflink
+  resources:
+    requests:
+      storage: {{ .Values.reflinkStorage.sizeGiB }}Gi

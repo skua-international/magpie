@@ -97,16 +97,6 @@ async fn main() -> Result<()> {
         }
     };
 
-    let volume_client = if cfg.volume_manager_url.is_empty() {
-        warn!("VOLUME_MANAGER_URL not set -- RegisterSource will skip its pre-emptive grow check");
-        None
-    } else {
-        Some(std::sync::Arc::new(volume_client::VolumeClient::new(
-            &cfg.volume_manager_url,
-            &cfg.volume_manager_token,
-        )?))
-    };
-
     let shared = Shared::new(
         pool,
         sync_state,
@@ -115,8 +105,6 @@ async fn main() -> Result<()> {
         client.clone(),
         cfg.namespace.clone(),
         cfg.steam_session_secret_name.clone(),
-        volume_client,
-        cfg.volume_grow_grace_bytes,
     );
 
     reconcile::spawn(

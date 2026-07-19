@@ -72,37 +72,25 @@ ingress:
   # needs to reach them.
   baseDomain: magpie.local
 
-# Node-local directories backing every shared volume in this chart --
-# hostPath, deliberately not PVCs. This whole chart targets single-node
-# k3s (see deploy/k3s-bootstrap.sh); on one node, "multiple pods need to
-# read/write the same volume concurrently" doesn't require a real
-# RWX-capable storage class (NFS, Longhorn, ...) at all, since every pod
-# is already on that one node -- hostPath already allows unlimited
-# concurrent mounts with zero extra infrastructure. It's also the
-# *correct* choice, not just the simplest one: contentPath and claimsPath
-# must be on the very same real filesystem for sync-daemon's reflink
-# claims to work (`cp --reflink=always` can't CoW across filesystems).
-#
-# That "same real filesystem" requirement is now enforced by construction
-# rather than by convention: contentPath/claimsPath live under
-# blobMountPath, a loop-mounted btrfs blob volume-manager owns (see
-# proto/volume/v1/volume.proto) specifically so reflink works regardless
-# of what filesystem the host itself actually has, and can grow itself as
-# content is added instead of needing a fixed size chosen up front.
-# blobImage is the blob's own backing file -- necessarily outside
-# blobMountPath, since a filesystem's backing file can't live inside the
-# filesystem it backs. Both directories must already exist, owned by the
-# magpie-volume user `magpiectl install` provisions (see
-# cli/magpie/internal/deploy/volumeuser.go) -- the chart deliberately
-# does not create them itself (hostPath type: Directory, not
-# DirectoryOrCreate), so a missing provisioning step fails loudly instead
-# of kubelet silently creating root-owned directories the non-root
-# volume-manager pod then can't write to.
+# sync-daemon's content/claims live on a PersistentVolumeClaim against
+# the magpie-reflink StorageClass (see reflink-storageclass.yaml and
+# services/magpie-csi) -- content/claims must be on the very same real
+# filesystem for sync-daemon's reflink claims to work (`cp
+# --reflink=always` can't CoW across filesystems), which is why they're
+# subPaths of one PVC rather than two separate ones. magpie-csi's own
+# Node plugin loop-mounts a growable btrfs blob for this regardless of
+# what filesystem the host itself actually has -- see its own doc for
+# why that's still necessary even though this isn't hostPath any more.
+reflinkStorage:
+  sizeGiB: 40
+
+# Node-local directory holding registry-owned local (zip-uploaded) mods
+# and missions -- hostPath, not a PVC: this chart targets single-node
+# k3s (see deploy/k3s-bootstrap.sh), so "multiple pods need to read/write
+# the same volume concurrently" doesn't need a real RWX-capable storage
+# class, and there's no reflink/same-filesystem requirement here the way
+# there is for sync-daemon's content/claims above.
 hostPaths:
-  blobImage: /var/lib/magpie-blob/content.img
-  blobMountPath: /var/lib/magpie/data
-  contentPath: /var/lib/magpie/data/content
-  claimsPath: /var/lib/magpie/data/claims
   localContentPath: /var/lib/magpie/local-content
 
 # JWT verification config, shared by services/registry and
@@ -285,21 +273,17 @@ registry:
 # there's no sensible generic default UID/GID to ship here, and shipping
 # a wrong one silently would be worse than the chart refusing to render
 # without it (see the DaemonSet template's own `required`).
-volumeManager:
+# services/magpie-csi -- one binary, deployed twice (see
+# magpie-csi-controller-deployment.yaml/magpie-csi-node-daemonset.yaml):
+# once as the CSI Controller service (CreateVolume/DeleteVolume, paired
+# with the standard external-provisioner sidecar) and once as the CSI
+# Node service (NodeStageVolume/NodePublishVolume, one per node, paired
+# with the standard node-driver-registrar sidecar). See its own README/
+# doc comments for why this replaced volume-manager's bespoke RPC design.
+magpieCsi:
   image:
-    repository: "ghcr.io/skua-international/magpie/volume-manager"
+    repository: "ghcr.io/skua-international/magpie/magpie-csi"
     tag: ""
-  runAsUser: ""
-  runAsGroup: ""
-  # Initial blob size, the very first time it's ever created -- every grow
-  # after that is driven by actual usage (sync-daemon calling GrowVolume
-  # ahead of a sync), never re-reads this value again.
-  initialSizeGiB: 40
-  # Added on top of new mods' summed size before sync-daemon calls
-  # GrowVolume -- headroom for the *next* registration, and for file_size
-  # being Steam's own reported size rather than exactly what lands on
-  # disk.
-  growGraceGiB: 10
   resources: {}
 
 # Cluster-wide baseline Arma server config -- every ArmaServer's own
