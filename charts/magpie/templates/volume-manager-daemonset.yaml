@@ -98,6 +98,17 @@ spec:
             # into this container at all -- see this file's own header.
             - name: blob-image-dir
               mountPath: /blob
+            # Loop device *node files* (/dev/loopN) live in /dev, which --
+            # unlike the loop driver's own kernel-global block-device
+            # numbers -- is a private, per-container tmpfs by default, not
+            # populated with any loop nodes at all. Confirmed live:
+            # "losetup: device node /dev/loop0 (7:0) is lost. You may use
+            # mknod(1) to recover it." Bind-mounting the host's real /dev
+            # is the standard fix for containers needing loop devices,
+            # consistent with this already being the one container in the
+            # chart with real host block-device access.
+            - name: dev
+              mountPath: /dev
           readinessProbe:
             httpGet:
               path: /healthz
@@ -111,6 +122,10 @@ spec:
         - name: blob-image-dir
           hostPath:
             path: {{ dir .Values.hostPaths.blobImage }}
+            type: Directory
+        - name: dev
+          hostPath:
+            path: /dev
             type: Directory
 ---
 apiVersion: v1
