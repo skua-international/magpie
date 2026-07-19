@@ -20,7 +20,7 @@ RUN apt-get update \
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain stable \
     && rustup component add clippy rustfmt
 
-RUN go_version="1.25.0" \
+RUN go_version="1.26.5" \
     && go_arch="$(dpkg --print-architecture)" \
     && case "$go_arch" in \
       amd64) go_arch=amd64 ;; \

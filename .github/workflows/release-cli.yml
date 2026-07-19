@@ -38,7 +38,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: "1.25"
+          go-version: "1.26"
           # go.mod/go.sum live at cli/magpie/, not the repo root -- see
           # build-cli-binaries.yml's own copy of this comment.
           cache-dependency-path: cli/magpie/go.sum

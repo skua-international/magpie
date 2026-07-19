@@ -1,6 +1,6 @@
 module github.com/skua-international/magpie/cli
 
-go 1.25.5
+go 1.26.5
 
 // Not published to a real module proxy -- lives in this same monorepo,
 // regenerated from proto/ on every release (see .github/workflows/

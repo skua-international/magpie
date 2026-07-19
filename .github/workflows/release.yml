@@ -104,7 +104,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: "1.25"
+          go-version: "1.26"
           # Same reasoning as generate-stubs.yml's own copy of this
           # comment: only go installs third-party tools here, no local
           # go.mod to key setup-go's built-in cache off at all.
