@@ -1,28 +1,23 @@
 package deploy
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
-	"strconv"
 	"strings"
 )
 
-// RunRemoteInstall runs only the root-level, host-specific parts of a
-// first install (k3s, the magpie-volume user) on a remote host over ssh
-// -- everything else (secrets, helm pull/upgrade) runs locally
-// afterward, against the kubeconfig that leaves behind. Deliberately
-// keeps the remote host's own footprint to exactly what actually has to
-// run there: k3s install and volume-manager's host-user provisioning are
-// genuinely root-level operations on that specific machine, but helm/
-// kubectl operations aren't tied to any particular host at all, and
-// requiring helm to be installed on the target too (the original
+// RunRemoteInstall runs only the root-level, host-specific part of a
+// first install (k3s) on a remote host over ssh -- everything else
+// (secrets, helm pull/upgrade) runs locally afterward, against the
+// kubeconfig that leaves behind. Deliberately keeps the remote host's
+// own footprint to exactly what actually has to run there: k3s install
+// is a genuinely root-level operation on that specific machine, but
+// helm/kubectl operations aren't tied to any particular host at all,
+// and requiring helm to be installed on the target too (the original
 // design, which mirrored this entire process onto it) was needless --
 // confirmed live, a fresh VM had no helm and there was no real reason
 // it needed one.
@@ -70,32 +65,24 @@ func RunRemoteInstall(ctx context.Context, sshHost, sshIdentity string, opts Opt
 	// A single remote shell command, not scp+ssh separately: downloads
 	// the correct-platform magpiectl straight to the remote host (never
 	// transits through this machine at all), runs it with only the
-	// node-setup-only invocation (k3s + volume-manager user, nothing
-	// else), and cleans up after itself regardless of exit status.
+	// node-setup-only invocation (k3s, nothing else), and cleans up
+	// after itself regardless of exit status.
 	remoteArgs := []string{
 		"install", "--bootstrap-k3s", "--node-setup-only",
 		"--data-dir", opts.DataDir,
-		"--blob-image-path", opts.BlobImagePath,
-		"--blob-mount-path", opts.BlobMountPath,
 	}
 	remoteScript := fmt.Sprintf(
 		`set -e; curl -sSf -H "Authorization: token %s" -H "Accept: application/octet-stream" -L %s -o /tmp/magpiectl.tar.gz && tar xzf /tmp/magpiectl.tar.gz -C /tmp magpiectl && chmod +x /tmp/magpiectl; rc=$?; if [ $rc -eq 0 ]; then /tmp/magpiectl %s; rc=$?; fi; rm -f /tmp/magpiectl /tmp/magpiectl.tar.gz; exit $rc`,
 		token, shellSingleQuote(assetURL), shellJoin(remoteArgs),
 	)
 
-	fmt.Printf("==> Provisioning %s (k3s + volume-manager user)...\n", sshHost)
+	fmt.Printf("==> Provisioning %s (k3s)...\n", sshHost)
 	sshRunArgs := append(append([]string{}, sshArgs...), sshHost, remoteScript)
 	cmd := exec.CommandContext(ctx, "ssh", sshRunArgs...)
-	var captured bytes.Buffer
-	cmd.Stdout = io.MultiWriter(os.Stdout, &captured)
+	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("remote node setup failed: %w", err)
-	}
-
-	uid, gid, err := parseVolumeManagerIDs(captured.String())
-	if err != nil {
-		return fmt.Errorf("failed to read volume-manager uid/gid back from %s: %w", sshHost, err)
 	}
 
 	fmt.Printf("==> Fetching kubeconfig from %s...\n", sshHost)
@@ -145,35 +132,8 @@ func RunRemoteInstall(ctx context.Context, sshHost, sshIdentity string, opts Opt
 	// kubeconfig above. helm/kubectl only need to be installed on this
 	// machine, never the remote one.
 	opts.BootstrapK3s = false
-	opts.SkipVolumeManagerProvisioning = true
-	opts.VolumeManagerUID = uid
-	opts.VolumeManagerGID = gid
 	fmt.Println("==> Continuing the install locally against the new cluster...")
 	return Run(ctx, opts)
-}
-
-var volumeManagerIDPattern = regexp.MustCompile(`MAGPIECTL_VOLUME_(UID|GID)=(\d+)`)
-
-// parseVolumeManagerIDs pulls the MAGPIECTL_VOLUME_UID/GID lines
-// RunNodeSetup prints out of the remote command's captured stdout.
-func parseVolumeManagerIDs(output string) (uid, gid int, err error) {
-	matches := volumeManagerIDPattern.FindAllStringSubmatch(output, -1)
-	var haveUID, haveGID bool
-	for _, m := range matches {
-		n, err := strconv.Atoi(m[2])
-		if err != nil {
-			continue
-		}
-		if m[1] == "UID" {
-			uid, haveUID = n, true
-		} else {
-			gid, haveGID = n, true
-		}
-	}
-	if !haveUID || !haveGID {
-		return 0, 0, fmt.Errorf("no MAGPIECTL_VOLUME_UID/GID found in remote output")
-	}
-	return uid, gid, nil
 }
 
 // resolveSSHHostname returns whatever `ssh -G` says it would actually

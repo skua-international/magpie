@@ -26,21 +26,18 @@ import (
 const chartNamespace = "magpie"
 
 // BootstrapK3s installs k3s on this host (if not already installed),
-// waits for the node to report Ready, checks whether dataDir's
-// filesystem supports reflink (steam_sync::claim needs btrfs, or XFS
-// formatted with reflink=1 -- warns, doesn't fail, if not), and writes a
-// kubeconfig -- setting KUBECONFIG for the rest of this process so every
-// subsequent helm/kubectl call in Run() picks it up automatically.
+// waits for the node to report Ready, and writes a kubeconfig --
+// setting KUBECONFIG for the rest of this process so every subsequent
+// helm/kubectl call in Run() picks it up automatically.
 //
 // Local-only, deliberately -- for a remote host, RunRemoteInstall (see
 // ssh.go) runs this (via RunNodeSetup) on the target over ssh instead,
 // then continues everything else (secrets, helm) locally against the
 // kubeconfig it leaves behind. That split is deliberate too: k3s install
-// and volume-manager's host-user provisioning genuinely have to run on
-// the target machine, but nothing downstream of them does, so mirroring
-// this whole process onto the remote host (an earlier version of this
-// design) would've required helm/kubectl to be installed there for no
-// real reason.
+// genuinely has to run on the target machine, but nothing downstream of
+// it does, so mirroring this whole process onto the remote host (an
+// earlier version of this design) would've required helm/kubectl to be
+// installed there for no real reason.
 func BootstrapK3s(ctx context.Context, dataDir string) error {
 	if _, err := exec.LookPath("k3s"); err == nil {
 		fmt.Println("==> k3s already installed, skipping install")
@@ -50,11 +47,9 @@ func BootstrapK3s(ctx context.Context, dataDir string) error {
 		// disk the OS itself lives on -- confirmed live to matter, not
 		// theoretical: a cloud image's default root partition can be a
 		// couple GB, nowhere near enough for containerd's image cache
-		// once real workloads start pulling, while dataDir (this flag
-		// already existed for the reflink check below) commonly points
-		// at a much larger, purpose-provisioned disk. k3sDataDir keeps
-		// k3s's own storage on that same disk, not a separate concern
-		// from where magpie's own content/claims/blob already live.
+		// once real workloads start pulling, while dataDir commonly
+		// points at a much larger, purpose-provisioned disk. k3sDataDir
+		// keeps k3s's own storage on that same disk.
 		//
 		// --data-dir alone isn't enough, confirmed live: kubelet has its
 		// own separate default root (/var/lib/kubelet) that --data-dir
@@ -115,8 +110,6 @@ func BootstrapK3s(ctx context.Context, dataDir string) error {
 	}
 	fmt.Println("==> Node is Ready")
 
-	checkReflink(dataDir)
-
 	kubeconfigPath, err := writeKubeconfig(ctx)
 	if err != nil {
 		return err
@@ -161,36 +154,6 @@ func writeKubeconfig(ctx context.Context) (string, error) {
 		return "", err
 	}
 	return path, nil
-}
-
-// checkReflink warns (doesn't fail) if dataDir's filesystem doesn't
-// support reflink CoW claims -- see deploy/k3s-bootstrap.sh's own
-// version of this check for the full rationale (contentPath/claimsPath
-// must be on the same real filesystem for `cp --reflink=always` to work
-// at all).
-func checkReflink(dataDir string) {
-	if err := os.MkdirAll(dataDir, 0o755); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: failed to create %s: %v\n", dataDir, err)
-		return
-	}
-	out, err := exec.Command("findmnt", "-no", "FSTYPE", "--target", dataDir).Output()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "warning: couldn't determine %s's filesystem type (findmnt unavailable?)\n", dataDir)
-		return
-	}
-	switch fsType := strings.TrimSpace(string(out)); fsType {
-	case "btrfs":
-		fmt.Printf("==> %s filesystem: btrfs (reflink supported)\n", dataDir)
-	case "xfs":
-		info, _ := exec.Command("xfs_info", dataDir).Output()
-		if strings.Contains(string(info), "reflink=1") {
-			fmt.Printf("==> %s filesystem: xfs with reflink=1 (reflink supported)\n", dataDir)
-		} else {
-			fmt.Fprintf(os.Stderr, "warning: %s is xfs but wasn't formatted with reflink=1 -- claims will fall back to real copies. Reformat with 'mkfs.xfs -m reflink=1' if you want fast CoW claims.\n", dataDir)
-		}
-	default:
-		fmt.Fprintf(os.Stderr, "warning: %s's filesystem is '%s', which doesn't support reflink -- claims will fall back to real copies (slower, more disk). btrfs or reflink-enabled xfs is recommended.\n", dataDir, fsType)
-	}
 }
 
 // EnsureInstallSecrets creates arma-postgres-creds (random password,

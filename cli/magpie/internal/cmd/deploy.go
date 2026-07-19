@@ -36,15 +36,13 @@ type installFlags struct {
 	ghcrToken           string
 	identityBaseURL     string
 	ingressBaseDomain   string
-	blobImagePath       string
-	blobMountPath       string
 }
 
 func addInstallFlags(c *cobra.Command, f *installFlags) {
 	c.Flags().BoolVar(&f.bootstrapK3s, "bootstrap-k3s", false,
 		"install k3s on this host first (opt-in) -- without this, an existing kubeconfig/kubectl context is required, same as deploy/upgrade")
 	c.Flags().StringVar(&f.dataDir, "data-dir", "/var/lib/magpie",
-		"only with --bootstrap-k3s: directory checked for reflink (CoW claim) filesystem support")
+		"only with --bootstrap-k3s: k3s/kubelet's own storage root")
 	c.Flags().StringVar(&f.externalPostgresURL, "external-postgres-url", "",
 		"use an existing Postgres instead of the chart-managed one (postgres.enabled=false)")
 	c.Flags().StringVar(&f.ghcrUser, "ghcr-user", "", "GHCR username -- creates ghcr-pull-secret if this and --ghcr-token are both set")
@@ -52,10 +50,6 @@ func addInstallFlags(c *cobra.Command, f *installFlags) {
 	c.Flags().StringVar(&f.identityBaseURL, "identity-base-url", "",
 		"identity's externally-reachable base URL (default: http://identity.<ingress-base-domain>)")
 	c.Flags().StringVar(&f.ingressBaseDomain, "ingress-base-domain", "magpie.local", "base domain every service's Ingress hostname is built from")
-	c.Flags().StringVar(&f.blobImagePath, "blob-image-path", "/var/lib/magpie-blob/content.img",
-		"path to volume-manager's loop-mounted btrfs blob image file -- must match charts/magpie's hostPaths.blobImage unless both are overridden together")
-	c.Flags().StringVar(&f.blobMountPath, "blob-mount-path", "/var/lib/magpie/data",
-		"where volume-manager mounts the blob (content/claims live under here) -- must match charts/magpie's hostPaths.blobMountPath unless both are overridden together")
 }
 
 // extraArgsAfterDash returns whatever was passed after a literal `--` on
@@ -133,11 +127,10 @@ func installCmd() *cobra.Command {
 			"detects the remote host's architecture and downloads the matching magpiectl release binary " +
 			"directly onto it (never copies over whatever platform is running this controlling process " +
 			"-- a Windows or macOS machine driving a Linux VM is the normal case here, not an edge case), " +
-			"runs only k3s install + volume-manager's host-user provisioning there (both genuinely " +
-			"root-level operations on that specific machine), then fetches the resulting kubeconfig back " +
-			"and runs everything else -- secrets, helm pull/upgrade -- locally against it. helm/kubectl " +
-			"only need to be installed on this machine, never the remote one. Assumes the target already " +
-			"has root or passwordless sudo.",
+			"runs only k3s install there (a genuinely root-level operation on that specific machine), " +
+			"then fetches the resulting kubeconfig back and runs everything else -- secrets, helm " +
+			"pull/upgrade -- locally against it. helm/kubectl only need to be installed on this machine, " +
+			"never the remote one. Assumes the target already has root or passwordless sudo.",
 		RunE: func(cc *cobra.Command, args []string) error {
 			opts := deploy.Options{
 				Version:             versionArg(cc, args),
@@ -155,11 +148,9 @@ func installCmd() *cobra.Command {
 				GHCRToken:           i.ghcrToken,
 				IdentityBaseURL:     i.identityBaseURL,
 				IngressBaseDomain:   i.ingressBaseDomain,
-				BlobImagePath:       i.blobImagePath,
-				BlobMountPath:       i.blobMountPath,
 			}
 			if nodeSetupOnly {
-				return deploy.RunNodeSetup(cc.Context(), opts.DataDir, opts.BlobImagePath, opts.BlobMountPath)
+				return deploy.RunNodeSetup(cc.Context(), opts.DataDir)
 			}
 			if sshHost != "" {
 				version, err := deploy.ResolveVersion(cc.Context(), opts.Version)
@@ -189,7 +180,7 @@ func installCmd() *cobra.Command {
 	c.Flags().StringVar(&sshHost, "ssh", "", "run this install on a remote host over ssh instead of locally (e.g. user@host)")
 	c.Flags().StringVar(&sshIdentity, "ssh-identity", "", "ssh identity file to use with --ssh")
 	c.Flags().BoolVar(&nodeSetupOnly, "node-setup-only", false,
-		"internal: used by --ssh on the remote side to run only k3s install + volume-manager user provisioning, not the full install")
+		"internal: used by --ssh on the remote side to run only k3s install, not the full install")
 	_ = c.Flags().MarkHidden("node-setup-only")
 	return c
 }
