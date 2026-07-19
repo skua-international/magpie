@@ -90,5 +90,7 @@ jobs:
 
       - name: Package and push chart
         run: |
-          helm package charts/magpie -d /tmp/chart-out --version "${{ steps.version.outputs.version }}" --app-version "${{ steps.version.outputs.version }}"
-          helm push /tmp/chart-out/magpie-*.tgz oci://${{ env.IMAGE_BASE }}/charts
+          helm plugin uninstall push >/dev/null 2>&1 || true
+          version="${{ steps.version.outputs.version }}"
+          helm package charts/magpie -d /tmp/chart-out --version "$version" --app-version "$version"
+          helm push "/tmp/chart-out/magpie-${version}.tgz" "oci://${{ env.IMAGE_BASE }}/charts"

@@ -274,6 +274,23 @@ func Run(ctx context.Context, opts Options) error {
 		// templates/namespace.yaml, properly Helm-owned), then a second
 		// pass below creates secrets into it and actually waits for a
 		// healthy rollout, once pods have what they need to start.
+		// Phase 1 still has to satisfy the chart's own `required` guard on
+		// postgres.existingSecret whenever postgres.enabled is true (its
+		// default) -- the secret itself doesn't exist yet (that's phase 2),
+		// but the *name* is deterministic (EnsureInstallSecrets always
+		// creates "arma-postgres-creds" for the chart-managed case), so
+		// passing it now just lets the template render; the pods that
+		// reference it simply won't be Ready until phase 2's real upgrade,
+		// which isn't a problem since phase 1 doesn't --wait anyway.
+		if opts.ExternalPostgresURL == "" {
+			opts.ExtraHelmArgs = append(opts.ExtraHelmArgs, "--set", "postgres.existingSecret=arma-postgres-creds")
+		} else {
+			opts.ExtraHelmArgs = append(opts.ExtraHelmArgs,
+				"--set", "postgres.enabled=false",
+				"--set", "postgres.externalUrl="+opts.ExternalPostgresURL,
+			)
+		}
+
 		if opts.IngressBaseDomain != "" {
 			opts.ExtraHelmArgs = append(opts.ExtraHelmArgs, "--set", "ingress.baseDomain="+opts.IngressBaseDomain)
 		}
