@@ -1,0 +1,59 @@
+{{- if .Values.rbac.create }}
+# ServiceAccount/RBAC for external-provisioner (the standard CSI
+# sidecar magpie-csi-controller-deployment.yaml pairs with) -- this is
+# the well-known, documented RBAC every external-provisioner deployment
+# needs (kubernetes-csi/external-provisioner's own deploy manifests are
+# the reference this mirrors), not anything magpie-csi's own binary
+# needs directly.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "magpie.fullname" . }}-magpie-csi-controller
+  namespace: {{ include "magpie.namespace" . }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "magpie.fullname" . }}-magpie-csi-provisioner
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["list", "watch", "create", "update", "patch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["csinodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattachments"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "magpie.fullname" . }}-magpie-csi-provisioner
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "magpie.fullname" . }}-magpie-csi-provisioner
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "magpie.fullname" . }}-magpie-csi-controller
+    namespace: {{ include "magpie.namespace" . }}
+{{- end }}

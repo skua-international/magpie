@@ -1,0 +1,17 @@
+# Cluster-scoped CSI driver registration -- tells kubelet how to talk to
+# magpie-csi's Node plugin (magpie-csi-node-daemonset.yaml). See
+# README.md's "magpie-csi" bullet for why this replaced volume-manager's
+# bespoke Connect-RPC design.
+apiVersion: storage.k8s.io/v1
+kind: CSIDriver
+metadata:
+  name: csi.magpie.skua.io
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+spec:
+  # Local storage, node-pinned by NodeStageVolume -- there's no separate
+  # ControllerPublishVolume/attach step for this kind of storage.
+  attachRequired: false
+  podInfoOnMount: false
+  volumeLifecycleModes:
+    - Persistent

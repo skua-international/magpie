@@ -116,8 +116,8 @@ jobs:
             dockerfile: services/server-api/Dockerfile
           - name: identity
             dockerfile: services/identity/Dockerfile
-          - name: volume-manager
-            dockerfile: services/volume-manager/Dockerfile
+          - name: magpie-csi
+            dockerfile: services/magpie-csi/Dockerfile
     steps:
       - uses: actions/checkout@v7
         with:
@@ -155,7 +155,7 @@ jobs:
       # dist/ is the artifact build-workspace produced above), not from
       # their own service directory. No cargo build happens in any of
       # these any more, but the apt-get layer (ca-certificates, or for
-      # volume-manager btrfs-progs/util-linux too) is still worth caching
+      # magpie-csi btrfs-progs/util-linux too) is still worth caching
       # -- unlike the old cargo-chef setup, there's no shared/racing scope
       # risk here at all: each service's own `RUN apt-get install ...`
       # line is different text (or doesn't exist, for the distroless

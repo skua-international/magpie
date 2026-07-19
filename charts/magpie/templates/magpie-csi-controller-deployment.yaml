@@ -1,0 +1,60 @@
+# CSI Controller plugin -- paired with the standard external-provisioner
+# sidecar, which watches PersistentVolumeClaims against the
+# magpie-reflink StorageClass and calls magpie-csi's own CreateVolume/
+# DeleteVolume over the shared Unix socket in /csi (an emptyDir, purely
+# local IPC between the two containers in this Pod -- not the same
+# socket kubelet talks to, that's the Node plugin's own, registered via
+# node-driver-registrar in magpie-csi-node-daemonset.yaml).
+#
+# Deliberately not privileged -- CreateVolume/DeleteVolume do no host
+# work at all (see services/magpie-csi/internal/driver/controller.go's
+# own doc for why), only the Node plugin needs real device access.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "magpie.fullname" . }}-magpie-csi-controller
+  namespace: {{ include "magpie.namespace" . }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+    app.kubernetes.io/component: magpie-csi-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "magpie.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: magpie-csi-controller
+  template:
+    metadata:
+      labels:
+        {{- include "magpie.labels" . | nindent 8 }}
+        app.kubernetes.io/component: magpie-csi-controller
+    spec:
+      {{- include "magpie.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "magpie.fullname" . }}-magpie-csi-controller
+      containers:
+        - name: csi-provisioner
+          image: registry.k8s.io/sig-storage/csi-provisioner:v5.1.0
+          args:
+            - "--csi-address=/csi/csi.sock"
+            - "--feature-gates=Topology=true"
+            - "--leader-election=false"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+        - name: magpie-csi
+          image: {{ include "magpie.image" (dict "root" $ "override" .Values.magpieCsi.image) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:///csi/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+          {{- with .Values.magpieCsi.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: socket-dir
+          emptyDir: {}

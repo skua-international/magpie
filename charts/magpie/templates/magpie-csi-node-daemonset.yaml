@@ -1,0 +1,89 @@
+# CSI Node plugin -- one per node, paired with the standard
+# node-driver-registrar sidecar, which registers magpie-csi's Unix
+# socket with kubelet (the well-known plugin-registration handshake
+# every CSI driver uses) so kubelet calls NodeStageVolume/
+# NodePublishVolume/etc. on it directly instead of through any bespoke
+# API. This is the one component in the stack with real host
+# block-device access (see services/magpie-csi/internal/blob's own
+# doc) -- privileged: true, deliberately; see README.md's "magpie-csi"
+# bullet for why an earlier unprivileged design (CAP_SYS_ADMIN +
+# hostPID + nsenter) was abandoned in favor of this.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "magpie.fullname" . }}-magpie-csi-node
+  namespace: {{ include "magpie.namespace" . }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+    app.kubernetes.io/component: magpie-csi-node
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "magpie.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: magpie-csi-node
+  template:
+    metadata:
+      labels:
+        {{- include "magpie.labels" . | nindent 8 }}
+        app.kubernetes.io/component: magpie-csi-node
+    spec:
+      {{- include "magpie.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: node-driver-registrar
+          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.12.0
+          args:
+            - "--csi-address=/csi/csi.sock"
+            - "--kubelet-registration-path=/var/lib/kubelet/plugins/csi.magpie.skua.io/csi.sock"
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /csi
+            - name: registration-dir
+              mountPath: /registration
+        - name: magpie-csi
+          image: {{ include "magpie.image" (dict "root" $ "override" .Values.magpieCsi.image) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            privileged: true
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:///csi/csi.sock
+            - name: NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: BLOB_IMAGE_PATH
+              value: /var/lib/magpie-csi/blob/content.img
+            - name: BLOB_MOUNT_PATH
+              value: /var/lib/magpie-csi/mnt
+            - name: INITIAL_SIZE_GIB
+              value: {{ .Values.reflinkStorage.sizeGiB | quote }}
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /csi
+            - name: pods-mount-dir
+              mountPath: /var/lib/kubelet/pods
+              mountPropagation: Bidirectional
+            - name: blob-storage
+              mountPath: /var/lib/magpie-csi
+          {{- with .Values.magpieCsi.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: plugin-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins/csi.magpie.skua.io
+            type: DirectoryOrCreate
+        - name: registration-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins_registry
+            type: Directory
+        - name: pods-mount-dir
+          hostPath:
+            path: /var/lib/kubelet/pods
+            type: DirectoryOrCreate
+        - name: blob-storage
+          hostPath:
+            path: /var/lib/magpie-csi
+            type: DirectoryOrCreate

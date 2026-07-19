@@ -78,7 +78,7 @@ jobs:
             done
           }
 
-          for service in launcher sync-daemon controller registry server-api identity volume-manager; do
+          for service in launcher sync-daemon controller registry server-api identity magpie-csi; do
             image_ref="${IMAGE_BASE}/${service}"
             wait_for_image "${image_ref}:${source_tag}"
             docker buildx imagetools create \
