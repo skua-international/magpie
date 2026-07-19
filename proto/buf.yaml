@@ -4,3 +4,12 @@ modules:
 breaking:
   use:
     - FILE
+  # volume/v1 was removed outright (volume-manager's bespoke Connect-RPC
+  # API replaced by magpie-csi, a real CSI driver speaking plain gRPC
+  # instead -- see README.md's "magpie-csi" bullet) -- a deliberate,
+  # already-shipped removal, not something `buf breaking` should keep
+  # flagging against every future release tag that still has it in
+  # history. Ignored in both directions, so it also doesn't error if a
+  # tag before the removal is ever diffed against.
+  ignore:
+    - volume
