@@ -1,37 +1,47 @@
 package deploy
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
-// RunRemoteInstall runs `magpiectl install` on a remote host over ssh
-// instead of locally. Deliberately does NOT scp over the binary
-// currently running this process -- that binary matches whatever
-// platform/arch is controlling this session, which has no guaranteed
-// relationship to the remote target's (a Windows or macOS/arm64 machine
-// driving a Linux/amd64 VM is exactly the normal case here, not an edge
-// case). k3s itself only targets Linux, so the remote OS is always
-// "linux"; only the architecture needs detecting (via `uname -m` on the
-// remote host itself), then the matching magpiectl_linux_<arch> release
-// asset is downloaded there directly -- same private-repo GitHub API
-// dance internal/steamlogin uses for its own release assets, just
-// resolving magpiectl's own asset.
+// RunRemoteInstall runs only the root-level, host-specific parts of a
+// first install (k3s, the magpie-volume user) on a remote host over ssh
+// -- everything else (secrets, helm pull/upgrade) runs locally
+// afterward, against the kubeconfig that leaves behind. Deliberately
+// keeps the remote host's own footprint to exactly what actually has to
+// run there: k3s install and volume-manager's host-user provisioning are
+// genuinely root-level operations on that specific machine, but helm/
+// kubectl operations aren't tied to any particular host at all, and
+// requiring helm to be installed on the target too (the original
+// design, which mirrored this entire process onto it) was needless --
+// confirmed live, a fresh VM had no helm and there was no real reason
+// it needed one.
 //
-// Once the remote install finishes, the resulting kubeconfig is fetched
-// back and saved locally (server URL rewritten from 127.0.0.1/localhost
-// to the real host) so kubectl/helm/magpiectl can target the new
-// cluster directly afterward, without an SSH session for every command
-// -- same contract deploy/k3s-bootstrap.sh's own --ssh already has.
-// Assumes the ssh target already has root or passwordless sudo -- no
-// TTY for an interactive sudo password prompt over a non-interactive
-// ssh command.
-func RunRemoteInstall(ctx context.Context, sshHost, sshIdentity, version string, rawArgs []string) error {
+// Doesn't scp over the binary currently running this process either --
+// that binary matches whatever platform/arch is controlling this
+// session, which has no guaranteed relationship to the remote target's
+// (a Windows or macOS/arm64 machine driving a Linux/amd64 VM is exactly
+// the normal case here, not an edge case). k3s itself only targets
+// Linux, so the remote OS is always "linux"; only the architecture needs
+// detecting (via `uname -m` on the remote host itself), then the
+// matching magpiectl_linux_<arch> release asset is downloaded there
+// directly -- same private-repo GitHub API dance internal/steamlogin
+// uses for its own release assets, just resolving magpiectl's own asset.
+//
+// Assumes the ssh target already has root or passwordless sudo -- no TTY
+// for an interactive sudo password prompt over a non-interactive ssh
+// command.
+func RunRemoteInstall(ctx context.Context, sshHost, sshIdentity string, opts Options) error {
 	sshArgs := []string{"-o", "BatchMode=yes"}
 	if sshIdentity != "" {
 		sshArgs = append(sshArgs, "-i", sshIdentity)
@@ -50,7 +60,7 @@ func RunRemoteInstall(ctx context.Context, sshHost, sshIdentity, version string,
 	arch := archToGoArch(strings.TrimSpace(string(archOut)))
 	assetName := fmt.Sprintf("magpiectl_linux_%s.tar.gz", arch)
 
-	tag := "v" + version
+	tag := "v" + opts.Version
 	fmt.Printf("==> Resolving %s from release %s...\n", assetName, tag)
 	assetURL, err := releaseAssetURL(ctx, tag, assetName, token)
 	if err != nil {
@@ -59,19 +69,33 @@ func RunRemoteInstall(ctx context.Context, sshHost, sshIdentity, version string,
 
 	// A single remote shell command, not scp+ssh separately: downloads
 	// the correct-platform magpiectl straight to the remote host (never
-	// transits through this machine at all), runs it with the same args
-	// this invocation got (minus --ssh/--ssh-identity, which would
-	// otherwise just try to ssh again from inside the remote run), and
-	// cleans up after itself regardless of exit status.
+	// transits through this machine at all), runs it with only the
+	// node-setup-only invocation (k3s + volume-manager user, nothing
+	// else), and cleans up after itself regardless of exit status.
+	remoteArgs := []string{
+		"install", "--bootstrap-k3s", "--node-setup-only",
+		"--data-dir", opts.DataDir,
+		"--blob-image-path", opts.BlobImagePath,
+		"--blob-mount-path", opts.BlobMountPath,
+	}
 	remoteScript := fmt.Sprintf(
 		`set -e; curl -sSf -H "Authorization: token %s" -H "Accept: application/octet-stream" -L %s -o /tmp/magpiectl.tar.gz && tar xzf /tmp/magpiectl.tar.gz -C /tmp magpiectl && chmod +x /tmp/magpiectl; rc=$?; if [ $rc -eq 0 ]; then /tmp/magpiectl %s; rc=$?; fi; rm -f /tmp/magpiectl /tmp/magpiectl.tar.gz; exit $rc`,
-		token, shellSingleQuote(assetURL), shellJoin(filterSSHArgs(rawArgs)),
+		token, shellSingleQuote(assetURL), shellJoin(remoteArgs),
 	)
 
-	fmt.Printf("==> Installing on %s...\n", sshHost)
+	fmt.Printf("==> Provisioning %s (k3s + volume-manager user)...\n", sshHost)
 	sshRunArgs := append(append([]string{}, sshArgs...), sshHost, remoteScript)
-	if err := run(ctx, "ssh", sshRunArgs...); err != nil {
-		return fmt.Errorf("remote install failed: %w", err)
+	cmd := exec.CommandContext(ctx, "ssh", sshRunArgs...)
+	var captured bytes.Buffer
+	cmd.Stdout = io.MultiWriter(os.Stdout, &captured)
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("remote node setup failed: %w", err)
+	}
+
+	uid, gid, err := parseVolumeManagerIDs(captured.String())
+	if err != nil {
+		return fmt.Errorf("failed to read volume-manager uid/gid back from %s: %w", sshHost, err)
 	}
 
 	fmt.Printf("==> Fetching kubeconfig from %s...\n", sshHost)
@@ -103,8 +127,45 @@ func RunRemoteInstall(ctx context.Context, sshHost, sshIdentity, version string,
 	if err := os.WriteFile(localPath, []byte(rewritten), 0o600); err != nil {
 		return err
 	}
-	fmt.Printf("==> kubeconfig saved to %s -- export KUBECONFIG=%s to use it locally\n", localPath, localPath)
-	return nil
+	fmt.Printf("==> kubeconfig saved to %s\n", localPath)
+	if err := os.Setenv("KUBECONFIG", localPath); err != nil {
+		return err
+	}
+
+	// Everything else -- CheckTools, secrets, helm pull/upgrade -- runs
+	// locally from here, against the cluster over the network via the
+	// kubeconfig above. helm/kubectl only need to be installed on this
+	// machine, never the remote one.
+	opts.BootstrapK3s = false
+	opts.SkipVolumeManagerProvisioning = true
+	opts.VolumeManagerUID = uid
+	opts.VolumeManagerGID = gid
+	fmt.Println("==> Continuing the install locally against the new cluster...")
+	return Run(ctx, opts)
+}
+
+var volumeManagerIDPattern = regexp.MustCompile(`MAGPIECTL_VOLUME_(UID|GID)=(\d+)`)
+
+// parseVolumeManagerIDs pulls the MAGPIECTL_VOLUME_UID/GID lines
+// RunNodeSetup prints out of the remote command's captured stdout.
+func parseVolumeManagerIDs(output string) (uid, gid int, err error) {
+	matches := volumeManagerIDPattern.FindAllStringSubmatch(output, -1)
+	var haveUID, haveGID bool
+	for _, m := range matches {
+		n, err := strconv.Atoi(m[2])
+		if err != nil {
+			continue
+		}
+		if m[1] == "UID" {
+			uid, haveUID = n, true
+		} else {
+			gid, haveGID = n, true
+		}
+	}
+	if !haveUID || !haveGID {
+		return 0, 0, fmt.Errorf("no MAGPIECTL_VOLUME_UID/GID found in remote output")
+	}
+	return uid, gid, nil
 }
 
 // archToGoArch maps `uname -m`'s output to the Go/goreleaser arch names
@@ -148,21 +209,6 @@ func releaseAssetURL(ctx context.Context, tag, assetName, token string) (string,
 		}
 	}
 	return "", fmt.Errorf("no %s asset found on release %s", assetName, tag)
-}
-
-// filterSSHArgs strips --ssh/--ssh-identity (and their values) from the
-// args being forwarded to the remote invocation -- otherwise the remote
-// run would just try to ssh again from inside itself.
-func filterSSHArgs(args []string) []string {
-	out := make([]string, 0, len(args))
-	for i := 0; i < len(args); i++ {
-		if args[i] == "--ssh" || args[i] == "--ssh-identity" {
-			i++ // also skip the value
-			continue
-		}
-		out = append(out, args[i])
-	}
-	return out
 }
 
 func shellJoin(args []string) string {

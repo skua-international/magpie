@@ -32,13 +32,15 @@ const chartNamespace = "magpie"
 // kubeconfig -- setting KUBECONFIG for the rest of this process so every
 // subsequent helm/kubectl call in Run() picks it up automatically.
 //
-// Local-only, deliberately: for a remote host, ssh there and run
-// `magpiectl install --bootstrap-k3s` directly. Unlike
-// deploy/k3s-bootstrap.sh (a shell script, which needs its own --ssh
-// piping trick to run itself remotely), magpiectl is already a real
-// standalone binary -- getting a shell on the remote host via ssh and
-// running it there natively is the same thing, no separate
-// remote-orchestration logic needed in this codebase at all.
+// Local-only, deliberately -- for a remote host, RunRemoteInstall (see
+// ssh.go) runs this (via RunNodeSetup) on the target over ssh instead,
+// then continues everything else (secrets, helm) locally against the
+// kubeconfig it leaves behind. That split is deliberate too: k3s install
+// and volume-manager's host-user provisioning genuinely have to run on
+// the target machine, but nothing downstream of them does, so mirroring
+// this whole process onto the remote host (an earlier version of this
+// design) would've required helm/kubectl to be installed there for no
+// real reason.
 func BootstrapK3s(ctx context.Context, dataDir string) error {
 	if _, err := exec.LookPath("k3s"); err == nil {
 		fmt.Println("==> k3s already installed, skipping install")

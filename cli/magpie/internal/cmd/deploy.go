@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"os"
-
 	"github.com/spf13/cobra"
 
 	"github.com/skua-international/magpie/cli/internal/deploy"
@@ -116,6 +114,7 @@ func installCmd() *cobra.Command {
 	var f deployFlags
 	var i installFlags
 	var sshHost, sshIdentity string
+	var nodeSetupOnly bool
 	c := &cobra.Command{
 		Use:   "install [version] [-- extra helm args]",
 		Short: "Install the magpie stack for the first time (shortcut for `deploy --install`)",
@@ -124,22 +123,17 @@ func installCmd() *cobra.Command {
 			"secrets/values a first install has no prior release to carry over. Without --bootstrap-k3s, " +
 			"an existing kubeconfig/kubectl context pointed at a real cluster is required, same as " +
 			"deploy/upgrade. Any --set/-f passed after `--` layers on top of everything this resolves.\n\n" +
-			"--ssh runs this identical command on a remote host instead of locally: k3s only targets " +
-			"Linux, so this detects the remote host's architecture and downloads the matching " +
-			"magpiectl release binary directly onto it (never copies over whatever platform is running " +
-			"this controlling process -- a Windows or macOS machine driving a Linux VM is the normal " +
-			"case here, not an edge case), runs it there, then fetches the resulting kubeconfig back -- " +
-			"same contract deploy/k3s-bootstrap.sh's own --ssh already has. Assumes the target already " +
+			"--ssh keeps the remote host's own footprint to just what genuinely has to run there: it " +
+			"detects the remote host's architecture and downloads the matching magpiectl release binary " +
+			"directly onto it (never copies over whatever platform is running this controlling process " +
+			"-- a Windows or macOS machine driving a Linux VM is the normal case here, not an edge case), " +
+			"runs only k3s install + volume-manager's host-user provisioning there (both genuinely " +
+			"root-level operations on that specific machine), then fetches the resulting kubeconfig back " +
+			"and runs everything else -- secrets, helm pull/upgrade -- locally against it. helm/kubectl " +
+			"only need to be installed on this machine, never the remote one. Assumes the target already " +
 			"has root or passwordless sudo.",
 		RunE: func(cc *cobra.Command, args []string) error {
-			if sshHost != "" {
-				version, err := deploy.ResolveVersion(cc.Context(), versionArg(cc, args))
-				if err != nil {
-					return err
-				}
-				return deploy.RunRemoteInstall(cc.Context(), sshHost, sshIdentity, version, os.Args[1:])
-			}
-			return deploy.Run(cc.Context(), deploy.Options{
+			opts := deploy.Options{
 				Version:             versionArg(cc, args),
 				ImageTag:            f.imageTag,
 				Namespace:           f.namespace,
@@ -157,13 +151,28 @@ func installCmd() *cobra.Command {
 				IngressBaseDomain:   i.ingressBaseDomain,
 				BlobImagePath:       i.blobImagePath,
 				BlobMountPath:       i.blobMountPath,
-			})
+			}
+			if nodeSetupOnly {
+				return deploy.RunNodeSetup(cc.Context(), opts.DataDir, opts.BlobImagePath, opts.BlobMountPath)
+			}
+			if sshHost != "" {
+				version, err := deploy.ResolveVersion(cc.Context(), opts.Version)
+				if err != nil {
+					return err
+				}
+				opts.Version = version
+				return deploy.RunRemoteInstall(cc.Context(), sshHost, sshIdentity, opts)
+			}
+			return deploy.Run(cc.Context(), opts)
 		},
 	}
 	addDeployFlags(c, &f)
 	addInstallFlags(c, &i)
 	c.Flags().StringVar(&sshHost, "ssh", "", "run this install on a remote host over ssh instead of locally (e.g. user@host)")
 	c.Flags().StringVar(&sshIdentity, "ssh-identity", "", "ssh identity file to use with --ssh")
+	c.Flags().BoolVar(&nodeSetupOnly, "node-setup-only", false,
+		"internal: used by --ssh on the remote side to run only k3s install + volume-manager user provisioning, not the full install")
+	_ = c.Flags().MarkHidden("node-setup-only")
 	return c
 }
 

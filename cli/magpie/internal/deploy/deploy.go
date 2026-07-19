@@ -53,6 +53,15 @@ type Options struct {
 	// actually lives).
 	BlobImagePath string
 	BlobMountPath string
+
+	// Set by RunRemoteInstall once it's already run EnsureVolumeManagerUser
+	// remotely (on the actual --ssh target, the only place that
+	// provisioning can correctly happen) -- Run() uses these directly
+	// instead of calling EnsureVolumeManagerUser itself in that case. Not
+	// meaningful outside RunRemoteInstall's own use.
+	SkipVolumeManagerProvisioning bool
+	VolumeManagerUID              int
+	VolumeManagerGID              int
 }
 
 // CheckTools verifies helm and kubectl are on PATH, printing an
@@ -277,10 +286,19 @@ func Run(ctx context.Context, opts Options) error {
 			opts.ExtraHelmArgs = append(opts.ExtraHelmArgs, "--set", "identity.baseUrl="+identityBaseURL)
 		}
 
-		fmt.Println("==> Provisioning the magpie-volume host user for volume-manager")
-		uid, gid, err := EnsureVolumeManagerUser(ctx, opts.BlobImagePath, opts.BlobMountPath)
-		if err != nil {
-			return fmt.Errorf("failed to provision volume-manager's host user: %w", err)
+		var uid, gid int
+		if opts.SkipVolumeManagerProvisioning {
+			// Already done -- RunRemoteInstall ran this on the actual
+			// --ssh target (the only place it can correctly happen: it's
+			// root-level host provisioning) before calling Run() locally
+			// for everything else.
+			uid, gid = opts.VolumeManagerUID, opts.VolumeManagerGID
+		} else {
+			fmt.Println("==> Provisioning the magpie-volume host user for volume-manager")
+			uid, gid, err = EnsureVolumeManagerUser(ctx, opts.BlobImagePath, opts.BlobMountPath)
+			if err != nil {
+				return fmt.Errorf("failed to provision volume-manager's host user: %w", err)
+			}
 		}
 		// contentPath/claimsPath must stay nested under blobMountPath for
 		// the same reason they always have to be on one real filesystem
@@ -327,6 +345,33 @@ func Run(ctx context.Context, opts Options) error {
 		fmt.Println("==> Deployed. Pods:")
 		_ = run(ctx, "kubectl", "get", "pods", "-n", opts.Namespace, "-o", "wide")
 	}
+	return nil
+}
+
+// RunNodeSetup does only the root-level, host-specific provisioning a
+// first install needs -- installing k3s and creating the magpie-volume
+// user -- and nothing else. Used by RunRemoteInstall as the one thing it
+// actually runs on the --ssh target: k3s and the volume-manager user
+// genuinely have to be provisioned on that machine, but nothing else
+// does (secrets, helm pull/upgrade all run locally afterward, against
+// the kubeconfig this leaves behind) -- keeping the remote host's own
+// footprint to exactly that, rather than mirroring the whole install
+// onto it (which would also mean requiring helm/kubectl to be installed
+// there too, for no real reason).
+//
+// Prints MAGPIECTL_VOLUME_UID=<uid> and MAGPIECTL_VOLUME_GID=<gid> on
+// their own lines so RunRemoteInstall can parse the result back out of
+// this command's own stdout over SSH.
+func RunNodeSetup(ctx context.Context, dataDir, blobImagePath, blobMountPath string) error {
+	if err := BootstrapK3s(ctx, dataDir); err != nil {
+		return err
+	}
+	uid, gid, err := EnsureVolumeManagerUser(ctx, blobImagePath, blobMountPath)
+	if err != nil {
+		return fmt.Errorf("failed to provision volume-manager's host user: %w", err)
+	}
+	fmt.Printf("MAGPIECTL_VOLUME_UID=%d\n", uid)
+	fmt.Printf("MAGPIECTL_VOLUME_GID=%d\n", gid)
 	return nil
 }
 
