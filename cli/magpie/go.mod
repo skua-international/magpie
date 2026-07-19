@@ -8,7 +8,10 @@ go 1.26.5
 // here, never a stale published version.
 replace github.com/skua-international/magpie/generated/go => ../../generated/go
 
-replace github.com/tbdevent/gosteam => ../../../ideal/third_party/gosteam
+// Confirmed-live nil-pointer panic in (*Client).Write's TOCTOU race on
+// c.Conn during QR login (see third_party/go-steam/client.go for the
+// fix) -- forked locally rather than waiting on upstream.
+replace github.com/0xAozora/go-steam => ../../third_party/go-steam
 
 require (
 	charm.land/bubbletea/v2 v2.0.8
