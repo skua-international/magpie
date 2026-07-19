@@ -4,6 +4,10 @@
 
 Kubernetes-native orchestration for Arma 3 dedicated servers: mod/collection syncing with copy-on-write claims, a CRD-driven reconciler, JWT-authenticated provisioning APIs, and its own OAuth2/Steam OpenID identity broker. Built as a Cargo workspace of small, single-purpose services deployed together via one Helm chart.
 
+## Why?
+
+Some of what's in here is more than a self-hosted Arma fleet strictly needs -- a purpose-built CSI driver, a placeholder-and-secret-aware config templating layer, its own OAuth2/OpenID identity broker. Running a handful of community game servers doesn't *require* any of that. Some of it got built anyway because the underlying problem was genuinely interesting to solve properly rather than duct-taped around, not because the requirements demanded it. If it looks over-engineered for the stated purpose in places, that's why -- and also, at some point, the acronym.
+
 ## Architecture
 
 ```mermaid
@@ -18,9 +22,9 @@ flowchart LR
     controller -->|creates| launcher["launcher<br/>Deployment"]
     controller -->|RegisterSource, Claim| syncdaemon
 
-    syncdaemon -->|GrowVolume| volumemanager["volume-manager<br/>(DaemonSet)"]
-    volumemanager -->|loop-mount, btrfs| blob[("blob-backed content<br/>(reflink claims)")]
-    launcher -->|reads its claim| blob
+    syncdaemon -->|PVC| reflinkpvc[("magpie-reflink PVC<br/>(content/claims)")]
+    magpiecsi["magpie-csi<br/>(CSI driver)"] -->|loop-mount, btrfs| reflinkpvc
+    launcher -->|reads its claim| reflinkpvc
 
     armaconfig[("Arma config<br/>ConfigMaps")] -->|baseline + per-server| controller
     postgres[("Postgres<br/>acl_grants/linked_accounts")] -->|arma:admin / arma:filepatch| controller
@@ -33,14 +37,14 @@ flowchart LR
 ```
 
 - **`launcher`** — launches the game server (and headless clients) from an already-synced claim plus a controller-rendered server config. No Steam logic of its own.
-- **`sync-daemon`** — owns all Steam depot/workshop mechanics: authenticated CM session, mod/collection resolution (including private/unlisted content), and reflink (copy-on-write) claims of one shared golden content tree, so every server gets its own cheap, isolated snapshot instead of sharing live state. Asks `volume-manager` to grow the underlying volume ahead of a sync whenever newly-registered mods need more room than is currently free.
-- **`volume-manager`** — the one component in the stack with real host block-device access (one per node, DaemonSet): owns a loop-mounted btrfs blob that `sync-daemon`'s content/claims live on, so reflink works regardless of what filesystem the host actually has, and grows the blob on request instead of needing a size chosen up front. Runs as a dedicated, minimally-privileged host user (`CAP_SYS_ADMIN` + `hostPID: true`, not `privileged: true`), provisioned by `magpiectl install` itself — mounts/formats/resizes directly in the host's own mount namespace via `nsenter` rather than needing `mountPropagation: Bidirectional` (which Kubernetes hard-requires `privileged: true` for).
+- **`sync-daemon`** — owns all Steam depot/workshop mechanics: authenticated CM session, mod/collection resolution (including private/unlisted content), and reflink (copy-on-write) claims of one shared golden content tree, so every server gets its own cheap, isolated snapshot instead of sharing live state. Content/claims live on a `PersistentVolumeClaim` against the `magpie-reflink` `StorageClass`, sized up front (`reflinkStorage.sizeGiB`) rather than grown on request.
+- **`magpie-csi`** — a small CSI driver, the one component in the stack with real host block-device access (its Node plugin, one per node, `privileged: true`): loop-mounts a growable btrfs blob per node so reflink works regardless of what filesystem the host actually has (the blob is a regular file -- any host filesystem works as its backing store, `mkfs.btrfs` formats the loop device itself, never the host disk underneath it), and grows it as `CreateVolume` calls need more room. Kubelet talks to it the same conformant way it talks to any CSI driver (Identity/Controller/Node gRPC services, the standard `external-provisioner`/`node-driver-registrar` sidecars) rather than through a bespoke API -- this replaced an earlier custom Connect-RPC design (`volume-manager`) that kept hitting new host-integration failure modes (AppArmor, cgroup device allowlists, udev rules) each of which needed its own bespoke fix; CSI's job is exactly this class of problem, so the privileged pieces now follow an established, widely-used pattern instead of being reasoned about from scratch.
 - **`controller`** — a `kube-runtime` reconciler that turns `ArmaServer` custom resources into launcher `Deployment`s, rendering each one's `main.cfg`/`basic.cfg` along the way (see "Arma server config" below) and provisioning the technical Postgres role `launcher`'s own Arma-side extensions connect as. No external listener, no auth surface.
 - **`server-api`** — JWT-authenticated `ArmaServer` CRUD plus deployment-like lifecycle (`Create`/`Start`/`Stop`/`Update`). Deliberately carries the least Kubernetes RBAC of anything here (no `Deployment` access at all) — it's the one process a stolen bearer token can reach directly.
 - **`registry`** — JWT-authenticated mod source registry (a Steam mod, a collection, a preset export, or a locally-uploaded zip mod) and mission (`.pbo`) storage. Never touches the Kubernetes API.
 - **`identity`** — OAuth2 login (Discord/GitHub/Google) and Steam login (OpenID 2.0 — Steam never adopted OIDC), account linking, and JWT issuance for every JWT-gated service above to verify. The first person to ever sign in is automatically granted every permission.
 
-All inter-service and client-facing APIs are [ConnectRPC](https://connectrpc.com/) (`proto/`). Mod sources (`ModSource`) and servers (`ArmaServer`) are Kubernetes CRDs, not database rows — `kubectl get modsources`/`kubectl get armaservers` shows live state directly, and `sync-daemon`/`controller` reconcile them the same way any other operator would. Postgres holds what's left: missions, ACL grants, and identities. `sync-daemon`'s content/claims live on a `volume-manager`-owned, loop-mounted btrfs blob rather than a plain `hostPath` directly on the host's own filesystem — see `charts/magpie/values.yaml`'s `hostPaths` comment for why (reflink CoW claims need a real btrfs/reflink-enabled filesystem underneath, which the host itself may not have).
+All inter-service and client-facing APIs are [ConnectRPC](https://connectrpc.com/) (`proto/`) -- the one exception is `magpie-csi`, which speaks plain CSI gRPC, since kubelet (its only client) doesn't speak Connect. Mod sources (`ModSource`) and servers (`ArmaServer`) are Kubernetes CRDs, not database rows — `kubectl get modsources`/`kubectl get armaservers` shows live state directly, and `sync-daemon`/`controller` reconcile them the same way any other operator would. Postgres holds what's left: missions, ACL grants, and identities.
 
 ## Deploying
 
@@ -49,7 +53,7 @@ This repo is private, so every command below that talks to GitHub (not GHCR/OCI,
 First install, on a fresh host with no Kubernetes yet -- either from a checkout:
 
 ```bash
-./deploy/k3s-bootstrap.sh   # installs k3s, checks the data dir's filesystem, walks through required secrets
+./deploy/k3s-bootstrap.sh   # installs k3s, walks through required secrets
 ```
 
 or with no checkout at all, piped straight from GitHub like most install.sh-style tools do it:
@@ -61,9 +65,9 @@ curl -sSf -H "Authorization: token $(gh auth token)" \
 
 Both are the same script -- piping it in just skips needing a clone first, and it fetches `scripts/deploy.sh` (and, for `--ssh`, itself) fresh from GitHub the same way when it can't find a local copy. It ends by actually running `scripts/deploy.sh --install` for you, with every `--set` it resolved along the way.
 
-`magpiectl install --bootstrap-k3s` (see "Installing the CLI" below) does the same first-install job as a single Go binary instead of a shell script -- installs k3s itself (data-dir and kubelet's own root-dir both pointed at wherever the reflink-capable disk actually is, not the OS disk), provisions the host user `volume-manager` needs, resolves/creates every bootstrap Secret, and runs the equivalent of `deploy --install`. `--ssh user@host` keeps the remote host's own footprint to just what genuinely has to run there: it detects the remote's architecture and downloads the matching Linux release binary directly onto it (never assumes the controlling machine's own platform matches the target's), runs *only* k3s install + volume-manager's host-user provisioning remotely, then fetches the resulting kubeconfig back and runs everything else -- secrets, `helm pull`/`upgrade` -- locally against it. helm/kubectl only need to be installed on whichever machine you're actually running `magpiectl` from, never the remote target.
+`magpiectl install --bootstrap-k3s` (see "Installing the CLI" below) does the same first-install job as a single Go binary instead of a shell script -- installs k3s itself (data-dir and kubelet's own root-dir both pointed at `--data-dir`, not the OS disk), resolves/creates every bootstrap Secret, and runs the equivalent of `deploy --install`. `--ssh user@host` keeps the remote host's own footprint to just what genuinely has to run there: it detects the remote's architecture and downloads the matching Linux release binary directly onto it (never assumes the controlling machine's own platform matches the target's), runs *only* k3s install remotely, then fetches the resulting kubeconfig back and runs everything else -- secrets, `helm pull`/`upgrade` -- locally against it. helm/kubectl only need to be installed on whichever machine you're actually running `magpiectl` from, never the remote target.
 
-`--bootstrap-k3s` requires passwordless sudo (locally, or for the `--ssh` user on the remote target) -- installing k3s, creating the `magpie-volume` system user/group, writing its udev rule, and chowning the blob's host directories are all genuinely root-only operations with no non-root alternative. There's no interactive password prompt (none of this works over a non-interactive `--ssh` session anyway), so a user that needs one will just fail outright rather than hang.
+`--bootstrap-k3s` requires passwordless sudo (locally, or for the `--ssh` user on the remote target) -- installing k3s is a genuinely root-only operation with no non-root alternative. There's no interactive password prompt (none of this works over a non-interactive `--ssh` session anyway), so a user that needs one will just fail outright rather than hang.
 
 Upgrades (including the very first install, via `--install`) all go through one script, same pattern:
 
@@ -168,8 +172,8 @@ Building from source instead (e.g. to run an unreleased commit): `cd cli/magpie 
 ## Repo layout
 
 ```
-crates/                shared library crates (steam-sync, registry-db, authn, protocol, crd, volume-client, ...)
-services/              the seven binaries described above
+crates/                shared library crates (steam-sync, registry-db, authn, protocol, crd, ...)
+services/              the service binaries described above (including magpie-csi)
 cli/magpie/            the magpie CLI/TUI (Go)
 proto/                 ConnectRPC service definitions
 charts/magpie/         the Helm chart
