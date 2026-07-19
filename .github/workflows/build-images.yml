@@ -153,10 +153,15 @@ jobs:
 
       # All Dockerfiles build from the repo root (COPY dist/<bin> --
       # dist/ is the artifact build-workspace produced above), not from
-      # their own service directory. No cargo/Docker cache here at all
-      # any more -- these Dockerfiles are just COPY + a handful of apt
-      # packages now, cheap enough that caching isn't worth the
-      # complexity it kept causing.
+      # their own service directory. No cargo build happens in any of
+      # these any more, but the apt-get layer (ca-certificates, or for
+      # volume-manager btrfs-progs/util-linux too) is still worth caching
+      # -- unlike the old cargo-chef setup, there's no shared/racing scope
+      # risk here at all: each service's own `RUN apt-get install ...`
+      # line is different text (or doesn't exist, for the distroless
+      # ones), so every service's own cache key is naturally distinct,
+      # not something 7 concurrent jobs could race on the way 6 jobs
+      # sharing one chef cook layer did.
       - uses: docker/build-push-action@v7
         with:
           context: .
@@ -164,4 +169,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=pkg-${{ matrix.service.name }}
+          cache-to: type=gha,mode=max,scope=pkg-${{ matrix.service.name }}
 # End of main-branch image build workflow.
