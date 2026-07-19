@@ -31,6 +31,16 @@ async fn main() -> Result<()> {
 
     let sync_state = SyncState::open(&cfg.content_root)?;
 
+    // rustls 0.23 needs a process-level CryptoProvider installed before
+    // its first use, or any TLS handshake through it panics -- confirmed
+    // live ("Could not automatically determine the process-level
+    // CryptoProvider"). Other services get this for free from
+    // registry_db::connect() (see its own doc), but sync-daemon doesn't
+    // depend on registry-db at all (SQLite-backed, not Postgres), so it
+    // never got that install call -- this is the same fix controller's
+    // own main.rs needed for the same reason.
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     let client = Client::try_default().await?;
     info!("connected to Kubernetes API");
 
