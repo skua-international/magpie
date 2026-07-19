@@ -38,11 +38,10 @@ func adminDiskUsageCmd() *cobra.Command {
 }
 
 // adminRefreshSteamAuthCmd is the "zero Steam credentials anywhere in
-// the cluster" bootstrap path. The QR-code login (see internal/steamlogin
-// and steam-login.rs) happens entirely on this machine, with no password
-// ever typed in anywhere -- scan the printed QR code with the Steam
-// account you want the cluster to use, and only the resulting refresh
-// token is ever sent to the cluster.
+// the cluster" bootstrap path. The QR-code login happens entirely on
+// this machine, with no password ever typed in anywhere -- scan the
+// printed QR code with the Steam account you want the cluster to use,
+// and only the resulting refresh token is ever sent to the cluster.
 func adminRefreshSteamAuthCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "refresh-steam-auth",
@@ -54,12 +53,7 @@ func adminRefreshSteamAuthCmd() *cobra.Command {
 				return err
 			}
 
-			binPath, err := steamlogin.EnsureBinary(ctx)
-			if err != nil {
-				return err
-			}
-
-			result, err := steamlogin.Negotiate(ctx, binPath)
+			result, err := steamlogin.Negotiate(ctx)
 			if err != nil {
 				return err
 			}

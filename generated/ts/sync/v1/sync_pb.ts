@@ -664,9 +664,9 @@ export const SyncService: GenService<{
    * already-negotiated refresh token -- the interactive username+password
    * (+ Guard code) negotiation itself never happens inside this or any
    * other deployed service; it happens client-side, in
-   * cli/magpie's `magpie admin refresh-steam-auth` (which shells out to
-   * steam-sync's steam-login helper binary for the actual Steam login,
-   * then calls this RPC with just the result). A password reaching this
+   * cli/magpie's `magpie admin refresh-steam-auth` (which runs the
+   * Steam login flow client-side, then calls this RPC with just the
+   * result). A password reaching this
    * process, even transiently, is exactly what this RPC shape is
    * designed to make impossible. On success, the new session is persisted
    * and this process exits to pick it up fresh on restart (see the

@@ -1,240 +1,345 @@
-// Package steamlogin downloads (and caches) the steam-login helper
-// binary -- a companion Rust binary (crates/steam-sync's src/bin/
-// steam-login.rs) that does the actual interactive Steam login
-// negotiation, since there's no usable Go implementation of Steam's
-// login protocol to build on. Reused rather than reimplemented so a
-// Steam password never has to reach any deployed service: the
-// negotiation happens entirely on the operator's own machine, and only
-// the resulting refresh token is ever sent to the cluster (see
-// RefreshSteamAuth's own proto doc).
-//
-// From the operator's side this is invisible -- `magpiectl admin
-// refresh-steam-auth` downloads the helper transparently on first use,
-// the same way many Go CLIs shell out to a companion binary for one
-// piece of platform-specific work (kubectl plugins, git remote helpers,
-// docker buildx).
+// Package steamlogin runs the interactive Steam login flow directly in
+// magpiectl. It handles QR login, username/password login, Steam Guard
+// challenges, and refresh-token reuse without shelling out to the old
+// helper binary.
 package steamlogin
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
-	"strings"
+	"time"
+
+	steam "github.com/0xAozora/go-steam"
+	"github.com/0xAozora/go-steam/protocol"
+	"github.com/0xAozora/go-steam/protocol/protobuf"
+	"github.com/0xAozora/go-steam/protocol/steamlang"
+	"github.com/mdp/qrterminal/v3"
+	"google.golang.org/protobuf/proto"
 )
 
-// Version is set by main.go to the exact same build-time-stamped version
-// as the running magpiectl binary -- steam-login ships from the same
-// release tag as magpiectl itself, so pinning the download to this version
-// (rather than "latest") means upgrading magpiectl automatically fetches a
-// matching helper next time. No separate "check for updates, prompt to
-// upgrade" logic needed at all: a version mismatch between magpie and
-// its helper is structurally impossible this way, not something to
-// detect after the fact.
-var Version = "dev"
-
-const githubRepo = "skua-international/magpie"
-
-// EnsureBinary returns the path to a local, version-matched steam-login
-// binary, downloading it from this build's own GitHub release if it
-// isn't already cached. Any other cached version found in the same
-// directory is removed first, so repeated magpiectl upgrades don't leave a
-// pile of stale helper binaries behind.
-func EnsureBinary(ctx context.Context) (string, error) {
-	if Version == "dev" {
-		return "", fmt.Errorf("steam-login isn't published for a dev build of magpiectl -- build it yourself: cargo run -p steam-sync --bin steam-login")
-	}
-
-	dir, err := cacheDir()
-	if err != nil {
-		return "", err
-	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", err
-	}
-
-	target := filepath.Join(dir, fmt.Sprintf("steam-login-v%s%s", Version, binExt()))
-	if _, err := os.Stat(target); err == nil {
-		return target, nil
-	}
-
-	if err := pruneStale(dir, target); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: failed to prune old steam-login binaries: %v\n", err)
-	}
-
-	fmt.Println("Downloading steam-login helper (first use for this magpiectl version)...")
-	if err := download(ctx, assetName(), target); err != nil {
-		return "", err
-	}
-	if err := os.Chmod(target, 0o700); err != nil {
-		return "", err
-	}
-	return target, nil
-}
-
-// NegotiateResult mirrors steam-login's own JSON output shape.
-type NegotiateResult struct {
+// Result is the negotiated Steam identity and refresh token.
+type Result struct {
 	SteamUser    string
 	RefreshToken string
 }
 
-// Negotiate runs the (already-downloaded) helper binary once, with no
-// arguments at all -- it does a QR-code login (see steam-login.rs), so
-// there's no password or guard code to pass in, and nothing to prompt
-// the operator for here either. Stderr is inherited so the QR code and
-// "waiting for confirmation" status render directly in the operator's
-// own terminal in real time; only the final JSON line on stdout is
-// captured.
-func Negotiate(ctx context.Context, binPath string) (*NegotiateResult, error) {
-	cmd := exec.CommandContext(ctx, binPath)
-	cmd.Stderr = os.Stderr
-	out, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("steam-login failed: %w", err)
-	}
+// Options mirrors the interactive auth modes supported by gosteam.
+type Options struct {
+	Username  string
+	Password  string
+	Anonymous bool
+	UseQR     bool
 
-	var raw struct {
-		SteamUser    string `json:"steam_user"`
-		RefreshToken string `json:"refresh_token"`
-	}
-	if err := json.Unmarshal(out, &raw); err != nil {
-		return nil, fmt.Errorf("failed to parse steam-login output: %w", err)
-	}
-	return &NegotiateResult{SteamUser: raw.SteamUser, RefreshToken: raw.RefreshToken}, nil
+	Guard func(kind GuardKind) (string, error)
+
+	// OnChallengeURL receives the QR challenge URL. If nil, the URL is
+	// rendered as a terminal QR code.
+	OnChallengeURL func(url string)
 }
 
-func cacheDir() (string, error) {
+// GuardKind identifies which Steam Guard code is required.
+type GuardKind int
+
+const (
+	GuardUnknown GuardKind = iota
+	GuardEmailCode
+	GuardDeviceCode
+)
+
+func (k GuardKind) String() string {
+	switch k {
+	case GuardEmailCode:
+		return "email code"
+	case GuardDeviceCode:
+		return "mobile authenticator code"
+	default:
+		return "guard code"
+	}
+}
+
+// Negotiate runs the default QR-based login flow.
+func Negotiate(ctx context.Context) (*Result, error) {
+	return Login(ctx, Options{UseQR: true})
+}
+
+// Login connects to Steam and runs the requested interactive auth flow.
+func Login(ctx context.Context, opts Options) (*Result, error) {
+	store, err := openStore()
+	if err != nil {
+		return nil, err
+	}
+
+	sc := steam.NewClient()
+	if _, err := sc.Connect(); err != nil {
+		return nil, fmt.Errorf("connect: %w", err)
+	}
+
+	var refreshToken, guardData string
+	if opts.Username != "" {
+		if token, ok := store.Token(opts.Username); ok {
+			refreshToken = token.RefreshToken
+			guardData = token.GuardData
+		}
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			sc.Disconnect()
+			return nil, ctx.Err()
+
+		case ev := <-sc.Events():
+			switch e := ev.(type) {
+			case *steam.ConnectedEvent:
+				if err := startLogin(sc, opts, refreshToken, guardData); err != nil {
+					sc.Disconnect()
+					return nil, err
+				}
+
+			case *steam.LoggedOnEvent:
+				if e.Result != steamlang.EResult_OK {
+					sc.Disconnect()
+					return nil, fmt.Errorf("logon failed: %v", e.Result)
+				}
+				return finishLogin(sc, store, opts)
+
+			case *steam.LogOnFailedEvent:
+				sc.Disconnect()
+				return nil, fmt.Errorf("logon failed: %v", e.Result)
+
+			case steam.FatalErrorEvent:
+				return nil, fmt.Errorf("steam connection error: %w", error(e))
+			}
+		}
+	}
+}
+
+func openStore() (*tokenStore, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return filepath.Join(dir, "magpiectl", "bin"), nil
+	return openTokenStore(filepath.Join(dir, "magpiectl", "steam"))
 }
 
-func pruneStale(dir, keep string) error {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
+func startLogin(sc *steam.Client, opts Options, refreshToken, guardData string) error {
+	switch {
+	case opts.Anonymous:
+		details := &steam.LogOnDetails{Anonymous: true}
+		sc.Auth.Details = details
+		return sc.Auth.LogOn(details)
+
+	case opts.UseQR:
+		challenge := opts.OnChallengeURL
+		if challenge == nil {
+			challenge = printChallengeURL
 		}
+		return logOnQR(sc, &steam.LogOnDetails{}, challenge)
+
+	case refreshToken != "":
+		details := &steam.LogOnDetails{
+			Username:               opts.Username,
+			RefreshToken:           refreshToken,
+			GuardData:              guardData,
+			ShouldRememberPassword: true,
+		}
+		sc.Auth.Details = details
+		return sc.Auth.LogOn(details)
+
+	default:
+		if opts.Username == "" || opts.Password == "" {
+			return errors.New("username and password required (or use Anonymous/UseQR/a stored token)")
+		}
+		if opts.Guard != nil {
+			sc.Auth.Authenticator = guardAuth{fn: opts.Guard}
+		}
+		details := &steam.LogOnDetails{
+			Username:               opts.Username,
+			Password:               opts.Password,
+			ShouldRememberPassword: true,
+		}
+		return sc.Auth.LogOnCredentials(details)
+	}
+}
+
+func finishLogin(sc *steam.Client, store *tokenStore, opts Options) (*Result, error) {
+	defer sc.Disconnect()
+
+	details := sc.Auth.Details
+	if details == nil {
+		return nil, errors.New("steam login succeeded without auth details")
+	}
+
+	user := details.Username
+	if user == "" {
+		user = opts.Username
+	}
+	if store != nil && user != "" && details.RefreshToken != "" {
+		_ = store.SaveToken(user, Token{RefreshToken: details.RefreshToken, GuardData: details.GuardData})
+	}
+	return &Result{SteamUser: user, RefreshToken: details.RefreshToken}, nil
+}
+
+func printChallengeURL(url string) {
+	fmt.Fprintln(os.Stderr, "Scan this QR code with the Steam mobile app:")
+	qrterminal.GenerateHalfBlock(url, qrterminal.L, os.Stderr)
+}
+
+type guardAuth struct {
+	fn func(GuardKind) (string, error)
+}
+
+func (g guardAuth) GetCode(kind protobuf.EAuthSessionGuardType, update func(string, protobuf.EAuthSessionGuardType) error) error {
+	code, err := g.fn(toGuardKind(kind))
+	if err != nil {
 		return err
 	}
-	for _, e := range entries {
-		path := filepath.Join(dir, e.Name())
-		if path == keep || !strings.HasPrefix(e.Name(), "steam-login-") {
-			continue
-		}
-		_ = os.Remove(path)
+	return update(code, kind)
+}
+
+func toGuardKind(kind protobuf.EAuthSessionGuardType) GuardKind {
+	switch kind {
+	case protobuf.EAuthSessionGuardType_k_EAuthSessionGuardType_EmailCode:
+		return GuardEmailCode
+	case protobuf.EAuthSessionGuardType_k_EAuthSessionGuardType_DeviceCode:
+		return GuardDeviceCode
+	default:
+		return GuardUnknown
 	}
+}
+
+type qrLogin struct {
+	client      *steam.Client
+	details     *steam.LogOnDetails
+	onChallenge func(string)
+
+	clientID  uint64
+	requestID []byte
+	interval  float32
+	pollStop  chan struct{}
+}
+
+func logOnQR(sc *steam.Client, details *steam.LogOnDetails, onChallenge func(string)) error {
+	q := &qrLogin{client: sc, details: details, onChallenge: onChallenge}
+	q.details.Username = ""
+	sc.Auth.Details = details
+
+	hello := &protobuf.CMsgClientHello{ProtocolVersion: proto.Uint32(steamlang.MsgClientLogon_CurrentProtocol)}
+	if err := sc.Send(protocol.NewClientMsgProtobuf(steamlang.EMsg_ClientHello, hello)); err != nil {
+		return err
+	}
+
+	return q.beginQRSession()
+}
+
+func (q *qrLogin) beginQRSession() error {
+	platformType := protobuf.EAuthTokenPlatformType_k_EAuthTokenPlatformType_SteamClient.Enum()
+	deviceFriendlyName := "DESKTOP-HELLO"
+	req := &protobuf.CAuthentication_BeginAuthSessionViaQR_Request{
+		DeviceFriendlyName: &deviceFriendlyName,
+		PlatformType:       platformType,
+		WebsiteId:          proto.String("Client"),
+		DeviceDetails: &protobuf.CAuthentication_DeviceDetails{
+			DeviceFriendlyName: &deviceFriendlyName,
+			PlatformType:       platformType,
+			OsType:             proto.Int32(16),
+		},
+	}
+	msg := protocol.NewClientMsgProtobuf(steamlang.EMsg_ServiceMethodCallFromClientNonAuthed, req)
+	jobname := "Authentication.BeginAuthSessionViaQR#1"
+	msg.Header.Proto.TargetJobName = &jobname
+	jobID := q.client.GetNextJobId()
+	msg.SetSourceJobId(jobID)
+
+	q.client.JobMutex.Lock()
+	q.client.JobHandlers[uint64(jobID)] = q.handleQRSession
+	q.client.JobMutex.Unlock()
+
+	return q.client.Send(msg)
+}
+
+func (q *qrLogin) handleQRSession(packet *protocol.Packet) error {
+	body := new(protobuf.CAuthentication_BeginAuthSessionViaQR_Response)
+	_ = packet.ReadProtoMsg(body)
+
+	q.clientID = body.GetClientId()
+	q.requestID = body.RequestId
+	q.interval = body.GetInterval()
+
+	if q.onChallenge != nil && body.ChallengeUrl != nil {
+		q.onChallenge(*body.ChallengeUrl)
+	}
+
+	go q.qrPollLoop()
 	return nil
 }
 
-func binExt() string {
-	if runtime.GOOS == "windows" {
-		return ".exe"
+func (q *qrLogin) qrPollLoop() {
+	interval := time.Duration(q.interval * float32(time.Second))
+	if interval <= 0 {
+		interval = 2 * time.Second
 	}
-	return ""
-}
-
-// assetName matches the naming convention .github/workflows/release-cli.yml
-// publishes steam-login binaries under -- runtime.GOOS/GOARCH already use
-// the same values that convention is built on (linux/darwin/windows,
-// amd64/arm64), so no translation table is needed.
-func assetName() string {
-	return fmt.Sprintf("steam-login_%s_%s%s", runtime.GOOS, runtime.GOARCH, binExt())
-}
-
-func ghToken() (string, error) {
-	out, err := exec.Command("gh", "auth", "token").Output()
-	if err != nil {
-		return "", fmt.Errorf("failed to get a GitHub token via `gh auth token` -- steam-login is a release asset in a private repo, install and log in to the GitHub CLI (gh auth login) to download it: %w", err)
-	}
-	return strings.TrimSpace(string(out)), nil
-}
-
-type releaseAsset struct {
-	Name string `json:"name"`
-	URL  string `json:"url"`
-}
-
-type release struct {
-	Assets []releaseAsset `json:"assets"`
-}
-
-func download(ctx context.Context, assetFileName, target string) error {
-	token, err := ghToken()
-	if err != nil {
-		return err
-	}
-
-	tag := "v" + Version
-	rel, err := fetchRelease(ctx, tag, token)
-	if err != nil {
-		return err
-	}
-
-	var assetURL string
-	for _, a := range rel.Assets {
-		if a.Name == assetFileName {
-			assetURL = a.URL
-			break
+	q.pollStop = make(chan struct{})
+	for {
+		select {
+		case <-q.pollStop:
+			return
+		case <-time.After(interval):
+			if err := q.sendQRPoll(); err != nil {
+				q.client.Fatalf("qr poll: %v", err)
+				return
+			}
 		}
 	}
-	if assetURL == "" {
-		return fmt.Errorf("no %s asset found on release %s -- steam-login may not have been published for this platform/version", assetFileName, tag)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, assetURL, nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Authorization", "token "+token)
-	req.Header.Set("Accept", "application/octet-stream")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to download steam-login: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to download steam-login: server returned %s", resp.Status)
-	}
-
-	f, err := os.Create(target)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	if _, err := io.Copy(f, resp.Body); err != nil {
-		os.Remove(target)
-		return fmt.Errorf("failed to write steam-login binary: %w", err)
-	}
-	return nil
 }
 
-func fetchRelease(ctx context.Context, tag, token string) (*release, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/tags/%s", githubRepo, tag)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
+func (q *qrLogin) sendQRPoll() error {
+	req := &protobuf.CAuthentication_PollAuthSessionStatus_Request{
+		ClientId:  proto.Uint64(q.clientID),
+		RequestId: q.requestID,
 	}
-	req.Header.Set("Authorization", "token "+token)
-	req.Header.Set("Accept", "application/vnd.github+json")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to look up release %s: %w", tag, err)
+	msg := protocol.NewClientMsgProtobuf(steamlang.EMsg_ServiceMethodCallFromClientNonAuthed, req)
+	jobname := "Authentication.PollAuthSessionStatus#1"
+	msg.Header.Proto.TargetJobName = &jobname
+	jobID := q.client.GetNextJobId()
+	msg.SetSourceJobId(jobID)
+
+	q.client.JobMutex.Lock()
+	q.client.JobHandlers[uint64(jobID)] = q.handleQRPoll
+	q.client.JobMutex.Unlock()
+
+	return q.client.Send(msg)
+}
+
+func (q *qrLogin) handleQRPoll(packet *protocol.Packet) error {
+	body := new(protobuf.CAuthentication_PollAuthSessionStatus_Response)
+	_ = packet.ReadProtoMsg(body)
+
+	if body.NewClientId != nil {
+		q.clientID = *body.NewClientId
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to look up release %s: server returned %s", tag, resp.Status)
+	if body.NewChallengeUrl != nil && q.onChallenge != nil {
+		q.onChallenge(*body.NewChallengeUrl)
 	}
-	var rel release
-	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
-		return nil, err
+	if body.RefreshToken == nil {
+		return nil
 	}
-	return &rel, nil
+
+	if q.pollStop != nil {
+		close(q.pollStop)
+	}
+
+	q.details.AccessToken = body.GetAccessToken()
+	q.details.RefreshToken = *body.RefreshToken
+	if body.NewGuardData != nil {
+		q.details.GuardData = *body.NewGuardData
+	}
+	if body.AccountName != nil {
+		q.details.Username = *body.AccountName
+	}
+
+	return q.client.Auth.LogOn(q.details)
 }

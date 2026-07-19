@@ -455,11 +455,9 @@ impl SyncService for SyncServiceImpl {
     /// `request.refresh_token` must already be negotiated -- this process
     /// (like every other deployed service) never sees a Steam password,
     /// not even transiently. The interactive username+password (+ Guard
-    /// code) negotiation happens entirely client-side, in cli/magpie's
-    /// `magpie admin refresh-steam-auth`, which shells out to
-    /// steam-sync's steam-login helper binary for the actual Steam login
-    /// and calls this RPC with only the result. See the proto's own doc
-    /// for the full rationale.
+    /// code) negotiation happens entirely client-side, in
+    /// `magpiectl admin refresh-steam-auth`, which calls this RPC with
+    /// only the result. See the proto's own doc for the full rationale.
     async fn refresh_steam_auth<'a>(
         &'a self,
         _ctx: RequestContext,

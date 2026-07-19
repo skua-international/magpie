@@ -20,8 +20,8 @@ import (
 // "linux"; only the architecture needs detecting (via `uname -m` on the
 // remote host itself), then the matching magpiectl_linux_<arch> release
 // asset is downloaded there directly -- same private-repo GitHub API
-// dance internal/steamlogin uses for its own binary, just resolving
-// magpiectl's own asset instead of steam-login's.
+// dance internal/steamlogin uses for its own release assets, just
+// resolving magpiectl's own asset.
 //
 // Once the remote install finishes, the resulting kubeconfig is fetched
 // back and saved locally (server URL rewritten from 127.0.0.1/localhost
