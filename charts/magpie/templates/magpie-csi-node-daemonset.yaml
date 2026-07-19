@@ -95,7 +95,17 @@ spec:
         - name: registration-dir
           hostPath:
             path: /var/lib/kubelet/plugins_registry
-            type: Directory
+            # DirectoryOrCreate, not Directory -- confirmed live:
+            # "hostPath type check failed: /var/lib/kubelet/plugins_registry
+            # is not a directory" on a node that had never had a CSI
+            # driver register before. k3s doesn't necessarily create
+            # this directory up front the way it does the base kubelet
+            # dir; unlike the CSI socket dirs above this isn't something
+            # magpie-csi itself owns/writes meaningfully, so there's no
+            # equivalent "fails loudly if missing" argument for keeping
+            # it strict the way some of this chart's other hostPath
+            # volumes deliberately do.
+            type: DirectoryOrCreate
         - name: pods-mount-dir
           hostPath:
             path: /var/lib/kubelet/pods
