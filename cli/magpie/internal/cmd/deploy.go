@@ -93,7 +93,7 @@ func deployCmd() *cobra.Command {
 			"runs helm upgrade. With no version, deploys the latest GitHub release. Go equivalent of " +
 			"scripts/deploy.sh, shelling out to the same helm/kubectl binaries.",
 		RunE: func(cc *cobra.Command, args []string) error {
-			return deploy.Run(cc.Context(), deploy.Options{
+			if err := deploy.Run(cc.Context(), deploy.Options{
 				Version:       versionArg(cc, args),
 				ImageTag:      f.imageTag,
 				Namespace:     f.namespace,
@@ -102,7 +102,13 @@ func deployCmd() *cobra.Command {
 				Install:       install,
 				DryRun:        f.dryRun,
 				ExtraHelmArgs: extraArgsAfterDash(cc, args),
-			})
+			}); err != nil {
+				return err
+			}
+			if !f.dryRun {
+				maybePromptEditBaselineConfigMap(cc.Context(), f.namespace, f.release)
+			}
+			return nil
 		},
 	}
 	addDeployFlags(c, &f)
@@ -161,9 +167,21 @@ func installCmd() *cobra.Command {
 					return err
 				}
 				opts.Version = version
-				return deploy.RunRemoteInstall(cc.Context(), sshHost, sshIdentity, opts)
+				if err := deploy.RunRemoteInstall(cc.Context(), sshHost, sshIdentity, opts); err != nil {
+					return err
+				}
+				if !opts.DryRun {
+					maybePromptEditBaselineConfigMap(cc.Context(), opts.Namespace, opts.Release)
+				}
+				return nil
 			}
-			return deploy.Run(cc.Context(), opts)
+			if err := deploy.Run(cc.Context(), opts); err != nil {
+				return err
+			}
+			if !opts.DryRun {
+				maybePromptEditBaselineConfigMap(cc.Context(), opts.Namespace, opts.Release)
+			}
+			return nil
 		},
 	}
 	addDeployFlags(c, &f)
@@ -182,7 +200,7 @@ func upgradeCmd() *cobra.Command {
 		Use:   "upgrade [version] [-- extra helm args]",
 		Short: "Upgrade an existing magpie stack (alias for `deploy`)",
 		RunE: func(cc *cobra.Command, args []string) error {
-			return deploy.Run(cc.Context(), deploy.Options{
+			if err := deploy.Run(cc.Context(), deploy.Options{
 				Version:       versionArg(cc, args),
 				ImageTag:      f.imageTag,
 				Namespace:     f.namespace,
@@ -191,7 +209,13 @@ func upgradeCmd() *cobra.Command {
 				Install:       false,
 				DryRun:        f.dryRun,
 				ExtraHelmArgs: extraArgsAfterDash(cc, args),
-			})
+			}); err != nil {
+				return err
+			}
+			if !f.dryRun {
+				maybePromptEditBaselineConfigMap(cc.Context(), f.namespace, f.release)
+			}
+			return nil
 		},
 	}
 	addDeployFlags(c, &f)

@@ -11,7 +11,7 @@ import (
 
 func adminCmd() *cobra.Command {
 	root := &cobra.Command{Use: "admin", Short: "Cluster administration"}
-	root.AddCommand(adminDiskUsageCmd(), adminRefreshSteamAuthCmd())
+	root.AddCommand(adminDiskUsageCmd(), adminRefreshSteamAuthCmd(), adminArmaConfigCmd())
 	return root
 }
 
