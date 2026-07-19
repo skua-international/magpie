@@ -57,6 +57,16 @@ message CreateServerRequest {
   repeated string mod_source_ids = 3;
   reserved 4, 5;
   reserved "arma_config", "network_config";
+  // Name of an operator-created ConfigMap (same namespace as the
+  // ArmaServer) providing per-server overrides on top of the cluster's
+  // baseline Arma config -- see ArmaServerSpec.config_map and
+  // services/controller/src/arma_config.rs. The ConfigMap itself isn't
+  // managed through this API (server-api carries no ConfigMap RBAC at
+  // all, deliberately -- see charts/magpie/values.yaml's serverApi
+  // comment); callers create/edit it directly against the cluster (e.g.
+  // `kubectl edit configmap`) and only pass its name here. Unset means
+  // "baseline only".
+  optional string config_map = 6;
 }
 
 enum ServerPhase {

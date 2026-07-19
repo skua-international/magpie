@@ -24,6 +24,7 @@ type screen int
 const (
 	screenMenu screen = iota
 	screenServers
+	screenServersCreate
 	screenModSources
 	screenMissions
 	screenAdmin
@@ -40,8 +41,9 @@ var menuItems = []struct {
 }
 
 type Model struct {
-	ctx     context.Context
-	clients *client.Clients
+	ctx       context.Context
+	clients   *client.Clients
+	namespace string
 
 	screen screen
 	cursor int
@@ -52,10 +54,16 @@ type Model struct {
 	modSources []*registryv1.ModSourceInfo
 	missions   []*registryv1.MissionInfo
 	diskUsage  *registryv1.GetDiskUsageResponse
+
+	create createServerState
 }
 
-func New(ctx context.Context, clients *client.Clients) Model {
-	return Model{ctx: ctx, clients: clients, screen: screenMenu}
+// New builds the TUI's top-level model. namespace is only used for the
+// "create server" flow's per-server ConfigMap kubectl calls (see
+// create_server.go) -- every RPC-backed screen gets its namespace from
+// server-api's own config instead, never from here.
+func New(ctx context.Context, clients *client.Clients, namespace string) Model {
+	return Model{ctx: ctx, clients: clients, namespace: namespace, screen: screenMenu, create: newCreateServerState()}
 }
 
 func (m Model) Init() tea.Cmd {
@@ -115,6 +123,10 @@ func (m Model) loadDiskUsageCmd() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if next, cmd, handled := m.handleCreateServerMsg(msg); handled {
+		return next, cmd
+	}
+
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
@@ -136,6 +148,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	// The create-server wizard has text-entry steps where "q"/"esc" would
+	// otherwise be swallowed as global back/quit keys instead of typed
+	// characters -- routed separately, before any of that, with only
+	// ctrl+c/esc treated specially (back to the servers list, not all the
+	// way out to the menu, since that's the natural "cancel" target here).
+	if m.screen == screenServersCreate {
+		switch msg.String() {
+		case "ctrl+c":
+			return m, tea.Quit
+		case "esc":
+			m.screen, m.cursor, m.loaded, m.err = screenServers, 0, false, nil
+			m.create = newCreateServerState()
+			return m, nil
+		}
+		return m.handleCreateServerKey(msg)
+	}
+
 	switch msg.String() {
 	case "ctrl+c", "q":
 		if m.screen == screenMenu {
@@ -148,6 +177,15 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.screen, m.cursor, m.loaded, m.err = screenMenu, 0, false, nil
 		}
 		return m, nil
+	}
+
+	if m.screen == screenServers {
+		if msg.String() == "n" {
+			m.screen = screenServersCreate
+			m.cursor = 0
+			m.create = newCreateServerState()
+			return m, nil
+		}
 	}
 
 	if m.screen == screenMenu {
@@ -243,7 +281,10 @@ func (m Model) View() tea.View {
 				b.WriteString(renderLine(line, i == m.cursor) + "\n")
 			}
 		}
-		b.WriteString("\n" + dimStyle.Render("esc to go back"))
+		b.WriteString("\n" + dimStyle.Render("n: new server, esc to go back"))
+
+	case screenServersCreate:
+		b.WriteString(m.viewCreateServer())
 
 	case screenModSources:
 		b.WriteString(titleStyle.Render("Mod Sources") + "\n\n")

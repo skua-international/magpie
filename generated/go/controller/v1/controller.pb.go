@@ -142,7 +142,17 @@ type CreateServerRequest struct {
 	// Zero or more previously-registered mod source IDs (from
 	// registry.v1.ModSourceService). Their resolved mod lists are unioned
 	// for this server's own -mod= launch args.
-	ModSourceIds  []string `protobuf:"bytes,3,rep,name=mod_source_ids,json=modSourceIds,proto3" json:"mod_source_ids,omitempty"`
+	ModSourceIds []string `protobuf:"bytes,3,rep,name=mod_source_ids,json=modSourceIds,proto3" json:"mod_source_ids,omitempty"`
+	// Name of an operator-created ConfigMap (same namespace as the
+	// ArmaServer) providing per-server overrides on top of the cluster's
+	// baseline Arma config -- see ArmaServerSpec.config_map and
+	// services/controller/src/arma_config.rs. The ConfigMap itself isn't
+	// managed through this API (server-api carries no ConfigMap RBAC at
+	// all, deliberately -- see charts/magpie/values.yaml's serverApi
+	// comment); callers create/edit it directly against the cluster (e.g.
+	// `kubectl edit configmap`) and only pass its name here. Unset means
+	// "baseline only".
+	ConfigMap     *string `protobuf:"bytes,6,opt,name=config_map,json=configMap,proto3,oneof" json:"config_map,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -196,6 +206,13 @@ func (x *CreateServerRequest) GetModSourceIds() []string {
 		return x.ModSourceIds
 	}
 	return nil
+}
+
+func (x *CreateServerRequest) GetConfigMap() string {
+	if x != nil && x.ConfigMap != nil {
+		return *x.ConfigMap
+	}
+	return ""
 }
 
 type ServerInfo struct {
@@ -638,11 +655,14 @@ var File_controller_v1_controller_proto protoreflect.FileDescriptor
 
 const file_controller_v1_controller_proto_rawDesc = "" +
 	"\n" +
-	"\x1econtroller/v1/controller.proto\x12\rcontroller.v1\"\x8c\x01\n" +
+	"\x1econtroller/v1/controller.proto\x12\rcontroller.v1\"\xbf\x01\n" +
 	"\x13CreateServerRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\rR\x04port\x12$\n" +
-	"\x0emod_source_ids\x18\x03 \x03(\tR\fmodSourceIdsJ\x04\b\x04\x10\x05J\x04\b\x05\x10\x06R\varma_configR\x0enetwork_config\"\xc0\x02\n" +
+	"\x0emod_source_ids\x18\x03 \x03(\tR\fmodSourceIds\x12\"\n" +
+	"\n" +
+	"config_map\x18\x06 \x01(\tH\x00R\tconfigMap\x88\x01\x01B\r\n" +
+	"\v_config_mapJ\x04\b\x04\x10\x05J\x04\b\x05\x10\x06R\varma_configR\x0enetwork_config\"\xc0\x02\n" +
 	"\n" +
 	"ServerInfo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
@@ -749,6 +769,7 @@ func file_controller_v1_controller_proto_init() {
 	if File_controller_v1_controller_proto != nil {
 		return
 	}
+	file_controller_v1_controller_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

@@ -16,6 +16,9 @@ func runTUI(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	_, err = tea.NewProgram(tui.New(ctx, cl), tea.WithContext(ctx)).Run()
+	// "magpie" matches every other subcommand's own --namespace default
+	// (servers.go, armaconfig.go) -- not configurable here yet since the
+	// bare TUI entrypoint takes no flags of its own at all.
+	_, err = tea.NewProgram(tui.New(ctx, cl, "magpie"), tea.WithContext(ctx)).Run()
 	return err
 }

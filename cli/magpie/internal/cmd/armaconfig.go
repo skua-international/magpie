@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
+
+	"github.com/skua-international/magpie/cli/internal/actions"
 )
 
 // baselineConfigMapName mirrors the chart's own naming
@@ -18,12 +19,18 @@ func baselineConfigMapName(release string) string {
 	return release + "-arma-config-baseline"
 }
 
-// editBaselineConfigMap shells out to `kubectl edit`, reusing its own
-// $EDITOR handling and get/apply-on-save flow directly rather than
-// hand-rolling a temp-file/diff/apply cycle -- the same reasoning
-// `kubectl edit` itself exists for.
+// editBaselineConfigMap runs actions.ConfigMapEditCmd (kubectl edit)
+// directly -- the plain CLI path, as opposed to the TUI's, which hands
+// the same *exec.Cmd to tea.ExecProcess instead (see tui/create_server.go).
 func editBaselineConfigMap(ctx context.Context, namespace, release string) error {
-	cmd := exec.CommandContext(ctx, "kubectl", "edit", "configmap", baselineConfigMapName(release), "-n", namespace)
+	return editConfigMap(ctx, namespace, baselineConfigMapName(release))
+}
+
+// editConfigMap wires actions.ConfigMapEditCmd's unstarted *exec.Cmd to
+// this process's own stdio and runs it -- also used by servers.go's
+// per-server config override flow (see maybePromptServerConfigMap).
+func editConfigMap(ctx context.Context, namespace, name string) error {
+	cmd := actions.ConfigMapEditCmd(ctx, namespace, name)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -50,6 +57,44 @@ func maybePromptEditBaselineConfigMap(ctx context.Context, namespace, release st
 		}
 	}
 	fmt.Printf("==> Edit it later any time via: kubectl edit configmap %s -n %s\n", name, namespace)
+}
+
+// maybePromptServerConfigMap offers the same "edit it now" flow
+// maybePromptEditBaselineConfigMap gives the cluster-wide baseline, but
+// for a single server's own override ConfigMap right after creating it
+// -- skipped entirely (no hang, no ConfigMap created) when stdin isn't a
+// terminal, same reasoning as the baseline prompt. Returns the ConfigMap
+// name to pass as CreateServerRequest.config_map, or "" if the operator
+// declined (server gets baseline-only config).
+func maybePromptServerConfigMap(ctx context.Context, namespace, serverName string) string {
+	if !term.IsTerminal(int(os.Stdin.Fd())) {
+		return ""
+	}
+
+	fmt.Print("==> Configure a per-server config override now? [y/N] ")
+	var answer string
+	_, _ = fmt.Scanln(&answer)
+	if answer != "y" && answer != "Y" {
+		return ""
+	}
+
+	name := serverName + "-config"
+	fmt.Printf("==> ConfigMap name [%s]: ", name)
+	var input string
+	_, _ = fmt.Scanln(&input)
+	if input != "" {
+		name = input
+	}
+
+	if err := actions.EnsureConfigMapExists(ctx, namespace, name); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to create ConfigMap %s: %v\n", name, err)
+		return ""
+	}
+	if err := editConfigMap(ctx, namespace, name); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: kubectl edit failed: %v\n", err)
+	}
+	fmt.Printf("==> Edit it later any time via: kubectl edit configmap %s -n %s\n", name, namespace)
+	return name
 }
 
 func adminArmaConfigCmd() *cobra.Command {

@@ -17,6 +17,7 @@ type CreateServerParams struct {
 	Name         string
 	Port         uint32
 	ModSourceIDs []string
+	ConfigMap    string
 }
 
 func ListServers(ctx context.Context, c *client.Clients) ([]*controllerv1.ServerInfo, error) {
@@ -40,6 +41,9 @@ func CreateServer(ctx context.Context, c *client.Clients, p CreateServerParams) 
 		Name:         p.Name,
 		Port:         p.Port,
 		ModSourceIds: p.ModSourceIDs,
+	}
+	if p.ConfigMap != "" {
+		req.ConfigMap = &p.ConfigMap
 	}
 	resp, err := c.Servers.CreateServer(ctx, connect.NewRequest(req))
 	if err != nil {

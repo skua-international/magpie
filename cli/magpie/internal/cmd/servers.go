@@ -51,20 +51,33 @@ func serversCreateCmd() *cobra.Command {
 	var (
 		port         uint32
 		modSourceIDs []string
+		configMap    string
+		namespace    string
 	)
 	c := &cobra.Command{
 		Use:   "create <name>",
 		Short: "Create and start a new server",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cc *cobra.Command, args []string) error {
+			name := args[0]
+
+			// Only prompt when --config-map wasn't already given
+			// explicitly -- maybePromptServerConfigMap itself skips the
+			// prompt on a non-terminal stdin, same as install's baseline
+			// prompt (see armaconfig.go).
+			if configMap == "" {
+				configMap = maybePromptServerConfigMap(cc.Context(), namespace, name)
+			}
+
 			cl, err := clients(cc.Context())
 			if err != nil {
 				return err
 			}
 			info, err := actions.CreateServer(cc.Context(), cl, actions.CreateServerParams{
-				Name:         args[0],
+				Name:         name,
 				Port:         port,
 				ModSourceIDs: modSourceIDs,
+				ConfigMap:    configMap,
 			})
 			if err != nil {
 				return err
@@ -75,6 +88,8 @@ func serversCreateCmd() *cobra.Command {
 	}
 	c.Flags().Uint32Var(&port, "port", 2302, "base game port (Arma binds a 5-port range starting here)")
 	c.Flags().StringSliceVar(&modSourceIDs, "mod-source", nil, "mod source ID (repeatable)")
+	c.Flags().StringVar(&configMap, "config-map", "", "per-server config override ConfigMap name (skips the interactive prompt)")
+	c.Flags().StringVar(&namespace, "namespace", "magpie", "namespace to create/edit the per-server config override ConfigMap in (kubectl-only, not sent to server-api)")
 	return c
 }
 

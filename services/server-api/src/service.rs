@@ -175,10 +175,16 @@ impl protocol::proto::controller::v1::ServerService for ServerServiceImpl {
             profiling: false,
             params: Vec::new(),
             desired_state: DesiredState::Running,
-            // Not yet exposed on CreateServer's own request -- set later
-            // via `kubectl edit`/`kubectl patch` on the ArmaServer object
-            // directly if a per-server config override is needed.
-            config_map: None,
+            // The ConfigMap named here isn't created/validated by this
+            // call at all (server-api has no ConfigMap RBAC) -- it's the
+            // caller's responsibility to have it in place first (e.g. via
+            // `kubectl edit`, following the same flow `admin arma-config`
+            // already uses for the baseline). Unlike leaving this unset,
+            // naming a ConfigMap that doesn't actually exist yet is a
+            // hard reconcile failure, not a silent baseline-only
+            // fallback -- arma_config.rs's fetch_and_merge propagates a
+            // missing override ConfigMap as an error.
+            config_map: request.config_map.map(|s| s.to_string()),
         };
         let name = request.name.to_string();
 
