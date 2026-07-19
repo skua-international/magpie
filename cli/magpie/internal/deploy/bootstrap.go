@@ -42,8 +42,20 @@ func BootstrapK3s(ctx context.Context, dataDir string) error {
 	if _, err := exec.LookPath("k3s"); err == nil {
 		fmt.Println("==> k3s already installed, skipping install")
 	} else {
-		fmt.Println("==> Installing k3s...")
+		// Without this, k3s puts its own storage (containerd's image/
+		// layer cache included) under /var/lib/rancher/k3s on whatever
+		// disk the OS itself lives on -- confirmed live to matter, not
+		// theoretical: a cloud image's default root partition can be a
+		// couple GB, nowhere near enough for containerd's image cache
+		// once real workloads start pulling, while dataDir (this flag
+		// already existed for the reflink check below) commonly points
+		// at a much larger, purpose-provisioned disk. k3sDataDir keeps
+		// k3s's own storage on that same disk, not a separate concern
+		// from where magpie's own content/claims/blob already live.
+		k3sDataDir := filepath.Join(dataDir, "k3s")
+		fmt.Printf("==> Installing k3s (data-dir: %s)...\n", k3sDataDir)
 		cmd := exec.CommandContext(ctx, "sh", "-c", "curl -sfL https://get.k3s.io | sh -")
+		cmd.Env = append(os.Environ(), "INSTALL_K3S_EXEC=server --data-dir="+k3sDataDir)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		cmd.Stdin = os.Stdin
