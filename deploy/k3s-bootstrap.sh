@@ -269,8 +269,16 @@ if [[ -n "$KUBECONFIG_PATH" ]]; then
 
     if [[ -z "$EXTERNAL_POSTGRES_URL" ]]; then
         log "creating arma-postgres-creds (random password)..."
+        # hex, not base64 -- this password gets embedded unescaped into
+        # DATABASE_URL via $(PGPASSWORD) k8s dependent-env-var expansion
+        # (see the chart's magpie.postgresEnv helper), which does raw
+        # string substitution with no percent-encoding. base64's alphabet
+        # includes "+"/"/"/"=" -- a "/" in particular corrupts a
+        # postgres://user:pass@host:port/db URL badly enough to surface
+        # as "invalid port number", confirmed live (see cli/magpie's own
+        # randomPassword(), fixed the same way for the same reason).
         kctl create secret generic arma-postgres-creds -n "$CHART_NAMESPACE" \
-            --from-literal=POSTGRES_PASSWORD="$(openssl rand -base64 24)" \
+            --from-literal=POSTGRES_PASSWORD="$(openssl rand -hex 24)" \
             --dry-run=client -o yaml | kctl apply -f - >/dev/null
         DEPLOY_SET_ARGS+=(--set postgres.existingSecret=arma-postgres-creds)
     else

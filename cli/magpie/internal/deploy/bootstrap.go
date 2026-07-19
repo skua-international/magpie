@@ -276,10 +276,20 @@ func applyPiped(ctx context.Context, createArgs []string) error {
 	return nil
 }
 
+// URL-safe, deliberately -- this password gets embedded unescaped into
+// DATABASE_URL via Kubernetes' $(PGPASSWORD) dependent-env-var expansion
+// (see the chart's magpie.postgresEnv helper), which does raw string
+// substitution with no percent-encoding. base64.StdEncoding's alphabet
+// includes "+", "/", and "=" -- a "/" in particular corrupts a
+// postgres://user:pass@host:port/db URL's structure badly enough to
+// surface as "invalid port number" from whatever's left after userinfo
+// parsing goes wrong, confirmed live. RawURLEncoding's alphabet
+// ([A-Za-z0-9-_], no padding) is entirely RFC 3986 unreserved, so it's
+// always safe unescaped wherever this password ends up.
 func randomPassword() (string, error) {
 	buf := make([]byte, 24)
 	if _, err := rand.Read(buf); err != nil {
 		return "", fmt.Errorf("failed to generate a random password: %w", err)
 	}
-	return base64.StdEncoding.EncodeToString(buf), nil
+	return base64.RawURLEncoding.EncodeToString(buf), nil
 }
