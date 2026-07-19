@@ -1,15 +1,23 @@
-//! `ArmaServer` reconciler only -- no external listener, no auth surface.
-//! `services/server-api` is the only thing that talks to this process, and
-//! it does so purely by writing/reading `ArmaServer` objects through the
-//! Kubernetes API, not by calling into this binary directly. Kept separate
-//! from server-api specifically so this process's ServiceAccount needs
-//! (create/delete Deployments) never has to be granted to the
-//! JWT-authenticated API surface -- least privilege, given this is the one
-//! process in the stack that actually mutates cluster workloads.
+//! `ArmaServer` reconciler -- no auth surface, no RPC API.
+//! `services/server-api` is the only thing that talks to this process
+//! for anything Arma-related, and it does so purely by writing/reading
+//! `ArmaServer` objects through the Kubernetes API, not by calling into
+//! this binary directly. Kept separate from server-api specifically so
+//! this process's ServiceAccount needs (create/delete Deployments)
+//! never has to be granted to the JWT-authenticated API surface --
+//! least privilege, given this is the one process in the stack that
+//! actually mutates cluster workloads.
+//!
+//! The one thing this *does* expose is a plain `/healthz` (see `main`) --
+//! confirmed live elsewhere in this chart (magpie-csi) that "the
+//! process is up" and "actually healthy" are different things worth
+//! distinguishing; this process previously had no probe of any kind.
 
 use std::sync::Arc;
 
 use anyhow::Result;
+use axum::Router;
+use axum::routing::get;
 use controller::config::Config;
 use controller::postgres_bootstrap::{self, AppPostgresConfig};
 use controller::reconcile;
@@ -58,8 +66,15 @@ async fn main() -> Result<()> {
 
     reconcile::spawn(client, pool, cfg)?;
 
-    // The reconciler runs entirely in its own spawned task; block forever
-    // rather than returning immediately.
-    std::future::pending::<()>().await;
+    // Only ever bound once every startup step above (kube::Client,
+    // Postgres pool, app-role bootstrap) has already succeeded -- so
+    // kubelet finding nothing listening is itself a meaningful signal
+    // that startup hasn't completed, not just a race to probe too
+    // early. No readiness distinction from liveness: this reconciler
+    // has no notion of "up but not ready yet" beyond that.
+    let app = Router::new().route("/healthz", get(|| async { "ok" }));
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await?;
+    info!("healthz listening on :8080");
+    axum::serve(listener, app).await?;
     Ok(())
 }

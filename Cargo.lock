@@ -649,6 +649,7 @@ name = "controller"
 version = "0.0.0-unreleased"
 dependencies = [
  "anyhow",
+ "axum",
  "chrono",
  "crd",
  "futures",
