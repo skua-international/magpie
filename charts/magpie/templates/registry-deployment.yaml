@@ -25,6 +25,7 @@ spec:
         runAsNonRoot: true
       initContainers:
         {{- include "magpie.waitForPostgresInit" . | nindent 8 }}
+        {{- include "magpie.chownHostPathInit" (dict "name" "local-content" "path" .Values.hostPaths.localContentPath "root" $) | nindent 8 }}
       containers:
         - name: registry
           image: {{ include "magpie.image" (dict "root" $ "override" .Values.registry.image) }}

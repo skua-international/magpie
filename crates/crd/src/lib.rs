@@ -46,28 +46,12 @@ pub struct ArmaServerSpec {
     /// actually gotten toward that.
     #[serde(default)]
     pub desired_state: DesiredState,
-    /// Filename (under this server's `SERVER_ROOT/configs/`) passed as
-    /// `-config=` -- the mission-cycle/security config.
-    #[serde(default = "default_arma_config")]
-    pub arma_config: String,
-    /// Filename (under this server's `SERVER_ROOT/configs/`) passed as
-    /// `-cfg=` -- the network performance config.
-    #[serde(default = "default_network_config")]
-    pub network_config: String,
     /// Name of an operator-created ConfigMap (same namespace) providing
     /// per-server overrides on top of the cluster's baseline Arma config
     /// (see `services/controller/src/arma_config.rs`). Unset means
     /// "baseline only".
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config_map: Option<String>,
-}
-
-pub fn default_arma_config() -> String {
-    "main.cfg".to_string()
-}
-
-pub fn default_network_config() -> String {
-    "basic.cfg".to_string()
 }
 
 /// The 5-port range Arma actually binds for a given base `port` (matching

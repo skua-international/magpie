@@ -14,11 +14,9 @@ import (
 )
 
 type CreateServerParams struct {
-	Name          string
-	Port          uint32
-	ModSourceIDs  []string
-	ArmaConfig    string
-	NetworkConfig string
+	Name         string
+	Port         uint32
+	ModSourceIDs []string
 }
 
 func ListServers(ctx context.Context, c *client.Clients) ([]*controllerv1.ServerInfo, error) {
@@ -42,12 +40,6 @@ func CreateServer(ctx context.Context, c *client.Clients, p CreateServerParams) 
 		Name:         p.Name,
 		Port:         p.Port,
 		ModSourceIds: p.ModSourceIDs,
-	}
-	if p.ArmaConfig != "" {
-		req.ArmaConfig = &p.ArmaConfig
-	}
-	if p.NetworkConfig != "" {
-		req.NetworkConfig = &p.NetworkConfig
 	}
 	resp, err := c.Servers.CreateServer(ctx, connect.NewRequest(req))
 	if err != nil {

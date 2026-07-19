@@ -307,14 +307,17 @@ async fn ensure_deployment(
             value: Some(obj.spec.port.to_string()),
             ..Default::default()
         },
+        // arma_config.rs always writes exactly these two filenames --
+        // there's no operator-selectable filename anymore (see
+        // CreateServerRequest's own reserved fields 4/5 for why).
         EnvVar {
             name: "ARMA_CONFIG".into(),
-            value: Some(obj.spec.arma_config.clone()),
+            value: Some("main.cfg".into()),
             ..Default::default()
         },
         EnvVar {
             name: "NETWORK_CONFIG".into(),
-            value: Some(obj.spec.network_config.clone()),
+            value: Some("basic.cfg".into()),
             ..Default::default()
         },
         // Consumed by whatever Postgres-backed extension the Arma server

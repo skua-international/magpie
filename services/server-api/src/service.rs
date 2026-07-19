@@ -148,8 +148,6 @@ fn to_info(obj: &ArmaServer) -> ServerInfo {
         claim_path: status.claim_path,
         message: status.message,
         desired_state: EnumValue::Known(desired_state_to_proto(obj.spec.desired_state)),
-        arma_config: obj.spec.arma_config.clone(),
-        network_config: obj.spec.network_config.clone(),
         ..Default::default()
     }
 }
@@ -177,14 +175,6 @@ impl protocol::proto::controller::v1::ServerService for ServerServiceImpl {
             profiling: false,
             params: Vec::new(),
             desired_state: DesiredState::Running,
-            arma_config: request
-                .arma_config
-                .map(|s| s.to_string())
-                .unwrap_or_else(crd::default_arma_config),
-            network_config: request
-                .network_config
-                .map(|s| s.to_string())
-                .unwrap_or_else(crd::default_network_config),
             // Not yet exposed on CreateServer's own request -- set later
             // via `kubectl edit`/`kubectl patch` on the ArmaServer object
             // directly if a per-server config override is needed.

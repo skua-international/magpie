@@ -55,14 +55,8 @@ message CreateServerRequest {
   // registry.v1.ModSourceService). Their resolved mod lists are unioned
   // for this server's own -mod= launch args.
   repeated string mod_source_ids = 3;
-  // Filename under this server's operator-provided configs/ directory,
-  // passed as -config= (mission-cycle/security config). Defaults to
-  // "main.cfg" if unset.
-  optional string arma_config = 4;
-  // Filename under this server's operator-provided configs/ directory,
-  // passed as -cfg= (network performance config). Defaults to "basic.cfg"
-  // if unset.
-  optional string network_config = 5;
+  reserved 4, 5;
+  reserved "arma_config", "network_config";
 }
 
 enum ServerPhase {
@@ -90,8 +84,8 @@ message ServerInfo {
   string claim_path = 6;
   string message = 7;
   DesiredState desired_state = 8;
-  string arma_config = 9;
-  string network_config = 10;
+  reserved 9, 10;
+  reserved "arma_config", "network_config";
 }
 
 message ListServersRequest {}

@@ -142,15 +142,7 @@ type CreateServerRequest struct {
 	// Zero or more previously-registered mod source IDs (from
 	// registry.v1.ModSourceService). Their resolved mod lists are unioned
 	// for this server's own -mod= launch args.
-	ModSourceIds []string `protobuf:"bytes,3,rep,name=mod_source_ids,json=modSourceIds,proto3" json:"mod_source_ids,omitempty"`
-	// Filename under this server's operator-provided configs/ directory,
-	// passed as -config= (mission-cycle/security config). Defaults to
-	// "main.cfg" if unset.
-	ArmaConfig *string `protobuf:"bytes,4,opt,name=arma_config,json=armaConfig,proto3,oneof" json:"arma_config,omitempty"`
-	// Filename under this server's operator-provided configs/ directory,
-	// passed as -cfg= (network performance config). Defaults to "basic.cfg"
-	// if unset.
-	NetworkConfig *string `protobuf:"bytes,5,opt,name=network_config,json=networkConfig,proto3,oneof" json:"network_config,omitempty"`
+	ModSourceIds  []string `protobuf:"bytes,3,rep,name=mod_source_ids,json=modSourceIds,proto3" json:"mod_source_ids,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -206,20 +198,6 @@ func (x *CreateServerRequest) GetModSourceIds() []string {
 	return nil
 }
 
-func (x *CreateServerRequest) GetArmaConfig() string {
-	if x != nil && x.ArmaConfig != nil {
-		return *x.ArmaConfig
-	}
-	return ""
-}
-
-func (x *CreateServerRequest) GetNetworkConfig() string {
-	if x != nil && x.NetworkConfig != nil {
-		return *x.NetworkConfig
-	}
-	return ""
-}
-
 type ServerInfo struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -230,8 +208,6 @@ type ServerInfo struct {
 	ClaimPath     string                 `protobuf:"bytes,6,opt,name=claim_path,json=claimPath,proto3" json:"claim_path,omitempty"`
 	Message       string                 `protobuf:"bytes,7,opt,name=message,proto3" json:"message,omitempty"`
 	DesiredState  DesiredState           `protobuf:"varint,8,opt,name=desired_state,json=desiredState,proto3,enum=controller.v1.DesiredState" json:"desired_state,omitempty"`
-	ArmaConfig    string                 `protobuf:"bytes,9,opt,name=arma_config,json=armaConfig,proto3" json:"arma_config,omitempty"`
-	NetworkConfig string                 `protobuf:"bytes,10,opt,name=network_config,json=networkConfig,proto3" json:"network_config,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -320,20 +296,6 @@ func (x *ServerInfo) GetDesiredState() DesiredState {
 		return x.DesiredState
 	}
 	return DesiredState_DESIRED_STATE_UNSPECIFIED
-}
-
-func (x *ServerInfo) GetArmaConfig() string {
-	if x != nil {
-		return x.ArmaConfig
-	}
-	return ""
-}
-
-func (x *ServerInfo) GetNetworkConfig() string {
-	if x != nil {
-		return x.NetworkConfig
-	}
-	return ""
 }
 
 type ListServersRequest struct {
@@ -676,16 +638,11 @@ var File_controller_v1_controller_proto protoreflect.FileDescriptor
 
 const file_controller_v1_controller_proto_rawDesc = "" +
 	"\n" +
-	"\x1econtroller/v1/controller.proto\x12\rcontroller.v1\"\xd8\x01\n" +
+	"\x1econtroller/v1/controller.proto\x12\rcontroller.v1\"\x8c\x01\n" +
 	"\x13CreateServerRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\rR\x04port\x12$\n" +
-	"\x0emod_source_ids\x18\x03 \x03(\tR\fmodSourceIds\x12$\n" +
-	"\varma_config\x18\x04 \x01(\tH\x00R\n" +
-	"armaConfig\x88\x01\x01\x12*\n" +
-	"\x0enetwork_config\x18\x05 \x01(\tH\x01R\rnetworkConfig\x88\x01\x01B\x0e\n" +
-	"\f_arma_configB\x11\n" +
-	"\x0f_network_config\"\xdf\x02\n" +
+	"\x0emod_source_ids\x18\x03 \x03(\tR\fmodSourceIdsJ\x04\b\x04\x10\x05J\x04\b\x05\x10\x06R\varma_configR\x0enetwork_config\"\xc0\x02\n" +
 	"\n" +
 	"ServerInfo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
@@ -696,11 +653,9 @@ const file_controller_v1_controller_proto_rawDesc = "" +
 	"\n" +
 	"claim_path\x18\x06 \x01(\tR\tclaimPath\x12\x18\n" +
 	"\amessage\x18\a \x01(\tR\amessage\x12@\n" +
-	"\rdesired_state\x18\b \x01(\x0e2\x1b.controller.v1.DesiredStateR\fdesiredState\x12\x1f\n" +
-	"\varma_config\x18\t \x01(\tR\n" +
-	"armaConfig\x12%\n" +
-	"\x0enetwork_config\x18\n" +
-	" \x01(\tR\rnetworkConfig\"\x14\n" +
+	"\rdesired_state\x18\b \x01(\x0e2\x1b.controller.v1.DesiredStateR\fdesiredStateJ\x04\b\t\x10\n" +
+	"J\x04\b\n" +
+	"\x10\vR\varma_configR\x0enetwork_config\"\x14\n" +
 	"\x12ListServersRequest\"J\n" +
 	"\x13ListServersResponse\x123\n" +
 	"\aservers\x18\x01 \x03(\v2\x19.controller.v1.ServerInfoR\aservers\"\"\n" +
@@ -794,7 +749,6 @@ func file_controller_v1_controller_proto_init() {
 	if File_controller_v1_controller_proto != nil {
 		return
 	}
-	file_controller_v1_controller_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

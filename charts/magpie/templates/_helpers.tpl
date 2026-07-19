@@ -133,6 +133,34 @@ Called as: {{- include "magpie.waitForPostgresInit" . | nindent 8 }}
 {{- end -}}
 
 {{/*
+initContainers entry that chowns a hostPath-backed volume to distroless
+nonroot's fixed 65532:65532 before the main container starts. Every
+Deployment that mounts a writable hostPath (server-roots, local-content)
+also sets runAsNonRoot: true with no explicit runAsUser, so it inherits
+whatever UID its distroless base image runs as -- but a hostPath volume
+with type: DirectoryOrCreate is created by kubelet itself the first time
+around, root:root 0755, and hostPath is one of the volume types fsGroup
+does *not* recursively chown (that's PVC/emptyDir-only) -- so the main
+container's first write attempt EACCESs. Confirmed live: controller's
+arma_config.rs failed with "failed to create /srv/arma-servers/test/
+configs". Cheap, standard fix: a root initContainer chowns it once before
+handoff, same shape as waitForPostgresInit's own root-image-vs-nonroot-
+pod workaround.
+
+Called as: {{- include "magpie.chownHostPathInit" (dict "name" "server-roots" "path" .Values.controller.serverRootBase "root" $) | nindent 8 }}
+*/}}
+{{- define "magpie.chownHostPathInit" -}}
+- name: chown-{{ .name }}
+  image: {{ .root.Values.postgres.image }}
+  securityContext:
+    runAsUser: 0
+  command: ["chown", "65532:65532", {{ .path | quote }}]
+  volumeMounts:
+    - name: {{ .name }}
+      mountPath: {{ .path }}
+{{- end -}}
+
+{{/*
 JWKS URL -- defaults to this chart's own services/identity, since that's
 the issuer this chart actually deploys; only overridden if jwt.jwksUrl is
 explicitly set to point at something else.

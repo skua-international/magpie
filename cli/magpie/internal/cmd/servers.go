@@ -49,10 +49,8 @@ func serversListCmd() *cobra.Command {
 
 func serversCreateCmd() *cobra.Command {
 	var (
-		port          uint32
-		modSourceIDs  []string
-		armaConfig    string
-		networkConfig string
+		port         uint32
+		modSourceIDs []string
 	)
 	c := &cobra.Command{
 		Use:   "create <name>",
@@ -64,11 +62,9 @@ func serversCreateCmd() *cobra.Command {
 				return err
 			}
 			info, err := actions.CreateServer(cc.Context(), cl, actions.CreateServerParams{
-				Name:          args[0],
-				Port:          port,
-				ModSourceIDs:  modSourceIDs,
-				ArmaConfig:    armaConfig,
-				NetworkConfig: networkConfig,
+				Name:         args[0],
+				Port:         port,
+				ModSourceIDs: modSourceIDs,
 			})
 			if err != nil {
 				return err
@@ -79,8 +75,6 @@ func serversCreateCmd() *cobra.Command {
 	}
 	c.Flags().Uint32Var(&port, "port", 2302, "base game port (Arma binds a 5-port range starting here)")
 	c.Flags().StringSliceVar(&modSourceIDs, "mod-source", nil, "mod source ID (repeatable)")
-	c.Flags().StringVar(&armaConfig, "arma-config", "", "config filename for -config= (default main.cfg)")
-	c.Flags().StringVar(&networkConfig, "network-config", "", "config filename for -cfg= (default basic.cfg)")
 	return c
 }
 

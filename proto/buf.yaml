@@ -11,5 +11,13 @@ breaking:
   # flagging against every future release tag that still has it in
   # history. Ignored in both directions, so it also doesn't error if a
   # tag before the removal is ever diffed against.
+  #
+  # controller/v1: CreateServerRequest/ServerInfo's arma_config/
+  # network_config fields removed -- they only ever let a caller pick a
+  # filename under configs/, but arma_config.rs (the controller's own
+  # renderer) always writes exactly main.cfg/basic.cfg regardless, so a
+  # non-default filename silently pointed the launcher at a file that was
+  # never actually written. Fields are `reserved`, not reused.
   ignore:
     - volume
+    - controller
