@@ -128,7 +128,20 @@ func ensureLoopDeviceUdevRule(ctx context.Context, group string) error {
 	if err := run(ctx, "sudo", "udevadm", "control", "--reload-rules"); err != nil {
 		return err
 	}
-	return run(ctx, "sudo", "udevadm", "trigger", "--subsystem-match=block")
+	// /dev/loop-control is a "misc"-subsystem device (created by the loop
+	// kernel module), not "block" -- the loopN device nodes themselves
+	// are "block", but loop-control isn't one of them. A block-only
+	// trigger silently never re-applies this rule's GROUP/MODE to
+	// loop-control, leaving it at its original (root-only) permissions,
+	// which then makes `losetup -f` itself fail with "Operation not
+	// permitted" -- confirmed live: losetup needs to open loop-control to
+	// allocate a free loop device before it ever touches a specific
+	// /dev/loopN. Both subsystems need triggering for the rule to
+	// actually take effect on every device it names.
+	if err := run(ctx, "sudo", "udevadm", "trigger", "--subsystem-match=block"); err != nil {
+		return err
+	}
+	return run(ctx, "sudo", "udevadm", "trigger", "--subsystem-match=misc")
 }
 
 func ensureOwnedDir(ctx context.Context, dir, user, group string) error {
