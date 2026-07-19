@@ -110,6 +110,18 @@ Called as: {{- include "magpie.waitForPostgresInit" . | nindent 8 }}
 {{- define "magpie.waitForPostgresInit" -}}
 - name: wait-for-postgres
   image: {{ .Values.postgres.image }}
+  # The postgres image runs as root by default (its own entrypoint drops
+  # to the "postgres" user itself, but overriding command/args the way
+  # this initContainer does bypasses that entirely) -- every Deployment
+  # this attaches to sets runAsNonRoot: true at the pod level, which
+  # rejects a container with no explicit non-root UID of its own,
+  # confirmed live ("container has runAsNonRoot and image will run as
+  # root"). pg_isready needs no particular UID, so nobody (65534) is a
+  # safe, image-independent choice rather than guessing this image's own
+  # built-in postgres UID.
+  securityContext:
+    runAsUser: 65534
+    runAsNonRoot: true
   command:
     - sh
     - -c
