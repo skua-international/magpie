@@ -320,9 +320,26 @@ func Run(ctx context.Context, opts Options) error {
 		helmArgs = append(helmArgs, "--set", "image.tag="+opts.ImageTag)
 	}
 
-	fmt.Println("==> Applying CRDs")
-	if err := run(ctx, "kubectl", "apply", "-f", filepath.Join(chartDir, "crds")); err != nil {
-		return err
+	// Only for upgrades of an existing release -- `helm install` (what
+	// --install triggers when there's no prior release) already installs
+	// crds/ itself, automatically, as part of a first install. Doing
+	// this unconditionally used to also run it before a first install,
+	// which then made helm's own CRD install fail outright: confirmed
+	// live against a genuinely fresh cluster, "conflict occurred while
+	// applying object .../armaservers.arma.skua.io: Apply failed with 1
+	// conflict: conflict with 'kubectl-client-side-apply'" -- two
+	// different apply mechanisms (kubectl's own field manager vs. helm's
+	// internal one) fighting over the same object. This manual step only
+	// exists at all because of Helm's own documented limitation the
+	// other direction: `helm upgrade` on an *existing* release never
+	// touches crds/ again after the first install, so without this,
+	// upgrading an existing release would silently never pick up CRD
+	// schema changes.
+	if !opts.Install {
+		fmt.Println("==> Applying CRDs")
+		if err := run(ctx, "kubectl", "apply", "-f", filepath.Join(chartDir, "crds")); err != nil {
+			return err
+		}
 	}
 
 	verb := "upgrade"

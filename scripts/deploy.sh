@@ -258,9 +258,18 @@ fi
 # touches it even if the chart's CRDs changed (a deliberate Helm safety
 # choice, not a bug: https://helm.sh/docs/chart_best_practices/custom_resource_definitions/).
 # Applying explicitly keeps CRDs (e.g. new ModSource printer columns/
-# fields) in sync on every deploy, not just the very first install.
-echo "==> Applying CRDs"
-kubectl apply -f "$CHART_DIR/crds/" ${KUBECTL_DRY_RUN:+"$KUBECTL_DRY_RUN"}
+# fields) in sync on every deploy of an *existing* release. Only for
+# upgrades, deliberately -- `helm install` (what --install triggers when
+# there's no prior release) already installs crds/ itself, automatically,
+# as part of a first install; doing this unconditionally used to also run
+# it before a first install too, which then made helm's own CRD install
+# fail outright (two different apply mechanisms -- kubectl's own field
+# manager vs. helm's internal one -- fighting over the same object,
+# confirmed live against magpiectl's own Go port of this same logic).
+if [[ -z "$INSTALL" ]]; then
+  echo "==> Applying CRDs"
+  kubectl apply -f "$CHART_DIR/crds/" ${KUBECTL_DRY_RUN:+"$KUBECTL_DRY_RUN"}
+fi
 
 VERB="upgrade"
 [[ -n "$INSTALL" ]] && VERB="upgrade --install"
