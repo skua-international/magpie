@@ -63,7 +63,7 @@ jobs:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # semantic-release walks commit history back to the last tag;
           # buf breaking (below) diffs against the last release tag.
@@ -112,7 +112,7 @@ jobs:
       # forever to whatever was first cached.
       - name: Cache Go proto plugins
         id: cache-go-plugins
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/go/bin
           key: protoc-plugins-go-${{ runner.os }}-${{ steps.week.outputs.week }}
@@ -131,7 +131,7 @@ jobs:
 
       - name: Cache TypeScript proto plugin
         id: cache-ts-plugin
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: /tmp/ts-plugin
           key: protoc-plugins-ts-${{ runner.os }}-${{ steps.week.outputs.week }}

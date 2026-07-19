@@ -55,7 +55,7 @@ jobs:
     container:
       image: rust:bookworm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # crates/protocol's build.rs shells out to a real protoc binary (via
       # connectrpc-build) at `cargo build` time for every workspace member.
@@ -74,7 +74,7 @@ jobs:
             cp "target/release/${bin}" "dist/${bin}"
           done
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: magpie-binaries
           path: dist/
@@ -107,11 +107,11 @@ jobs:
           - name: volume-manager
             dockerfile: services/volume-manager/Dockerfile
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-tags: true
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: magpie-binaries
           path: dist/
@@ -145,7 +145,7 @@ jobs:
       # any more -- these Dockerfiles are just COPY + a handful of apt
       # packages now, cheap enough that caching isn't worth the
       # complexity it kept causing.
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           file: ${{ matrix.service.dockerfile }}
