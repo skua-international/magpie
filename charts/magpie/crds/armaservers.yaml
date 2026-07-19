@@ -40,6 +40,14 @@ spec:
                 items:
                   type: string
                 type: array
+              config_map:
+                description: |-
+                  Name of an operator-created ConfigMap (same namespace) providing
+                  per-server overrides on top of the cluster's baseline Arma config
+                  (see `services/controller/src/arma_config.rs`). Unset means
+                  "baseline only".
+                nullable: true
+                type: string
               desired_state:
                 default: Running
                 description: |-

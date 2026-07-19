@@ -54,6 +54,12 @@ pub struct ArmaServerSpec {
     /// `-cfg=` -- the network performance config.
     #[serde(default = "default_network_config")]
     pub network_config: String,
+    /// Name of an operator-created ConfigMap (same namespace) providing
+    /// per-server overrides on top of the cluster's baseline Arma config
+    /// (see `services/controller/src/arma_config.rs`). Unset means
+    /// "baseline only".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config_map: Option<String>,
 }
 
 pub fn default_arma_config() -> String {

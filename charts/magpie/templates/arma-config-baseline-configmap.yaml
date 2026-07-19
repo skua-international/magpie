@@ -1,0 +1,51 @@
+# Cluster-wide baseline Arma config -- see values.yaml's armaConfig
+# block and services/controller/src/arma_config.rs, which merges this
+# with a given ArmaServer's own spec.configMap (per-server overrides,
+# same key names) and renders main.cfg/basic.cfg from the result.
+#
+# ConfigMap data is flat string->string: every value below goes through
+# `| toString`/`| join ","` as needed. hostname is the one field left
+# out entirely when unset (rather than emitted as an empty string) --
+# arma_config.rs's own default for an *absent* hostname key is the
+# computed "prefix + server_name + suffix" template, which only
+# ever applies when the key is missing, not when it's present-but-empty.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "magpie.fullname" . }}-arma-config-baseline
+  namespace: {{ include "magpie.namespace" . }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+data:
+  {{- if .Values.armaConfig.main.hostname }}
+  hostname: {{ .Values.armaConfig.main.hostname | quote }}
+  {{- end }}
+  prefix: {{ .Values.armaConfig.main.prefix | quote }}
+  suffix: {{ .Values.armaConfig.main.suffix | quote }}
+  max_players: {{ .Values.armaConfig.main.maxPlayers | toString | quote }}
+  force_difficulty: {{ .Values.armaConfig.main.forceDifficulty | toString | quote }}
+  forced_difficulty: {{ .Values.armaConfig.main.forcedDifficulty | quote }}
+  missions_whitelist: {{ .Values.armaConfig.main.missionsWhitelist | join "," | quote }}
+  persist_without_players: {{ .Values.armaConfig.main.persistWithoutPlayers | toString | quote }}
+  use_battleEye: {{ .Values.armaConfig.main.useBattlEye | toString | quote }}
+  verify_signatures: {{ .Values.armaConfig.main.verifySignatures | toString | quote }}
+  skip_lobby: {{ .Values.armaConfig.main.skipLobby | toString | quote }}
+  allow_zeus_composition_scripts: {{ .Values.armaConfig.main.allowZeusCompositionScripts | toString | quote }}
+  allow_custom_glasses: {{ .Values.armaConfig.main.allowCustomGlasses | toString | quote }}
+  max_ping: {{ .Values.armaConfig.main.maxPing | toString | quote }}
+  max_packet_loss: {{ .Values.armaConfig.main.maxPacketLoss | toString | quote }}
+  max_desync: {{ .Values.armaConfig.main.maxDesync | toString | quote }}
+  password_admin: {{ .Values.armaConfig.main.passwordAdmin | quote }}
+  password: {{ .Values.armaConfig.main.password | quote }}
+  server_command_password: {{ .Values.armaConfig.main.serverCommandPassword | quote }}
+  motd: {{ .Values.armaConfig.main.motd | join "," | quote }}
+  motd_interval: {{ .Values.armaConfig.main.motdInterval | toString | quote }}
+  other_properties: {{ .Values.armaConfig.main.otherProperties | quote }}
+  max_msg_send: {{ .Values.armaConfig.basic.maxMsgSend | toString | quote }}
+  max_size_guaranteed: {{ .Values.armaConfig.basic.maxSizeGuaranteed | toString | quote }}
+  max_size_nonguaranteed: {{ .Values.armaConfig.basic.maxSizeNonguaranteed | toString | quote }}
+  min_bandwidth: {{ .Values.armaConfig.basic.minBandwidth | quote }}
+  max_bandwidth: {{ .Values.armaConfig.basic.maxBandwidth | quote }}
+  min_error_to_send: {{ .Values.armaConfig.basic.minErrorToSend | toString | quote }}
+  min_error_to_send_near: {{ .Values.armaConfig.basic.minErrorToSendNear | toString | quote }}
+  basic_other_properties: {{ .Values.armaConfig.basic.otherProperties | quote }}

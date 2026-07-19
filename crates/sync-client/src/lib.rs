@@ -205,7 +205,11 @@ impl SyncClient {
     /// `refresh_token` must already be negotiated -- this process (and
     /// everything downstream of it) never handles a Steam password, see
     /// the RPC's own proto doc for the full rationale.
-    pub async fn refresh_steam_auth(&self, username: &str, refresh_token: &str) -> anyhow::Result<()> {
+    pub async fn refresh_steam_auth(
+        &self,
+        username: &str,
+        refresh_token: &str,
+    ) -> anyhow::Result<()> {
         self.inner
             .refresh_steam_auth(RefreshSteamAuthRequest {
                 username: username.to_string(),

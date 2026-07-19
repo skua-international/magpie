@@ -38,11 +38,17 @@ async fn main() -> Result<()> {
     let client = Client::try_default().await?;
     info!("connected to Kubernetes API");
 
+    // One long-lived pool for the whole process -- used once here for
+    // the app-role bootstrap, then handed to the reconciler for
+    // arma_config's ongoing scope queries (admins[]/filePatchingExceptions[]),
+    // rather than opening/dropping a pool for each purpose separately.
+    let pool = registry_db::connect(&cfg.database_url).await?;
+
     postgres_bootstrap::ensure_app_role(
         &client,
+        &pool,
         &cfg.namespace,
         AppPostgresConfig {
-            database_url: &cfg.database_url,
             role: &cfg.app_postgres_role,
             database: &cfg.app_postgres_database,
             secret_name: &cfg.app_postgres_secret_name,
@@ -50,7 +56,7 @@ async fn main() -> Result<()> {
     )
     .await?;
 
-    reconcile::spawn(client, cfg)?;
+    reconcile::spawn(client, pool, cfg)?;
 
     // The reconciler runs entirely in its own spawned task; block forever
     // rather than returning immediately.

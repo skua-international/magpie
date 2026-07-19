@@ -73,7 +73,28 @@ spec:
               value: {{ include "magpie.postgresHost" . | quote }}
             - name: APP_POSTGRES_PORT
               value: {{ .Values.postgres.port | quote }}
+            - name: ARMA_CONFIG_BASELINE_CONFIGMAP
+              value: {{ printf "%s-arma-config-baseline" (include "magpie.fullname" .) | quote }}
+            - name: USER_SECRETS_NAMESPACE
+              value: {{ .Values.userSecretsNamespace | quote }}
           {{- with .Values.controller.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          volumeMounts:
+            # arma_config.rs writes main.cfg/basic.cfg directly onto this
+            # tree -- mounted at the *same* path the host uses (rather
+            # than a different container-local path, the way local-
+            # content/claims are split from their own host-path
+            # counterparts) since SERVER_ROOT_BASE above is also reused
+            # as-is to build every launcher Pod's own hostPath source
+            # (ensure_deployment); keeping both uses of the same config
+            # value mean the same thing avoids a second path-translation
+            # field for no real benefit.
+            - name: server-roots
+              mountPath: {{ .Values.controller.serverRootBase }}
+      volumes:
+        - name: server-roots
+          hostPath:
+            path: {{ .Values.controller.serverRootBase }}
+            type: DirectoryOrCreate

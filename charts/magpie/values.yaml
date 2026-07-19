@@ -41,6 +41,15 @@ launcherImage: ghcr.io/skua-international/magpie/launcher:latest
 # just what's in the invoking namespace.
 namespace: magpie
 
+# Dedicated namespace for Secrets an operator wants referenceable from
+# Arma config ConfigMaps via {{secret:<name>/<key>}} -- see the "Arma
+# server config" section of README.md. Chart-created (templates/
+# user-secrets-namespace.yaml), kept separate from `namespace` above so
+# the controller's cross-namespace read access can be scoped to just
+# this namespace, not the one holding arma-postgres-creds/
+# ghcr-pull-secret/etc.
+userSecretsNamespace: magpie-user-secrets
+
 # services/server-api, services/identity, and services/registry are
 # ClusterIP-only -- reached from outside the cluster via the Ingress
 # resources this chart also creates (see ingress.* below), fronted by
@@ -292,6 +301,52 @@ volumeManager:
   # disk.
   growGraceGiB: 10
   resources: {}
+
+# Cluster-wide baseline Arma server config -- every ArmaServer's own
+# main.cfg/basic.cfg starts here (rendered into templates/arma-config-
+# baseline-configmap.yaml); a server's own spec.configMap, if set, layers
+# per-server overrides on top, key-by-key. See services/controller/src/
+# arma_config.rs and README's "Arma server config" section for the full
+# placeholder/{{secret:...}}/env.* mechanism this feeds.
+armaConfig:
+  main:
+    # Empty means "use the computed default": "{{prefix}}{{server_name}}{{suffix}}".
+    hostname: ""
+    prefix: ""
+    suffix: "Powered by MAGPIE"
+    maxPlayers: 64
+    forceDifficulty: false
+    forcedDifficulty: veteran
+    missionsWhitelist: []
+    persistWithoutPlayers: false
+    useBattlEye: false
+    verifySignatures: true
+    skipLobby: false
+    allowZeusCompositionScripts: true
+    allowCustomGlasses: false
+    maxPing: 300
+    # Unset (not 0) by default -- omitted from the rendered main.cfg entirely.
+    maxPacketLoss: ""
+    maxDesync: ""
+    passwordAdmin: ""
+    password: ""
+    serverCommandPassword: ""
+    motd: []
+    motdInterval: ""
+    # Raw text appended verbatim at the end of main.cfg.
+    otherProperties: ""
+  # All fields here default unset (not 0), omitted entirely when unset --
+  # matches basic.cfg's own convention of only setting what you mean to.
+  basic:
+    maxMsgSend: ""
+    maxSizeGuaranteed: ""
+    maxSizeNonguaranteed: ""
+    minBandwidth: ""
+    maxBandwidth: ""
+    minErrorToSend: ""
+    minErrorToSendNear: ""
+    # Raw text appended verbatim at the end of basic.cfg.
+    otherProperties: ""
 
 rbac:
   create: true

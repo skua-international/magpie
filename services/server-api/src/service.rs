@@ -185,6 +185,10 @@ impl protocol::proto::controller::v1::ServerService for ServerServiceImpl {
                 .network_config
                 .map(|s| s.to_string())
                 .unwrap_or_else(crd::default_network_config),
+            // Not yet exposed on CreateServer's own request -- set later
+            // via `kubectl edit`/`kubectl patch` on the ArmaServer object
+            // directly if a per-server config override is needed.
+            config_map: None,
         };
         let name = request.name.to_string();
 

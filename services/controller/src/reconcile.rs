@@ -54,14 +54,16 @@ struct Ctx {
     client: Client,
     cfg: Arc<Config>,
     sync_client: SyncClient,
+    pool: sqlx::PgPool,
 }
 
-pub fn spawn(client: Client, cfg: Arc<Config>) -> anyhow::Result<()> {
+pub fn spawn(client: Client, pool: sqlx::PgPool, cfg: Arc<Config>) -> anyhow::Result<()> {
     let sync_client = SyncClient::new(&cfg.sync_daemon_url)?;
     let ctx = Arc::new(Ctx {
         client: client.clone(),
         cfg,
         sync_client,
+        pool,
     });
     let api: Api<ArmaServer> = Api::namespaced(client, &ctx.cfg.namespace);
 
@@ -170,7 +172,17 @@ async fn apply(obj: &ArmaServer, ctx: &Ctx) -> anyhow::Result<Action> {
                 }
                 ClaimStatus::Done { claim_path } => {
                     let mod_paths = resolve_mod_paths(ctx, obj).await?;
-                    ensure_deployment(ctx, obj, &claim_path, &mod_paths).await?;
+                    let extra_env = crate::arma_config::render_and_write(
+                        &ctx.client,
+                        &ctx.pool,
+                        &ctx.cfg.namespace,
+                        &ctx.cfg.user_secrets_namespace,
+                        &ctx.cfg.server_root_base,
+                        &ctx.cfg.arma_config_baseline,
+                        obj,
+                    )
+                    .await?;
+                    ensure_deployment(ctx, obj, &claim_path, &mod_paths, extra_env).await?;
                     set_status(
                         ctx,
                         &name,
@@ -268,6 +280,7 @@ async fn ensure_deployment(
     obj: &ArmaServer,
     claim_path: &str,
     mod_paths: &[String],
+    extra_env: Vec<(String, String)>,
 ) -> anyhow::Result<()> {
     let name = obj.name_any();
     let deployments: Api<Deployment> = Api::namespaced(ctx.client.clone(), &ctx.cfg.namespace);
@@ -344,6 +357,17 @@ async fn ensure_deployment(
         env.push(EnvVar {
             name: "ARMA_PARAMS".into(),
             value: Some(obj.spec.params.join(" ")),
+            ..Default::default()
+        });
+    }
+    // From the merged arma-config ConfigMap's own `env.*` keys -- see
+    // arma_config::extract_env_vars. Appended last so an operator can
+    // override any of the fixed vars above via the same ConfigMap
+    // mechanism if they genuinely need to (e.g. re-pointing MODS).
+    for (key, value) in extra_env {
+        env.push(EnvVar {
+            name: key,
+            value: Some(value),
             ..Default::default()
         });
     }

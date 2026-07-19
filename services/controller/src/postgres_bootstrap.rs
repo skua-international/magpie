@@ -32,29 +32,24 @@
 use k8s_openapi::api::core::v1::Secret;
 use kube::Client;
 use kube::api::Api;
+use sqlx::PgPool;
 
 pub struct AppPostgresConfig<'a> {
-    pub database_url: &'a str,
     pub role: &'a str,
     pub database: &'a str,
     pub secret_name: &'a str,
 }
 
-/// No-op if `database_url` is unset (e.g. postgres support disabled
-/// entirely for this deployment) -- logs a warning rather than failing
-/// startup, since launcher Pods that actually need this role will simply
-/// fail their own DATABASE_PASSWORD secretKeyRef lookup downstream,
-/// which is a clearer signal than a controller crash loop.
+/// Takes an already-connected `pool` (main.rs creates one long-lived
+/// pool for the whole process -- reused afterward by arma_config's own
+/// scope queries, not dropped after this one-time bootstrap) rather than
+/// connecting itself.
 pub async fn ensure_app_role(
     client: &Client,
+    pool: &PgPool,
     namespace: &str,
     cfg: AppPostgresConfig<'_>,
 ) -> anyhow::Result<()> {
-    if cfg.database_url.is_empty() {
-        tracing::warn!("DATABASE_URL not set -- skipping app Postgres role provisioning");
-        return Ok(());
-    }
-
     let api: Api<Secret> = Api::namespaced(client.clone(), namespace);
     let secret = api.get(cfg.secret_name).await?;
     let password = secret
@@ -64,8 +59,6 @@ pub async fn ensure_app_role(
         .map(|b| String::from_utf8(b.0.clone()))
         .ok_or_else(|| anyhow::anyhow!("{} has no POSTGRES_PASSWORD key", cfg.secret_name))??;
 
-    let pool = registry_db::connect(cfg.database_url).await?;
-
     // Checked from Rust, not a server-side DO-block IF, specifically so
     // GRANT/REVOKE (not valid PL/pgSQL inside a DO block without dynamic
     // EXECUTE) can just be plain top-level statements -- and so the
@@ -74,7 +67,7 @@ pub async fn ensure_app_role(
     let (exists,): (bool,) =
         sqlx::query_as("SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname = $1)")
             .bind(cfg.role)
-            .fetch_one(&pool)
+            .fetch_one(pool)
             .await?;
     if exists {
         tracing::info!(
@@ -99,7 +92,7 @@ pub async fn ensure_app_role(
         password = password,
         database = cfg.database,
     );
-    sqlx::raw_sql(&sql).execute(&pool).await?;
+    sqlx::raw_sql(&sql).execute(pool).await?;
 
     tracing::info!(
         role = cfg.role,

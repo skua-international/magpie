@@ -61,6 +61,21 @@ pub struct Config {
     /// `DATABASE_HOST`/`DATABASE_PORT` env vars.
     pub app_postgres_host: String,
     pub app_postgres_port: String,
+    /// Chart-managed ConfigMap holding the cluster-wide baseline Arma
+    /// config every server's main.cfg/basic.cfg starts from -- see
+    /// arma_config.rs. A given `ArmaServer`'s own `spec.config_map`, if
+    /// set, layers per-server overrides on top of this.
+    pub arma_config_baseline: String,
+    /// Namespace `{{secret:<name>/<key>}}` references (arma_config.rs)
+    /// resolve against -- deliberately *not* this reconciler's own
+    /// namespace, which also holds arma-postgres-creds/ghcr-pull-secret/
+    /// etc. An operator-controlled ConfigMap value naming a Secret to
+    /// read is effectively an exfiltration primitive if it can reach any
+    /// secret in the platform's own namespace; scoping it to a separate,
+    /// dedicated namespace (chart-created, see user-secrets-namespace.yaml)
+    /// means the worst a malicious/mistaken ConfigMap value can do is
+    /// read a secret an operator deliberately put there for this purpose.
+    pub user_secrets_namespace: String,
 }
 
 impl Config {
@@ -98,6 +113,10 @@ impl Config {
                 .unwrap_or_else(|_| "arma".into()),
             app_postgres_host: env::var("APP_POSTGRES_HOST").unwrap_or_default(),
             app_postgres_port: env::var("APP_POSTGRES_PORT").unwrap_or_else(|_| "5432".into()),
+            arma_config_baseline: env::var("ARMA_CONFIG_BASELINE_CONFIGMAP")
+                .unwrap_or_else(|_| "arma-config-baseline".into()),
+            user_secrets_namespace: env::var("USER_SECRETS_NAMESPACE")
+                .unwrap_or_else(|_| "magpie-user-secrets".into()),
         })
     }
 }

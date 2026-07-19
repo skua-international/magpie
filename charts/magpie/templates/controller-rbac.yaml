@@ -44,6 +44,16 @@ rules:
     resources: ["secrets"]
     resourceNames: [{{ .Values.postgres.appSecretName | quote }}]
     verbs: ["get"]
+  # ConfigMaps holding Arma server config (see arma_config.rs) --
+  # unrestricted by resourceNames unlike the Secret above, since
+  # per-server override ConfigMap names are operator-chosen and
+  # unpredictable. Read-only, and ConfigMaps here hold no secrets
+  # themselves (only secret: *references*, resolved against the
+  # separate user-secrets namespace below) -- an acceptable, low-
+  # sensitivity boundary to leave unscoped.
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -56,6 +66,42 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: {{ include "magpie.fullname" . }}-controller
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "magpie.fullname" . }}-controller
+    namespace: {{ include "magpie.namespace" . }}
+---
+# Cross-namespace: secret: references in Arma config
+# ConfigMaps (arma_config.rs) resolve against this dedicated namespace,
+# not the controller's own -- see user-secrets-namespace.yaml's doc.
+# Bound to the same ServiceAccount, just via a Role/RoleBinding pair
+# that live in the *target* namespace instead (RoleBindings can
+# reference a ServiceAccount from any namespace; only the Role/
+# RoleBinding objects themselves have to live where the permission
+# applies).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "magpie.fullname" . }}-user-secrets-reader
+  namespace: {{ .Values.userSecretsNamespace }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "magpie.fullname" . }}-user-secrets-reader
+  namespace: {{ .Values.userSecretsNamespace }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "magpie.fullname" . }}-user-secrets-reader
 subjects:
   - kind: ServiceAccount
     name: {{ include "magpie.fullname" . }}-controller

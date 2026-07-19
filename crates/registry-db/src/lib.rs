@@ -158,6 +158,27 @@ pub async fn scopes_for_subject(pool: &PgPool, subject: &str) -> sqlx::Result<Ve
     Ok(row.map(|(scopes,)| scopes).unwrap_or_default())
 }
 
+/// SteamID64s (linked_accounts.provider_user_id, provider = "steam") of
+/// every identity holding `scope` (or the coarse "*" grant) -- used by
+/// services/controller's arma_config to populate main.cfg's admins[]/
+/// filePatchingExceptions[] from real grants rather than a hand-maintained
+/// list. `acl_grants.subject` and `linked_accounts.user_id` are the same
+/// underlying user, just stored as text vs. uuid respectively (subject is
+/// a JWT `sub` claim value, always a stringified user id here) -- joined
+/// via a cast rather than changing either column's type.
+pub async fn steam_ids_with_scope(pool: &PgPool, scope: &str) -> sqlx::Result<Vec<String>> {
+    sqlx::query_scalar(
+        "SELECT la.provider_user_id
+         FROM acl_grants g
+         JOIN linked_accounts la ON la.user_id::text = g.subject
+         WHERE la.provider = 'steam'
+           AND ($1 = ANY(g.scopes) OR '*' = ANY(g.scopes))",
+    )
+    .bind(scope)
+    .fetch_all(pool)
+    .await
+}
+
 pub async fn grant_scopes(pool: &PgPool, subject: &str, scopes: &[String]) -> sqlx::Result<()> {
     sqlx::query(
         "INSERT INTO acl_grants (subject, scopes) VALUES ($1, $2)
