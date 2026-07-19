@@ -22,10 +22,15 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["persistentvolumes"]
-    verbs: ["get", "list", "watch", "create", "delete"]
+    # patch/update are both needed -- confirmed live: without patch,
+    # external-provisioner successfully creates the PV (Provisioning
+    # succeeded) but then fails forever trying to add the
+    # kubernetes.io/pv-protection finalizer to it ("cannot patch
+    # resource \"persistentvolumes\"").
+    verbs: ["get", "list", "watch", "create", "delete", "patch", "update"]
   - apiGroups: [""]
     resources: ["persistentvolumeclaims"]
-    verbs: ["get", "list", "watch", "update"]
+    verbs: ["get", "list", "watch", "update", "patch"]
   - apiGroups: ["storage.k8s.io"]
     resources: ["storageclasses"]
     verbs: ["get", "list", "watch"]
