@@ -30,7 +30,7 @@ jobs:
       # that need to *create* tags/pushes that re-trigger other workflows).
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           fetch-tags: true
