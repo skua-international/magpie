@@ -19,8 +19,13 @@ on:
   workflow_dispatch: {}
 
 jobs:
+  pick-runner:
+    uses: ./.github/workflows/pick-runner.yml
+    secrets: inherit
+
   generate:
-    runs-on: ubuntu-latest
+    needs: pick-runner
+    runs-on: ${{ fromJSON(needs.pick-runner.outputs.labels) }}
     permissions:
       contents: write
     steps:

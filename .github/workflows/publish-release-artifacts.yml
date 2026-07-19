@@ -17,8 +17,13 @@ env:
   IMAGE_BASE: ghcr.io/skua-international/magpie
 
 jobs:
+  pick-runner:
+    uses: ./.github/workflows/pick-runner.yml
+    secrets: inherit
+
   retag-images:
-    runs-on: ubuntu-latest
+    needs: pick-runner
+    runs-on: ${{ fromJSON(needs.pick-runner.outputs.labels) }}
     permissions:
       contents: read
       packages: write
@@ -59,7 +64,8 @@ jobs:
           done
 
   publish-chart:
-    runs-on: ubuntu-latest
+    needs: pick-runner
+    runs-on: ${{ fromJSON(needs.pick-runner.outputs.labels) }}
     permissions:
       contents: read
       packages: write
