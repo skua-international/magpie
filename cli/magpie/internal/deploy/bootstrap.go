@@ -52,10 +52,22 @@ func BootstrapK3s(ctx context.Context, dataDir string) error {
 		// at a much larger, purpose-provisioned disk. k3sDataDir keeps
 		// k3s's own storage on that same disk, not a separate concern
 		// from where magpie's own content/claims/blob already live.
+		//
+		// --data-dir alone isn't enough, confirmed live: kubelet has its
+		// own separate default root (/var/lib/kubelet) that --data-dir
+		// doesn't touch at all -- pod logs and the emptyDir/ephemeral-
+		// storage kubelet tracks for eviction decisions still landed on
+		// the OS disk, and once *that* filled up kubelet's eviction
+		// manager started trying (and failing, since they're all
+		// critical/static pods) to evict everything to reclaim space.
+		// --kubelet-arg=root-dir relocates that too, onto the same disk.
 		k3sDataDir := filepath.Join(dataDir, "k3s")
-		fmt.Printf("==> Installing k3s (data-dir: %s)...\n", k3sDataDir)
+		kubeletDir := filepath.Join(dataDir, "kubelet")
+		fmt.Printf("==> Installing k3s (data-dir: %s, kubelet root-dir: %s)...\n", k3sDataDir, kubeletDir)
 		cmd := exec.CommandContext(ctx, "sh", "-c", "curl -sfL https://get.k3s.io | sh -")
-		cmd.Env = append(os.Environ(), "INSTALL_K3S_EXEC=server --data-dir="+k3sDataDir)
+		cmd.Env = append(os.Environ(),
+			"INSTALL_K3S_EXEC=server --data-dir="+k3sDataDir+" --kubelet-arg=root-dir="+kubeletDir,
+		)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		cmd.Stdin = os.Stdin
