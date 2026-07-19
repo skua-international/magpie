@@ -92,6 +92,35 @@ appSecretName and postgres_bootstrap.rs). Called as:
 {{- end -}}
 
 {{/*
+initContainers entry that blocks until Postgres actually accepts
+connections, via pg_isready -- reuses postgres.image (already pulled for
+the chart-managed StatefulSet, or a reasonable image to pull anyway for
+an external one) rather than adding a new image dependency just for
+this. Exists because of a real, confirmed-live startup race: services
+using magpie.postgresEnv start immediately and try to resolve Postgres'
+*headless* Service by DNS, which returns no records at all until at
+least one backing pod is Ready -- not just scheduled -- so a service
+starting before Postgres finishes its own startup crashes on DNS
+resolution, not just connection refused. Kubernetes' own CrashLoopBackoff
+does recover this eventually, but this avoids the churn (and the
+confusing DNS-lookup-failure error, which doesn't obviously point at
+"Postgres isn't ready yet" the way a connection-refused would) entirely.
+Called as: {{- include "magpie.waitForPostgresInit" . | nindent 8 }}
+*/}}
+{{- define "magpie.waitForPostgresInit" -}}
+- name: wait-for-postgres
+  image: {{ .Values.postgres.image }}
+  command:
+    - sh
+    - -c
+    - |
+      until pg_isready -h {{ include "magpie.postgresHost" . }} -p {{ .Values.postgres.port }}; do
+        echo "waiting for postgres..."
+        sleep 2
+      done
+{{- end -}}
+
+{{/*
 JWKS URL -- defaults to this chart's own services/identity, since that's
 the issuer this chart actually deploys; only overridden if jwt.jwksUrl is
 explicitly set to point at something else.

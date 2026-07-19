@@ -23,6 +23,8 @@ spec:
       serviceAccountName: {{ include "magpie.fullname" . }}-registry
       securityContext:
         runAsNonRoot: true
+      initContainers:
+        {{- include "magpie.waitForPostgresInit" . | nindent 8 }}
       containers:
         - name: registry
           image: {{ include "magpie.image" (dict "root" $ "override" .Values.registry.image) }}

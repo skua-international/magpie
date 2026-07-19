@@ -149,7 +149,7 @@ postgres:
   # every other component. Set enabled: false and fill in externalUrl to
   # point at a Postgres you already run instead.
   enabled: true
-  image: postgres:16-alpine
+  image: postgres:18-alpine
   port: 56275
   database: arma
   user: arma
