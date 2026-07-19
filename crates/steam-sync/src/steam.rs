@@ -1697,6 +1697,7 @@ async fn dir_size(dir: &std::path::Path) -> Result<u64> {
 /// ships (lowercased -- runs after `lowercase_synced_tree`), whose
 /// executable bit needs setting explicitly. See the caller's comment for
 /// why this can't just rely on the manifest's own executable flag.
+#[cfg_attr(not(unix), allow(dead_code))] // only read inside fix_executable_bits_blocking's #[cfg(unix)] variant
 const KNOWN_SERVER_BINARIES: &[&str] = &["arma3server", "arma3server_x64"];
 
 async fn fix_executable_bits(dir: &std::path::Path) -> Result<()> {
@@ -1706,6 +1707,7 @@ async fn fix_executable_bits(dir: &std::path::Path) -> Result<()> {
         .context("chmod task panicked")?
 }
 
+#[cfg(unix)]
 fn fix_executable_bits_blocking(dir: &std::path::Path) -> Result<()> {
     use std::os::unix::fs::PermissionsExt;
 
@@ -1723,6 +1725,15 @@ fn fix_executable_bits_blocking(dir: &std::path::Path) -> Result<()> {
         std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755))
             .with_context(|| format!("failed to chmod +x {}", path.display()))?;
     }
+    Ok(())
+}
+
+// Windows has no executable-bit concept to fix -- KNOWN_SERVER_BINARIES
+// are Linux server binaries in the first place (see its own doc), so
+// this genuinely never has anything to do there, not just "doesn't
+// bother."
+#[cfg(not(unix))]
+fn fix_executable_bits_blocking(_dir: &std::path::Path) -> Result<()> {
     Ok(())
 }
 
