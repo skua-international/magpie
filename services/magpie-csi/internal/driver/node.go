@@ -132,7 +132,17 @@ func (d *Driver) NodeGetInfo(context.Context, *csi.NodeGetInfoRequest) (*csi.Nod
 }
 
 func isMounted(ctx context.Context, path string) (bool, error) {
-	cmd := exec.CommandContext(ctx, "findmnt", "--noheadings", "--target", path)
+	// --mountpoint, not --target: see blob.Manager.isMounted's own
+	// comment -- the staging/publish paths are os.MkdirAll'd (onto the
+	// host's own filesystem) before this check runs, so --target's
+	// walk-up-to-nearest-filesystem behavior made every staging/publish
+	// directory look "already mounted" on the very first call, and the
+	// actual bind mount from the btrfs blob never ran. Confirmed live:
+	// sync-daemon's /content ended up as a plain directory on the
+	// node's root xfs filesystem instead of the loop-mounted btrfs
+	// blob, and `btrfs subvolume snapshot` failed with "Not a Btrfs
+	// filesystem" as a result.
+	cmd := exec.CommandContext(ctx, "findmnt", "--noheadings", "--mountpoint", path)
 	return cmd.Run() == nil, nil
 }
 

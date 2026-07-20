@@ -114,7 +114,13 @@ func (m *Manager) IsReady(ctx context.Context) bool {
 }
 
 func (m *Manager) isMounted(ctx context.Context) (bool, error) {
-	cmd := exec.CommandContext(ctx, "findmnt", "--noheadings", "--target", m.mountPath)
+	// --mountpoint, not --target: --target walks up to the nearest
+	// containing filesystem and succeeds for *any* ordinary directory
+	// (confirmed live -- a plain, never-mounted directory happily
+	// "matches" its host filesystem), so it can never actually report
+	// "not mounted". --mountpoint only matches when the path itself is
+	// a real mount point.
+	cmd := exec.CommandContext(ctx, "findmnt", "--noheadings", "--mountpoint", m.mountPath)
 	return cmd.Run() == nil, nil
 }
 
