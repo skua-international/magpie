@@ -42,6 +42,13 @@ use crate::config::Config;
 const FINALIZER_NAME: &str = "arma.skua.io/cleanup";
 const FAST_REQUEUE: Duration = Duration::from_secs(5);
 const SLOW_REQUEUE: Duration = Duration::from_secs(300);
+// Separate from SLOW_REQUEUE deliberately: that one's the steady-state poll
+// interval for objects with nothing to do (Running, permanently Failed).
+// This one backs off a genuine reconcile error (e.g. sync-daemon briefly
+// unreachable mid-restart) -- reusing SLOW_REQUEUE here meant any transient
+// blip while still Pending parked the object for 5 minutes before the
+// controller looked at it again.
+const ERROR_REQUEUE: Duration = Duration::from_secs(10);
 
 /// `kube-runtime`'s `finalizer`/`Controller::run` both require their error
 /// type to implement `std::error::Error`, which `anyhow::Error` deliberately
@@ -96,7 +103,7 @@ async fn reconcile(obj: Arc<ArmaServer>, ctx: Arc<Ctx>) -> Result<Action, Finali
 
 fn error_policy(_obj: Arc<ArmaServer>, err: &FinalizerError, _ctx: Arc<Ctx>) -> Action {
     error!("reconcile failed: {err}");
-    Action::requeue(SLOW_REQUEUE)
+    Action::requeue(ERROR_REQUEUE)
 }
 
 async fn apply(obj: &ArmaServer, ctx: &Ctx) -> anyhow::Result<Action> {
