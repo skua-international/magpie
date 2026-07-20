@@ -5,12 +5,14 @@
 FROM debian:trixie-slim
 
 # Needs a real userland, not distroless: steam_sync::claim shells out to
-# `cp --reflink=always` (see crates/steam-sync/src/claim.rs) rather than
-# binding the platform-specific FICLONE ioctl directly. `cp` (coreutils) is
-# already part of debian-slim's base install -- nothing extra needed here.
+# `btrfs subvolume snapshot`/`delete` (see crates/steam-sync/src/claim.rs)
+# rather than binding the ioctls directly, so the `btrfs` CLI (btrfs-progs)
+# has to actually be present in the image -- it isn't part of any Debian
+# base install.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends --no-install-suggests \
         ca-certificates \
+        btrfs-progs \
     && rm -rf /var/lib/apt/lists/*
 
 ENV CONTENT_ROOT=/content
