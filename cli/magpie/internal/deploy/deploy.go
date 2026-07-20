@@ -248,7 +248,21 @@ func Run(ctx context.Context, opts Options) error {
 	}
 	chartDir := filepath.Join(tmpDir, "magpie")
 
-	helmArgs := []string{"--namespace", opts.Namespace, "--timeout", opts.Timeout}
+	// --force-conflicts: Helm defaults --server-side to "auto", which uses
+	// Server-Side Apply on any install with no prior release to inherit a
+	// method from (every --install, and any upgrade against a cluster
+	// Helm doesn't already have release history for). SSA refuses to
+	// reassert a field another field manager currently owns without this
+	// -- confirmed live: re-running `install --bootstrap-k3s` against a
+	// VM that still had a prior attempt's ConfigMap (edited once via
+	// `kubectl edit`, e.g. through maybePromptEditBaselineConfigMap)
+	// failed outright ("conflict with \"kubectl-edit\" ... .data.verify_
+	// signatures"). A no-op when SSA isn't actually in play, so always
+	// passing it is safe -- Helm's own chart-templated value should win
+	// on a real deploy regardless, the same as it always implicitly did
+	// before SSA (a hand-edited field is live drift, not something a
+	// redeploy should get permanently blocked by).
+	helmArgs := []string{"--namespace", opts.Namespace, "--timeout", opts.Timeout, "--force-conflicts"}
 
 	if !opts.Install {
 		helmArgs = append(helmArgs, "--wait")
@@ -385,6 +399,7 @@ func Run(ctx context.Context, opts Options) error {
 			"--namespace", opts.Namespace,
 			"--reuse-values",
 			"--wait", "--timeout", opts.Timeout,
+			"--force-conflicts",
 		}
 		secondArgs = append(secondArgs, secretArgs...)
 		fmt.Printf("==> helm upgrade %s -> %s (secrets applied)\n", opts.Release, version)
