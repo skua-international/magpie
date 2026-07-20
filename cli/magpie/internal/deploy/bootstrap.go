@@ -125,6 +125,10 @@ func BootstrapK3s(ctx context.Context, dataDir string) (string, error) {
 	}
 	fmt.Println("==> Node is Ready")
 
+	if err := ensureHostPathOwnership(ctx); err != nil {
+		return "", err
+	}
+
 	kubeconfigPath, err := writeKubeconfig(ctx)
 	if err != nil {
 		return "", err
@@ -152,6 +156,51 @@ func currentGroupName() (string, error) {
 		return "", err
 	}
 	return g.Name, nil
+}
+
+// distrolessNonrootID is the fixed UID/GID every distroless "nonroot"
+// image in this project's own services (controller, registry, ...) runs
+// as -- gcr.io/distroless/*:nonroot's own documented convention, not
+// something derived at runtime.
+const distrolessNonrootID = "65532"
+
+// hostPathsNeedingOwnership mirrors charts/magpie/values.yaml's own
+// controller.serverRootBase/hostPaths.localContentPath defaults -- see
+// ensureHostPathOwnership's own doc for why these need to exist with
+// the right ownership before the chart's Deployments ever start.
+var hostPathsNeedingOwnership = []string{
+	"/srv/arma-servers",
+	"/var/lib/magpie/local-content",
+}
+
+// ensureHostPathOwnership pre-creates and chowns the hostPath
+// directories controller/registry write into, to the same fixed UID/GID
+// their own containers run as -- entirely outside Kubernetes, before
+// k3s's kubelet or Helm ever touch them. kubelet's own `DirectoryOrCreate`
+// only creates a hostPath if it's missing (never fixes existing
+// ownership), and hostPath is one of the volume types fsGroup doesn't
+// recursively chown either (PVC/emptyDir only) -- so without this, a
+// kubelet-created root:root directory EACCESs the first time a
+// runAsNonRoot: true container tries to write to it (confirmed live).
+// Handling it here instead of via a privileged in-cluster initContainer
+// (an earlier version of this, reverted) means the chart's own pods
+// never need to run anything as root at all.
+//
+// Only covers the chart's own default paths -- an operator overriding
+// controller.serverRootBase/hostPaths.localContentPath via --set needs
+// to chown their own custom path to 65532:65532 themselves.
+func ensureHostPathOwnership(ctx context.Context) error {
+	for _, p := range hostPathsNeedingOwnership {
+		fmt.Printf("==> Ensuring %s exists, owned by %s:%s...\n", p, distrolessNonrootID, distrolessNonrootID)
+		if err := exec.CommandContext(ctx, "sudo", "mkdir", "-p", p).Run(); err != nil {
+			return fmt.Errorf("failed to create %s: %w", p, err)
+		}
+		owner := distrolessNonrootID + ":" + distrolessNonrootID
+		if err := exec.CommandContext(ctx, "sudo", "chown", owner, p).Run(); err != nil {
+			return fmt.Errorf("failed to chown %s to %s: %w", p, owner, err)
+		}
+	}
+	return nil
 }
 
 func writeKubeconfig(ctx context.Context) (string, error) {

@@ -90,6 +90,17 @@ reflinkStorage:
 # the same volume concurrently" doesn't need a real RWX-capable storage
 # class, and there's no reflink/same-filesystem requirement here the way
 # there is for sync-daemon's content/claims above.
+#
+# Must already exist, owned by 65532:65532 (distroless nonroot's fixed
+# UID/GID, what registry's own container runs as) before this Deployment
+# starts -- kubelet's own `DirectoryOrCreate` creates it root:root
+# otherwise, and hostPath is one of the volume types fsGroup doesn't
+# recursively chown (PVC/emptyDir only), so the container's first write
+# would EACCES. `magpiectl install --bootstrap-k3s` does this for you
+# automatically; a manually-provisioned host needs `mkdir -p` + `chown
+# 65532:65532` run once ahead of time instead (deliberately not solved
+# with a privileged initContainer in-cluster -- see git history for why
+# that approach was tried and reverted).
 hostPaths:
   localContentPath: /var/lib/magpie/local-content
 
@@ -236,6 +247,10 @@ controller:
   # <serverRootBase>/<name>) holding each server's own operator-provided
   # content -- configs/profiles/keys. Not Steam-synced, not tied to any
   # claim's lifecycle.
+  #
+  # Same 65532:65532-ownership prerequisite as hostPaths.localContentPath
+  # above -- see that comment for why. `magpiectl install --bootstrap-k3s`
+  # handles this one too.
   serverRootBase: /srv/arma-servers
   resources: {}
 

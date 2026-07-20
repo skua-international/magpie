@@ -23,18 +23,15 @@ spec:
     spec:
       {{- include "magpie.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "magpie.fullname" . }}-registry
-      # Deliberately no pod-level runAsNonRoot -- see controller-
-      # deployment.yaml's identical comment for why (chown-local-content
-      # below genuinely needs root).
+      securityContext:
+        runAsNonRoot: true
       initContainers:
         {{- include "magpie.waitForPostgresInit" . | nindent 8 }}
-        {{- include "magpie.chownHostPathInit" (dict "name" "local-content" "path" .Values.hostPaths.localContentPath "root" $) | nindent 8 }}
       containers:
         - name: registry
           image: {{ include "magpie.image" (dict "root" $ "override" .Values.registry.image) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
-            runAsNonRoot: true
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]

@@ -26,22 +26,15 @@ spec:
     spec:
       {{- include "magpie.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "magpie.fullname" . }}-controller
-      # Deliberately no pod-level runAsNonRoot -- chown-server-roots below
-      # genuinely needs root (see chownHostPathInit's own doc), and a
-      # pod-level default every container inherits unless it explicitly
-      # opts out would make that a contradiction kubelet actually
-      # enforces ("container's runAsUser breaks non-root policy",
-      # confirmed live), not just a redundant restatement. The main
-      # container declares its own requirement directly below instead.
+      securityContext:
+        runAsNonRoot: true
       initContainers:
         {{- include "magpie.waitForPostgresInit" . | nindent 8 }}
-        {{- include "magpie.chownHostPathInit" (dict "name" "server-roots" "path" .Values.controller.serverRootBase "root" $) | nindent 8 }}
       containers:
         - name: controller
           image: {{ include "magpie.image" (dict "root" $ "override" .Values.controller.image) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
-            runAsNonRoot: true
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:

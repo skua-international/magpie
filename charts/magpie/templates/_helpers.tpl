@@ -112,12 +112,9 @@ Called as: {{- include "magpie.waitForPostgresInit" . | nindent 8 }}
   image: {{ .Values.postgres.image }}
   # The postgres image runs as root by default (its own entrypoint drops
   # to the "postgres" user itself, but overriding command/args the way
-  # this initContainer does bypasses that entirely) -- every container
-  # here ends up requiring a non-root UID one way or another (either a
-  # pod-level runAsNonRoot: true this inherits, or its own Deployment's
-  # main container declaring it directly -- see chownHostPathInit's own
-  # doc for why a couple of these went the second way), and a container
-  # with no explicit non-root UID of its own fails outright either way,
+  # this initContainer does bypasses that entirely) -- every Deployment
+  # this attaches to sets runAsNonRoot: true at the pod level, which
+  # rejects a container with no explicit non-root UID of its own,
   # confirmed live ("container has runAsNonRoot and image will run as
   # root"). pg_isready needs no particular UID, so nobody (65534) is a
   # safe, image-independent choice rather than guessing this image's own
@@ -133,34 +130,6 @@ Called as: {{- include "magpie.waitForPostgresInit" . | nindent 8 }}
         echo "waiting for postgres..."
         sleep 2
       done
-{{- end -}}
-
-{{/*
-initContainers entry that chowns a hostPath-backed volume to distroless
-nonroot's fixed 65532:65532 before the main container starts. Every
-Deployment that mounts a writable hostPath (server-roots, local-content)
-also sets runAsNonRoot: true with no explicit runAsUser, so it inherits
-whatever UID its distroless base image runs as -- but a hostPath volume
-with type: DirectoryOrCreate is created by kubelet itself the first time
-around, root:root 0755, and hostPath is one of the volume types fsGroup
-does *not* recursively chown (that's PVC/emptyDir-only) -- so the main
-container's first write attempt EACCESs. Confirmed live: controller's
-arma_config.rs failed with "failed to create /srv/arma-servers/test/
-configs". Cheap, standard fix: a root initContainer chowns it once before
-handoff, same shape as waitForPostgresInit's own root-image-vs-nonroot-
-pod workaround.
-
-Called as: {{- include "magpie.chownHostPathInit" (dict "name" "server-roots" "path" .Values.controller.serverRootBase "root" $) | nindent 8 }}
-*/}}
-{{- define "magpie.chownHostPathInit" -}}
-- name: chown-{{ .name }}
-  image: {{ .root.Values.postgres.image }}
-  securityContext:
-    runAsUser: 0
-  command: ["chown", "65532:65532", {{ .path | quote }}]
-  volumeMounts:
-    - name: {{ .name }}
-      mountPath: {{ .path }}
 {{- end -}}
 
 {{/*
