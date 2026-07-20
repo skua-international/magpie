@@ -4,11 +4,12 @@ use std::sync::{Arc, Mutex};
 
 use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest, ServiceResult};
 use protocol::proto::sync::v1::{
-    ClaimJobState, ClaimRequest, ClaimResponse, DeregisterSourceRequest, DeregisterSourceResponse,
-    GetClaimStatusRequest, GetClaimStatusResponse, GetSourceModsRequest, GetSourceModsResponse,
-    GetSyncStatsRequest, GetSyncStatsResponse, GetSyncedModRequest, GetSyncedModResponse,
-    InvalidateModRequest, InvalidateModResponse, ListSyncedModsRequest, ListSyncedModsResponse,
-    RefreshSourceRequest, RefreshSourceResponse, RefreshSteamAuthRequest, RefreshSteamAuthResponse,
+    ClaimJobState, ClaimRequest, ClaimResponse, DeleteClaimRequest, DeleteClaimResponse,
+    DeregisterSourceRequest, DeregisterSourceResponse, GetClaimStatusRequest,
+    GetClaimStatusResponse, GetSourceModsRequest, GetSourceModsResponse, GetSyncStatsRequest,
+    GetSyncStatsResponse, GetSyncedModRequest, GetSyncedModResponse, InvalidateModRequest,
+    InvalidateModResponse, ListSyncedModsRequest, ListSyncedModsResponse, RefreshSourceRequest,
+    RefreshSourceResponse, RefreshSteamAuthRequest, RefreshSteamAuthResponse,
     RegisterSourceRequest, RegisterSourceResponse, ResolvedMod as ProtoResolvedMod, SyncService,
     SyncedMod,
 };
@@ -376,6 +377,48 @@ impl SyncService for SyncServiceImpl {
             },
         };
         Response::ok(response)
+    }
+
+    async fn delete_claim<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        request: ServiceRequest<'_, DeleteClaimRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<DeleteClaimResponse> + Send + use<'a>> {
+        let claim_path = PathBuf::from(request.claim_path.to_string());
+
+        // Resolve both sides through canonicalize (not a plain prefix
+        // check on the raw strings) so a `..`-laden or symlink-laced
+        // claim_path can't talk this into deleting something outside
+        // claims_root -- request.claim_path only ever legitimately came
+        // from a GetClaimStatusResponse this same process generated, but
+        // there's no reason to trust an RPC input further than that.
+        // Already-gone is fine (claim_path.claim's own doc: not an error).
+        let canonical = match claim_path.canonicalize() {
+            Ok(p) => p,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                return Response::ok(DeleteClaimResponse::default());
+            }
+            Err(e) => {
+                return Err(ConnectError::internal(format!(
+                    "failed to resolve claim path {}: {e}",
+                    claim_path.display()
+                )));
+            }
+        };
+        let claims_root =
+            self.shared.claims_root.canonicalize().map_err(|e| {
+                ConnectError::internal(format!("failed to resolve claims_root: {e}"))
+            })?;
+        if !canonical.starts_with(&claims_root) {
+            return Err(ConnectError::invalid_argument(format!(
+                "{} is not under this daemon's claims_root",
+                claim_path.display()
+            )));
+        }
+
+        steam_sync::claim::delete_claim(&canonical)
+            .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
+        Response::ok(DeleteClaimResponse::default())
     }
 
     async fn list_synced_mods<'a>(

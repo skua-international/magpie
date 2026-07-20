@@ -44,6 +44,8 @@ const (
 	// SyncServiceGetClaimStatusProcedure is the fully-qualified name of the SyncService's
 	// GetClaimStatus RPC.
 	SyncServiceGetClaimStatusProcedure = "/sync.v1.SyncService/GetClaimStatus"
+	// SyncServiceDeleteClaimProcedure is the fully-qualified name of the SyncService's DeleteClaim RPC.
+	SyncServiceDeleteClaimProcedure = "/sync.v1.SyncService/DeleteClaim"
 	// SyncServiceGetSourceModsProcedure is the fully-qualified name of the SyncService's GetSourceMods
 	// RPC.
 	SyncServiceGetSourceModsProcedure = "/sync.v1.SyncService/GetSourceMods"
@@ -84,12 +86,29 @@ type SyncServiceClient interface {
 	DeregisterSource(context.Context, *connect.Request[v1.DeregisterSourceRequest]) (*connect.Response[v1.DeregisterSourceResponse], error)
 	// Start a background job that syncs every mod/depot currently desired
 	// (the union of every registered source's resolved membership, plus
-	// server/CDLC depots) and issues a reflink claim of the result. Returns
-	// immediately with a job ID -- this does not block for the sync duration,
-	// which can range from instant (warm cache) to minutes (cold).
+	// server/CDLC depots) and issues a claim of the result: a read-only
+	// btrfs snapshot of the golden content tree (crates/steam-sync's own
+	// doc has the full rationale for snapshot over the old cp
+	// --reflink=always -- an atomic, whole-tree, single-ioctl operation
+	// instead of walking and reflinking file-by-file). Returns immediately
+	// with a job ID -- this does not block for the sync duration, which can
+	// range from instant (warm cache) to minutes (cold).
 	Claim(context.Context, *connect.Request[v1.ClaimRequest]) (*connect.Response[v1.ClaimResponse], error)
 	// Poll a job started by Claim.
 	GetClaimStatus(context.Context, *connect.Request[v1.GetClaimStatusRequest]) (*connect.Response[v1.GetClaimStatusResponse], error)
+	// Releases a claim -- `btrfs subvolume delete` on its directory.
+	// Deliberately caller-triggered (the launcher calls this itself right
+	// before it exits, whatever the reason -- game process exited, crashed,
+	// or SIGTERM from Kubernetes during a rollover) rather than sync-daemon
+	// tracking claim ownership/lifecycle itself: sync-daemon's own Claim RPC
+	// is completely anonymous (no server identity in ClaimRequest at all),
+	// and keeping it that way -- letting whoever actually held the claim be
+	// the one to say when they're done with it -- avoids needing a whole
+	// separate ownership-tracking/GC subsystem here. A claim that's never
+	// released this way (e.g. the launcher is SIGKILLed before it can call
+	// this) still leaks, same as every claim did before this RPC existed at
+	// all -- this fixes the common case, not every case.
+	DeleteClaim(context.Context, *connect.Request[v1.DeleteClaimRequest]) (*connect.Response[v1.DeleteClaimResponse], error)
 	// Read a previously-registered source's current resolved mod list
 	// without re-registering it (no candidate IDs needed, no Steam calls --
 	// a plain read of what RegisterSource/the background poller last
@@ -174,6 +193,12 @@ func NewSyncServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(syncServiceMethods.ByName("GetClaimStatus")),
 			connect.WithClientOptions(opts...),
 		),
+		deleteClaim: connect.NewClient[v1.DeleteClaimRequest, v1.DeleteClaimResponse](
+			httpClient,
+			baseURL+SyncServiceDeleteClaimProcedure,
+			connect.WithSchema(syncServiceMethods.ByName("DeleteClaim")),
+			connect.WithClientOptions(opts...),
+		),
 		getSourceMods: connect.NewClient[v1.GetSourceModsRequest, v1.GetSourceModsResponse](
 			httpClient,
 			baseURL+SyncServiceGetSourceModsProcedure,
@@ -225,6 +250,7 @@ type syncServiceClient struct {
 	deregisterSource *connect.Client[v1.DeregisterSourceRequest, v1.DeregisterSourceResponse]
 	claim            *connect.Client[v1.ClaimRequest, v1.ClaimResponse]
 	getClaimStatus   *connect.Client[v1.GetClaimStatusRequest, v1.GetClaimStatusResponse]
+	deleteClaim      *connect.Client[v1.DeleteClaimRequest, v1.DeleteClaimResponse]
 	getSourceMods    *connect.Client[v1.GetSourceModsRequest, v1.GetSourceModsResponse]
 	refreshSource    *connect.Client[v1.RefreshSourceRequest, v1.RefreshSourceResponse]
 	listSyncedMods   *connect.Client[v1.ListSyncedModsRequest, v1.ListSyncedModsResponse]
@@ -252,6 +278,11 @@ func (c *syncServiceClient) Claim(ctx context.Context, req *connect.Request[v1.C
 // GetClaimStatus calls sync.v1.SyncService.GetClaimStatus.
 func (c *syncServiceClient) GetClaimStatus(ctx context.Context, req *connect.Request[v1.GetClaimStatusRequest]) (*connect.Response[v1.GetClaimStatusResponse], error) {
 	return c.getClaimStatus.CallUnary(ctx, req)
+}
+
+// DeleteClaim calls sync.v1.SyncService.DeleteClaim.
+func (c *syncServiceClient) DeleteClaim(ctx context.Context, req *connect.Request[v1.DeleteClaimRequest]) (*connect.Response[v1.DeleteClaimResponse], error) {
+	return c.deleteClaim.CallUnary(ctx, req)
 }
 
 // GetSourceMods calls sync.v1.SyncService.GetSourceMods.
@@ -306,12 +337,29 @@ type SyncServiceHandler interface {
 	DeregisterSource(context.Context, *connect.Request[v1.DeregisterSourceRequest]) (*connect.Response[v1.DeregisterSourceResponse], error)
 	// Start a background job that syncs every mod/depot currently desired
 	// (the union of every registered source's resolved membership, plus
-	// server/CDLC depots) and issues a reflink claim of the result. Returns
-	// immediately with a job ID -- this does not block for the sync duration,
-	// which can range from instant (warm cache) to minutes (cold).
+	// server/CDLC depots) and issues a claim of the result: a read-only
+	// btrfs snapshot of the golden content tree (crates/steam-sync's own
+	// doc has the full rationale for snapshot over the old cp
+	// --reflink=always -- an atomic, whole-tree, single-ioctl operation
+	// instead of walking and reflinking file-by-file). Returns immediately
+	// with a job ID -- this does not block for the sync duration, which can
+	// range from instant (warm cache) to minutes (cold).
 	Claim(context.Context, *connect.Request[v1.ClaimRequest]) (*connect.Response[v1.ClaimResponse], error)
 	// Poll a job started by Claim.
 	GetClaimStatus(context.Context, *connect.Request[v1.GetClaimStatusRequest]) (*connect.Response[v1.GetClaimStatusResponse], error)
+	// Releases a claim -- `btrfs subvolume delete` on its directory.
+	// Deliberately caller-triggered (the launcher calls this itself right
+	// before it exits, whatever the reason -- game process exited, crashed,
+	// or SIGTERM from Kubernetes during a rollover) rather than sync-daemon
+	// tracking claim ownership/lifecycle itself: sync-daemon's own Claim RPC
+	// is completely anonymous (no server identity in ClaimRequest at all),
+	// and keeping it that way -- letting whoever actually held the claim be
+	// the one to say when they're done with it -- avoids needing a whole
+	// separate ownership-tracking/GC subsystem here. A claim that's never
+	// released this way (e.g. the launcher is SIGKILLed before it can call
+	// this) still leaks, same as every claim did before this RPC existed at
+	// all -- this fixes the common case, not every case.
+	DeleteClaim(context.Context, *connect.Request[v1.DeleteClaimRequest]) (*connect.Response[v1.DeleteClaimResponse], error)
 	// Read a previously-registered source's current resolved mod list
 	// without re-registering it (no candidate IDs needed, no Steam calls --
 	// a plain read of what RegisterSource/the background poller last
@@ -392,6 +440,12 @@ func NewSyncServiceHandler(svc SyncServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(syncServiceMethods.ByName("GetClaimStatus")),
 		connect.WithHandlerOptions(opts...),
 	)
+	syncServiceDeleteClaimHandler := connect.NewUnaryHandler(
+		SyncServiceDeleteClaimProcedure,
+		svc.DeleteClaim,
+		connect.WithSchema(syncServiceMethods.ByName("DeleteClaim")),
+		connect.WithHandlerOptions(opts...),
+	)
 	syncServiceGetSourceModsHandler := connect.NewUnaryHandler(
 		SyncServiceGetSourceModsProcedure,
 		svc.GetSourceMods,
@@ -444,6 +498,8 @@ func NewSyncServiceHandler(svc SyncServiceHandler, opts ...connect.HandlerOption
 			syncServiceClaimHandler.ServeHTTP(w, r)
 		case SyncServiceGetClaimStatusProcedure:
 			syncServiceGetClaimStatusHandler.ServeHTTP(w, r)
+		case SyncServiceDeleteClaimProcedure:
+			syncServiceDeleteClaimHandler.ServeHTTP(w, r)
 		case SyncServiceGetSourceModsProcedure:
 			syncServiceGetSourceModsHandler.ServeHTTP(w, r)
 		case SyncServiceRefreshSourceProcedure:
@@ -481,6 +537,10 @@ func (UnimplementedSyncServiceHandler) Claim(context.Context, *connect.Request[v
 
 func (UnimplementedSyncServiceHandler) GetClaimStatus(context.Context, *connect.Request[v1.GetClaimStatusRequest]) (*connect.Response[v1.GetClaimStatusResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sync.v1.SyncService.GetClaimStatus is not implemented"))
+}
+
+func (UnimplementedSyncServiceHandler) DeleteClaim(context.Context, *connect.Request[v1.DeleteClaimRequest]) (*connect.Response[v1.DeleteClaimResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sync.v1.SyncService.DeleteClaim is not implemented"))
 }
 
 func (UnimplementedSyncServiceHandler) GetSourceMods(context.Context, *connect.Request[v1.GetSourceModsRequest]) (*connect.Response[v1.GetSourceModsResponse], error) {

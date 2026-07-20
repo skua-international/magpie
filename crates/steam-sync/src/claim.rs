@@ -1,21 +1,31 @@
-//! Copy-on-write "claims" of a fully-synced content tree.
+//! Read-only btrfs snapshot "claims" of a fully-synced content tree.
 //!
 //! More than one server instance can share one golden, continuously-synced
-//! content directory. Rather than each instance running (and writing)
-//! directly against that shared tree, a claim gives an instance its own
-//! private copy to run against -- cheap when the underlying filesystem
-//! supports reflink (btrfs, XFS with reflink=1): a `claim()` call copies
-//! metadata, not bytes, so it's fast and doesn't multiply disk usage per
-//! instance. On a filesystem without reflink support, this degrades safely
-//! to a real copy -- slower and disk-hungry, but still correct.
+//! content directory. Rather than each instance running directly against
+//! that shared tree, a claim gives an instance its own private, isolated
+//! view to run against -- a `btrfs subvolume snapshot -r`, one atomic
+//! ioctl regardless of how many files the tree contains, sharing extents
+//! with the golden tree until something actually diverges. `golden_dir`
+//! must already be a real btrfs subvolume for this to work (magpie-csi's
+//! blob.go creates it as one at blob-bootstrap time, not this crate's
+//! job) -- this crate does no filesystem-portability fallback the way an
+//! earlier `cp --reflink=always`-based version of this did, since
+//! magpie-csi unconditionally formats its own blob as btrfs regardless of
+//! the host's own filesystem, so there's never actually a non-btrfs
+//! target to degrade for in this deployment.
+//!
+//! Read-only, not read-write: nothing ever writes back into a claim after
+//! creation (launcher Pods mount their claim subPath read-only at the
+//! Kubernetes level too, see reconcile.rs), so there's no reason to pay
+//! for a writable snapshot's extra bookkeeping.
 
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 
-/// Reflink-copy (falling back to a real copy) `golden_dir` into `claim_dir`.
-/// `claim_dir` must not already exist -- claims are meant to be fresh,
-/// disposable copies, not merged into existing state.
+/// Snapshots `golden_dir` (a btrfs subvolume) into `claim_dir`. `claim_dir`
+/// must not already exist -- claims are meant to be fresh, disposable
+/// copies, not merged into existing state.
 pub fn claim(golden_dir: &Path, claim_dir: &Path) -> Result<PathBuf> {
     if claim_dir.exists() {
         bail!("claim dir {} already exists", claim_dir.display());
@@ -24,65 +34,57 @@ pub fn claim(golden_dir: &Path, claim_dir: &Path) -> Result<PathBuf> {
         std::fs::create_dir_all(parent).context("failed to create claim parent dir")?;
     }
 
-    match run_cp_reflink(golden_dir, claim_dir) {
-        Ok(()) => {
-            tracing::debug!(
-                "claimed {} -> {} (reflink)",
-                golden_dir.display(),
-                claim_dir.display()
-            );
-        }
-        Err(e) => {
-            tracing::warn!(
-                "reflink copy failed ({e:#}), falling back to a real copy -- this will be slower \
-                 and use real disk space proportional to the content size"
-            );
-            copy_dir_recursive(golden_dir, claim_dir).with_context(|| {
-                format!(
-                    "failed to copy {} -> {}",
-                    golden_dir.display(),
-                    claim_dir.display()
-                )
-            })?;
-        }
-    }
+    run_btrfs(&["subvolume", "snapshot", "-r"], golden_dir, claim_dir).with_context(|| {
+        format!(
+            "failed to snapshot {} -> {}",
+            golden_dir.display(),
+            claim_dir.display()
+        )
+    })?;
+    tracing::debug!(
+        "claimed {} -> {} (btrfs snapshot)",
+        golden_dir.display(),
+        claim_dir.display()
+    );
 
     Ok(claim_dir.to_path_buf())
 }
 
-/// Shell out to `cp --reflink=always -r`, which understands both btrfs and
-/// XFS reflink semantics without us needing filesystem-specific ioctl
-/// bindings for each. Fails outright (rather than silently falling back
-/// itself) if the filesystem doesn't support reflink, so the caller can
-/// decide how to handle that -- here, one real recursive copy.
-fn run_cp_reflink(from: &Path, to: &Path) -> Result<()> {
-    let status = std::process::Command::new("cp")
-        .arg("--reflink=always")
-        .arg("-r")
-        .arg(from)
-        .arg(to)
+/// Releases a claim -- `btrfs subvolume delete`, not `rm -rf`: a claim
+/// snapshot is a real subvolume, and plain directory removal leaves a
+/// subvolume dangling (invisible to normal file tools, still consuming
+/// its own space) rather than actually freeing it. A no-op (not an
+/// error) if `claim_dir` is already gone -- delete-on-exit call sites
+/// (see services/launcher) shouldn't fail just because something else
+/// already cleaned this claim up first.
+pub fn delete_claim(claim_dir: &Path) -> Result<()> {
+    if !claim_dir.exists() {
+        return Ok(());
+    }
+    let status = std::process::Command::new("btrfs")
+        .arg("subvolume")
+        .arg("delete")
+        .arg(claim_dir)
         .status()
-        .context("failed to spawn cp")?;
+        .context("failed to spawn btrfs subvolume delete")?;
     if !status.success() {
-        // Reflink copy leaves no partial directory behind on failure in
-        // practice (cp aborts before creating anything on an unsupported
-        // fs), but clean up defensively before the fallback copy runs.
-        let _ = std::fs::remove_dir_all(to);
-        bail!("cp --reflink=always exited with {status}");
+        bail!(
+            "btrfs subvolume delete {} exited with {status}",
+            claim_dir.display()
+        );
     }
     Ok(())
 }
 
-fn copy_dir_recursive(from: &Path, to: &Path) -> Result<()> {
-    std::fs::create_dir_all(to)?;
-    for entry in std::fs::read_dir(from)? {
-        let entry = entry?;
-        let dest = to.join(entry.file_name());
-        if entry.file_type()?.is_dir() {
-            copy_dir_recursive(&entry.path(), &dest)?;
-        } else {
-            std::fs::copy(entry.path(), &dest)?;
-        }
+fn run_btrfs(args: &[&str], from: &Path, to: &Path) -> Result<()> {
+    let status = std::process::Command::new("btrfs")
+        .args(args)
+        .arg(from)
+        .arg(to)
+        .status()
+        .context("failed to spawn btrfs")?;
+    if !status.success() {
+        bail!("btrfs {} exited with {status}", args.join(" "));
     }
     Ok(())
 }

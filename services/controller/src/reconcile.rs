@@ -292,6 +292,15 @@ async fn ensure_deployment(
             value: Some(claim_path.to_string()),
             ..Default::default()
         },
+        // So the launcher can release its own claim on exit (see
+        // services/launcher/src/launch.rs's release_claim) -- this is
+        // the one env var the launcher container needs that isn't about
+        // its own launch args.
+        EnvVar {
+            name: "SYNC_DAEMON_URL".into(),
+            value: Some(ctx.cfg.sync_daemon_url.clone()),
+            ..Default::default()
+        },
         EnvVar {
             name: "MODS".into(),
             value: Some(mod_paths.join(";")),

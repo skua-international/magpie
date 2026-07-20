@@ -2217,7 +2217,9 @@ name = "launcher"
 version = "0.0.0-unreleased"
 dependencies = [
  "anyhow",
+ "libc",
  "regex",
+ "sync-client",
  "tokio",
  "tracing",
  "tracing-subscriber",

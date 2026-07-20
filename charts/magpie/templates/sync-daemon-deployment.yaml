@@ -30,6 +30,18 @@ spec:
         - name: sync-daemon
           image: {{ include "magpie.image" (dict "root" $ "override" .Values.syncDaemon.image) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # CAP_SYS_ADMIN, not full privileged: true -- crates/steam-sync's
+          # claim()/delete_claim() shell out to `btrfs subvolume
+          # snapshot`/`delete`, and those ioctls need this capability
+          # regardless of the filesystem's own mount options (there's no
+          # user_subvol_rm_allowed-style opt-out for create/snapshot the
+          # way there is for delete). Kept as narrow as the actual need --
+          # everything else this container does (Postgres/K8s API calls,
+          # Steam sync) needs nothing beyond a normal container's default
+          # capability set.
+          securityContext:
+            capabilities:
+              add: ["SYS_ADMIN"]
           ports:
             - name: http
               containerPort: 8080
@@ -70,9 +82,10 @@ spec:
           {{- end }}
       volumes:
         # content and claims are subPaths of one PVC, not two separate
-        # ones -- they must be on the very same real filesystem for
-        # reflink claims to work at all (`cp --reflink=always` can't CoW
-        # across filesystems). See reflink-pvc.yaml/reflink-
+        # ones -- they must be on the very same real btrfs filesystem for
+        # `btrfs subvolume snapshot` to work at all (can't snapshot across
+        # filesystems any more than `cp --reflink=always`, the mechanism
+        # this used before, could). See reflink-pvc.yaml/reflink-
         # storageclass.yaml, services/magpie-csi, and crates/steam-sync's
         # claim() doc comment.
         - name: reflink

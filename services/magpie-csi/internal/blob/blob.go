@@ -154,7 +154,45 @@ func (m *Manager) bootstrap(ctx context.Context, minSizeBytes int64) error {
 	if err := os.MkdirAll(m.mountPath, 0o755); err != nil {
 		return fmt.Errorf("failed to create %s: %w", m.mountPath, err)
 	}
-	return run(ctx, "mount", loopDev, m.mountPath)
+	if err := run(ctx, "mount", loopDev, m.mountPath); err != nil {
+		return err
+	}
+	return m.ensureContentSubvolume(ctx)
+}
+
+// ensureContentSubvolume makes sure <mountPath>/content is a real btrfs
+// subvolume, not a plain directory -- crates/steam-sync's claim() needs
+// a genuine subvolume as the source for `btrfs subvolume snapshot`
+// (magpie's per-server "claims" are now read-only snapshots of this,
+// not `cp --reflink=always` copies; see that crate's own doc for the
+// full rationale). Idempotent: a plain `os.Stat` existence check is
+// enough to skip re-creating it on every restart -- `btrfs subvolume
+// create` on a path that already exists (subvolume or not) just fails,
+// so this only ever runs once per blob's lifetime, on the very first
+// bootstrap.
+//
+// <mountPath>/claims (the parent directory individual per-claim
+// subvolumes get created under, at claim time, by sync-daemon -- not
+// this package's job) stays a plain directory; only content itself
+// needs to be a subvolume.
+func (m *Manager) ensureContentSubvolume(ctx context.Context) error {
+	contentPath := filepath.Join(m.mountPath, "content")
+	claimsPath := filepath.Join(m.mountPath, "claims")
+
+	if _, err := os.Stat(contentPath); os.IsNotExist(err) {
+		if err := run(ctx, "btrfs", "subvolume", "create", contentPath); err != nil {
+			return fmt.Errorf("failed to create content subvolume: %w", err)
+		}
+	} else if err != nil {
+		return fmt.Errorf("failed to stat %s: %w", contentPath, err)
+	}
+	// A pre-existing plain directory from before this subvolume
+	// requirement existed is left alone rather than converted in place
+	// (btrfs has no in-place directory->subvolume conversion) --
+	// deliberately not handled here, this deployment predates any real
+	// upgrade-compatibility guarantee.
+
+	return os.MkdirAll(claimsPath, 0o755)
 }
 
 func (m *Manager) growTo(ctx context.Context, newSizeBytes int64) error {

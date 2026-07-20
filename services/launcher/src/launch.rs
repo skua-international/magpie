@@ -5,6 +5,8 @@ use std::process::Command;
 
 use anyhow::{Context, Result};
 use regex::Regex;
+use tokio::process::Command as TokioCommand;
+use tokio::signal::unix::{SignalKind, signal};
 
 use crate::config::Config;
 
@@ -173,11 +175,41 @@ pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Inst
     ));
 
     tracing::info!("LAUNCHING ARMA SERVER WITH {launch}");
-    let status = Command::new("sh")
+    // `exec` (not a plain `sh -c "<launch>"`, which leaves arma3server as
+    // sh's own child) so the spawned process's PID *is* arma3server's --
+    // sh replaces its own process image rather than forking, so a signal
+    // sent to this PID always reaches arma3server directly regardless of
+    // which instant it's sent (before or after the exec syscall
+    // completes; the PID is stable across it).
+    let mut child = TokioCommand::new("sh")
         .arg("-c")
-        .arg(&launch)
-        .status()
-        .context("failed to exec arma3server")?;
+        .arg(format!("exec {launch}"))
+        .spawn()
+        .context("failed to spawn arma3server")?;
+
+    // No handler at all used to mean Kubernetes' SIGTERM (pod deletion,
+    // or the Recreate rollover a resync triggers) killed this process
+    // immediately, forwarding nothing to arma3server and never releasing
+    // its claim -- confirmed live as a real gap once claims actually
+    // needed releasing (see release_claim below). Forward SIGTERM and
+    // wait for the real exit instead of dying immediately ourselves.
+    let mut sigterm =
+        signal(SignalKind::terminate()).context("failed to install SIGTERM handler")?;
+    let status = tokio::select! {
+        status = child.wait() => status.context("failed to wait for arma3server")?,
+        _ = sigterm.recv() => {
+            tracing::info!("received SIGTERM -- forwarding to arma3server and waiting for it to exit");
+            if let Some(pid) = child.id() {
+                // SAFETY: pid is a real, currently-running child of this
+                // process (just read from the still-live Child handle) --
+                // kill(2) with a valid pid and SIGTERM is always sound.
+                unsafe { libc::kill(pid as i32, libc::SIGTERM) };
+            }
+            child.wait().await.context("failed to wait for arma3server after SIGTERM")?
+        }
+    };
+
+    release_claim(cfg).await;
 
     if !status.success() {
         anyhow::bail!(
@@ -189,6 +221,33 @@ pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Inst
     }
 
     Ok(())
+}
+
+/// Releases this run's claim right before the launcher process itself
+/// exits, whatever the reason (arma3server exited normally, crashed, or
+/// this got SIGTERM'd -- see the caller). Best-effort: a failure here
+/// only warns, never fails the whole process -- the game server's own
+/// exit status is what actually matters to whatever's watching this
+/// Pod, and a claim that doesn't get released this way just leaks the
+/// same way every claim did before this existed at all (see sync.proto's
+/// own doc on DeleteClaim).
+async fn release_claim(cfg: &Config) {
+    let Some(url) = &cfg.sync_daemon_url else {
+        tracing::warn!("SYNC_DAEMON_URL not set -- skipping claim release");
+        return;
+    };
+    let claim_path = cfg.claim_path.to_string_lossy();
+    let client = match sync_client::SyncClient::new(url) {
+        Ok(client) => client,
+        Err(e) => {
+            tracing::warn!("failed to build sync-daemon client, claim {claim_path} not released: {e:#}");
+            return;
+        }
+    };
+    match client.delete_claim(&claim_path).await {
+        Ok(()) => tracing::info!("released claim {claim_path}"),
+        Err(e) => tracing::warn!("failed to release claim {claim_path}: {e:#}"),
+    }
 }
 
 fn glob_hc_scripts() -> Result<Vec<std::path::PathBuf>> {

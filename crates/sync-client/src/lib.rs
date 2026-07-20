@@ -4,10 +4,10 @@
 
 use connectrpc::client::{ClientConfig, HttpClient};
 use protocol::proto::sync::v1::{
-    ClaimJobState, ClaimRequest, DeregisterSourceRequest, GetClaimStatusRequest,
-    GetSourceModsRequest, GetSyncStatsRequest, GetSyncedModRequest, InvalidateModRequest,
-    ListSyncedModsRequest, RefreshSourceRequest, RefreshSteamAuthRequest, RegisterSourceRequest,
-    SyncServiceClient,
+    ClaimJobState, ClaimRequest, DeleteClaimRequest, DeregisterSourceRequest,
+    GetClaimStatusRequest, GetSourceModsRequest, GetSyncStatsRequest, GetSyncedModRequest,
+    InvalidateModRequest, ListSyncedModsRequest, RefreshSourceRequest, RefreshSteamAuthRequest,
+    RegisterSourceRequest, SyncServiceClient,
 };
 
 pub struct SyncClient {
@@ -124,6 +124,20 @@ impl SyncClient {
             .await
             .map_err(|e| anyhow::anyhow!("Claim failed: {e}"))?;
         Ok(response.view().job_id.to_string())
+    }
+
+    /// Releases a claim -- see sync.proto's own doc on `DeleteClaim` for
+    /// why this is caller-triggered (the launcher, on exit) rather than
+    /// sync-daemon tracking claim ownership itself.
+    pub async fn delete_claim(&self, claim_path: &str) -> anyhow::Result<()> {
+        self.inner
+            .delete_claim(DeleteClaimRequest {
+                claim_path: claim_path.to_string(),
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| anyhow::anyhow!("DeleteClaim failed: {e}"))?;
+        Ok(())
     }
 
     /// Every currently-tracked workshop mod ID and the manifest_id it was
