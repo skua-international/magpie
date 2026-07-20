@@ -71,14 +71,14 @@ func (m Model) viewSyncedMods() string {
 	} else if len(m.syncedMods) == 0 {
 		b.WriteString(dimStyle.Render("No synced mods."))
 	} else {
-		for i, mod := range m.syncedMods {
+		m.renderList(&b, len(m.syncedMods), func(i int) string {
+			mod := m.syncedMods[i]
 			title := mod.Title
 			if title == "" {
 				title = dimStyle.Render("(unresolved)")
 			}
-			line := fmt.Sprintf("%-12s size=%-10s %s", strconv.FormatUint(mod.ModId, 10), actions.HumanBytes(mod.SizeBytes), title)
-			b.WriteString(renderLine(line, i == m.cursor) + "\n")
-		}
+			return fmt.Sprintf("%-12s size=%-10s %s", strconv.FormatUint(mod.ModId, 10), actions.HumanBytes(mod.SizeBytes), title)
+		})
 	}
 	b.WriteString("\n" + dimStyle.Render("i: invalidate verification cache, esc to go back"))
 	return b.String()

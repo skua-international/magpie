@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 	"unicode"
 
 	tea "charm.land/bubbletea/v2"
@@ -19,6 +20,13 @@ import (
 	"github.com/skua-international/magpie/cli/internal/actions"
 	"github.com/skua-international/magpie/cli/internal/client"
 )
+
+// refreshInterval is how often a "live" list screen (Servers, Mod
+// Sources, Synced Mods, Missions, Admin) silently reloads its data in
+// the background -- without this, watching an ArmaServer move through
+// phases (Pending -> Claiming -> Running) meant backing all the way out
+// to the menu and back in just to see the current state.
+const refreshInterval = 3 * time.Second
 
 type screen int
 
@@ -56,6 +64,12 @@ type Model struct {
 	release     string
 	identityURL string
 	accessToken string
+
+	// Zero until the first tea.WindowSizeMsg arrives (sent automatically
+	// on startup and on every resize) -- list rendering treats 0 as
+	// "unknown, don't clamp" rather than collapsing everything to
+	// nothing on the first frame.
+	width, height int
 
 	screen    screen
 	cursor    int
@@ -95,7 +109,88 @@ func New(ctx context.Context, clients *client.Clients, namespace, release, ident
 }
 
 func (m Model) Init() tea.Cmd {
-	return nil
+	return tickCmd()
+}
+
+// tickMsg drives the background auto-refresh loop -- self-perpetuating
+// (every tickMsg reschedules the next one via tickCmd in Update), so
+// this fires for the lifetime of the program regardless of which screen
+// is active; Update only actually reloads data for screens that have
+// something live to show (see isLiveScreen).
+type tickMsg struct{}
+
+func tickCmd() tea.Cmd {
+	return tea.Tick(refreshInterval, func(time.Time) tea.Msg { return tickMsg{} })
+}
+
+// isLiveScreen is true for screens showing data that can change out
+// from under the operator while they're looking at it (a server's
+// phase, a mod source's resolved size, ...). Wizard/form screens
+// (create/add/upload, export/import, account) are deliberately excluded
+// -- a background reload has no business touching in-progress input.
+func isLiveScreen(s screen) bool {
+	switch s {
+	case screenServers, screenModSources, screenSyncedMods, screenMissions, screenAdmin:
+		return true
+	default:
+		return false
+	}
+}
+
+// reloadCmdForScreen returns whatever load command corresponds to the
+// current screen's data, or nil if this screen has nothing to reload
+// (mirrors the menu's own screen -> loadCmd switch in handleKey).
+func (m Model) reloadCmdForScreen() tea.Cmd {
+	switch m.screen {
+	case screenServers:
+		return m.loadServersCmd()
+	case screenModSources:
+		return m.loadModSourcesCmd()
+	case screenSyncedMods:
+		return m.loadSyncedModsCmd()
+	case screenMissions:
+		return m.loadMissionsCmd()
+	case screenAdmin:
+		return m.loadDiskUsageCmd()
+	default:
+		return nil
+	}
+}
+
+// loadOrKeep centralizes every *LoadedMsg handler's shared "did this
+// load succeed" logic: a failure on a screen's very first load shows a
+// full-screen error (there's nothing better to show yet); a failure on
+// a background refresh (m.loaded already true) leaves whatever's
+// already displayed alone and surfaces a transient status line instead,
+// so one missed poll doesn't blank out a perfectly good list. Returns
+// true if the caller should go on to apply the new data.
+func (m *Model) loadOrKeep(err error) bool {
+	if err != nil {
+		if !m.loaded {
+			m.err = err
+		} else {
+			m.status, m.statusErr = "refresh failed: "+err.Error(), true
+		}
+		return false
+	}
+	m.loaded = true
+	return true
+}
+
+// clampCursor keeps the cursor in bounds after a reload shrinks (or
+// starts from) a list -- a background refresh can shrink the list out
+// from under a cursor that was previously sitting on the last row.
+func clampCursor(cursor, length int) int {
+	if length == 0 {
+		return 0
+	}
+	if cursor >= length {
+		return length - 1
+	}
+	if cursor < 0 {
+		return 0
+	}
+	return cursor
 }
 
 // --- messages carrying the result of an internal/actions call back into
@@ -156,6 +251,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width, m.height = msg.Width, msg.Height
+		return m, nil
+
+	case tickMsg:
+		next := tickCmd()
+		if !isLiveScreen(m.screen) {
+			return m, next
+		}
+		if reload := m.reloadCmdForScreen(); reload != nil {
+			return m, tea.Batch(reload, next)
+		}
+		return m, next
+
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 
@@ -163,19 +272,38 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handlePaste(msg), nil
 
 	case serversLoadedMsg:
-		m.loaded, m.err, m.servers = true, msg.err, msg.servers
+		if !m.loadOrKeep(msg.err) {
+			return m, nil
+		}
+		m.err, m.servers = nil, msg.servers
+		m.cursor = clampCursor(m.cursor, len(m.servers))
 		return m, nil
 	case modSourcesLoadedMsg:
-		m.loaded, m.err, m.modSources = true, msg.err, msg.sources
+		if !m.loadOrKeep(msg.err) {
+			return m, nil
+		}
+		m.err, m.modSources = nil, msg.sources
+		m.cursor = clampCursor(m.cursor, len(m.modSources))
 		return m, nil
 	case missionsLoadedMsg:
-		m.loaded, m.err, m.missions = true, msg.err, msg.missions
+		if !m.loadOrKeep(msg.err) {
+			return m, nil
+		}
+		m.err, m.missions = nil, msg.missions
+		m.cursor = clampCursor(m.cursor, len(m.missions))
 		return m, nil
 	case diskUsageLoadedMsg:
-		m.loaded, m.err, m.diskUsage = true, msg.err, msg.usage
+		if !m.loadOrKeep(msg.err) {
+			return m, nil
+		}
+		m.err, m.diskUsage = nil, msg.usage
 		return m, nil
 	case syncedModsLoadedMsg:
-		m.loaded, m.err, m.syncedMods = true, msg.err, msg.mods
+		if !m.loadOrKeep(msg.err) {
+			return m, nil
+		}
+		m.err, m.syncedMods = nil, msg.mods
+		m.cursor = clampCursor(m.cursor, len(m.syncedMods))
 		return m, nil
 
 	case invalidateModDoneMsg:
@@ -467,6 +595,65 @@ func digitsOnly(s string) string {
 	return b.String()
 }
 
+// maxListRows returns how many list rows currently fit below the
+// title/status and above the footer help line -- a generous fixed
+// reservation rather than an exact layout budget (this is a plain-text
+// TUI, not a pixel-perfect one), erring toward leaving a little slack
+// rather than risking an off-by-one overflow past the bottom of the
+// terminal. Returns a very large number until the first
+// tea.WindowSizeMsg arrives, so nothing clamps before the real terminal
+// size is known.
+func (m Model) maxListRows() int {
+	if m.height <= 0 {
+		return 1 << 30
+	}
+	reserved := 6 // title + blank, blank + footer help, one line of slack
+	if m.status != "" {
+		reserved += strings.Count(m.status, "\n") + 2
+	}
+	rows := m.height - reserved
+	if rows < 1 {
+		rows = 1
+	}
+	return rows
+}
+
+// visibleWindow returns [start, end) into a total-length list, sized to
+// maxRows and centered on cursor -- keeps the selected row on screen
+// while scrolling through a list longer than the terminal can show at
+// once, instead of either truncating past the cursor or overflowing the
+// screen entirely.
+func visibleWindow(cursor, total, maxRows int) (start, end int) {
+	if maxRows <= 0 || total <= maxRows {
+		return 0, total
+	}
+	start = cursor - maxRows/2
+	if start < 0 {
+		start = 0
+	}
+	end = start + maxRows
+	if end > total {
+		end = total
+		start = end - maxRows
+	}
+	return start, end
+}
+
+// renderList writes a (possibly windowed) list to b, plus a "(a-b of
+// n)" indicator when the window doesn't cover the whole list -- shared
+// by every *LoadedMsg-backed list screen (Servers/Mod Sources/
+// Missions/Synced Mods) instead of each reimplementing the same
+// scroll-window arithmetic.
+func (m Model) renderList(b *strings.Builder, total int, lineFor func(i int) string) {
+	start, end := visibleWindow(m.cursor, total, m.maxListRows())
+	for i := start; i < end; i++ {
+		b.WriteString(renderLine(lineFor(i), i == m.cursor) + "\n")
+	}
+	if start > 0 || end < total {
+		b.WriteString(dimStyle.Render(fmt.Sprintf("(%d-%d of %d)", start+1, end, total)) + "\n")
+	}
+}
+
 func (m Model) currentListLen() int {
 	switch m.screen {
 	case screenServers:
@@ -521,10 +708,10 @@ func (m Model) View() tea.View {
 		} else if len(m.servers) == 0 {
 			b.WriteString(dimStyle.Render("No servers."))
 		} else {
-			for i, s := range m.servers {
-				line := fmt.Sprintf("%-20s port=%-5d phase=%-12s desired=%s", s.Id, s.Port, s.Phase.String(), s.DesiredState.String())
-				b.WriteString(renderLine(line, i == m.cursor) + "\n")
-			}
+			m.renderList(&b, len(m.servers), func(i int) string {
+				s := m.servers[i]
+				return fmt.Sprintf("%-20s port=%-5d phase=%-12s desired=%s", s.Id, s.Port, s.Phase.String(), s.DesiredState.String())
+			})
 		}
 		b.WriteString("\n" + dimStyle.Render("n: new, s: start, x: stop, u: resync, d: delete, esc to go back"))
 
@@ -540,10 +727,10 @@ func (m Model) View() tea.View {
 		} else if len(m.modSources) == 0 {
 			b.WriteString(dimStyle.Render("No mod sources."))
 		} else {
-			for i, s := range m.modSources {
-				line := fmt.Sprintf("%-38s kind=%-11s %s", s.Id, s.Kind.String(), actions.ModSourceLabel(s))
-				b.WriteString(renderLine(line, i == m.cursor) + "\n")
-			}
+			m.renderList(&b, len(m.modSources), func(i int) string {
+				s := m.modSources[i]
+				return fmt.Sprintf("%-38s kind=%-11s %s", s.Id, s.Kind.String(), actions.ModSourceLabel(s))
+			})
 		}
 		b.WriteString("\n" + dimStyle.Render("a: add, s: sync, d: delete, esc to go back"))
 
@@ -562,10 +749,10 @@ func (m Model) View() tea.View {
 		} else if len(m.missions) == 0 {
 			b.WriteString(dimStyle.Render("No missions."))
 		} else {
-			for i, ms := range m.missions {
-				line := fmt.Sprintf("%-38s %s", ms.Id, ms.Name)
-				b.WriteString(renderLine(line, i == m.cursor) + "\n")
-			}
+			m.renderList(&b, len(m.missions), func(i int) string {
+				ms := m.missions[i]
+				return fmt.Sprintf("%-38s %s", ms.Id, ms.Name)
+			})
 		}
 		b.WriteString("\n" + dimStyle.Render("u: upload, d: delete, esc to go back"))
 
@@ -600,7 +787,9 @@ func (m Model) View() tea.View {
 		b.WriteString("\n\n" + errorStyle.Render(m.confirm.prompt))
 	}
 
-	return tea.NewView(b.String())
+	view := tea.NewView(b.String())
+	view.AltScreen = true
+	return view
 }
 
 func renderLine(s string, selected bool) string {
