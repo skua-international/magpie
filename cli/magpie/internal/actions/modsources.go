@@ -2,6 +2,7 @@ package actions
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"connectrpc.com/connect"
@@ -16,6 +17,23 @@ func ListModSources(ctx context.Context, c *client.Clients) ([]*registryv1.ModSo
 		return nil, err
 	}
 	return resp.Msg.Sources, nil
+}
+
+// ModSourceLabel is what a listing should show for a mod source -- its
+// real title when one's known (Steam mod/collection names, captured
+// once at registration time into ModSourceInfo.display_name) alongside
+// what it was registered with, since a bare UUID + Steam URL/local
+// unique_id is meaningless at a glance otherwise (confirmed live: the
+// create-server wizard's mod-source picker showed exactly that and
+// nothing else). display_name is empty for LOCAL kind (its reference,
+// the caller-given unique_id, already *is* a name) and for a preset
+// registered from multiple/inline content (no single title applies) --
+// both fall back to reference alone.
+func ModSourceLabel(s *registryv1.ModSourceInfo) string {
+	if s.DisplayName != "" {
+		return fmt.Sprintf("%s (%s)", s.DisplayName, s.Reference)
+	}
+	return s.Reference
 }
 
 func AddModSourceSteamURL(ctx context.Context, c *client.Clients, steamURL string) (string, error) {

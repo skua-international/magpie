@@ -39,7 +39,7 @@ func modsListCmd() *cobra.Command {
 				return nil
 			}
 			for _, s := range sources {
-				fmt.Printf("%-38s kind=%-11s size=%-10s %s\n", s.Id, s.Kind.String(), actions.HumanBytes(s.SizeBytes), s.Reference)
+				fmt.Printf("%-38s kind=%-11s size=%-10s %s\n", s.Id, s.Kind.String(), actions.HumanBytes(s.SizeBytes), actions.ModSourceLabel(s))
 			}
 			return nil
 		},

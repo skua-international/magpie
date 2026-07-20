@@ -541,7 +541,7 @@ func (m Model) View() tea.View {
 			b.WriteString(dimStyle.Render("No mod sources."))
 		} else {
 			for i, s := range m.modSources {
-				line := fmt.Sprintf("%-38s kind=%-11s %s", s.Id, s.Kind.String(), s.Reference)
+				line := fmt.Sprintf("%-38s kind=%-11s %s", s.Id, s.Kind.String(), actions.ModSourceLabel(s))
 				b.WriteString(renderLine(line, i == m.cursor) + "\n")
 			}
 		}

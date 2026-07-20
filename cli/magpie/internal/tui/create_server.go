@@ -291,7 +291,7 @@ func (m Model) viewCreateServer() string {
 				if m.create.modSelected[s.Id] {
 					box = "[x]"
 				}
-				line := fmt.Sprintf("%s %-38s %s", box, s.Id, s.Reference)
+				line := fmt.Sprintf("%s %s", box, actions.ModSourceLabel(s))
 				b.WriteString(renderLine(line, i == m.create.modCursor) + "\n")
 			}
 		} else {
