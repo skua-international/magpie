@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"unicode"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -157,6 +158,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
+
+	case tea.PasteMsg:
+		return m.handlePaste(msg), nil
 
 	case serversLoadedMsg:
 		m.loaded, m.err, m.servers = true, msg.err, msg.servers
@@ -417,6 +421,50 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+// handlePaste routes a bracketed-paste's whole content into whichever
+// text field the current screen/step has focused -- bubbletea delivers a
+// paste as one tea.PasteMsg, never as tea.KeyPressMsg (confirmed live:
+// every text field here only ever handled KeyPressMsg, so pasting into
+// any of them silently did nothing). Mirrors each screen's own per-char
+// `default:` append branch in handleCreateServerKey/handleModSourcesAddKey/
+// etc., just appending the whole string at once instead of one rune at a
+// time.
+func (m Model) handlePaste(msg tea.PasteMsg) Model {
+	switch m.screen {
+	case screenServersCreate:
+		switch m.create.step {
+		case createStepName:
+			m.create.name += msg.Content
+		case createStepPort:
+			m.create.port += digitsOnly(msg.Content)
+		case createStepConfigMapName:
+			m.create.configMap += msg.Content
+		}
+	case screenModSourcesAdd:
+		switch m.addMod.step {
+		case addModStepValue:
+			m.addMod.value += msg.Content
+		case addModStepLocalID:
+			m.addMod.localID += msg.Content
+		}
+	case screenMissionsUpload:
+		m.uploadMission.path += msg.Content
+	case screenAdminExportState, screenAdminImportState:
+		m.adminState.path += msg.Content
+	}
+	return m
+}
+
+func digitsOnly(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if unicode.IsDigit(r) {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
 
 func (m Model) currentListLen() int {

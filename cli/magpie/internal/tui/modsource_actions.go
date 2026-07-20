@@ -9,24 +9,26 @@ import (
 	"github.com/skua-international/magpie/cli/internal/actions"
 )
 
-// addModSourceKind picks which of AddModSourceSteamURL/HTMLURL/LocalZip
-// the wizard submits to -- mirrors `mods add`'s three mutually exclusive
-// flags (--steam-url/--preset-url/--local-zip+--local-id).
+// addModSourceKind picks which of AddModSourceSteamURL/HTMLURL/
+// HTMLContent/LocalZip the wizard submits to -- mirrors `mods add`'s
+// four mutually exclusive flags (--steam-url/--preset-url/--local-html/
+// --local-zip+--local-id).
 type addModSourceKind int
 
 const (
 	addModSteam addModSourceKind = iota
 	addModPreset
+	addModLocalHTML
 	addModLocalZip
 )
 
-var addModKindLabels = []string{"Steam Workshop URL", "Preset HTML export URL", "Local zip file"}
+var addModKindLabels = []string{"Steam Workshop URL", "Preset HTML export URL", "Local HTML export file", "Local zip file"}
 
 type addModSourceStep int
 
 const (
-	addModStepKind    addModSourceStep = iota // pick which of the three
-	addModStepValue                           // URL, or local zip path
+	addModStepKind    addModSourceStep = iota // pick which of the four
+	addModStepValue                           // URL, or local file path
 	addModStepLocalID                         // only reached for addModLocalZip
 )
 
@@ -55,6 +57,8 @@ func (m Model) addModSourceCmd() tea.Cmd {
 			id, err = actions.AddModSourceSteamURL(m.ctx, m.clients, value)
 		case addModPreset:
 			id, err = actions.AddModSourceHTMLURL(m.ctx, m.clients, value)
+		case addModLocalHTML:
+			id, err = actions.AddModSourceHTMLContent(m.ctx, m.clients, value)
 		case addModLocalZip:
 			id, err = actions.AddModSourceLocalZip(m.ctx, m.clients, localID, value)
 		}
@@ -183,6 +187,8 @@ func (m Model) viewModSourcesAdd() string {
 	switch m.addMod.kind {
 	case addModPreset:
 		valueLabel = "preset HTML export URL"
+	case addModLocalHTML:
+		valueLabel = "local path to .html"
 	case addModLocalZip:
 		valueLabel = "local path to .zip"
 	}

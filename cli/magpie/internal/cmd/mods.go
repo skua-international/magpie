@@ -50,12 +50,13 @@ func modsAddCmd() *cobra.Command {
 	var (
 		steamURL  string
 		presetURL string
+		localHTML string
 		localZip  string
 		localID   string
 	)
 	c := &cobra.Command{
 		Use:   "add",
-		Short: "Register a mod source (exactly one of --steam-url, --preset-url, --local-zip)",
+		Short: "Register a mod source (exactly one of --steam-url, --preset-url, --local-html, --local-zip)",
 		RunE: func(cc *cobra.Command, _ []string) error {
 			cl, err := clients(cc.Context())
 			if err != nil {
@@ -67,13 +68,15 @@ func modsAddCmd() *cobra.Command {
 				id, err = actions.AddModSourceSteamURL(cc.Context(), cl, steamURL)
 			case presetURL != "":
 				id, err = actions.AddModSourceHTMLURL(cc.Context(), cl, presetURL)
+			case localHTML != "":
+				id, err = actions.AddModSourceHTMLContent(cc.Context(), cl, localHTML)
 			case localZip != "":
 				if localID == "" {
 					return fmt.Errorf("--local-id is required with --local-zip")
 				}
 				id, err = actions.AddModSourceLocalZip(cc.Context(), cl, localID, localZip)
 			default:
-				return fmt.Errorf("exactly one of --steam-url, --preset-url, --local-zip is required")
+				return fmt.Errorf("exactly one of --steam-url, --preset-url, --local-html, --local-zip is required")
 			}
 			if err != nil {
 				return err
@@ -84,6 +87,7 @@ func modsAddCmd() *cobra.Command {
 	}
 	c.Flags().StringVar(&steamURL, "steam-url", "", "a single Steam Workshop URL (mod or collection)")
 	c.Flags().StringVar(&presetURL, "preset-url", "", "URL to a preset HTML export")
+	c.Flags().StringVar(&localHTML, "local-html", "", "path to a local preset HTML export file (uploaded directly, not fetched from a URL)")
 	c.Flags().StringVar(&localZip, "local-zip", "", "path to a local mod's zip file")
 	c.Flags().StringVar(&localID, "local-id", "", "stable unique ID for a --local-zip upload")
 	return c

@@ -36,6 +36,25 @@ func AddModSourceHTMLURL(ctx context.Context, c *client.Clients, presetURL strin
 	return resp.Msg.Id, nil
 }
 
+// AddModSourceHTMLContent registers a preset from a local HTML export
+// file's content -- unlike AddModSourceHTMLURL (a link registry itself
+// fetches), this reads the file locally and uploads its bytes directly,
+// same "point at a local file" shape as AddModSourceLocalZip.
+func AddModSourceHTMLContent(ctx context.Context, c *client.Clients, htmlPath string) (string, error) {
+	data, err := os.ReadFile(htmlPath)
+	if err != nil {
+		return "", err
+	}
+	req := &registryv1.AddModSourceRequest{
+		Source: &registryv1.AddModSourceRequest_HtmlContent{HtmlContent: string(data)},
+	}
+	resp, err := c.ModSources.AddModSource(ctx, connect.NewRequest(req))
+	if err != nil {
+		return "", err
+	}
+	return resp.Msg.Id, nil
+}
+
 // AddModSourceLocalZip uploads a local mod from a zip file already on
 // disk -- uniqueID is the caller-assigned, stable reference used as the
 // mod's on-disk directory name (see LocalModUpload's own proto doc).
