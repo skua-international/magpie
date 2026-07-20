@@ -18,6 +18,14 @@ breaking:
   # renderer) always writes exactly main.cfg/basic.cfg regardless, so a
   # non-default filename silently pointed the launcher at a file that was
   # never actually written. Fields are `reserved`, not reused.
+  #
+  # registry/v1: ModSourceKind's MOD_SOURCE_KIND_GAME_FILES = 5 added and
+  # then removed again in the same short-lived change -- surfacing game
+  # files as a selectable ModSource let the create-server picker store
+  # its synthetic id in mod_source_ids, which the controller then tried
+  # to fetch as a real CR and 404'd on. Never shipped in a real release;
+  # nothing depends on it.
   ignore:
     - volume
     - controller
+    - registry
