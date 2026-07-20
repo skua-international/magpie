@@ -16,6 +16,19 @@ metadata:
   namespace: {{ include "magpie.namespace" . }}
   labels:
     {{- include "magpie.labels" . | nindent 4 }}
+  annotations:
+    # ConfigMap `data` has no native comment support -- `kubectl edit`
+    # fetches the live object fresh from the API (a plain key/value map,
+    # no comments ever persisted server-side to begin with), so per-key
+    # inline comments can't survive the way this chart's own YAML
+    # source's comments do. This annotation is the actual achievable
+    # equivalent: it's part of the same object, so it's right there in
+    # the same `kubectl edit` buffer. Keep in sync with README.md's
+    # "Arma server config" table and cli/magpie/internal/cmd/
+    # armaconfig.go's own copy of this text (per-server override
+    # ConfigMaps, created via kubectl not Helm, can't reference this
+    # template at all).
+    magpie.skua.io/field-guide: {{ include "magpie.armaConfigFieldGuide" . | quote }}
 data:
   {{- if .Values.armaConfig.main.hostname }}
   hostname: {{ .Values.armaConfig.main.hostname | quote }}
@@ -30,6 +43,13 @@ data:
   use_battleEye: {{ .Values.armaConfig.main.useBattlEye | toString | quote }}
   verify_signatures: {{ .Values.armaConfig.main.verifySignatures | toString | quote }}
   skip_lobby: {{ .Values.armaConfig.main.skipLobby | toString | quote }}
+  allowed_file_patching: {{ .Values.armaConfig.main.allowedFilePatching | toString | quote }}
+  disable_von: {{ .Values.armaConfig.main.disableVON | toString | quote }}
+  {{- $pairs := list }}
+  {{- range .Values.armaConfig.main.kickTimeout }}
+  {{- $pairs = append $pairs (printf "%v:%v" .level .seconds) }}
+  {{- end }}
+  kick_timeout: {{ $pairs | join "," | quote }}
   allow_zeus_composition_scripts: {{ .Values.armaConfig.main.allowZeusCompositionScripts | toString | quote }}
   allow_custom_glasses: {{ .Values.armaConfig.main.allowCustomGlasses | toString | quote }}
   max_ping: {{ .Values.armaConfig.main.maxPing | toString | quote }}

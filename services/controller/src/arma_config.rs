@@ -196,6 +196,24 @@ fn parse_list(m: &BTreeMap<String, String>, key: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// `"<level>:<seconds>,<level>:<seconds>,..."` -- same comma-separated
+/// convention as every other list-valued key here, just with a `:` pair
+/// separator since kickTimeout[] entries are two numbers, not one. `None`
+/// only when the key is absent entirely (vs. present-but-empty, which is
+/// `Some(vec![])`), so callers can tell "not configured, use the actual
+/// default" apart from "explicitly cleared."
+fn parse_pairs(m: &BTreeMap<String, String>, key: &str) -> Option<Vec<(i64, i64)>> {
+    let raw = m.get(key)?;
+    Some(
+        raw.split(',')
+            .filter_map(|pair| {
+                let (a, b) = pair.trim().split_once(':')?;
+                Some((a.trim().parse().ok()?, b.trim().parse().ok()?))
+            })
+            .collect(),
+    )
+}
+
 pub struct ResolvedMainConfig {
     pub hostname: String,
     pub max_players: i64,
@@ -219,6 +237,16 @@ pub struct ResolvedMainConfig {
     pub other_properties: String,
     pub admins: Vec<String>,
     pub file_patching_exceptions: Vec<String>,
+    /// `(level, seconds)` pairs -- old-fleet default (see issue #25) is
+    /// `{0,1},{1,1},{2,1},{3,1}`, applied whenever the key is absent
+    /// entirely (an explicit empty list stays empty, same as every other
+    /// list field here).
+    pub kick_timeout: Vec<(i64, i64)>,
+    /// 0/1/2, matching Arma's own allowedFilePatching values directly
+    /// (not a bool) -- old-fleet default is 1.
+    pub allowed_file_patching: i64,
+    /// Old-fleet default is 1 (VON disabled).
+    pub disable_von: bool,
 }
 
 pub struct ResolvedBasicConfig {
@@ -297,6 +325,10 @@ async fn resolve_main_config(
         other_properties: m.get("other_properties").cloned().unwrap_or_default(),
         admins,
         file_patching_exceptions: filepatch,
+        kick_timeout: parse_pairs(m, "kick_timeout")
+            .unwrap_or_else(|| vec![(0, 1), (1, 1), (2, 1), (3, 1)]),
+        allowed_file_patching: parse_num(m, "allowed_file_patching").unwrap_or(1),
+        disable_von: parse_bool(m, "disable_von").unwrap_or(true),
     })
 }
 
@@ -332,6 +364,20 @@ fn string_array(items: &[String]) -> String {
     }
 }
 
+/// `{ { a, b }, { a, b }, ... }` -- kickTimeout[]'s own two-number-pair
+/// shape, distinct from string_array's single-value entries.
+fn pair_array(items: &[(i64, i64)]) -> String {
+    if items.is_empty() {
+        "{}".to_string()
+    } else {
+        let entries: Vec<String> = items
+            .iter()
+            .map(|(level, seconds)| format!("{{ {level}, {seconds} }}"))
+            .collect();
+        format!("{{{}}}", entries.join(","))
+    }
+}
+
 pub fn render_main_cfg(cfg: &ResolvedMainConfig) -> String {
     let mut out = String::new();
     out += &format!("hostname = \"{}\";\n\n", escape(&cfg.hostname));
@@ -358,6 +404,9 @@ pub fn render_main_cfg(cfg: &ResolvedMainConfig) -> String {
         if cfg.verify_signatures { 2 } else { 0 }
     );
     out += &format!("skipLobby = {};\n", bool_num(cfg.skip_lobby));
+    out += &format!("allowedFilePatching = {};\n", cfg.allowed_file_patching);
+    out += &format!("disableVON = {};\n", bool_num(cfg.disable_von));
+    out += &format!("kickTimeout[] = {};\n", pair_array(&cfg.kick_timeout));
     out += &format!(
         "zeusCompositionScriptLevel = {};\n",
         if cfg.allow_zeus_composition_scripts {
@@ -453,7 +502,31 @@ mod tests {
             other_properties: "".into(),
             admins: vec!["76561198027717871".into()],
             file_patching_exceptions: vec![],
+            kick_timeout: vec![(0, 1), (1, 1), (2, 1), (3, 1)],
+            allowed_file_patching: 1,
+            disable_von: true,
         }
+    }
+
+    #[test]
+    fn renders_kick_timeout_pairs() {
+        let out = render_main_cfg(&base_main());
+        assert!(out.contains("kickTimeout[] = {{ 0, 1 },{ 1, 1 },{ 2, 1 },{ 3, 1 }};"));
+    }
+
+    #[test]
+    fn empty_kick_timeout_renders_as_empty_braces() {
+        let mut cfg = base_main();
+        cfg.kick_timeout = vec![];
+        let out = render_main_cfg(&cfg);
+        assert!(out.contains("kickTimeout[] = {};"));
+    }
+
+    #[test]
+    fn renders_allowed_file_patching_and_disable_von() {
+        let out = render_main_cfg(&base_main());
+        assert!(out.contains("allowedFilePatching = 1;"));
+        assert!(out.contains("disableVON = 1;"));
     }
 
     #[test]

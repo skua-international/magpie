@@ -94,6 +94,8 @@ This isn't elevated access — visibility into private/unlisted mods and collect
 
 `controller` renders every `ArmaServer`'s `main.cfg`/`basic.cfg` from a cluster-wide baseline ConfigMap (`charts/magpie/values.yaml`'s `armaConfig` block, one per install) merged with an optional per-server override ConfigMap (`ArmaServer.spec.configMap`, same key names, per-server wins key-by-key). The rendered files land as plain files under the server's own `SERVER_ROOT/configs/` on the host — not a mounted, read-only ConfigMap volume — so they stay hand-editable in place afterward if you need to.
 
+Every ConfigMap this creates (the baseline, and any per-server override created via `servers create`'s prompt) carries a `magpie.skua.io/field-guide` annotation -- a per-key reference visible right in `kubectl edit`'s buffer. ConfigMap `data` itself has no native comment support (`kubectl edit` fetches the live object fresh from the API, which never had any to begin with), so this is the closest achievable equivalent.
+
 Right after a successful `magpiectl install`/`deploy`/`upgrade`, you'll be prompted to open the baseline ConfigMap in `$EDITOR` (`kubectl edit`, under the hood). Edit it again any time with:
 
 ```bash
@@ -113,6 +115,9 @@ magpiectl admin armaconfig
 | `use_battleEye` | bool | `false` | `BattlEye` |
 | `verify_signatures` | bool | `true` | `verifySignatures` (2/0) |
 | `skip_lobby` | bool | `false` | `skipLobby` |
+| `allowed_file_patching` | number (0/1/2) | `1` | `allowedFilePatching` |
+| `disable_von` | bool | `true` | `disableVON` |
+| `kick_timeout` | `"level:seconds,..."` | `0:1,1:1,2:1,3:1` | `kickTimeout[]` |
 | `allow_zeus_composition_scripts` | bool | `true` | `zeusCompositionScriptLevel` (2/0) |
 | `allow_custom_glasses` | bool | `false` | `allowProfileGlasses` |
 | `max_ping` | number | `300` | `MaxPing` |
@@ -120,7 +125,7 @@ magpiectl admin armaconfig
 | `password_admin` / `password` / `server_command_password` | string, placeholders + secrets | `""` | same-named fields |
 | `motd` | comma-separated list, placeholders | *(empty)* | `motd[]` |
 | `motd_interval` | number | *unset* | `motdInterval` |
-| `other_properties` | raw text | `""` | appended verbatim at the end |
+| `other_properties` | raw text | `allowedLoadFileExtensions[]`/`allowedPreprocessFileExtensions[]`/`allowedHTMLLoadExtensions[]` (see `values.yaml`) | appended verbatim at the end |
 
 `admins[]`/`filePatchingExceptions[]` are **never** ConfigMap keys — computed on every reconcile from identities holding the `arma:admin`/`arma:filepatch` scopes (`magpiectl` doesn't grant scopes today; use `registry_db::grant_scopes` directly, or the first-ever login, which gets `*`). This reads `linked_accounts`' Steam OpenID `provider_user_id`, already the exact SteamID64 string Arma wants.
 

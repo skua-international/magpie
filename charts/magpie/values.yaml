@@ -333,6 +333,21 @@ armaConfig:
     useBattlEye: false
     verifySignatures: true
     skipLobby: false
+    # 0/1/2, matching Arma's own allowedFilePatching values directly.
+    allowedFilePatching: 1
+    disableVON: true
+    # (level, seconds) pairs -- old-fleet default. An empty list renders
+    # as kickTimeout[] = {} (kicks disabled), same as any other empty
+    # list field here.
+    kickTimeout:
+      - level: 0
+        seconds: 1
+      - level: 1
+        seconds: 1
+      - level: 2
+        seconds: 1
+      - level: 3
+        seconds: 1
     allowZeusCompositionScripts: true
     allowCustomGlasses: false
     maxPing: 300
@@ -344,8 +359,17 @@ armaConfig:
     serverCommandPassword: ""
     motd: []
     motdInterval: ""
-    # Raw text appended verbatim at the end of main.cfg.
-    otherProperties: ""
+    # Raw text appended verbatim at the end of main.cfg. Defaults to the
+    # old fleet's own allowed*Extensions[] lists (issue #25) -- a sane
+    # cluster-level default, not typed/per-server-overridable fields of
+    # their own, but still just this same escape hatch underneath, so
+    # overriding it (per-server via spec.configMap, or cluster-wide by
+    # setting this value directly) works exactly like overriding any
+    # other otherProperties content would.
+    otherProperties: |-
+      allowedLoadFileExtensions[] = {"h","hpp","sqs","sqf","fsm","cpp","paa","txt","xml","inc","ext","sqm","ods","fxy","lip","csv","kb","bik","bikb","html","htm","biedi","b64"};
+      allowedPreprocessFileExtensions[] = {"h","hpp","sqs","sqf","fsm","cpp","paa","txt","xml","inc","ext","sqm","ods","fxy","lip","csv","kb","bik","bikb","html","htm","biedi"};
+      allowedHTMLLoadExtensions[] = {"htm","html","xml","txt"};
   # All fields here default unset (not 0), omitted entirely when unset --
   # matches basic.cfg's own convention of only setting what you mean to.
   basic:
