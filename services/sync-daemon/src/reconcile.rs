@@ -95,6 +95,14 @@ async fn apply(obj: &ModSource, ctx: &Ctx) -> anyhow::Result<Action> {
 
 async fn resolve(obj: &ModSource, ctx: &Ctx) -> anyhow::Result<Action> {
     let name = obj.name_any();
+    // Checked before this reconcile's own set_status call below -- true
+    // only for a source that was already fully resolved going into this
+    // reconcile (i.e. a steady-state drift recheck, not this source's
+    // first-ever resolve).
+    let was_already_synced = obj
+        .status
+        .as_ref()
+        .is_some_and(|s| s.phase == ModSourcePhase::Synced);
 
     let (candidate_ids, kind_hint) = match &obj.spec.source {
         ModSourceInput::SteamUrl(url) => {
@@ -153,6 +161,29 @@ async fn resolve(obj: &ModSource, ctx: &Ctx) -> anyhow::Result<Action> {
             )
             .await?;
             info!("{name}: resolved");
+
+            // Auto-sync content the moment a source first resolves,
+            // rather than waiting for an operator to hit SyncModSource or
+            // for some server to start (the only two triggers before
+            // this). Gated on was_already_synced so a routine drift
+            // recheck of an already-synced source doesn't re-download on
+            // every requeue -- steam-sync's own chunk-diffing already
+            // makes re-syncs cheap, but there's no reason to pay even
+            // that cost on a timer for content that hasn't changed.
+            // Spawned, not awaited: a fresh mod's download can take a
+            // while and shouldn't hold up this reconcile's own return.
+            if !was_already_synced {
+                let shared = ctx.shared.clone();
+                let name = name.clone();
+                tokio::spawn(async move {
+                    info!("{name}: syncing content after first resolve");
+                    match shared.sync_content().await {
+                        Ok(()) => info!("{name}: content synced"),
+                        Err(e) => warn!("{name}: failed to auto-sync content: {e:#}"),
+                    }
+                });
+            }
+
             Ok(Action::requeue(ctx.drift_requeue))
         }
         Err(e) => {

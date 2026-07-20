@@ -29,6 +29,14 @@ use uuid::Uuid;
 
 use crate::storage;
 
+/// Sentinel `id` for the synthetic game-files entry `list_mod_sources`
+/// prepends -- not a real `ModSource` name (those are UUIDs), so it can
+/// never collide with one, and `delete_mod_source`/`sync_mod_source`
+/// check for it explicitly rather than letting it fall through to a
+/// confusing "no such mod source" 404 (it does "exist", just not as a
+/// mutable object).
+pub(crate) const GAME_FILES_ID: &str = "game-files";
+
 pub struct ModSourceServiceImpl {
     client: Client,
     namespace: String,
@@ -182,6 +190,12 @@ impl protocol::proto::registry::v1::ModSourceService for ModSourceServiceImpl {
         _ctx: RequestContext,
         request: ServiceRequest<'_, DeleteModSourceRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<DeleteModSourceResponse> + Send + use<'a>> {
+        if request.id == GAME_FILES_ID {
+            return Err(ConnectError::invalid_argument(
+                "game files are always synced automatically and can't be deleted",
+            ));
+        }
+
         let obj = self.api().get(request.id).await.map_err(|e| match e {
             kube::Error::Api(e) if e.code == 404 => {
                 ConnectError::not_found(format!("no such mod source: {}", request.id))
@@ -213,7 +227,30 @@ impl protocol::proto::registry::v1::ModSourceService for ModSourceServiceImpl {
             .list(&ListParams::default())
             .await
             .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
-        let sources = objs.items.iter().map(to_mod_source_info).collect();
+
+        // Best-effort: sync-daemon being briefly unreachable shouldn't
+        // fail the whole listing, just show the synthetic entry with an
+        // unknown (0) size for this call.
+        let game_files_bytes = match self.sync_client.sync_stats().await {
+            Ok(stats) => stats.game_files_bytes,
+            Err(e) => {
+                tracing::warn!("failed to fetch game files size: {e:#}");
+                0
+            }
+        };
+        let game_files = ModSourceInfo {
+            id: GAME_FILES_ID.to_string(),
+            kind: EnumValue::Known(ProtoKind::GameFiles),
+            reference: "Arma 3 Dedicated Server (+ CDLC)".to_string(),
+            display_name: String::new(),
+            created_at_unix_ms: 0,
+            size_bytes: game_files_bytes,
+            ..Default::default()
+        };
+
+        let sources = std::iter::once(game_files)
+            .chain(objs.items.iter().map(to_mod_source_info))
+            .collect();
         Response::ok(ListModSourcesResponse {
             sources,
             ..Default::default()
@@ -225,6 +262,12 @@ impl protocol::proto::registry::v1::ModSourceService for ModSourceServiceImpl {
         _ctx: RequestContext,
         request: ServiceRequest<'_, SyncModSourceRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<SyncModSourceResponse> + Send + use<'a>> {
+        if request.id == GAME_FILES_ID {
+            return Err(ConnectError::invalid_argument(
+                "game files are always kept synced automatically, no need to sync manually",
+            ));
+        }
+
         let obj = self.api().get(request.id).await.map_err(|e| match e {
             kube::Error::Api(e) if e.code == 404 => {
                 ConnectError::not_found(format!("no such mod source: {}", request.id))

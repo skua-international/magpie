@@ -166,7 +166,14 @@ impl Shared {
         self.jobs.lock().unwrap().insert(job_id, status);
     }
 
-    async fn do_claim(&self) -> anyhow::Result<String> {
+    /// Downloads server/CDLC depots plus every currently-registered
+    /// source's resolved mods into the shared golden tree -- no claim/
+    /// snapshot involved, so nothing to leak or clean up. Shared by
+    /// `do_claim` (which snapshots the result for a specific caller) and
+    /// callers that just want content warmed without anyone waiting on a
+    /// claim path right now: the reconciler's auto-sync-on-first-resolve
+    /// (`reconcile.rs`) and main.rs's sync-on-startup.
+    pub async fn sync_content(&self) -> anyhow::Result<()> {
         let sem = Arc::new(Semaphore::new(steam::SYNC_CONCURRENCY));
         let tasks: Mutex<SyncTasks> = Mutex::new(SyncTasks::new());
 
@@ -217,7 +224,11 @@ impl Shared {
         while let Some(result) = tasks.join_next().await {
             result??;
         }
+        Ok(())
+    }
 
+    async fn do_claim(&self) -> anyhow::Result<String> {
+        self.sync_content().await?;
         let claim_id = Uuid::now_v7();
         let claim_dir = self.claims_root.join(claim_id.to_string());
         let claim_path = steam_sync::claim::claim(&self.content_root, &claim_dir)?;

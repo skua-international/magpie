@@ -134,6 +134,12 @@ enum ModSourceKind {
   // resolves to however many mod IDs the preset listed, with no single
   // Workshop item/collection identity of its own.
   MOD_SOURCE_KIND_PRESET = 4;
+  // The base game (+ CDLC) depots -- synthetic, not backed by a real
+  // ModSource object. Always present in ListModSources, always kept
+  // synced by sync-daemon regardless of the source registry (see
+  // services/sync-daemon/src/service.rs's do_claim/sync_content), and
+  // can't be added or deleted through this service.
+  MOD_SOURCE_KIND_GAME_FILES = 5;
 }
 
 message ModSourceInfo {

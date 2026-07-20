@@ -32,6 +32,12 @@ const (
 	// resolves to however many mod IDs the preset listed, with no single
 	// Workshop item/collection identity of its own.
 	ModSourceKind_MOD_SOURCE_KIND_PRESET ModSourceKind = 4
+	// The base game (+ CDLC) depots -- synthetic, not backed by a real
+	// ModSource object. Always present in ListModSources, always kept
+	// synced by sync-daemon regardless of the source registry (see
+	// services/sync-daemon/src/service.rs's do_claim/sync_content), and
+	// can't be added or deleted through this service.
+	ModSourceKind_MOD_SOURCE_KIND_GAME_FILES ModSourceKind = 5
 )
 
 // Enum value maps for ModSourceKind.
@@ -42,6 +48,7 @@ var (
 		2: "MOD_SOURCE_KIND_COLLECTION",
 		3: "MOD_SOURCE_KIND_LOCAL",
 		4: "MOD_SOURCE_KIND_PRESET",
+		5: "MOD_SOURCE_KIND_GAME_FILES",
 	}
 	ModSourceKind_value = map[string]int32{
 		"MOD_SOURCE_KIND_UNSPECIFIED": 0,
@@ -49,6 +56,7 @@ var (
 		"MOD_SOURCE_KIND_COLLECTION":  2,
 		"MOD_SOURCE_KIND_LOCAL":       3,
 		"MOD_SOURCE_KIND_PRESET":      4,
+		"MOD_SOURCE_KIND_GAME_FILES":  5,
 	}
 )
 
@@ -2173,13 +2181,14 @@ const file_registry_v1_registry_proto_rawDesc = "" +
 	"\x18RefreshSteamAuthResponse\"&\n" +
 	"\x14DeleteMissionRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x17\n" +
-	"\x15DeleteMissionResponse*\xa0\x01\n" +
+	"\x15DeleteMissionResponse*\xc0\x01\n" +
 	"\rModSourceKind\x12\x1f\n" +
 	"\x1bMOD_SOURCE_KIND_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13MOD_SOURCE_KIND_MOD\x10\x01\x12\x1e\n" +
 	"\x1aMOD_SOURCE_KIND_COLLECTION\x10\x02\x12\x19\n" +
 	"\x15MOD_SOURCE_KIND_LOCAL\x10\x03\x12\x1a\n" +
-	"\x16MOD_SOURCE_KIND_PRESET\x10\x04*\x86\x01\n" +
+	"\x16MOD_SOURCE_KIND_PRESET\x10\x04\x12\x1e\n" +
+	"\x1aMOD_SOURCE_KIND_GAME_FILES\x10\x05*\x86\x01\n" +
 	"\x14ExportedDesiredState\x12&\n" +
 	"\"EXPORTED_DESIRED_STATE_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1eEXPORTED_DESIRED_STATE_RUNNING\x10\x01\x12\"\n" +

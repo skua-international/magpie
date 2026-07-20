@@ -125,6 +125,24 @@ async fn main() -> Result<()> {
         shared.clone(),
     );
 
+    // Warm the golden tree (base game + CDLC, plus anything already
+    // registered) as soon as this process comes up, instead of only ever
+    // syncing lazily on the first server start or an operator's manual
+    // SyncModSource call. Spawned, not awaited -- a cold cluster's first
+    // download can take a while and shouldn't block readiness. Degrades
+    // to a logged warning (not a crash) with no Steam session yet, same
+    // as everywhere else in this file.
+    {
+        let shared = shared.clone();
+        tokio::spawn(async move {
+            info!("syncing game files at startup");
+            match shared.sync_content().await {
+                Ok(()) => info!("startup content sync complete"),
+                Err(e) => warn!("startup content sync failed: {e:#}"),
+            }
+        });
+    }
+
     let sync_service = SyncServiceImpl::new(shared);
     let connect = ConnectRouter::new().add_service(sync_service);
 
