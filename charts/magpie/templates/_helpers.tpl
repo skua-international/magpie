@@ -112,9 +112,12 @@ Called as: {{- include "magpie.waitForPostgresInit" . | nindent 8 }}
   image: {{ .Values.postgres.image }}
   # The postgres image runs as root by default (its own entrypoint drops
   # to the "postgres" user itself, but overriding command/args the way
-  # this initContainer does bypasses that entirely) -- every Deployment
-  # this attaches to sets runAsNonRoot: true at the pod level, which
-  # rejects a container with no explicit non-root UID of its own,
+  # this initContainer does bypasses that entirely) -- every container
+  # here ends up requiring a non-root UID one way or another (either a
+  # pod-level runAsNonRoot: true this inherits, or its own Deployment's
+  # main container declaring it directly -- see chownHostPathInit's own
+  # doc for why a couple of these went the second way), and a container
+  # with no explicit non-root UID of its own fails outright either way,
   # confirmed live ("container has runAsNonRoot and image will run as
   # root"). pg_isready needs no particular UID, so nobody (65534) is a
   # safe, image-independent choice rather than guessing this image's own
@@ -158,6 +161,24 @@ Called as: {{- include "magpie.chownHostPathInit" (dict "name" "server-roots" "p
   volumeMounts:
     - name: {{ .name }}
       mountPath: {{ .path }}
+{{- end -}}
+
+{{/*
+Pod-template annotations advertising this service's own /metrics to a
+Prometheus scraping the cluster via the standard annotation-based
+kubernetes_sd_config discovery -- plain prometheus.io/* annotations
+rather than a PodMonitor/ServiceMonitor CRD, so this doesn't depend on
+prometheus-operator's CRDs existing in the cluster just because an
+operator wants these scraped (see the observability-metrics plan's own
+"Discovery mechanism" note). Same mechanism ArmaServerSpec.metrics uses
+for an operator's own per-server exporter (services/controller/src/
+reconcile.rs's ensure_deployment).
+Called as: {{- include "magpie.prometheusAnnotations" (dict "port" 8444) | nindent 8 }}
+*/}}
+{{- define "magpie.prometheusAnnotations" -}}
+prometheus.io/scrape: "true"
+prometheus.io/port: {{ .port | quote }}
+prometheus.io/path: "/metrics"
 {{- end -}}
 
 {{/*

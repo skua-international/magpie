@@ -18,11 +18,14 @@ spec:
       labels:
         {{- include "magpie.labels" . | nindent 8 }}
         app.kubernetes.io/component: registry
+      annotations:
+        {{- include "magpie.prometheusAnnotations" (dict "port" .Values.registry.service.port) | nindent 8 }}
     spec:
       {{- include "magpie.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "magpie.fullname" . }}-registry
-      securityContext:
-        runAsNonRoot: true
+      # Deliberately no pod-level runAsNonRoot -- see controller-
+      # deployment.yaml's identical comment for why (chown-local-content
+      # below genuinely needs root).
       initContainers:
         {{- include "magpie.waitForPostgresInit" . | nindent 8 }}
         {{- include "magpie.chownHostPathInit" (dict "name" "local-content" "path" .Values.hostPaths.localContentPath "root" $) | nindent 8 }}
@@ -31,6 +34,7 @@ spec:
           image: {{ include "magpie.image" (dict "root" $ "override" .Values.registry.image) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
+            runAsNonRoot: true
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
