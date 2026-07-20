@@ -120,6 +120,40 @@ impl ServerServiceImpl {
     }
 }
 
+/// Kubernetes object names must satisfy DNS-1123 label rules (lowercase
+/// alphanumeric and `-` only, must start/end alphanumeric, max 63
+/// chars) -- `name` becomes the `ArmaServer`'s own `metadata.name`
+/// verbatim (`create_server`, below), completely unvalidated before
+/// this. Confirmed live: a name with a space ("test server") sailed
+/// past the old empty-check, then failed deep inside kube-rs's own HTTP
+/// client with "Failed to build request: ... invalid uri character" --
+/// a raw space breaks `http::Uri`'s strict parser when kube-rs
+/// interpolates the name into a request path, and that error gives the
+/// caller zero indication *why*. Catching this before it ever reaches
+/// kube-rs turns that into an immediate, actionable INVALID_ARGUMENT
+/// instead.
+fn validate_k8s_name(name: &str) -> Result<(), &'static str> {
+    if name.len() > 63 {
+        return Err("must be 63 characters or fewer");
+    }
+    let is_label_char = |c: char| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-';
+    if !name.chars().all(is_label_char) {
+        return Err("must contain only lowercase letters, digits, and '-'");
+    }
+    let starts_alnum = name
+        .chars()
+        .next()
+        .is_some_and(|c| c.is_ascii_alphanumeric());
+    let ends_alnum = name
+        .chars()
+        .last()
+        .is_some_and(|c| c.is_ascii_alphanumeric());
+    if !starts_alnum || !ends_alnum {
+        return Err("must start and end with a letter or digit");
+    }
+    Ok(())
+}
+
 fn phase_to_proto(phase: ArmaServerPhase) -> ServerPhase {
     match phase {
         ArmaServerPhase::Stopped => ServerPhase::Stopped,
@@ -160,6 +194,12 @@ impl protocol::proto::controller::v1::ServerService for ServerServiceImpl {
     ) -> ServiceResult<impl connectrpc::Encodable<ServerInfo> + Send + use<'a>> {
         if request.name.is_empty() {
             return Err(ConnectError::invalid_argument("name is required"));
+        }
+        if let Err(reason) = validate_k8s_name(&request.name) {
+            return Err(ConnectError::invalid_argument(format!(
+                "invalid name {:?}: {reason}",
+                request.name
+            )));
         }
         let port = request.port as u16;
         self.check_port_conflict(port, None).await?;

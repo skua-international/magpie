@@ -579,10 +579,10 @@ func (m Model) View() tea.View {
 		} else if m.err != nil {
 			b.WriteString(errorStyle.Render(m.err.Error()))
 		} else if m.diskUsage != nil {
-			b.WriteString(fmt.Sprintf("mods:       %d bytes\n", m.diskUsage.ModsBytes))
-			b.WriteString(fmt.Sprintf("missions:   %d bytes\n", m.diskUsage.MissionsBytes))
-			b.WriteString(fmt.Sprintf("game files: %d bytes\n", m.diskUsage.GameFilesBytes))
-			b.WriteString(fmt.Sprintf("total:      %d bytes\n", m.diskUsage.TotalBytes))
+			b.WriteString(fmt.Sprintf("mods:       %s\n", actions.HumanBytes(m.diskUsage.ModsBytes)))
+			b.WriteString(fmt.Sprintf("missions:   %s\n", actions.HumanBytes(m.diskUsage.MissionsBytes)))
+			b.WriteString(fmt.Sprintf("game files: %s\n", actions.HumanBytes(m.diskUsage.GameFilesBytes)))
+			b.WriteString(fmt.Sprintf("total:      %s\n", actions.HumanBytes(m.diskUsage.TotalBytes)))
 		}
 		b.WriteString("\n" + dimStyle.Render("e: edit baseline config, r: refresh Steam auth, x: export state, m: import state, esc to go back"))
 
