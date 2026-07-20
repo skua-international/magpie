@@ -42,12 +42,25 @@ pub struct AuthState {
     pub required_scope: fn(&str) -> Option<&'static str>,
 }
 
+/// Records `magpie_rpc_requests_total{path, status}` -- `status` is a
+/// coarse class (`401`/`403`/`404`/`500`/`2xx`), not a raw HTTP code
+/// (Connect's own RPC-level error codes live in the response body, not
+/// necessarily the HTTP status, but every early-return path here still
+/// maps to a distinct real HTTP status worth breaking out on its own).
+fn record_outcome(path: &str, status: &'static str) {
+    metrics::counter!("magpie_rpc_requests_total", "path" => path.to_string(), "status" => status)
+        .increment(1);
+}
+
 pub async fn require_auth(
     State(state): State<Arc<AuthState>>,
     mut request: Request,
     next: Next,
 ) -> Response {
-    let Some(required) = (state.required_scope)(request.uri().path()) else {
+    let path = request.uri().path().to_string();
+
+    let Some(required) = (state.required_scope)(&path) else {
+        record_outcome(&path, "404");
         return (StatusCode::NOT_FOUND, "unknown procedure").into_response();
     };
 
@@ -57,18 +70,23 @@ pub async fn require_auth(
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.strip_prefix("Bearer "))
     else {
+        record_outcome(&path, "401");
         return (StatusCode::UNAUTHORIZED, "missing bearer token").into_response();
     };
 
     let subject = match state.verifier.verify(token) {
         Ok(subject) => subject,
-        Err(msg) => return (StatusCode::UNAUTHORIZED, msg).into_response(),
+        Err(msg) => {
+            record_outcome(&path, "401");
+            return (StatusCode::UNAUTHORIZED, msg).into_response();
+        }
     };
 
     let scopes = match registry_db::scopes_for_subject(&state.pool, &subject).await {
         Ok(scopes) => scopes,
         Err(e) => {
             tracing::error!("failed to look up scopes for {subject}: {e:#}");
+            record_outcome(&path, "500");
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "authorization check failed",
@@ -79,6 +97,7 @@ pub async fn require_auth(
 
     let identity = AuthIdentity { subject, scopes };
     if !identity.has_scope(required) {
+        record_outcome(&path, "403");
         return (
             StatusCode::FORBIDDEN,
             format!("missing required scope: {required}"),
@@ -87,5 +106,19 @@ pub async fn require_auth(
     }
 
     request.extensions_mut().insert(identity);
-    next.run(request).await
+
+    let in_flight = metrics::gauge!("magpie_rpc_requests_in_flight", "path" => path.clone());
+    in_flight.increment(1.0);
+    let response = next.run(request).await;
+    in_flight.decrement(1.0);
+
+    record_outcome(
+        &path,
+        if response.status().is_success() {
+            "2xx"
+        } else {
+            "5xx"
+        },
+    );
+    response
 }

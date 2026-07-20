@@ -1439,8 +1439,11 @@ type ExportedServer struct {
 	Profiling           bool                 `protobuf:"varint,6,opt,name=profiling,proto3" json:"profiling,omitempty"`
 	Params              []string             `protobuf:"bytes,7,rep,name=params,proto3" json:"params,omitempty"`
 	DesiredState        ExportedDesiredState `protobuf:"varint,8,opt,name=desired_state,json=desiredState,proto3,enum=registry.v1.ExportedDesiredState" json:"desired_state,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// Mirrors ArmaServerSpec.metrics -- see its own doc.
+	MetricsPort   *uint32 `protobuf:"varint,9,opt,name=metrics_port,json=metricsPort,proto3,oneof" json:"metrics_port,omitempty"`
+	MetricsPath   *string `protobuf:"bytes,10,opt,name=metrics_path,json=metricsPath,proto3,oneof" json:"metrics_path,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ExportedServer) Reset() {
@@ -1527,6 +1530,20 @@ func (x *ExportedServer) GetDesiredState() ExportedDesiredState {
 		return x.DesiredState
 	}
 	return ExportedDesiredState_EXPORTED_DESIRED_STATE_UNSPECIFIED
+}
+
+func (x *ExportedServer) GetMetricsPort() uint32 {
+	if x != nil && x.MetricsPort != nil {
+		return *x.MetricsPort
+	}
+	return 0
+}
+
+func (x *ExportedServer) GetMetricsPath() string {
+	if x != nil && x.MetricsPath != nil {
+		return *x.MetricsPath
+	}
+	return ""
 }
 
 type ExportStateRequest struct {
@@ -2108,7 +2125,7 @@ const file_registry_v1_registry_proto_rawDesc = "" +
 	"\x04data\x18\x02 \x03(\v2(.registry.v1.ExportedConfigMap.DataEntryR\x04data\x1a7\n" +
 	"\tDataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xb1\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa3\x03\n" +
 	"\x0eExportedServer\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\rR\x04port\x122\n" +
@@ -2118,8 +2135,13 @@ const file_registry_v1_registry_proto_rawDesc = "" +
 	"\x04cdlc\x18\x05 \x03(\tR\x04cdlc\x12\x1c\n" +
 	"\tprofiling\x18\x06 \x01(\bR\tprofiling\x12\x16\n" +
 	"\x06params\x18\a \x03(\tR\x06params\x12F\n" +
-	"\rdesired_state\x18\b \x01(\x0e2!.registry.v1.ExportedDesiredStateR\fdesiredStateB\r\n" +
-	"\v_config_map\"\x14\n" +
+	"\rdesired_state\x18\b \x01(\x0e2!.registry.v1.ExportedDesiredStateR\fdesiredState\x12&\n" +
+	"\fmetrics_port\x18\t \x01(\rH\x01R\vmetricsPort\x88\x01\x01\x12&\n" +
+	"\fmetrics_path\x18\n" +
+	" \x01(\tH\x02R\vmetricsPath\x88\x01\x01B\r\n" +
+	"\v_config_mapB\x0f\n" +
+	"\r_metrics_portB\x0f\n" +
+	"\r_metrics_path\"\x14\n" +
 	"\x12ExportStateRequest\"\x9a\x02\n" +
 	"\x13ExportStateResponse\x12.\n" +
 	"\x13exported_at_rfc3339\x18\x01 \x01(\tR\x11exportedAtRfc3339\x12?\n" +

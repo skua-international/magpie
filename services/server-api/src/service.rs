@@ -12,8 +12,8 @@ use std::sync::Arc;
 use buffa::enumeration::EnumValue;
 use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest, ServiceResult};
 use crd::{
-    ArmaServer, ArmaServerPhase, ArmaServerSpec, DesiredState, ModSource, ModSourceInput,
-    port_ranges_overlap,
+    ArmaServer, ArmaServerMetrics, ArmaServerPhase, ArmaServerSpec, DesiredState, ModSource,
+    ModSourceInput, port_ranges_overlap,
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use kube::api::{Api, DeleteParams, ListParams, Patch, PatchParams};
@@ -185,6 +185,10 @@ impl protocol::proto::controller::v1::ServerService for ServerServiceImpl {
             // fallback -- arma_config.rs's fetch_and_merge propagates a
             // missing override ConfigMap as an error.
             config_map: request.config_map.map(|s| s.to_string()),
+            metrics: request.metrics_port.map(|port| ArmaServerMetrics {
+                port: port as u16,
+                path: request.metrics_path.map(|s| s.to_string()),
+            }),
         };
         let name = request.name.to_string();
 

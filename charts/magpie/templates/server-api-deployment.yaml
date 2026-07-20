@@ -18,6 +18,8 @@ spec:
       labels:
         {{- include "magpie.labels" . | nindent 8 }}
         app.kubernetes.io/component: server-api
+      annotations:
+        {{- include "magpie.prometheusAnnotations" (dict "port" .Values.serverApi.service.port) | nindent 8 }}
     spec:
       {{- include "magpie.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "magpie.fullname" . }}-server-api

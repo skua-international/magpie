@@ -17,6 +17,7 @@ use axum::routing::get;
 use axum::{Router, middleware};
 use connectrpc::Router as ConnectRouter;
 use kube::Client;
+use metrics_exporter_prometheus::PrometheusBuilder;
 use server_api::config::Config;
 use server_api::service::ServerServiceImpl;
 use sync_client::SyncClient;
@@ -52,6 +53,9 @@ async fn main() -> Result<()> {
     let client = Client::try_default().await?;
     info!("connected to Kubernetes API");
 
+    let prometheus_handle = PrometheusBuilder::new().install_recorder()?;
+    server_api::metrics::spawn(client.clone(), cfg.namespace.clone());
+
     let sync_client = SyncClient::new(&cfg.sync_daemon_url)?;
     let server_service = ServerServiceImpl::new(client, cfg.namespace.clone(), sync_client);
 
@@ -70,6 +74,10 @@ async fn main() -> Result<()> {
 
     let app = Router::new()
         .route("/healthz", get(|| async { "ok" }))
+        .route(
+            "/metrics",
+            get(|| async move { prometheus_handle.render() }),
+        )
         .fallback_service(connect_service);
 
     let listener = tokio::net::TcpListener::bind(&cfg.listen_addr).await?;

@@ -288,6 +288,9 @@ message ExportedServer {
   bool profiling = 6;
   repeated string params = 7;
   ExportedDesiredState desired_state = 8;
+  // Mirrors ArmaServerSpec.metrics -- see its own doc.
+  optional uint32 metrics_port = 9;
+  optional string metrics_path = 10;
 }
 
 message ExportStateRequest {}

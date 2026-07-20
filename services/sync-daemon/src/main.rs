@@ -9,6 +9,7 @@ use axum::routing::get;
 use config::{Config, SteamAuthConfig};
 use connectrpc::Router as ConnectRouter;
 use kube::Client;
+use metrics_exporter_prometheus::PrometheusBuilder;
 use secrets::Session;
 use service::{Shared, SyncServiceImpl};
 use steam_sync::cache::SyncState;
@@ -127,8 +128,17 @@ async fn main() -> Result<()> {
     let sync_service = SyncServiceImpl::new(shared);
     let connect = ConnectRouter::new().add_service(sync_service);
 
+    // No require_auth layer here at all (internal-only service, see this
+    // file's own doc), so the RPC counters that middleware records for
+    // registry/server-api don't apply -- /metrics exists regardless, for
+    // shape consistency and whatever gets added here later.
+    let prometheus_handle = PrometheusBuilder::new().install_recorder()?;
     let app = Router::new()
         .route("/healthz", get(|| async { "ok" }))
+        .route(
+            "/metrics",
+            get(|| async move { prometheus_handle.render() }),
+        )
         .fallback_service(connect.into_axum_service());
 
     let listener = tokio::net::TcpListener::bind(&cfg.listen_addr).await?;

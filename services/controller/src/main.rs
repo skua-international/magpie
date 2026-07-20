@@ -22,6 +22,7 @@ use controller::config::Config;
 use controller::postgres_bootstrap::{self, AppPostgresConfig};
 use controller::reconcile;
 use kube::Client;
+use metrics_exporter_prometheus::PrometheusBuilder;
 use tracing::info;
 
 #[tokio::main]
@@ -64,6 +65,8 @@ async fn main() -> Result<()> {
     )
     .await?;
 
+    let prometheus_handle = PrometheusBuilder::new().install_recorder()?;
+
     reconcile::spawn(client, pool, cfg)?;
 
     // Only ever bound once every startup step above (kube::Client,
@@ -72,7 +75,18 @@ async fn main() -> Result<()> {
     // that startup hasn't completed, not just a race to probe too
     // early. No readiness distinction from liveness: this reconciler
     // has no notion of "up but not ready yet" beyond that.
-    let app = Router::new().route("/healthz", get(|| async { "ok" }));
+    //
+    // /metrics has nothing published to it yet -- this reconciler has no
+    // business metrics of its own today (server crash/restart counts
+    // deliberately come from kube-state-metrics instead, see the plan
+    // this landed under), the route exists so the shape is consistent
+    // with every other service and ready for whatever gets added later.
+    let app = Router::new()
+        .route("/healthz", get(|| async { "ok" }))
+        .route(
+            "/metrics",
+            get(|| async move { prometheus_handle.render() }),
+        );
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await?;
     info!("healthz listening on :8080");
     axum::serve(listener, app).await?;

@@ -12,6 +12,8 @@ connectrpc = { version = "0.8.1", features = ["axum"] }
 crd = { path = "../../crates/crd" }
 k8s-openapi = { version = "0.28.0", features = ["latest"] }
 kube = { version = "4.0.0", features = ["derive"] }
+metrics = "0.24"
+metrics-exporter-prometheus = { version = "0.16", default-features = false }
 protocol = { path = "../../crates/protocol" }
 registry-db = { path = "../../crates/registry-db" }
 serde_json = "1.0.150"

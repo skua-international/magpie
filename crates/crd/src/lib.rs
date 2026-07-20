@@ -52,6 +52,31 @@ pub struct ArmaServerSpec {
     /// "baseline only".
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config_map: Option<String>,
+    /// A metrics endpoint this server's own game process/extension
+    /// exposes, if any -- purely a scrape hint for the future
+    /// observability addon (see README.md's "Why?" and issue #17):
+    /// `services/controller/src/reconcile.rs`'s `ensure_deployment`
+    /// copies this straight into `prometheus.io/scrape`/`port`/`path`
+    /// annotations on the launcher Pod, the same discovery mechanism
+    /// every one of this chart's own services already advertises
+    /// themselves with. Nothing in this repo runs anything on this port
+    /// -- it's entirely the operator's own exporter to configure.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metrics: Option<ArmaServerMetrics>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+pub struct ArmaServerMetrics {
+    pub port: u16,
+    /// Defaults to "/metrics" (the Prometheus convention) when unset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+}
+
+impl ArmaServerMetrics {
+    pub fn path_or_default(&self) -> &str {
+        self.path.as_deref().unwrap_or("/metrics")
+    }
 }
 
 /// The 5-port range Arma actually binds for a given base `port` (matching

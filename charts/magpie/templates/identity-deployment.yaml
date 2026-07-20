@@ -18,6 +18,8 @@ spec:
       labels:
         {{- include "magpie.labels" . | nindent 8 }}
         app.kubernetes.io/component: identity
+      annotations:
+        {{- include "magpie.prometheusAnnotations" (dict "port" .Values.identity.service.port) | nindent 8 }}
     spec:
       {{- include "magpie.imagePullSecrets" . | nindent 6 }}
       # No ServiceAccount token needed -- this service never talks to the

@@ -382,6 +382,24 @@ async fn ensure_deployment(
     ]
     .into();
 
+    // Purely a scrape hint for the operator's own exporter on
+    // spec.metrics (see ArmaServerSpec.metrics's own doc) -- plain
+    // prometheus.io/* annotations rather than a PodMonitor/ServiceMonitor
+    // CRD, same discovery mechanism this chart's own services advertise
+    // themselves with (see charts/magpie/templates/*-deployment.yaml),
+    // so it doesn't depend on prometheus-operator's CRDs existing in the
+    // cluster just because an operator wants their own exporter scraped.
+    let pod_annotations = obj.spec.metrics.as_ref().map(|m| {
+        std::collections::BTreeMap::from([
+            ("prometheus.io/scrape".to_string(), "true".to_string()),
+            ("prometheus.io/port".to_string(), m.port.to_string()),
+            (
+                "prometheus.io/path".to_string(),
+                m.path_or_default().to_string(),
+            ),
+        ])
+    });
+
     let deployment = Deployment {
         metadata: ObjectMeta {
             name: Some(name.clone()),
@@ -410,6 +428,7 @@ async fn ensure_deployment(
             template: PodTemplateSpec {
                 metadata: Some(ObjectMeta {
                     labels: Some(labels),
+                    annotations: pod_annotations,
                     ..Default::default()
                 }),
                 spec: Some(PodSpec {

@@ -53,6 +53,8 @@ func serversCreateCmd() *cobra.Command {
 		modSourceIDs []string
 		configMap    string
 		namespace    string
+		metricsPort  uint32
+		metricsPath  string
 	)
 	c := &cobra.Command{
 		Use:   "create <name>",
@@ -78,6 +80,8 @@ func serversCreateCmd() *cobra.Command {
 				Port:         port,
 				ModSourceIDs: modSourceIDs,
 				ConfigMap:    configMap,
+				MetricsPort:  metricsPort,
+				MetricsPath:  metricsPath,
 			})
 			if err != nil {
 				return err
@@ -90,6 +94,8 @@ func serversCreateCmd() *cobra.Command {
 	c.Flags().StringSliceVar(&modSourceIDs, "mod-source", nil, "mod source ID (repeatable)")
 	c.Flags().StringVar(&configMap, "config-map", "", "per-server config override ConfigMap name (skips the interactive prompt)")
 	c.Flags().StringVar(&namespace, "namespace", "magpie", "namespace to create/edit the per-server config override ConfigMap in (kubectl-only, not sent to server-api)")
+	c.Flags().Uint32Var(&metricsPort, "metrics-port", 0, "metrics endpoint this server's own game process/extension exposes, if any (Prometheus scrape hint only -- nothing here runs anything on it)")
+	c.Flags().StringVar(&metricsPath, "metrics-path", "", "metrics endpoint path (default /metrics; ignored if --metrics-port is unset)")
 	return c
 }
 

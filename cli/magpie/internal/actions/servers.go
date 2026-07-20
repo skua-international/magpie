@@ -18,6 +18,12 @@ type CreateServerParams struct {
 	Port         uint32
 	ModSourceIDs []string
 	ConfigMap    string
+	// A metrics endpoint this server's own game process/extension
+	// exposes, if any -- purely a Prometheus scrape hint (see
+	// ArmaServerSpec.metrics's own doc); MetricsPath defaults to
+	// "/metrics" server-side when left empty. Ignored if MetricsPort is 0.
+	MetricsPort uint32
+	MetricsPath string
 }
 
 func ListServers(ctx context.Context, c *client.Clients) ([]*controllerv1.ServerInfo, error) {
@@ -44,6 +50,12 @@ func CreateServer(ctx context.Context, c *client.Clients, p CreateServerParams) 
 	}
 	if p.ConfigMap != "" {
 		req.ConfigMap = &p.ConfigMap
+	}
+	if p.MetricsPort != 0 {
+		req.MetricsPort = &p.MetricsPort
+		if p.MetricsPath != "" {
+			req.MetricsPath = &p.MetricsPath
+		}
 	}
 	resp, err := c.Servers.CreateServer(ctx, connect.NewRequest(req))
 	if err != nil {

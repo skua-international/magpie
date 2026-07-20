@@ -155,6 +155,8 @@ impl AdminServiceImpl {
                     DesiredState::Running => ExportedDesiredState::Running,
                     DesiredState::Stopped => ExportedDesiredState::Stopped,
                 }),
+                metrics_port: obj.spec.metrics.as_ref().map(|m| m.port as u32),
+                metrics_path: obj.spec.metrics.as_ref().and_then(|m| m.path.clone()),
                 ..Default::default()
             });
         }
@@ -313,6 +315,10 @@ impl AdminServiceImpl {
                 params: server.params.clone(),
                 desired_state,
                 config_map: server.config_map.clone(),
+                metrics: server.metrics_port.map(|port| crd::ArmaServerMetrics {
+                    port: port as u16,
+                    path: server.metrics_path.clone(),
+                }),
             };
             let obj = ArmaServer {
                 metadata: ObjectMeta {

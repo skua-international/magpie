@@ -145,6 +145,16 @@ pub async fn delete_mission(pool: &PgPool, id: Uuid) -> sqlx::Result<bool> {
     Ok(result.rows_affected() > 0)
 }
 
+/// Total distinct identities (`users` rows -- one per real person, not
+/// per linked provider account: two providers linked to the same person
+/// share one `users` row via `link_account_to_user`'s merge). Used for
+/// services/identity's own `magpie_identities_total` metric.
+pub async fn count_users(pool: &PgPool) -> sqlx::Result<i64> {
+    sqlx::query_scalar("SELECT count(*) FROM users")
+        .fetch_one(pool)
+        .await
+}
+
 /// Scopes granted to `subject` (a JWT `sub` claim value), for the
 /// authorization middleware to check per-RPC required scopes against.
 /// `"*"` in the returned set means "every scope" -- a coarse admin grant,

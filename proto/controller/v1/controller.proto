@@ -67,6 +67,13 @@ message CreateServerRequest {
   // `kubectl edit configmap`) and only pass its name here. Unset means
   // "baseline only".
   optional string config_map = 6;
+  // A metrics endpoint this server's own game process/extension exposes,
+  // if any -- see ArmaServerSpec.metrics's own doc. Purely a scrape hint
+  // (prometheus.io/scrape annotations on the launcher Pod); nothing in
+  // this repo runs anything on this port. Unset means no such endpoint.
+  optional uint32 metrics_port = 7;
+  // Defaults to "/metrics" when unset. Ignored if metrics_port is unset.
+  optional string metrics_path = 8;
 }
 
 enum ServerPhase {

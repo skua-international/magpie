@@ -152,7 +152,14 @@ type CreateServerRequest struct {
 	// comment); callers create/edit it directly against the cluster (e.g.
 	// `kubectl edit configmap`) and only pass its name here. Unset means
 	// "baseline only".
-	ConfigMap     *string `protobuf:"bytes,6,opt,name=config_map,json=configMap,proto3,oneof" json:"config_map,omitempty"`
+	ConfigMap *string `protobuf:"bytes,6,opt,name=config_map,json=configMap,proto3,oneof" json:"config_map,omitempty"`
+	// A metrics endpoint this server's own game process/extension exposes,
+	// if any -- see ArmaServerSpec.metrics's own doc. Purely a scrape hint
+	// (prometheus.io/scrape annotations on the launcher Pod); nothing in
+	// this repo runs anything on this port. Unset means no such endpoint.
+	MetricsPort *uint32 `protobuf:"varint,7,opt,name=metrics_port,json=metricsPort,proto3,oneof" json:"metrics_port,omitempty"`
+	// Defaults to "/metrics" when unset. Ignored if metrics_port is unset.
+	MetricsPath   *string `protobuf:"bytes,8,opt,name=metrics_path,json=metricsPath,proto3,oneof" json:"metrics_path,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -211,6 +218,20 @@ func (x *CreateServerRequest) GetModSourceIds() []string {
 func (x *CreateServerRequest) GetConfigMap() string {
 	if x != nil && x.ConfigMap != nil {
 		return *x.ConfigMap
+	}
+	return ""
+}
+
+func (x *CreateServerRequest) GetMetricsPort() uint32 {
+	if x != nil && x.MetricsPort != nil {
+		return *x.MetricsPort
+	}
+	return 0
+}
+
+func (x *CreateServerRequest) GetMetricsPath() string {
+	if x != nil && x.MetricsPath != nil {
+		return *x.MetricsPath
 	}
 	return ""
 }
@@ -655,14 +676,18 @@ var File_controller_v1_controller_proto protoreflect.FileDescriptor
 
 const file_controller_v1_controller_proto_rawDesc = "" +
 	"\n" +
-	"\x1econtroller/v1/controller.proto\x12\rcontroller.v1\"\xbf\x01\n" +
+	"\x1econtroller/v1/controller.proto\x12\rcontroller.v1\"\xb1\x02\n" +
 	"\x13CreateServerRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\rR\x04port\x12$\n" +
 	"\x0emod_source_ids\x18\x03 \x03(\tR\fmodSourceIds\x12\"\n" +
 	"\n" +
-	"config_map\x18\x06 \x01(\tH\x00R\tconfigMap\x88\x01\x01B\r\n" +
-	"\v_config_mapJ\x04\b\x04\x10\x05J\x04\b\x05\x10\x06R\varma_configR\x0enetwork_config\"\xc0\x02\n" +
+	"config_map\x18\x06 \x01(\tH\x00R\tconfigMap\x88\x01\x01\x12&\n" +
+	"\fmetrics_port\x18\a \x01(\rH\x01R\vmetricsPort\x88\x01\x01\x12&\n" +
+	"\fmetrics_path\x18\b \x01(\tH\x02R\vmetricsPath\x88\x01\x01B\r\n" +
+	"\v_config_mapB\x0f\n" +
+	"\r_metrics_portB\x0f\n" +
+	"\r_metrics_pathJ\x04\b\x04\x10\x05J\x04\b\x05\x10\x06R\varma_configR\x0enetwork_config\"\xc0\x02\n" +
 	"\n" +
 	"ServerInfo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
