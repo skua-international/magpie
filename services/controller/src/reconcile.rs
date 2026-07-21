@@ -126,6 +126,19 @@ async fn apply(obj: &ArmaServer, ctx: &Ctx) -> anyhow::Result<Action> {
 
     match status.phase {
         ArmaServerPhase::Stopped if desired_running => {
+            // Fire-and-forget, best-effort: makes sure a start actually
+            // kicks sync-daemon into motion instead of just hoping
+            // something else already has (its own startup sync, a
+            // ModSource's first resolve, or an admin registering a mod
+            // source through registry) -- otherwise the Pending gate below
+            // could wait on a golden tree nothing is actively syncing.
+            // Idempotent on sync-daemon's side regardless of whether a
+            // sync is already in flight (see SyncContent's own proto doc),
+            // so this is safe to call on every start with no dedup needed
+            // here.
+            if let Err(e) = ctx.sync_client.sync_content().await {
+                warn!("{name}: failed to trigger sync-daemon content sync on start: {e:#}");
+            }
             set_status(
                 ctx,
                 &name,
