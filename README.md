@@ -2,7 +2,7 @@
 
 **M**anaged **A**rma **G**eneral **P**ile of **I**ntricate **E**ngineering.
 
-Kubernetes-native orchestration for Arma 3 dedicated servers: mod/collection syncing with copy-on-write claims, a CRD-driven reconciler, JWT-authenticated provisioning APIs, and its own OAuth2/Steam OpenID identity broker. Built as a Cargo workspace of small, single-purpose services deployed together via one Helm chart.
+Kubernetes-native orchestration for Arma 3 dedicated servers: mod/collection syncing with copy-on-write CSI snapshots, a CRD-driven reconciler, JWT-authenticated provisioning APIs, and its own OAuth2/Steam OpenID identity broker. Built as a Cargo workspace of small, single-purpose services deployed together via one Helm chart.
 
 ## Why?
 
@@ -20,11 +20,14 @@ flowchart LR
 
     controller["controller<br/>(reconciler)"] -->|watches| armaserver
     controller -->|creates| launcher["launcher<br/>Deployment"]
-    controller -->|RegisterSource, Claim| syncdaemon
+    controller -->|creates/deletes to match spec.headless_clients| headlessclient[("HeadlessClient<br/>(CRD)")]
+    headlessclient -->|own reconciler creates| hcdeployment["headless client<br/>Deployment"]
+    controller -->|SyncContent, GetSyncStatus| syncdaemon
 
-    syncdaemon -->|PVC| reflinkpvc[("magpie-reflink PVC<br/>(content/claims)")]
-    magpiecsi["magpie-csi<br/>(CSI driver)"] -->|loop-mount, btrfs| reflinkpvc
-    launcher -->|reads its claim| reflinkpvc
+    syncdaemon -->|PVC| goldenpvc[("magpie-golden-content PVC<br/>(one shared tree)")]
+    magpiecsi["magpie-csi<br/>(CSI driver)"] -->|loop-mount, btrfs| goldenpvc
+    magpiecsi -->|fresh read-only snapshot, per Pod| launcher
+    magpiecsi -->|fresh read-only snapshot, per Pod| hcdeployment
 
     armaconfig[("Arma config<br/>ConfigMaps")] -->|baseline + per-server| controller
     postgres[("Postgres<br/>acl_grants/linked_accounts")] -->|arma:admin / arma:filepatch| controller
@@ -36,15 +39,15 @@ flowchart LR
     syncdaemon -->|authenticated CM session| steam(["Steam"])
 ```
 
-- **`launcher`** — launches the game server (and headless clients) from an already-synced claim plus a controller-rendered server config. No Steam logic of its own.
-- **`sync-daemon`** — owns all Steam depot/workshop mechanics: authenticated CM session, mod/collection resolution (including private/unlisted content), and reflink (copy-on-write) claims of one shared golden content tree, so every server gets its own cheap, isolated snapshot instead of sharing live state. Content/claims live on a `PersistentVolumeClaim` against the `magpie-reflink` `StorageClass`, sized up front (`reflinkStorage.sizeGiB`) rather than grown on request.
-- **`magpie-csi`** — a small CSI driver, the one component in the stack with real host block-device access (its Node plugin, one per node, `privileged: true`): loop-mounts a growable btrfs blob per node so reflink works regardless of what filesystem the host actually has (the blob is a regular file -- any host filesystem works as its backing store, `mkfs.btrfs` formats the loop device itself, never the host disk underneath it), and grows it as `CreateVolume` calls need more room. Kubelet talks to it the same conformant way it talks to any CSI driver (Identity/Controller/Node gRPC services, the standard `external-provisioner`/`node-driver-registrar` sidecars) rather than through a bespoke API -- this replaced an earlier custom Connect-RPC design (`volume-manager`) that kept hitting new host-integration failure modes (AppArmor, cgroup device allowlists, udev rules) each of which needed its own bespoke fix; CSI's job is exactly this class of problem, so the privileged pieces now follow an established, widely-used pattern instead of being reasoned about from scratch.
-- **`controller`** — a `kube-runtime` reconciler that turns `ArmaServer` custom resources into launcher `Deployment`s, rendering each one's `main.cfg`/`basic.cfg` along the way (see "Arma server config" below) and provisioning the technical Postgres role `launcher`'s own Arma-side extensions connect as. No external listener, no auth surface.
+- **`launcher`** — launches the game server (or, in headless-client mode, connects to one) from a fresh CSI-provisioned snapshot plus a controller-rendered server config. No Steam logic of its own.
+- **`sync-daemon`** — owns all Steam depot/workshop mechanics: authenticated CM session, mod/collection resolution (including private/unlisted content), and keeping one shared golden content tree in sync (on demand via `SyncContent`, or on a background timer -- `syncDaemon.contentSyncIntervalSecs`). That tree lives on a `PersistentVolumeClaim` against the `magpie-golden-content` `StorageClass`. Every `ArmaServer`'s (and `HeadlessClient`'s) own content is a separate CSI inline ephemeral volume instead -- no PVC/PV of its own at all -- a fresh read-only btrfs snapshot of the golden tree, taken by `magpie-csi` the moment its own launcher Pod is actually scheduled; `controller` gates a server's `Pending` phase on `GetSyncStatus` first, so a Pod is never scheduled against a tree still mid-download.
+- **`magpie-csi`** — a small CSI driver, the one component in the stack with real host block-device access (its Node plugin, one per node, `privileged: true`): loop-mounts a growable btrfs blob per node (the blob is a regular file -- any host filesystem works as its backing store, `mkfs.btrfs` formats the loop device itself, never the host disk underneath it) so both the golden-content `PersistentVolumeClaim` and every server/headless-client's own inline ephemeral snapshot work regardless of what filesystem the host actually has. Kubelet talks to it the same conformant way it talks to any CSI driver (Identity/Controller/Node gRPC services, the standard `external-provisioner`/`node-driver-registrar` sidecars) rather than through a bespoke API -- this replaced an earlier custom Connect-RPC design (`volume-manager`) that kept hitting new host-integration failure modes (AppArmor, cgroup device allowlists, udev rules) each of which needed its own bespoke fix; CSI's job is exactly this class of problem, so the privileged pieces now follow an established, widely-used pattern instead of being reasoned about from scratch.
+- **`controller`** — a `kube-runtime` reconciler that turns `ArmaServer` custom resources into launcher `Deployment`s, rendering each one's `main.cfg`/`basic.cfg` along the way (see "Arma server config" below) and provisioning the technical Postgres role `launcher`'s own Arma-side extensions connect as. Also reconciles `HeadlessClient` objects (created/deleted to match `ArmaServer.spec.headless_clients` -- a fixed count set at creation, no separate scale-in/scale-out API, no CLI/TUI wiring yet, `kubectl edit armaserver` directly) into their own Deployments, hostNetwork like the server they belong to so `-connect=127.0.0.1` just works. No external listener, no auth surface.
 - **`server-api`** — JWT-authenticated `ArmaServer` CRUD plus deployment-like lifecycle (`Create`/`Start`/`Stop`/`Update`). Deliberately carries the least Kubernetes RBAC of anything here (no `Deployment` access at all) — it's the one process a stolen bearer token can reach directly.
 - **`registry`** — JWT-authenticated mod source registry (a Steam mod, a collection, a preset export, or a locally-uploaded zip mod) and mission (`.pbo`) storage, backed directly by the `ModSource` CRD. Also the one place that can export/import declarative cluster state (`admin export-state`/`import-state`, `admin:export`/`admin:import` scopes) — mod source registrations, ConfigMaps, and `ArmaServer` specs, deliberately excluding synced file content, Postgres data, ACL grants, and any live credential — which is why it's also the only service besides `controller`/`server-api` with any `ArmaServer`/`ConfigMap` RBAC at all.
 - **`identity`** — OAuth2 login (Discord/GitHub/Google) and Steam login (OpenID 2.0 — Steam never adopted OIDC), account linking, and JWT issuance for every JWT-gated service above to verify. The first person to ever sign in is automatically granted every permission.
 
-All inter-service and client-facing APIs are [ConnectRPC](https://connectrpc.com/) (`proto/`) -- the one exception is `magpie-csi`, which speaks plain CSI gRPC, since kubelet (its only client) doesn't speak Connect. Mod sources (`ModSource`) and servers (`ArmaServer`) are Kubernetes CRDs, not database rows — `kubectl get modsources`/`kubectl get armaservers` shows live state directly, and `sync-daemon`/`controller` reconcile them the same way any other operator would. Postgres holds what's left: missions, ACL grants, and identities.
+All inter-service and client-facing APIs are [ConnectRPC](https://connectrpc.com/) (`proto/`) -- the one exception is `magpie-csi`, which speaks plain CSI gRPC, since kubelet (its only client) doesn't speak Connect. Mod sources (`ModSource`), servers (`ArmaServer`), and headless clients (`HeadlessClient`) are Kubernetes CRDs, not database rows — `kubectl get modsources`/`kubectl get armaservers`/`kubectl get headlessclients` shows live state directly, and `sync-daemon`/`controller` reconcile them the same way any other operator would. Postgres holds what's left: missions, ACL grants, and identities.
 
 ## Deploying
 
@@ -195,7 +198,7 @@ magpiectl --identity-url http://identity.magpie.local \
 magpiectl completion install   # optional -- bash/zsh/fish/powershell autocompletion
 ```
 
-(Those base URLs are this chart's own `ingress.baseDomain` default, `magpie.local` — override to match whatever you actually set at install time.)
+(Those base URLs are this chart's own `ingress.baseDomain` default, `magpie.local` — override to match whatever you actually set at install time. `http://` above matches that local default; a real public deployment sets `ingress.tls.enabled: true` plus `ingress.tls.clusterIssuer` to a cert-manager `ClusterIssuer` already installed in the cluster, and every generated Ingress picks up a real cert instead — needed for Steam OAuth login to work for anyone off the local network at all, since `identity`'s callback URL has to actually be reachable from wherever the browser is.)
 
 Building from source instead (e.g. to run an unreleased commit): `cd cli/magpie && go install ./cmd/magpiectl` -- only works from within a clone of this monorepo, since `cli/magpie`'s `go.mod` points at `generated/go` via a relative `replace` directive rather than a published module.
 
@@ -209,7 +212,6 @@ proto/                 ConnectRPC service definitions
 charts/magpie/         the Helm chart
 deploy/                k3s-bootstrap.sh
 scripts/               deploy.sh
-configs/               reference main.cfg/basic.cfg showing every field controller's arma_config.rs can render (see "Arma server config")
 Dockerfile.workspace   compiles every service binary in one build (see Development below)
 ```
 
