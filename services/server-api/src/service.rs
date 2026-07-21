@@ -331,7 +331,7 @@ impl protocol::proto::controller::v1::ServerService for ServerServiceImpl {
         self.check_port_conflict(existing.spec.port, Some(request.id))
             .await?;
 
-        let patch = serde_json::json!({ "spec": { "desiredState": "Running" } });
+        let patch = serde_json::json!({ "spec": { "desired_state": "Running" } });
         self.api()
             .patch(request.id, &PatchParams::default(), &Patch::Merge(patch))
             .await
@@ -351,7 +351,7 @@ impl protocol::proto::controller::v1::ServerService for ServerServiceImpl {
         // sees desired_state flip and deletes the Deployment -- pre-shutdown
         // hooks (e.g. notifying the server over HTTP before it goes down)
         // are planned but not built yet.
-        let patch = serde_json::json!({ "spec": { "desiredState": "Stopped" } });
+        let patch = serde_json::json!({ "spec": { "desired_state": "Stopped" } });
         let obj = self
             .api()
             .patch(request.id, &PatchParams::default(), &Patch::Merge(patch))
