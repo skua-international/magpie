@@ -24,6 +24,17 @@ pub struct Config {
     pub mods: Vec<String>,
     pub arma_binary: String,
     pub arma_cdlc: Vec<String>,
+    /// Set only on a headless-client launcher Pod (see
+    /// `services/controller/src/reconcile.rs`'s `ensure_hc_deployment`) --
+    /// presence alone is what switches `launch::run` into client mode at
+    /// all, not a separate bool env var, since a connect target is
+    /// required for `-client` to mean anything regardless.
+    pub client_connect: Option<String>,
+    /// Only ever set alongside `client_connect`, and only when the owning
+    /// server's own `password` is non-empty -- a headless client is just
+    /// another connecting client as far as Arma's `password[]` check is
+    /// concerned.
+    pub client_password: Option<String>,
 }
 
 impl Config {
@@ -43,6 +54,12 @@ impl Config {
                 .map(|s| s.trim().to_lowercase())
                 .filter(|s| !s.is_empty())
                 .collect(),
+            client_connect: env::var("ARMA_CLIENT_CONNECT")
+                .ok()
+                .filter(|s| !s.is_empty()),
+            client_password: env::var("ARMA_SERVER_PASSWORD")
+                .ok()
+                .filter(|s| !s.is_empty()),
         })
     }
 }

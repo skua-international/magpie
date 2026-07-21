@@ -7,11 +7,6 @@ use tokio::signal::unix::{SignalKind, signal};
 use crate::config::Config;
 
 const SERVER_ROOT: &str = "/arma3/server";
-const TMP_CONFIG: &str = "/tmp/arma3.cfg";
-
-fn env_defined(key: &str) -> bool {
-    std::env::var(key).map(|v| !v.is_empty()).unwrap_or(false)
-}
 
 /// Build the launch args and exec the server directly (no shell involved
 /// at all -- see the spawn call's own doc for why that's more than just
@@ -19,9 +14,14 @@ fn env_defined(key: &str) -> bool {
 /// final "ready in" log; unlike before this rework, that's the whole
 /// story timing-wise -- no login/resolve/download phases happen in this
 /// process any more, sync-daemon already did all of that before this
-/// run's claim existed. Headless clients are gone entirely (see the
-/// tracked follow-up for real support) -- this only ever launches the
-/// one server process now.
+/// run's claim existed.
+///
+/// `cfg.client_connect` is what switches this into headless-client mode
+/// (see `services/controller/src/reconcile.rs`'s `ensure_hc_deployment`,
+/// the only place that ever sets it): same mods/CDLC as a normal launch,
+/// but `-client -connect=<...> -port=<owning server's port>` instead of
+/// hosting anything, and no `-config=`/`-cfg=` at all -- neither applies
+/// to a connecting client, only to whatever process is actually hosting.
 pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Instant) -> Result<()> {
     let mut args = vec![
         format!(
@@ -62,42 +62,39 @@ pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Inst
     std::env::set_current_dir(&cfg.claim_path)
         .with_context(|| format!("failed to chdir into {}", cfg.claim_path.display()))?;
 
-    let config_file = std::env::var("ARMA_CONFIG").context("missing ARMA_CONFIG")?;
     let port = std::env::var("PORT").unwrap_or_else(|_| "2302".into());
-
-    // INIT_MISSION: auto-start a mission on server launch.
-    let mut config_arg = format!("{SERVER_ROOT}/configs/{config_file}");
-    if env_defined("INIT_MISSION") {
-        let mut init_mission = std::env::var("INIT_MISSION").unwrap();
-        if let Some(stripped) = init_mission.strip_suffix(".pbo") {
-            init_mission = stripped.to_string();
-        }
-        tracing::info!("INIT_MISSION set to: {init_mission}");
-
-        let mut data = std::fs::read_to_string(&config_arg)
-            .with_context(|| format!("failed to read {config_arg}"))?;
-
-        if !data.to_lowercase().contains("persistent") {
-            data.push_str("\npersistent = 1;\n");
-        }
-        data.push_str(&format!(
-            "\nclass Missions {{\n  class Mission_1 {{\n    template = \"{init_mission}\";\n    difficulty = \"skua_difficulty\";\n  }};\n}};\n"
-        ));
-
-        std::fs::write(TMP_CONFIG, data).context("failed to write temp config for INIT_MISSION")?;
-        config_arg = TMP_CONFIG.to_string();
-        args.push("-autoInit".to_string());
-    }
-    args.push(format!("-config={config_arg}"));
-
     let arma_profile = std::env::var("ARMA_PROFILE").unwrap_or_else(|_| "main".into());
-    let network_config = std::env::var("NETWORK_CONFIG").context("missing NETWORK_CONFIG")?;
-    args.push(format!("-port={port}"));
-    args.push(format!("-name={arma_profile}"));
-    args.push(format!("-profiles={SERVER_ROOT}/configs/profiles"));
-    args.push(format!("-cfg={SERVER_ROOT}/configs/{network_config}"));
 
-    tracing::info!("LAUNCHING ARMA SERVER WITH {} {}", cfg.arma_binary, args.join(" "));
+    if let Some(connect) = &cfg.client_connect {
+        args.push("-client".to_string());
+        args.push(format!("-connect={connect}"));
+        args.push(format!("-port={port}"));
+        if let Some(password) = &cfg.client_password {
+            args.push(format!("-password={password}"));
+        }
+        args.push(format!("-name={arma_profile}"));
+        args.push(format!("-profiles={SERVER_ROOT}/configs/profiles"));
+    } else {
+        let config_file = std::env::var("ARMA_CONFIG").context("missing ARMA_CONFIG")?;
+        args.push(format!("-config={SERVER_ROOT}/configs/{config_file}"));
+
+        let network_config = std::env::var("NETWORK_CONFIG").context("missing NETWORK_CONFIG")?;
+        args.push(format!("-port={port}"));
+        args.push(format!("-name={arma_profile}"));
+        args.push(format!("-profiles={SERVER_ROOT}/configs/profiles"));
+        args.push(format!("-cfg={SERVER_ROOT}/configs/{network_config}"));
+    }
+
+    tracing::info!(
+        "LAUNCHING ARMA {} WITH {} {}",
+        if cfg.client_connect.is_some() {
+            "CLIENT"
+        } else {
+            "SERVER"
+        },
+        cfg.arma_binary,
+        args.join(" ")
+    );
     // Spawned directly, no shell involved -- unlike the `sh -c "exec
     // <cmd>"` this used to go through, args here are passed as real
     // argv entries (Command::args), never re-parsed/re-quoted by

@@ -26,6 +26,18 @@ rules:
   - apiGroups: ["arma.skua.io"]
     resources: ["armaservers/status"]
     verbs: ["get", "update", "patch"]
+  # HeadlessClient objects are fully owned by this reconciler (both the
+  # ArmaServer side, which creates/deletes them to match
+  # spec.headless_clients, and the separate HeadlessClient reconciler,
+  # which turns each into its own Deployment) -- same full-access shape
+  # as armaservers/deployments above, not the read-only grant modsources
+  # gets.
+  - apiGroups: ["arma.skua.io"]
+    resources: ["headlessclients"]
+    verbs: ["get", "list", "watch", "create", "delete", "patch"]
+  - apiGroups: ["arma.skua.io"]
+    resources: ["headlessclients/status"]
+    verbs: ["get", "update", "patch"]
   # Read-only -- resolve_mod_paths reads a referenced ModSource's spec to
   # build -mod= args. Never creates/deletes/patches one; that's
   # services/registry's job.

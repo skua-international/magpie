@@ -30,16 +30,19 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use crd::{ArmaServer, ArmaServerPhase, ArmaServerStatus, DesiredState, ModSource, ModSourceInput};
+use crd::{
+    ArmaServer, ArmaServerPhase, ArmaServerStatus, DesiredState, HeadlessClient,
+    HeadlessClientPhase, HeadlessClientSpec, HeadlessClientStatus, ModSource, ModSourceInput,
+};
 use futures::StreamExt;
 use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec};
 use k8s_openapi::api::core::v1::{
-    Capabilities, CSIVolumeSource, Container, EnvVar, EnvVarSource, ExecAction,
+    CSIVolumeSource, Capabilities, Container, EnvVar, EnvVarSource, ExecAction,
     HostPathVolumeSource, LocalObjectReference, PodSecurityContext, PodSpec, PodTemplateSpec,
     Probe, SecretKeySelector, SecurityContext, Volume, VolumeMount,
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
-use kube::api::{Api, DeleteParams, Patch, PatchParams};
+use kube::api::{Api, DeleteParams, ListParams, Patch, PatchParams};
 use kube::runtime::Controller;
 use kube::runtime::controller::Action;
 use kube::runtime::finalizer::{Event as FinalizerEvent, finalizer};
@@ -61,7 +64,6 @@ const SLOW_REQUEUE: Duration = Duration::from_secs(300);
 // blip while still Pending parked the object for 5 minutes before the
 // controller looked at it again.
 const ERROR_REQUEUE: Duration = Duration::from_secs(10);
-
 
 /// `kube-runtime`'s `finalizer`/`Controller::run` both require their error
 /// type to implement `std::error::Error`, which `anyhow::Error` deliberately
@@ -86,14 +88,29 @@ pub fn spawn(client: Client, pool: sqlx::PgPool, cfg: Arc<Config>) -> anyhow::Re
         sync_client,
         pool,
     });
-    let api: Api<ArmaServer> = Api::namespaced(client, &ctx.cfg.namespace);
+    let api: Api<ArmaServer> = Api::namespaced(client.clone(), &ctx.cfg.namespace);
 
+    tokio::spawn({
+        let ctx = ctx.clone();
+        async move {
+            Controller::new(api, watcher::Config::default())
+                .run(reconcile, error_policy, ctx)
+                .for_each(|res| async move {
+                    if let Err(e) = res {
+                        warn!("reconcile error: {e:#}");
+                    }
+                })
+                .await;
+        }
+    });
+
+    let hc_api: Api<HeadlessClient> = Api::namespaced(client, &ctx.cfg.namespace);
     tokio::spawn(async move {
-        Controller::new(api, watcher::Config::default())
-            .run(reconcile, error_policy, ctx)
+        Controller::new(hc_api, watcher::Config::default())
+            .run(reconcile_hc, hc_error_policy, ctx)
             .for_each(|res| async move {
                 if let Err(e) = res {
-                    warn!("reconcile error: {e:#}");
+                    warn!("headless client reconcile error: {e:#}");
                 }
             })
             .await;
@@ -154,6 +171,14 @@ async fn apply(obj: &ArmaServer, ctx: &Ctx) -> anyhow::Result<Action> {
 
         _ if !desired_running => {
             scale_down(ctx, &name).await?;
+            // Headless clients have nothing to connect to once the main
+            // server is stopped -- deleted outright, not scaled to 0 like
+            // the main Deployment: a HeadlessClient CR's own existence
+            // *is* its desired state (see ensure_headless_clients' own
+            // doc), so there's no separate "scaled down but still
+            // declared" state for it to sit in the way the main server's
+            // Deployment can.
+            delete_all_headless_clients(ctx, &name).await?;
             set_status(
                 ctx,
                 &name,
@@ -248,12 +273,14 @@ async fn run_pending(ctx: &Ctx, obj: &ArmaServer) -> anyhow::Result<()> {
         obj,
     )
     .await?;
-    ensure_deployment(ctx, obj, &mod_paths, extra_env).await
+    ensure_deployment(ctx, obj, &mod_paths, extra_env).await?;
+    ensure_headless_clients(ctx, obj).await
 }
 
 async fn cleanup(obj: &ArmaServer, ctx: &Ctx) -> anyhow::Result<Action> {
     let name = obj.name_any();
     delete_deployment(ctx, &name).await?;
+    delete_all_headless_clients(ctx, &name).await?;
     Ok(Action::await_change())
 }
 
@@ -299,6 +326,92 @@ async fn set_status(ctx: &Ctx, name: &str, status: ArmaServerStatus) -> anyhow::
     let patch = serde_json::json!({ "status": status });
     api.patch_status(name, &PatchParams::default(), &Patch::Merge(patch))
         .await?;
+    Ok(())
+}
+
+/// This `ArmaServer`'s currently-existing `HeadlessClient` objects --
+/// listed and filtered client-side (`spec.server == name`) rather than
+/// via a label selector, since the count per server is always small and
+/// this avoids having to keep a label in sync with `spec.server`
+/// separately.
+async fn list_headless_clients(ctx: &Ctx, name: &str) -> anyhow::Result<Vec<HeadlessClient>> {
+    let api: Api<HeadlessClient> = Api::namespaced(ctx.client.clone(), &ctx.cfg.namespace);
+    let all = api.list(&ListParams::default()).await?;
+    Ok(all
+        .items
+        .into_iter()
+        .filter(|hc| hc.spec.server == name)
+        .collect())
+}
+
+/// Creates/deletes owned `HeadlessClient` objects (named
+/// `<server>-hc-<index>`) to match `spec.headless_clients` -- a
+/// HeadlessClient CR's own existence *is* its desired state (unlike the
+/// main server, there's no separate `desired_state` knob on it at all),
+/// so this is the one place that decides whether each index should
+/// exist; the separate HeadlessClient reconciler (`reconcile_hc`) just
+/// reacts to whatever already exists, no polling of the owning server's
+/// own state needed on that side.
+async fn ensure_headless_clients(ctx: &Ctx, obj: &ArmaServer) -> anyhow::Result<()> {
+    let name = obj.name_any();
+    let api: Api<HeadlessClient> = Api::namespaced(ctx.client.clone(), &ctx.cfg.namespace);
+    let existing = list_headless_clients(ctx, &name).await?;
+    let desired = obj.spec.headless_clients;
+
+    for hc in &existing {
+        if hc.spec.index >= desired {
+            let hc_name = hc.name_any();
+            match api.delete(&hc_name, &DeleteParams::default()).await {
+                Ok(_) => info!("{name}: deleted excess headless client {hc_name}"),
+                Err(kube::Error::Api(e)) if e.code == 404 => {}
+                Err(e) => return Err(e.into()),
+            }
+        }
+    }
+
+    let existing_indices: std::collections::HashSet<u32> =
+        existing.iter().map(|hc| hc.spec.index).collect();
+    for index in 0..desired {
+        if existing_indices.contains(&index) {
+            continue;
+        }
+        let hc_name = format!("{name}-hc-{index}");
+        let hc = HeadlessClient {
+            metadata: ObjectMeta {
+                name: Some(hc_name.clone()),
+                owner_references: Some(vec![
+                    obj.controller_owner_ref(&())
+                        .expect("ArmaServer has a name"),
+                ]),
+                ..Default::default()
+            },
+            spec: HeadlessClientSpec {
+                server: name.clone(),
+                index,
+            },
+            status: None,
+        };
+        api.patch(
+            &hc_name,
+            &PatchParams::apply("arma-controller").force(),
+            &Patch::Apply(&hc),
+        )
+        .await?;
+        info!("{name}: created headless client {hc_name}");
+    }
+    Ok(())
+}
+
+async fn delete_all_headless_clients(ctx: &Ctx, name: &str) -> anyhow::Result<()> {
+    let api: Api<HeadlessClient> = Api::namespaced(ctx.client.clone(), &ctx.cfg.namespace);
+    for hc in list_headless_clients(ctx, name).await? {
+        let hc_name = hc.name_any();
+        match api.delete(&hc_name, &DeleteParams::default()).await {
+            Ok(_) => info!("{name}: deleted headless client {hc_name}"),
+            Err(kube::Error::Api(e)) if e.code == 404 => {}
+            Err(e) => return Err(e.into()),
+        }
+    }
     Ok(())
 }
 
@@ -664,6 +777,331 @@ async fn ensure_deployment(
                             name: "server-root".into(),
                             host_path: Some(HostPathVolumeSource {
                                 path: format!("{}/{name}", ctx.cfg.server_root_base),
+                                type_: Some("DirectoryOrCreate".into()),
+                            }),
+                            ..Default::default()
+                        },
+                    ]),
+                    ..Default::default()
+                }),
+            },
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    deployments
+        .patch(
+            &name,
+            &PatchParams::apply("arma-controller").force(),
+            &Patch::Apply(&deployment),
+        )
+        .await?;
+    Ok(())
+}
+
+// ---------------------------------------------------------------------
+// HeadlessClient reconciler. A separate Controller loop (see spawn's own
+// doc), not a sub-step of the ArmaServer reconciler above -- each
+// HeadlessClient CR's own existence *is* its desired state (created/
+// deleted by ensure_headless_clients/delete_all_headless_clients above),
+// so this side just reacts to whatever already exists: apply's job is
+// solely "make sure this CR's own Deployment exists and matches", no
+// separate Stopped/Pending/Running state machine needed the way the
+// main server has one.
+// ---------------------------------------------------------------------
+
+const HC_FINALIZER_NAME: &str = "arma.skua.io/headless-client-cleanup";
+
+type HcFinalizerError = kube::runtime::finalizer::Error<ReconcileError>;
+
+async fn reconcile_hc(obj: Arc<HeadlessClient>, ctx: Arc<Ctx>) -> Result<Action, HcFinalizerError> {
+    let api: Api<HeadlessClient> = Api::namespaced(ctx.client.clone(), &ctx.cfg.namespace);
+    finalizer(&api, HC_FINALIZER_NAME, obj, |event| async {
+        match event {
+            FinalizerEvent::Apply(obj) => hc_apply(&obj, &ctx).await.map_err(ReconcileError),
+            FinalizerEvent::Cleanup(obj) => hc_cleanup(&obj, &ctx).await.map_err(ReconcileError),
+        }
+    })
+    .await
+}
+
+fn hc_error_policy(_obj: Arc<HeadlessClient>, err: &HcFinalizerError, _ctx: Arc<Ctx>) -> Action {
+    error!("headless client reconcile failed: {err}");
+    Action::requeue(ERROR_REQUEUE)
+}
+
+async fn hc_apply(obj: &HeadlessClient, ctx: &Ctx) -> anyhow::Result<Action> {
+    let name = obj.name_any();
+    let servers: Api<ArmaServer> = Api::namespaced(ctx.client.clone(), &ctx.cfg.namespace);
+    // Should only ever be missing transiently, if at all: the owning
+    // ArmaServer's own finalizer deletes every one of its HeadlessClients
+    // (delete_all_headless_clients) before it finishes removing itself,
+    // so by the time this object's owner is truly gone, this object
+    // itself should already have its own deletionTimestamp set --
+    // meaning FinalizerEvent::Cleanup fires instead of Apply, and this
+    // lookup is never reached at all in the normal flow.
+    let server = servers.get(&obj.spec.server).await.map_err(|e| match e {
+        kube::Error::Api(e) if e.code == 404 => {
+            anyhow::anyhow!("owning ArmaServer {} no longer exists", obj.spec.server)
+        }
+        e => e.into(),
+    })?;
+
+    let mod_paths = resolve_mod_paths(ctx, &server).await?;
+    // A headless client is just another connecting client as far as
+    // password[] is concerned -- resolved independently here (not
+    // passed through from the main server's own last render_and_write
+    // call) so this reconciler stays self-contained and correct even if
+    // it runs out of step with the ArmaServer's own reconcile pass (e.g.
+    // right after a controller restart, before either side's watch
+    // cache has settled).
+    let password = crate::arma_config::resolve_password(
+        &ctx.client,
+        &ctx.cfg.namespace,
+        &ctx.cfg.user_secrets_namespace,
+        &ctx.cfg.arma_config_baseline,
+        &server,
+    )
+    .await?;
+
+    let new_status = match ensure_hc_deployment(ctx, obj, &server, &mod_paths, &password).await {
+        Ok(()) => HeadlessClientStatus {
+            phase: HeadlessClientPhase::Running,
+            message: String::new(),
+        },
+        Err(e) => HeadlessClientStatus {
+            phase: HeadlessClientPhase::Failed,
+            message: format!("{e:#}"),
+        },
+    };
+    set_hc_status(ctx, &name, new_status).await?;
+    Ok(Action::requeue(SLOW_REQUEUE))
+}
+
+async fn hc_cleanup(obj: &HeadlessClient, ctx: &Ctx) -> anyhow::Result<Action> {
+    let name = obj.name_any();
+    delete_hc_deployment(ctx, &name).await?;
+    Ok(Action::await_change())
+}
+
+async fn set_hc_status(ctx: &Ctx, name: &str, status: HeadlessClientStatus) -> anyhow::Result<()> {
+    let api: Api<HeadlessClient> = Api::namespaced(ctx.client.clone(), &ctx.cfg.namespace);
+    let patch = serde_json::json!({ "status": status });
+    api.patch_status(name, &PatchParams::default(), &Patch::Merge(patch))
+        .await?;
+    Ok(())
+}
+
+async fn delete_hc_deployment(ctx: &Ctx, name: &str) -> anyhow::Result<()> {
+    let deployments: Api<Deployment> = Api::namespaced(ctx.client.clone(), &ctx.cfg.namespace);
+    match deployments.delete(name, &DeleteParams::default()).await {
+        Ok(_) => info!("{name}: deleted headless client deployment"),
+        Err(kube::Error::Api(e)) if e.code == 404 => {}
+        Err(e) => return Err(e.into()),
+    }
+    Ok(())
+}
+
+/// Builds a headless client's own Deployment -- same content (mods,
+/// CDLC) and `hostNetwork: true` as the owning server (see
+/// `crd::HeadlessClientSpec`'s own "tumor pod" doc), own profile
+/// (`<server>-hc-<index>`, this object's own name, already unique by
+/// construction), launched with `-client` instead of hosting anything.
+/// Shares the owning server's own `server-root` hostPath (so its
+/// `-profiles=` lands in the same directory) rather than getting a
+/// separate one; does *not* share its `content` volume literally (CSI
+/// inline ephemeral volumes are inherently Pod-scoped) -- gets its own
+/// fresh snapshot of the same golden tree instead, which is
+/// indistinguishable in practice since it's read-only content either way.
+async fn ensure_hc_deployment(
+    ctx: &Ctx,
+    obj: &HeadlessClient,
+    server: &ArmaServer,
+    mod_paths: &[String],
+    password: &str,
+) -> anyhow::Result<()> {
+    let name = obj.name_any();
+    let deployments: Api<Deployment> = Api::namespaced(ctx.client.clone(), &ctx.cfg.namespace);
+
+    let mut env = vec![
+        EnvVar {
+            name: "CLAIM_PATH".into(),
+            value: Some(CLAIM_PATH.to_string()),
+            ..Default::default()
+        },
+        EnvVar {
+            name: "MODS".into(),
+            value: Some(mod_paths.join(";")),
+            ..Default::default()
+        },
+        EnvVar {
+            name: "ARMA_CDLC".into(),
+            value: Some(server.spec.cdlc.join(";")),
+            ..Default::default()
+        },
+        // The owning server's own port -- an HC never binds this itself
+        // (see this Deployment's own doc: no ports/probes at all), it's
+        // only ever used as the -port= value alongside -connect= so Arma
+        // associates this client with that specific local server.
+        EnvVar {
+            name: "PORT".into(),
+            value: Some(server.spec.port.to_string()),
+            ..Default::default()
+        },
+        EnvVar {
+            name: "ARMA_PROFILE".into(),
+            value: Some(name.clone()),
+            ..Default::default()
+        },
+        // Presence of this var is what tells launch.rs to run in
+        // headless-client mode at all (see launch.rs's own doc) --
+        // hardcoded to loopback, not discovered per-server, because
+        // every HC Pod is hostNetwork: true on this single-node cluster,
+        // same as the owning server -- see HeadlessClientSpec's own doc
+        // for why that makes 127.0.0.1 always correct rather than
+        // something that needs resolving live.
+        EnvVar {
+            name: "ARMA_CLIENT_CONNECT".into(),
+            value: Some("127.0.0.1".into()),
+            ..Default::default()
+        },
+    ];
+    if !server.spec.params.is_empty() {
+        env.push(EnvVar {
+            name: "ARMA_PARAMS".into(),
+            value: Some(server.spec.params.join(" ")),
+            ..Default::default()
+        });
+    }
+    if !password.is_empty() {
+        env.push(EnvVar {
+            name: "ARMA_SERVER_PASSWORD".into(),
+            value: Some(password.to_string()),
+            ..Default::default()
+        });
+    }
+
+    let labels: std::collections::BTreeMap<String, String> = [
+        ("app".to_string(), "arma-headless-client".to_string()),
+        ("armaserver".to_string(), server.name_any()),
+        ("headlessclient".to_string(), name.clone()),
+    ]
+    .into();
+
+    let mut pod_annotations = std::collections::BTreeMap::new();
+    // Same reasoning as ensure_deployment's own identical annotation --
+    // forces a fresh Pod (and so a fresh CSI content snapshot) on every
+    // resync instead of Kubernetes deciding nothing changed.
+    pod_annotations.insert(
+        "magpie.skua.io/content-generation".to_string(),
+        Uuid::now_v7().to_string(),
+    );
+
+    let deployment = Deployment {
+        metadata: ObjectMeta {
+            name: Some(name.clone()),
+            labels: Some(labels.clone()),
+            owner_references: Some(vec![
+                obj.controller_owner_ref(&())
+                    .expect("HeadlessClient has a name"),
+            ]),
+            ..Default::default()
+        },
+        spec: Some(DeploymentSpec {
+            replicas: Some(1),
+            selector: LabelSelector {
+                match_labels: Some(labels.clone()),
+                ..Default::default()
+            },
+            strategy: Some(k8s_openapi::api::apps::v1::DeploymentStrategy {
+                type_: Some("Recreate".into()),
+                rolling_update: None,
+            }),
+            template: PodTemplateSpec {
+                metadata: Some(ObjectMeta {
+                    labels: Some(labels),
+                    annotations: Some(pod_annotations),
+                    ..Default::default()
+                }),
+                spec: Some(PodSpec {
+                    host_network: Some(true),
+                    security_context: Some(PodSecurityContext {
+                        run_as_non_root: Some(true),
+                        ..Default::default()
+                    }),
+                    image_pull_secrets: (!ctx.cfg.image_pull_secrets.is_empty()).then(|| {
+                        ctx.cfg
+                            .image_pull_secrets
+                            .iter()
+                            .map(|name| LocalObjectReference { name: name.clone() })
+                            .collect()
+                    }),
+                    containers: vec![Container {
+                        name: "launcher".into(),
+                        image: Some(ctx.cfg.launcher_image.clone()),
+                        security_context: Some(SecurityContext {
+                            allow_privilege_escalation: Some(false),
+                            capabilities: Some(Capabilities {
+                                drop: Some(vec!["ALL".into()]),
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        }),
+                        image_pull_policy: Some("IfNotPresent".into()),
+                        env: Some(env),
+                        volume_mounts: Some(vec![
+                            VolumeMount {
+                                name: "content".into(),
+                                mount_path: CLAIM_PATH.into(),
+                                ..Default::default()
+                            },
+                            VolumeMount {
+                                name: "server-root".into(),
+                                mount_path: "/arma3/server".into(),
+                                ..Default::default()
+                            },
+                            VolumeMount {
+                                name: "local-content".into(),
+                                mount_path: ctx.cfg.local_content_root.clone(),
+                                read_only: Some(true),
+                                ..Default::default()
+                            },
+                        ]),
+                        // No readiness/liveness probes -- the default
+                        // healthcheck is a Steam A2S_INFO query against a
+                        // hosted server's own Steam query port (see
+                        // healthcheck.rs), which doesn't apply here at
+                        // all (a -client instance hosts nothing to
+                        // query). Kubernetes' own container-exit-code
+                        // restart already recovers a crashed HC without
+                        // needing a probe on top of that.
+                        ..Default::default()
+                    }],
+                    volumes: Some(vec![
+                        Volume {
+                            name: "content".into(),
+                            csi: Some(CSIVolumeSource {
+                                driver: "csi.magpie.skua.io".into(),
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        },
+                        Volume {
+                            name: "local-content".into(),
+                            host_path: Some(HostPathVolumeSource {
+                                path: ctx.cfg.local_content_host_path.clone(),
+                                type_: Some("DirectoryOrCreate".into()),
+                            }),
+                            ..Default::default()
+                        },
+                        // The owning server's own server-root path, not a
+                        // separate one -- shares its configs/profiles
+                        // directory (this HC's own -profiles= target).
+                        Volume {
+                            name: "server-root".into(),
+                            host_path: Some(HostPathVolumeSource {
+                                path: format!("{}/{}", ctx.cfg.server_root_base, server.name_any()),
                                 type_: Some("DirectoryOrCreate".into()),
                             }),
                             ..Default::default()

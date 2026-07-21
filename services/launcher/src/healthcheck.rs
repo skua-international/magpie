@@ -43,7 +43,10 @@ pub fn run() -> anyhow::Result<()> {
 
     if n >= 5 && buf[4] == b'A' {
         let challenge = buf.get(5..9.min(n)).unwrap_or_default().to_vec();
-        anyhow::ensure!(challenge.len() == 4, "truncated challenge in {n}-byte reply");
+        anyhow::ensure!(
+            challenge.len() == 4,
+            "truncated challenge in {n}-byte reply"
+        );
 
         let mut request = A2S_HEADER.to_vec();
         request.extend_from_slice(&challenge);

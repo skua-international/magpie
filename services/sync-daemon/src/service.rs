@@ -4,13 +4,13 @@ use std::sync::{Arc, Mutex};
 
 use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest, ServiceResult};
 use protocol::proto::sync::v1::{
-    DeregisterSourceRequest, DeregisterSourceResponse, GetSourceModsRequest,
-    GetSourceModsResponse, GetSyncStatsRequest, GetSyncStatsResponse, GetSyncStatusRequest,
-    GetSyncStatusResponse, GetSyncedModRequest, GetSyncedModResponse, InvalidateModRequest,
-    InvalidateModResponse, ListSyncedModsRequest, ListSyncedModsResponse, RefreshSourceRequest,
-    RefreshSourceResponse, RefreshSteamAuthRequest, RefreshSteamAuthResponse,
-    RegisterSourceRequest, RegisterSourceResponse, ResolvedMod as ProtoResolvedMod,
-    SyncContentRequest, SyncContentResponse, SyncService, SyncedMod,
+    DeregisterSourceRequest, DeregisterSourceResponse, GetSourceModsRequest, GetSourceModsResponse,
+    GetSyncStatsRequest, GetSyncStatsResponse, GetSyncStatusRequest, GetSyncStatusResponse,
+    GetSyncedModRequest, GetSyncedModResponse, InvalidateModRequest, InvalidateModResponse,
+    ListSyncedModsRequest, ListSyncedModsResponse, RefreshSourceRequest, RefreshSourceResponse,
+    RefreshSteamAuthRequest, RefreshSteamAuthResponse, RegisterSourceRequest,
+    RegisterSourceResponse, ResolvedMod as ProtoResolvedMod, SyncContentRequest,
+    SyncContentResponse, SyncService, SyncedMod,
 };
 use steam_sync::cache::SyncState;
 use steam_sync::steam::{self, CmPool, ResolvedMod, SyncTasks};

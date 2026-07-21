@@ -29,12 +29,6 @@ spec:
               volume (for `local`-kind, zip-uploaded sources). The reconciler unions
               all of them into this server's `-mod=` launch args.
             properties:
-              arma_config:
-                default: main.cfg
-                description: |-
-                  Filename (under this server's `SERVER_ROOT/configs/`) passed as
-                  `-config=` -- the mission-cycle/security config.
-                type: string
               cdlc:
                 default: []
                 items:
@@ -59,17 +53,50 @@ spec:
                 - Running
                 - Stopped
                 type: string
+              headless_clients:
+                default: 0
+                description: |-
+                  How many `HeadlessClient` objects this server wants -- the
+                  reconciler creates/deletes owned `HeadlessClient`s (named
+                  `<server>-hc-<index>`) to match this count whenever the server
+                  itself is running (see `services/controller/src/reconcile.rs`'s
+                  `ensure_headless_clients`). No elasticity beyond that: changing
+                  this takes effect on the next reconcile pass, same as any other
+                  spec field, but there's no separate scale-in/scale-out API --
+                  this one field is the whole knob.
+                format: uint32
+                minimum: 0.0
+                type: integer
+              metrics:
+                description: |-
+                  A metrics endpoint this server's own game process/extension
+                  exposes, if any -- purely a scrape hint for the future
+                  observability addon (see README.md's "Why?" and issue #17):
+                  `services/controller/src/reconcile.rs`'s `ensure_deployment`
+                  copies this straight into `prometheus.io/scrape`/`port`/`path`
+                  annotations on the launcher Pod, the same discovery mechanism
+                  every one of this chart's own services already advertises
+                  themselves with. Nothing in this repo runs anything on this port
+                  -- it's entirely the operator's own exporter to configure.
+                nullable: true
+                properties:
+                  path:
+                    description: Defaults to "/metrics" (the Prometheus convention) when unset.
+                    nullable: true
+                    type: string
+                  port:
+                    format: uint16
+                    maximum: 65535.0
+                    minimum: 0.0
+                    type: integer
+                required:
+                - port
+                type: object
               mod_source_ids:
                 default: []
                 items:
                   type: string
                 type: array
-              network_config:
-                default: basic.cfg
-                description: |-
-                  Filename (under this server's `SERVER_ROOT/configs/`) passed as
-                  `-cfg=` -- the network performance config.
-                type: string
               params:
                 default: []
                 description: |-
@@ -97,13 +124,6 @@ spec:
           status:
             nullable: true
             properties:
-              claim_path:
-                default: ''
-                description: |-
-                  The claim path returned by sync-daemon's last successful `Claim`,
-                  mounted into the launcher Pod as `CLAIM_PATH`. Empty until the first
-                  claim completes.
-                type: string
               message:
                 default: ''
                 type: string
@@ -111,7 +131,6 @@ spec:
                 default: Stopped
                 enum:
                 - Pending
-                - Claiming
                 - Running
                 - Failed
                 - Stopped

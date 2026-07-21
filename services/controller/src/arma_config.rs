@@ -61,6 +61,7 @@ pub async fn render_and_write(
         &name,
         admins,
         filepatch,
+        obj.spec.headless_clients > 0,
     )
     .await?;
     let basic = resolve_basic_config(&merged);
@@ -73,6 +74,39 @@ pub async fn render_and_write(
     tokio::fs::write(format!("{dir}/main.cfg"), render_main_cfg(&main)).await?;
     tokio::fs::write(format!("{dir}/basic.cfg"), render_basic_cfg(&basic)).await?;
     Ok(extra_env)
+}
+
+/// The resolved (secret-substituted) `password` value alone, without
+/// writing anything to disk or resolving the rest of `ResolvedMainConfig`
+/// -- used by the `HeadlessClient` reconciler to build an HC's own
+/// `-password=`, which is otherwise unrelated to any of the main
+/// server's own config-file rendering.
+pub async fn resolve_password(
+    client: &Client,
+    namespace: &str,
+    user_secrets_namespace: &str,
+    baseline_configmap: &str,
+    obj: &ArmaServer,
+) -> anyhow::Result<String> {
+    let merged = fetch_and_merge(
+        client,
+        namespace,
+        baseline_configmap,
+        obj.spec.config_map.as_deref(),
+    )
+    .await?;
+    let prefix = merged.get("prefix").cloned().unwrap_or_default();
+    let suffix = merged
+        .get("suffix")
+        .cloned()
+        .unwrap_or_else(|| " | Powered by MAGPIE".to_string());
+    let raw = substitute_simple(
+        merged.get("password").map(String::as_str).unwrap_or(""),
+        &obj.name_any(),
+        &prefix,
+        &suffix,
+    );
+    resolve_secret_ref(client, user_secrets_namespace, &raw).await
 }
 
 /// Any merged-config key of the form `env.<NAME>` becomes an extra
@@ -247,6 +281,16 @@ pub struct ResolvedMainConfig {
     pub allowed_file_patching: i64,
     /// Old-fleet default is 1 (VON disabled).
     pub disable_von: bool,
+    /// `spec.headless_clients > 0` -- when true, render_main_cfg adds
+    /// `headlessClients[] = {"127.0.0.1"};`/`localClient[] =
+    /// {"127.0.0.1"};` (single-node scope: every HC pod is hostNetwork:
+    /// true same as the main server, so every HC's own connection really
+    /// does come from 127.0.0.1, no per-HC IP discovery needed -- see
+    /// `crd::HeadlessClientSpec`'s own doc). No prior ConfigMap-driven
+    /// mechanism ever produced these two keys, so there's no existing
+    /// operator override to preserve here, unlike every other field in
+    /// this struct.
+    pub headless_clients: bool,
 }
 
 pub struct ResolvedBasicConfig {
@@ -269,6 +313,7 @@ async fn resolve_main_config(
     server_name: &str,
     admins: Vec<String>,
     filepatch: Vec<String>,
+    headless_clients: bool,
 ) -> anyhow::Result<ResolvedMainConfig> {
     let prefix = m.get("prefix").cloned().unwrap_or_default();
     let suffix = m
@@ -329,6 +374,7 @@ async fn resolve_main_config(
             .unwrap_or_else(|| vec![(0, 1), (1, 1), (2, 1), (3, 1)]),
         allowed_file_patching: parse_num(m, "allowed_file_patching").unwrap_or(1),
         disable_von: parse_bool(m, "disable_von").unwrap_or(true),
+        headless_clients,
     })
 }
 
@@ -435,6 +481,10 @@ pub fn render_main_cfg(cfg: &ResolvedMainConfig) -> String {
     if let Some(v) = cfg.motd_interval {
         out += &format!("motdInterval = {v};\n");
     }
+    if cfg.headless_clients {
+        out += "headlessClients[] = {\"127.0.0.1\"};\n";
+        out += "localClient[] = {\"127.0.0.1\"};\n";
+    }
     if !cfg.other_properties.is_empty() {
         out += "\n";
         out += &cfg.other_properties;
@@ -505,6 +555,7 @@ mod tests {
             kick_timeout: vec![(0, 1), (1, 1), (2, 1), (3, 1)],
             allowed_file_patching: 1,
             disable_von: true,
+            headless_clients: false,
         }
     }
 
@@ -577,6 +628,22 @@ mod tests {
         };
         let out = render_basic_cfg(&cfg);
         assert_eq!(out, "MaxMsgSend = 256;\n");
+    }
+
+    #[test]
+    fn headless_clients_add_localhost_directives() {
+        let mut cfg = base_main();
+        cfg.headless_clients = true;
+        let out = render_main_cfg(&cfg);
+        assert!(out.contains("headlessClients[] = {\"127.0.0.1\"};"));
+        assert!(out.contains("localClient[] = {\"127.0.0.1\"};"));
+    }
+
+    #[test]
+    fn no_headless_clients_omits_directives_entirely() {
+        let out = render_main_cfg(&base_main());
+        assert!(!out.contains("headlessClients"));
+        assert!(!out.contains("localClient"));
     }
 
     #[test]

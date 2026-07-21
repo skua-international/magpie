@@ -63,6 +63,16 @@ pub struct ArmaServerSpec {
     /// -- it's entirely the operator's own exporter to configure.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metrics: Option<ArmaServerMetrics>,
+    /// How many `HeadlessClient` objects this server wants -- the
+    /// reconciler creates/deletes owned `HeadlessClient`s (named
+    /// `<server>-hc-<index>`) to match this count whenever the server
+    /// itself is running (see `services/controller/src/reconcile.rs`'s
+    /// `ensure_headless_clients`). No elasticity beyond that: changing
+    /// this takes effect on the next reconcile pass, same as any other
+    /// spec field, but there's no separate scale-in/scale-out API --
+    /// this one field is the whole knob.
+    #[serde(default)]
+    pub headless_clients: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
@@ -114,6 +124,58 @@ pub enum ArmaServerPhase {
     /// `desired_state: Running` and so normally move past this immediately.
     #[default]
     Stopped,
+    Pending,
+    Running,
+    Failed,
+}
+
+/// A single headless client instance belonging to an `ArmaServer` --
+/// effectively a "tumor pod": same content (mods, CDLC), same
+/// `hostNetwork: true` as its owning server (single-node scope, so this
+/// makes both share the same real network identity, which is what lets
+/// `-connect=127.0.0.1` and the owning server's own `headlessClients[]`/
+/// `localClient[]` config just be `"127.0.0.1"` -- no per-HC IP discovery
+/// needed at all), but its own profile and launched with `-client`
+/// instead of hosting anything itself. One object per HC instance (not a
+/// bare replica count) so each gets its own recoverable lifecycle,
+/// independent of the main server's own Deployment restarts -- see
+/// issue #26's own discussion for why.
+#[derive(CustomResource, Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[kube(
+    group = "arma.skua.io",
+    version = "v1",
+    kind = "HeadlessClient",
+    namespaced,
+    status = "HeadlessClientStatus",
+    shortname = "hc",
+    printcolumn = r#"{"name":"Server","type":"string","jsonPath":".spec.server"}"#,
+    printcolumn = r#"{"name":"Index","type":"integer","jsonPath":".spec.index"}"#,
+    printcolumn = r#"{"name":"Phase","type":"string","jsonPath":".status.phase"}"#
+)]
+pub struct HeadlessClientSpec {
+    /// Name of the owning `ArmaServer` (same namespace) -- not an owner
+    /// reference alone, since the reconciler also needs this to look up
+    /// the server's own mod_source_ids/cdlc/port to build this HC's
+    /// launch args, not just for garbage collection.
+    pub server: String,
+    /// 0-based index among this server's headless clients -- purely for
+    /// deterministic naming (`<server>-hc-<index>`) and profile
+    /// generation (`<server>-hc-<index>` again, unique by construction),
+    /// not something an operator ever needs to pick themselves.
+    pub index: u32,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+pub struct HeadlessClientStatus {
+    #[serde(default)]
+    pub phase: HeadlessClientPhase,
+    #[serde(default)]
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+pub enum HeadlessClientPhase {
+    #[default]
     Pending,
     Running,
     Failed,

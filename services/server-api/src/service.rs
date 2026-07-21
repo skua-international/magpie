@@ -227,6 +227,10 @@ impl protocol::proto::controller::v1::ServerService for ServerServiceImpl {
                 port: port as u16,
                 path: request.metrics_path.map(|s| s.to_string()),
             }),
+            // No CreateServerRequest field for this yet (backend-only
+            // for now, see issue #26) -- an operator can still set it
+            // directly via `kubectl edit armaserver` once created.
+            headless_clients: 0,
         };
         let name = request.name.to_string();
 

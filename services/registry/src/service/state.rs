@@ -319,6 +319,12 @@ impl AdminServiceImpl {
                     port: port as u16,
                     path: server.metrics_path.clone(),
                 }),
+                // Not in ExportedServer yet (backend-only for now, see
+                // issue #26) -- silently drops headless_clients across
+                // an export/import round trip, same class of gap
+                // flagged on #22/#23/#28 for other ArmaServerSpec
+                // fields that predate their own proto plumbing.
+                headless_clients: 0,
             };
             let obj = ArmaServer {
                 metadata: ObjectMeta {
