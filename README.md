@@ -90,6 +90,22 @@ There's no password-based bootstrap Secret at all -- a Steam password should nev
 
 This isn't elevated access — visibility into private/unlisted mods and collections is scoped to whatever that specific Steam account can actually see (its own subscriptions, friends-only shares, etc.), same as browsing the Workshop as that account normally would. Use an account that's actually subscribed to / has visibility into whatever private content the servers need.
 
+### OAuth2 login (Discord/GitHub/Google)
+
+Steam is the only login method that works out of the box — Discord/GitHub/Google are fully implemented (`services/identity/src/oauth.rs`: generic Authorization Code flow + each provider's own userinfo REST endpoint, uniformly), but each needs its own app registered with that provider (a `client_id`/`client_secret` pair), which this chart deliberately doesn't create or default for you.
+
+To enable one or more:
+
+1. Register an OAuth2 app with the provider(s) you want (Discord Developer Portal / GitHub OAuth Apps / Google Cloud Console), with its redirect URI set to `<identity.baseUrl>/auth/<provider>/callback` (e.g. `https://id.example.com/auth/discord/callback`).
+2. Create a Secret holding whichever providers you're enabling, as `<PROVIDER>_CLIENT_ID`/`<PROVIDER>_CLIENT_SECRET` keys:
+   ```bash
+   kubectl create secret generic magpie-oauth -n <namespace> \
+     --from-literal=DISCORD_CLIENT_ID=... --from-literal=DISCORD_CLIENT_SECRET=... \
+     --from-literal=GITHUB_CLIENT_ID=...  --from-literal=GITHUB_CLIENT_SECRET=...
+   ```
+   Only set the pairs you actually want enabled — `identity` enables a provider only if both its keys are present (`config.rs`), and warns at startup if none are (Steam-only, same as leaving this unset entirely).
+3. Set `identity.oauthSecret: magpie-oauth` (matching whatever name you used) and re-run `magpiectl upgrade`/`helm upgrade`.
+
 ### Arma server config
 
 `controller` renders every `ArmaServer`'s `main.cfg`/`basic.cfg` from a cluster-wide baseline ConfigMap (`charts/magpie/values.yaml`'s `armaConfig` block, one per install) merged with an optional per-server override ConfigMap (`ArmaServer.spec.configMap`, same key names, per-server wins key-by-key). The rendered files land as plain files under the server's own `SERVER_ROOT/configs/` on the host — not a mounted, read-only ConfigMap volume — so they stay hand-editable in place afterward if you need to.
