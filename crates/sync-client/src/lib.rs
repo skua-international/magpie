@@ -4,9 +4,9 @@
 
 use connectrpc::client::{ClientConfig, HttpClient};
 use protocol::proto::sync::v1::{
-    DeregisterSourceRequest, GetSourceModsRequest, GetSyncStatsRequest, GetSyncedModRequest,
-    InvalidateModRequest, ListSyncedModsRequest, RefreshSourceRequest, RefreshSteamAuthRequest,
-    RegisterSourceRequest, SyncContentRequest, SyncServiceClient,
+    DeregisterSourceRequest, GetSourceModsRequest, GetSyncStatsRequest, GetSyncStatusRequest,
+    GetSyncedModRequest, InvalidateModRequest, ListSyncedModsRequest, RefreshSourceRequest,
+    RefreshSteamAuthRequest, RegisterSourceRequest, SyncContentRequest, SyncServiceClient,
 };
 
 pub struct SyncClient {
@@ -23,6 +23,11 @@ pub struct SyncedMod {
 pub struct SyncStats {
     pub mods_bytes: u64,
     pub game_files_bytes: u64,
+}
+
+pub struct SyncStatus {
+    pub syncing: bool,
+    pub game_files_ready: bool,
 }
 
 pub struct RegisterSourceResult {
@@ -194,6 +199,25 @@ impl SyncClient {
         Ok(SyncStats {
             mods_bytes: view.mods_bytes,
             game_files_bytes: view.game_files_bytes,
+        })
+    }
+
+    /// Whether the golden content tree is safe to snapshot from right now
+    /// -- the reconciler calls this before creating an ArmaServer's
+    /// Deployment, so a launcher Pod never gets a CSI snapshot of a
+    /// base-game/CDLC sync that's still mid-download. See the proto's own
+    /// doc for why this exists as its own call rather than being folded
+    /// into `sync_stats`.
+    pub async fn sync_status(&self) -> anyhow::Result<SyncStatus> {
+        let response = self
+            .inner
+            .get_sync_status(GetSyncStatusRequest::default())
+            .await
+            .map_err(|e| anyhow::anyhow!("GetSyncStatus failed: {e}"))?;
+        let view = response.view();
+        Ok(SyncStatus {
+            syncing: view.syncing,
+            game_files_ready: view.game_files_ready,
         })
     }
 

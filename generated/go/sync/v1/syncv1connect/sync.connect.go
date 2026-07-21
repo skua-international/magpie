@@ -62,6 +62,9 @@ const (
 	// SyncServiceRefreshSteamAuthProcedure is the fully-qualified name of the SyncService's
 	// RefreshSteamAuth RPC.
 	SyncServiceRefreshSteamAuthProcedure = "/sync.v1.SyncService/RefreshSteamAuth"
+	// SyncServiceGetSyncStatusProcedure is the fully-qualified name of the SyncService's GetSyncStatus
+	// RPC.
+	SyncServiceGetSyncStatusProcedure = "/sync.v1.SyncService/GetSyncStatus"
 )
 
 // SyncServiceClient is a client for the sync.v1.SyncService service.
@@ -138,6 +141,17 @@ type SyncServiceClient interface {
 	// handler's own doc for why) -- the response still reaches the caller
 	// first.
 	RefreshSteamAuth(context.Context, *connect.Request[v1.RefreshSteamAuthRequest]) (*connect.Response[v1.RefreshSteamAuthResponse], error)
+	// Whether the golden content tree is safe to snapshot from right now --
+	// the controller polls this before creating an ArmaServer's Deployment
+	// so a launcher Pod never gets a CSI snapshot of a base-game/CDLC sync
+	// that's still mid-download (confirmed live: a server started against a
+	// partial sync fails to even spawn arma3server_x64, "Permission denied",
+	// since steamcmd doesn't set the binary's final mode/content until its
+	// download actually completes). Deliberately not folded into
+	// GetSyncStats -- that reports totals regardless of whether a sync is
+	// currently touching them, this reports the one boolean the controller
+	// actually needs to gate on.
+	GetSyncStatus(context.Context, *connect.Request[v1.GetSyncStatusRequest]) (*connect.Response[v1.GetSyncStatusResponse], error)
 }
 
 // NewSyncServiceClient constructs a client for the sync.v1.SyncService service. By default, it uses
@@ -211,6 +225,12 @@ func NewSyncServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(syncServiceMethods.ByName("RefreshSteamAuth")),
 			connect.WithClientOptions(opts...),
 		),
+		getSyncStatus: connect.NewClient[v1.GetSyncStatusRequest, v1.GetSyncStatusResponse](
+			httpClient,
+			baseURL+SyncServiceGetSyncStatusProcedure,
+			connect.WithSchema(syncServiceMethods.ByName("GetSyncStatus")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -226,6 +246,7 @@ type syncServiceClient struct {
 	getSyncedMod     *connect.Client[v1.GetSyncedModRequest, v1.GetSyncedModResponse]
 	getSyncStats     *connect.Client[v1.GetSyncStatsRequest, v1.GetSyncStatsResponse]
 	refreshSteamAuth *connect.Client[v1.RefreshSteamAuthRequest, v1.RefreshSteamAuthResponse]
+	getSyncStatus    *connect.Client[v1.GetSyncStatusRequest, v1.GetSyncStatusResponse]
 }
 
 // RegisterSource calls sync.v1.SyncService.RegisterSource.
@@ -276,6 +297,11 @@ func (c *syncServiceClient) GetSyncStats(ctx context.Context, req *connect.Reque
 // RefreshSteamAuth calls sync.v1.SyncService.RefreshSteamAuth.
 func (c *syncServiceClient) RefreshSteamAuth(ctx context.Context, req *connect.Request[v1.RefreshSteamAuthRequest]) (*connect.Response[v1.RefreshSteamAuthResponse], error) {
 	return c.refreshSteamAuth.CallUnary(ctx, req)
+}
+
+// GetSyncStatus calls sync.v1.SyncService.GetSyncStatus.
+func (c *syncServiceClient) GetSyncStatus(ctx context.Context, req *connect.Request[v1.GetSyncStatusRequest]) (*connect.Response[v1.GetSyncStatusResponse], error) {
+	return c.getSyncStatus.CallUnary(ctx, req)
 }
 
 // SyncServiceHandler is an implementation of the sync.v1.SyncService service.
@@ -352,6 +378,17 @@ type SyncServiceHandler interface {
 	// handler's own doc for why) -- the response still reaches the caller
 	// first.
 	RefreshSteamAuth(context.Context, *connect.Request[v1.RefreshSteamAuthRequest]) (*connect.Response[v1.RefreshSteamAuthResponse], error)
+	// Whether the golden content tree is safe to snapshot from right now --
+	// the controller polls this before creating an ArmaServer's Deployment
+	// so a launcher Pod never gets a CSI snapshot of a base-game/CDLC sync
+	// that's still mid-download (confirmed live: a server started against a
+	// partial sync fails to even spawn arma3server_x64, "Permission denied",
+	// since steamcmd doesn't set the binary's final mode/content until its
+	// download actually completes). Deliberately not folded into
+	// GetSyncStats -- that reports totals regardless of whether a sync is
+	// currently touching them, this reports the one boolean the controller
+	// actually needs to gate on.
+	GetSyncStatus(context.Context, *connect.Request[v1.GetSyncStatusRequest]) (*connect.Response[v1.GetSyncStatusResponse], error)
 }
 
 // NewSyncServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -421,6 +458,12 @@ func NewSyncServiceHandler(svc SyncServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(syncServiceMethods.ByName("RefreshSteamAuth")),
 		connect.WithHandlerOptions(opts...),
 	)
+	syncServiceGetSyncStatusHandler := connect.NewUnaryHandler(
+		SyncServiceGetSyncStatusProcedure,
+		svc.GetSyncStatus,
+		connect.WithSchema(syncServiceMethods.ByName("GetSyncStatus")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/sync.v1.SyncService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SyncServiceRegisterSourceProcedure:
@@ -443,6 +486,8 @@ func NewSyncServiceHandler(svc SyncServiceHandler, opts ...connect.HandlerOption
 			syncServiceGetSyncStatsHandler.ServeHTTP(w, r)
 		case SyncServiceRefreshSteamAuthProcedure:
 			syncServiceRefreshSteamAuthHandler.ServeHTTP(w, r)
+		case SyncServiceGetSyncStatusProcedure:
+			syncServiceGetSyncStatusHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -490,4 +535,8 @@ func (UnimplementedSyncServiceHandler) GetSyncStats(context.Context, *connect.Re
 
 func (UnimplementedSyncServiceHandler) RefreshSteamAuth(context.Context, *connect.Request[v1.RefreshSteamAuthRequest]) (*connect.Response[v1.RefreshSteamAuthResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sync.v1.SyncService.RefreshSteamAuth is not implemented"))
+}
+
+func (UnimplementedSyncServiceHandler) GetSyncStatus(context.Context, *connect.Request[v1.GetSyncStatusRequest]) (*connect.Response[v1.GetSyncStatusResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sync.v1.SyncService.GetSyncStatus is not implemented"))
 }

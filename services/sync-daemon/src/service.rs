@@ -1,15 +1,16 @@
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest, ServiceResult};
 use protocol::proto::sync::v1::{
     DeregisterSourceRequest, DeregisterSourceResponse, GetSourceModsRequest,
-    GetSourceModsResponse, GetSyncStatsRequest, GetSyncStatsResponse, GetSyncedModRequest,
-    GetSyncedModResponse, InvalidateModRequest, InvalidateModResponse, ListSyncedModsRequest,
-    ListSyncedModsResponse, RefreshSourceRequest, RefreshSourceResponse, RefreshSteamAuthRequest,
-    RefreshSteamAuthResponse, RegisterSourceRequest, RegisterSourceResponse,
-    ResolvedMod as ProtoResolvedMod, SyncContentRequest, SyncContentResponse, SyncService,
-    SyncedMod,
+    GetSourceModsResponse, GetSyncStatsRequest, GetSyncStatsResponse, GetSyncStatusRequest,
+    GetSyncStatusResponse, GetSyncedModRequest, GetSyncedModResponse, InvalidateModRequest,
+    InvalidateModResponse, ListSyncedModsRequest, ListSyncedModsResponse, RefreshSourceRequest,
+    RefreshSourceResponse, RefreshSteamAuthRequest, RefreshSteamAuthResponse,
+    RegisterSourceRequest, RegisterSourceResponse, ResolvedMod as ProtoResolvedMod,
+    SyncContentRequest, SyncContentResponse, SyncService, SyncedMod,
 };
 use steam_sync::cache::SyncState;
 use steam_sync::steam::{self, CmPool, ResolvedMod, SyncTasks};
@@ -39,6 +40,30 @@ pub struct Shared {
     pub client: kube::Client,
     pub namespace: String,
     pub steam_session_secret_name: String,
+    /// Count of `sync_content` calls currently in flight -- a counter, not
+    /// a bool, since this can be entered from three independent places
+    /// (the `SyncContent` RPC, the reconciler's auto-sync-on-first-resolve,
+    /// main.rs's sync-on-startup) with no guarantee they're ever mutually
+    /// exclusive. `GetSyncStatus`'s `syncing` field is just `> 0`.
+    syncing: AtomicUsize,
+}
+
+/// RAII guard incrementing `Shared::syncing` on creation, decrementing on
+/// drop -- so a `sync_content` call that returns early via `?` still
+/// clears itself, no separate cleanup needed at every return point.
+struct SyncingGuard<'a>(&'a AtomicUsize);
+
+impl<'a> SyncingGuard<'a> {
+    fn enter(counter: &'a AtomicUsize) -> Self {
+        counter.fetch_add(1, Ordering::SeqCst);
+        Self(counter)
+    }
+}
+
+impl Drop for SyncingGuard<'_> {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
 }
 
 impl Shared {
@@ -57,6 +82,7 @@ impl Shared {
             client,
             namespace,
             steam_session_secret_name,
+            syncing: AtomicUsize::new(0),
         })
     }
 
@@ -138,6 +164,7 @@ impl Shared {
     /// the reconciler's auto-sync-on-first-resolve (`reconcile.rs`), and
     /// main.rs's sync-on-startup.
     pub async fn sync_content(&self) -> anyhow::Result<()> {
+        let _guard = SyncingGuard::enter(&self.syncing);
         let sem = Arc::new(Semaphore::new(steam::SYNC_CONCURRENCY));
         let tasks: Mutex<SyncTasks> = Mutex::new(SyncTasks::new());
 
@@ -364,6 +391,18 @@ impl SyncService for SyncServiceImpl {
         Response::ok(GetSyncStatsResponse {
             mods_bytes: self.shared.sync_state.total_mods_size(),
             game_files_bytes: self.shared.sync_state.total_game_files_size(),
+            ..Default::default()
+        })
+    }
+
+    async fn get_sync_status<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        _request: ServiceRequest<'_, GetSyncStatusRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<GetSyncStatusResponse> + Send + use<'a>> {
+        Response::ok(GetSyncStatusResponse {
+            syncing: self.shared.syncing.load(Ordering::SeqCst) > 0,
+            game_files_ready: self.shared.sync_state.total_game_files_size() > 0,
             ..Default::default()
         })
     }

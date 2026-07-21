@@ -1027,6 +1027,101 @@ func (*SyncContentResponse) Descriptor() ([]byte, []int) {
 	return file_sync_v1_sync_proto_rawDescGZIP(), []int{21}
 }
 
+type GetSyncStatusRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSyncStatusRequest) Reset() {
+	*x = GetSyncStatusRequest{}
+	mi := &file_sync_v1_sync_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSyncStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSyncStatusRequest) ProtoMessage() {}
+
+func (x *GetSyncStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSyncStatusRequest.ProtoReflect.Descriptor instead.
+func (*GetSyncStatusRequest) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{22}
+}
+
+type GetSyncStatusResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// True while any sync_content pass (RPC-triggered, the reconciler's
+	// auto-sync-on-first-resolve, or the startup sync) is actually running.
+	Syncing bool `protobuf:"varint,1,opt,name=syncing,proto3" json:"syncing,omitempty"`
+	// True once the base game/CDLC depots have been synced at least once --
+	// false both before the very first sync and while game_files_bytes'
+	// last-known content isn't actually complete yet (i.e. while syncing is
+	// also true and this is still the first sync ever). A server with this
+	// false has no arma3server_x64 to run at all yet, regardless of syncing.
+	GameFilesReady bool `protobuf:"varint,2,opt,name=game_files_ready,json=gameFilesReady,proto3" json:"game_files_ready,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *GetSyncStatusResponse) Reset() {
+	*x = GetSyncStatusResponse{}
+	mi := &file_sync_v1_sync_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSyncStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSyncStatusResponse) ProtoMessage() {}
+
+func (x *GetSyncStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSyncStatusResponse.ProtoReflect.Descriptor instead.
+func (*GetSyncStatusResponse) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *GetSyncStatusResponse) GetSyncing() bool {
+	if x != nil {
+		return x.Syncing
+	}
+	return false
+}
+
+func (x *GetSyncStatusResponse) GetGameFilesReady() bool {
+	if x != nil {
+		return x.GameFilesReady
+	}
+	return false
+}
+
 var File_sync_v1_sync_proto protoreflect.FileDescriptor
 
 const file_sync_v1_sync_proto_rawDesc = "" +
@@ -1083,7 +1178,11 @@ const file_sync_v1_sync_proto_rawDesc = "" +
 	"\tsource_id\x18\x01 \x01(\tR\bsourceId\"\x1a\n" +
 	"\x18DeregisterSourceResponse\"\x14\n" +
 	"\x12SyncContentRequest\"\x15\n" +
-	"\x13SyncContentResponse2\xb9\x06\n" +
+	"\x13SyncContentResponse\"\x16\n" +
+	"\x14GetSyncStatusRequest\"[\n" +
+	"\x15GetSyncStatusResponse\x12\x18\n" +
+	"\asyncing\x18\x01 \x01(\bR\asyncing\x12(\n" +
+	"\x10game_files_ready\x18\x02 \x01(\bR\x0egameFilesReady2\x89\a\n" +
 	"\vSyncService\x12Q\n" +
 	"\x0eRegisterSource\x12\x1e.sync.v1.RegisterSourceRequest\x1a\x1f.sync.v1.RegisterSourceResponse\x12W\n" +
 	"\x10DeregisterSource\x12 .sync.v1.DeregisterSourceRequest\x1a!.sync.v1.DeregisterSourceResponse\x12H\n" +
@@ -1094,7 +1193,8 @@ const file_sync_v1_sync_proto_rawDesc = "" +
 	"\rInvalidateMod\x12\x1d.sync.v1.InvalidateModRequest\x1a\x1e.sync.v1.InvalidateModResponse\x12K\n" +
 	"\fGetSyncedMod\x12\x1c.sync.v1.GetSyncedModRequest\x1a\x1d.sync.v1.GetSyncedModResponse\x12K\n" +
 	"\fGetSyncStats\x12\x1c.sync.v1.GetSyncStatsRequest\x1a\x1d.sync.v1.GetSyncStatsResponse\x12W\n" +
-	"\x10RefreshSteamAuth\x12 .sync.v1.RefreshSteamAuthRequest\x1a!.sync.v1.RefreshSteamAuthResponseBBZ@github.com/skua-international/magpie/generated/go/sync/v1;syncv1b\x06proto3"
+	"\x10RefreshSteamAuth\x12 .sync.v1.RefreshSteamAuthRequest\x1a!.sync.v1.RefreshSteamAuthResponse\x12N\n" +
+	"\rGetSyncStatus\x12\x1d.sync.v1.GetSyncStatusRequest\x1a\x1e.sync.v1.GetSyncStatusResponseBBZ@github.com/skua-international/magpie/generated/go/sync/v1;syncv1b\x06proto3"
 
 var (
 	file_sync_v1_sync_proto_rawDescOnce sync.Once
@@ -1108,7 +1208,7 @@ func file_sync_v1_sync_proto_rawDescGZIP() []byte {
 	return file_sync_v1_sync_proto_rawDescData
 }
 
-var file_sync_v1_sync_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_sync_v1_sync_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_sync_v1_sync_proto_goTypes = []any{
 	(*ListSyncedModsRequest)(nil),    // 0: sync.v1.ListSyncedModsRequest
 	(*SyncedMod)(nil),                // 1: sync.v1.SyncedMod
@@ -1132,6 +1232,8 @@ var file_sync_v1_sync_proto_goTypes = []any{
 	(*DeregisterSourceResponse)(nil), // 19: sync.v1.DeregisterSourceResponse
 	(*SyncContentRequest)(nil),       // 20: sync.v1.SyncContentRequest
 	(*SyncContentResponse)(nil),      // 21: sync.v1.SyncContentResponse
+	(*GetSyncStatusRequest)(nil),     // 22: sync.v1.GetSyncStatusRequest
+	(*GetSyncStatusResponse)(nil),    // 23: sync.v1.GetSyncStatusResponse
 }
 var file_sync_v1_sync_proto_depIdxs = []int32{
 	1,  // 0: sync.v1.ListSyncedModsResponse.mods:type_name -> sync.v1.SyncedMod
@@ -1148,18 +1250,20 @@ var file_sync_v1_sync_proto_depIdxs = []int32{
 	3,  // 11: sync.v1.SyncService.GetSyncedMod:input_type -> sync.v1.GetSyncedModRequest
 	5,  // 12: sync.v1.SyncService.GetSyncStats:input_type -> sync.v1.GetSyncStatsRequest
 	7,  // 13: sync.v1.SyncService.RefreshSteamAuth:input_type -> sync.v1.RefreshSteamAuthRequest
-	17, // 14: sync.v1.SyncService.RegisterSource:output_type -> sync.v1.RegisterSourceResponse
-	19, // 15: sync.v1.SyncService.DeregisterSource:output_type -> sync.v1.DeregisterSourceResponse
-	21, // 16: sync.v1.SyncService.SyncContent:output_type -> sync.v1.SyncContentResponse
-	14, // 17: sync.v1.SyncService.GetSourceMods:output_type -> sync.v1.GetSourceModsResponse
-	12, // 18: sync.v1.SyncService.RefreshSource:output_type -> sync.v1.RefreshSourceResponse
-	2,  // 19: sync.v1.SyncService.ListSyncedMods:output_type -> sync.v1.ListSyncedModsResponse
-	10, // 20: sync.v1.SyncService.InvalidateMod:output_type -> sync.v1.InvalidateModResponse
-	4,  // 21: sync.v1.SyncService.GetSyncedMod:output_type -> sync.v1.GetSyncedModResponse
-	6,  // 22: sync.v1.SyncService.GetSyncStats:output_type -> sync.v1.GetSyncStatsResponse
-	8,  // 23: sync.v1.SyncService.RefreshSteamAuth:output_type -> sync.v1.RefreshSteamAuthResponse
-	14, // [14:24] is the sub-list for method output_type
-	4,  // [4:14] is the sub-list for method input_type
+	22, // 14: sync.v1.SyncService.GetSyncStatus:input_type -> sync.v1.GetSyncStatusRequest
+	17, // 15: sync.v1.SyncService.RegisterSource:output_type -> sync.v1.RegisterSourceResponse
+	19, // 16: sync.v1.SyncService.DeregisterSource:output_type -> sync.v1.DeregisterSourceResponse
+	21, // 17: sync.v1.SyncService.SyncContent:output_type -> sync.v1.SyncContentResponse
+	14, // 18: sync.v1.SyncService.GetSourceMods:output_type -> sync.v1.GetSourceModsResponse
+	12, // 19: sync.v1.SyncService.RefreshSource:output_type -> sync.v1.RefreshSourceResponse
+	2,  // 20: sync.v1.SyncService.ListSyncedMods:output_type -> sync.v1.ListSyncedModsResponse
+	10, // 21: sync.v1.SyncService.InvalidateMod:output_type -> sync.v1.InvalidateModResponse
+	4,  // 22: sync.v1.SyncService.GetSyncedMod:output_type -> sync.v1.GetSyncedModResponse
+	6,  // 23: sync.v1.SyncService.GetSyncStats:output_type -> sync.v1.GetSyncStatsResponse
+	8,  // 24: sync.v1.SyncService.RefreshSteamAuth:output_type -> sync.v1.RefreshSteamAuthResponse
+	23, // 25: sync.v1.SyncService.GetSyncStatus:output_type -> sync.v1.GetSyncStatusResponse
+	15, // [15:26] is the sub-list for method output_type
+	4,  // [4:15] is the sub-list for method input_type
 	4,  // [4:4] is the sub-list for extension type_name
 	4,  // [4:4] is the sub-list for extension extendee
 	0,  // [0:4] is the sub-list for field type_name
@@ -1177,7 +1281,7 @@ func file_sync_v1_sync_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sync_v1_sync_proto_rawDesc), len(file_sync_v1_sync_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   22,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

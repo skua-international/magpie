@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file sync/v1/sync.proto.
  */
 export const file_sync_v1_sync: GenFile = /*@__PURE__*/
-  fileDesc("ChJzeW5jL3YxL3N5bmMucHJvdG8SB3N5bmMudjEiFwoVTGlzdFN5bmNlZE1vZHNSZXF1ZXN0IlMKCVN5bmNlZE1vZBIOCgZtb2RfaWQYASABKAQSEwoLbWFuaWZlc3RfaWQYAiABKAQSEgoKc2l6ZV9ieXRlcxgDIAEoBBINCgV0aXRsZRgEIAEoCSI6ChZMaXN0U3luY2VkTW9kc1Jlc3BvbnNlEiAKBG1vZHMYASADKAsyEi5zeW5jLnYxLlN5bmNlZE1vZCIlChNHZXRTeW5jZWRNb2RSZXF1ZXN0Eg4KBm1vZF9pZBgBIAEoBCJYChRHZXRTeW5jZWRNb2RSZXNwb25zZRIkCgNtb2QYASABKAsyEi5zeW5jLnYxLlN5bmNlZE1vZEgAiAEBEhIKCnNvdXJjZV9pZHMYAiADKAlCBgoEX21vZCIVChNHZXRTeW5jU3RhdHNSZXF1ZXN0IkQKFEdldFN5bmNTdGF0c1Jlc3BvbnNlEhIKCm1vZHNfYnl0ZXMYASABKAQSGAoQZ2FtZV9maWxlc19ieXRlcxgCIAEoBCJCChdSZWZyZXNoU3RlYW1BdXRoUmVxdWVzdBIQCgh1c2VybmFtZRgBIAEoCRIVCg1yZWZyZXNoX3Rva2VuGAIgASgJIhoKGFJlZnJlc2hTdGVhbUF1dGhSZXNwb25zZSImChRJbnZhbGlkYXRlTW9kUmVxdWVzdBIOCgZtb2RfaWQYASABKAQiFwoVSW52YWxpZGF0ZU1vZFJlc3BvbnNlIikKFFJlZnJlc2hTb3VyY2VSZXF1ZXN0EhEKCXNvdXJjZV9pZBgBIAEoCSI7ChVSZWZyZXNoU291cmNlUmVzcG9uc2USIgoEbW9kcxgBIAMoCzIULnN5bmMudjEuUmVzb2x2ZWRNb2QiKQoUR2V0U291cmNlTW9kc1JlcXVlc3QSEQoJc291cmNlX2lkGAEgASgJIigKFUdldFNvdXJjZU1vZHNSZXNwb25zZRIPCgdtb2RfaWRzGAEgAygEIkEKFVJlZ2lzdGVyU291cmNlUmVxdWVzdBIVCg1jYW5kaWRhdGVfaWRzGAEgAygEEhEKCXNvdXJjZV9pZBgCIAEoCSIsCgtSZXNvbHZlZE1vZBIOCgZtb2RfaWQYASABKAQSDQoFdGl0bGUYAiABKAkiUAoWUmVnaXN0ZXJTb3VyY2VSZXNwb25zZRIiCgRtb2RzGAEgAygLMhQuc3luYy52MS5SZXNvbHZlZE1vZBISCgpyb290X3RpdGxlGAIgASgJIiwKF0RlcmVnaXN0ZXJTb3VyY2VSZXF1ZXN0EhEKCXNvdXJjZV9pZBgBIAEoCSIaChhEZXJlZ2lzdGVyU291cmNlUmVzcG9uc2UiFAoSU3luY0NvbnRlbnRSZXF1ZXN0IhUKE1N5bmNDb250ZW50UmVzcG9uc2UyuQYKC1N5bmNTZXJ2aWNlElEKDlJlZ2lzdGVyU291cmNlEh4uc3luYy52MS5SZWdpc3RlclNvdXJjZVJlcXVlc3QaHy5zeW5jLnYxLlJlZ2lzdGVyU291cmNlUmVzcG9uc2USVwoQRGVyZWdpc3RlclNvdXJjZRIgLnN5bmMudjEuRGVyZWdpc3RlclNvdXJjZVJlcXVlc3QaIS5zeW5jLnYxLkRlcmVnaXN0ZXJTb3VyY2VSZXNwb25zZRJICgtTeW5jQ29udGVudBIbLnN5bmMudjEuU3luY0NvbnRlbnRSZXF1ZXN0Ghwuc3luYy52MS5TeW5jQ29udGVudFJlc3BvbnNlEk4KDUdldFNvdXJjZU1vZHMSHS5zeW5jLnYxLkdldFNvdXJjZU1vZHNSZXF1ZXN0Gh4uc3luYy52MS5HZXRTb3VyY2VNb2RzUmVzcG9uc2USTgoNUmVmcmVzaFNvdXJjZRIdLnN5bmMudjEuUmVmcmVzaFNvdXJjZVJlcXVlc3QaHi5zeW5jLnYxLlJlZnJlc2hTb3VyY2VSZXNwb25zZRJRCg5MaXN0U3luY2VkTW9kcxIeLnN5bmMudjEuTGlzdFN5bmNlZE1vZHNSZXF1ZXN0Gh8uc3luYy52MS5MaXN0U3luY2VkTW9kc1Jlc3BvbnNlEk4KDUludmFsaWRhdGVNb2QSHS5zeW5jLnYxLkludmFsaWRhdGVNb2RSZXF1ZXN0Gh4uc3luYy52MS5JbnZhbGlkYXRlTW9kUmVzcG9uc2USSwoMR2V0U3luY2VkTW9kEhwuc3luYy52MS5HZXRTeW5jZWRNb2RSZXF1ZXN0Gh0uc3luYy52MS5HZXRTeW5jZWRNb2RSZXNwb25zZRJLCgxHZXRTeW5jU3RhdHMSHC5zeW5jLnYxLkdldFN5bmNTdGF0c1JlcXVlc3QaHS5zeW5jLnYxLkdldFN5bmNTdGF0c1Jlc3BvbnNlElcKEFJlZnJlc2hTdGVhbUF1dGgSIC5zeW5jLnYxLlJlZnJlc2hTdGVhbUF1dGhSZXF1ZXN0GiEuc3luYy52MS5SZWZyZXNoU3RlYW1BdXRoUmVzcG9uc2VCQlpAZ2l0aHViLmNvbS9za3VhLWludGVybmF0aW9uYWwvbWFncGllL2dlbmVyYXRlZC9nby9zeW5jL3YxO3N5bmN2MWIGcHJvdG8z");
+  fileDesc("ChJzeW5jL3YxL3N5bmMucHJvdG8SB3N5bmMudjEiFwoVTGlzdFN5bmNlZE1vZHNSZXF1ZXN0IlMKCVN5bmNlZE1vZBIOCgZtb2RfaWQYASABKAQSEwoLbWFuaWZlc3RfaWQYAiABKAQSEgoKc2l6ZV9ieXRlcxgDIAEoBBINCgV0aXRsZRgEIAEoCSI6ChZMaXN0U3luY2VkTW9kc1Jlc3BvbnNlEiAKBG1vZHMYASADKAsyEi5zeW5jLnYxLlN5bmNlZE1vZCIlChNHZXRTeW5jZWRNb2RSZXF1ZXN0Eg4KBm1vZF9pZBgBIAEoBCJYChRHZXRTeW5jZWRNb2RSZXNwb25zZRIkCgNtb2QYASABKAsyEi5zeW5jLnYxLlN5bmNlZE1vZEgAiAEBEhIKCnNvdXJjZV9pZHMYAiADKAlCBgoEX21vZCIVChNHZXRTeW5jU3RhdHNSZXF1ZXN0IkQKFEdldFN5bmNTdGF0c1Jlc3BvbnNlEhIKCm1vZHNfYnl0ZXMYASABKAQSGAoQZ2FtZV9maWxlc19ieXRlcxgCIAEoBCJCChdSZWZyZXNoU3RlYW1BdXRoUmVxdWVzdBIQCgh1c2VybmFtZRgBIAEoCRIVCg1yZWZyZXNoX3Rva2VuGAIgASgJIhoKGFJlZnJlc2hTdGVhbUF1dGhSZXNwb25zZSImChRJbnZhbGlkYXRlTW9kUmVxdWVzdBIOCgZtb2RfaWQYASABKAQiFwoVSW52YWxpZGF0ZU1vZFJlc3BvbnNlIikKFFJlZnJlc2hTb3VyY2VSZXF1ZXN0EhEKCXNvdXJjZV9pZBgBIAEoCSI7ChVSZWZyZXNoU291cmNlUmVzcG9uc2USIgoEbW9kcxgBIAMoCzIULnN5bmMudjEuUmVzb2x2ZWRNb2QiKQoUR2V0U291cmNlTW9kc1JlcXVlc3QSEQoJc291cmNlX2lkGAEgASgJIigKFUdldFNvdXJjZU1vZHNSZXNwb25zZRIPCgdtb2RfaWRzGAEgAygEIkEKFVJlZ2lzdGVyU291cmNlUmVxdWVzdBIVCg1jYW5kaWRhdGVfaWRzGAEgAygEEhEKCXNvdXJjZV9pZBgCIAEoCSIsCgtSZXNvbHZlZE1vZBIOCgZtb2RfaWQYASABKAQSDQoFdGl0bGUYAiABKAkiUAoWUmVnaXN0ZXJTb3VyY2VSZXNwb25zZRIiCgRtb2RzGAEgAygLMhQuc3luYy52MS5SZXNvbHZlZE1vZBISCgpyb290X3RpdGxlGAIgASgJIiwKF0RlcmVnaXN0ZXJTb3VyY2VSZXF1ZXN0EhEKCXNvdXJjZV9pZBgBIAEoCSIaChhEZXJlZ2lzdGVyU291cmNlUmVzcG9uc2UiFAoSU3luY0NvbnRlbnRSZXF1ZXN0IhUKE1N5bmNDb250ZW50UmVzcG9uc2UiFgoUR2V0U3luY1N0YXR1c1JlcXVlc3QiQgoVR2V0U3luY1N0YXR1c1Jlc3BvbnNlEg8KB3N5bmNpbmcYASABKAgSGAoQZ2FtZV9maWxlc19yZWFkeRgCIAEoCDKJBwoLU3luY1NlcnZpY2USUQoOUmVnaXN0ZXJTb3VyY2USHi5zeW5jLnYxLlJlZ2lzdGVyU291cmNlUmVxdWVzdBofLnN5bmMudjEuUmVnaXN0ZXJTb3VyY2VSZXNwb25zZRJXChBEZXJlZ2lzdGVyU291cmNlEiAuc3luYy52MS5EZXJlZ2lzdGVyU291cmNlUmVxdWVzdBohLnN5bmMudjEuRGVyZWdpc3RlclNvdXJjZVJlc3BvbnNlEkgKC1N5bmNDb250ZW50Ehsuc3luYy52MS5TeW5jQ29udGVudFJlcXVlc3QaHC5zeW5jLnYxLlN5bmNDb250ZW50UmVzcG9uc2USTgoNR2V0U291cmNlTW9kcxIdLnN5bmMudjEuR2V0U291cmNlTW9kc1JlcXVlc3QaHi5zeW5jLnYxLkdldFNvdXJjZU1vZHNSZXNwb25zZRJOCg1SZWZyZXNoU291cmNlEh0uc3luYy52MS5SZWZyZXNoU291cmNlUmVxdWVzdBoeLnN5bmMudjEuUmVmcmVzaFNvdXJjZVJlc3BvbnNlElEKDkxpc3RTeW5jZWRNb2RzEh4uc3luYy52MS5MaXN0U3luY2VkTW9kc1JlcXVlc3QaHy5zeW5jLnYxLkxpc3RTeW5jZWRNb2RzUmVzcG9uc2USTgoNSW52YWxpZGF0ZU1vZBIdLnN5bmMudjEuSW52YWxpZGF0ZU1vZFJlcXVlc3QaHi5zeW5jLnYxLkludmFsaWRhdGVNb2RSZXNwb25zZRJLCgxHZXRTeW5jZWRNb2QSHC5zeW5jLnYxLkdldFN5bmNlZE1vZFJlcXVlc3QaHS5zeW5jLnYxLkdldFN5bmNlZE1vZFJlc3BvbnNlEksKDEdldFN5bmNTdGF0cxIcLnN5bmMudjEuR2V0U3luY1N0YXRzUmVxdWVzdBodLnN5bmMudjEuR2V0U3luY1N0YXRzUmVzcG9uc2USVwoQUmVmcmVzaFN0ZWFtQXV0aBIgLnN5bmMudjEuUmVmcmVzaFN0ZWFtQXV0aFJlcXVlc3QaIS5zeW5jLnYxLlJlZnJlc2hTdGVhbUF1dGhSZXNwb25zZRJOCg1HZXRTeW5jU3RhdHVzEh0uc3luYy52MS5HZXRTeW5jU3RhdHVzUmVxdWVzdBoeLnN5bmMudjEuR2V0U3luY1N0YXR1c1Jlc3BvbnNlQkJaQGdpdGh1Yi5jb20vc2t1YS1pbnRlcm5hdGlvbmFsL21hZ3BpZS9nZW5lcmF0ZWQvZ28vc3luYy92MTtzeW5jdjFiBnByb3RvMw");
 
 /**
  * @generated from message sync.v1.ListSyncedModsRequest
@@ -434,6 +434,50 @@ export const SyncContentResponseSchema: GenMessage<SyncContentResponse> = /*@__P
   messageDesc(file_sync_v1_sync, 21);
 
 /**
+ * @generated from message sync.v1.GetSyncStatusRequest
+ */
+export type GetSyncStatusRequest = Message<"sync.v1.GetSyncStatusRequest"> & {
+};
+
+/**
+ * Describes the message sync.v1.GetSyncStatusRequest.
+ * Use `create(GetSyncStatusRequestSchema)` to create a new message.
+ */
+export const GetSyncStatusRequestSchema: GenMessage<GetSyncStatusRequest> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 22);
+
+/**
+ * @generated from message sync.v1.GetSyncStatusResponse
+ */
+export type GetSyncStatusResponse = Message<"sync.v1.GetSyncStatusResponse"> & {
+  /**
+   * True while any sync_content pass (RPC-triggered, the reconciler's
+   * auto-sync-on-first-resolve, or the startup sync) is actually running.
+   *
+   * @generated from field: bool syncing = 1;
+   */
+  syncing: boolean;
+
+  /**
+   * True once the base game/CDLC depots have been synced at least once --
+   * false both before the very first sync and while game_files_bytes'
+   * last-known content isn't actually complete yet (i.e. while syncing is
+   * also true and this is still the first sync ever). A server with this
+   * false has no arma3server_x64 to run at all yet, regardless of syncing.
+   *
+   * @generated from field: bool game_files_ready = 2;
+   */
+  gameFilesReady: boolean;
+};
+
+/**
+ * Describes the message sync.v1.GetSyncStatusResponse.
+ * Use `create(GetSyncStatusResponseSchema)` to create a new message.
+ */
+export const GetSyncStatusResponseSchema: GenMessage<GetSyncStatusResponse> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 23);
+
+/**
  * Mod/collection sync registry and content-claim service. Owns all Steam
  * depot/workshop mechanics -- callers (the controller) never talk to Steam
  * directly, only in terms of candidate IDs and resolved mod IDs.
@@ -592,6 +636,25 @@ export const SyncService: GenService<{
     methodKind: "unary";
     input: typeof RefreshSteamAuthRequestSchema;
     output: typeof RefreshSteamAuthResponseSchema;
+  },
+  /**
+   * Whether the golden content tree is safe to snapshot from right now --
+   * the controller polls this before creating an ArmaServer's Deployment
+   * so a launcher Pod never gets a CSI snapshot of a base-game/CDLC sync
+   * that's still mid-download (confirmed live: a server started against a
+   * partial sync fails to even spawn arma3server_x64, "Permission denied",
+   * since steamcmd doesn't set the binary's final mode/content until its
+   * download actually completes). Deliberately not folded into
+   * GetSyncStats -- that reports totals regardless of whether a sync is
+   * currently touching them, this reports the one boolean the controller
+   * actually needs to gate on.
+   *
+   * @generated from rpc sync.v1.SyncService.GetSyncStatus
+   */
+  getSyncStatus: {
+    methodKind: "unary";
+    input: typeof GetSyncStatusRequestSchema;
+    output: typeof GetSyncStatusResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_sync_v1_sync, 0);

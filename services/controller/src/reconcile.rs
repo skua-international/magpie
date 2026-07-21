@@ -154,6 +154,32 @@ async fn apply(obj: &ArmaServer, ctx: &Ctx) -> anyhow::Result<Action> {
         }
 
         ArmaServerPhase::Pending => {
+            // A launcher Pod's own content is a CSI snapshot of sync-daemon's
+            // golden tree taken the instant it's scheduled -- if that tree
+            // is still mid-download (or has never finished a first sync at
+            // all), the snapshot is of a partial/incomplete tree and
+            // arma3server_x64 fails outright (confirmed live: "Permission
+            // denied" spawning it, since steamcmd doesn't finalize a
+            // depot's files -- including the binary's own mode -- until its
+            // download actually completes). Block here instead of creating
+            // the Deployment against that: stay Pending and requeue fast
+            // until sync-daemon reports the golden tree is quiescent and
+            // has a complete base game.
+            match ctx.sync_client.sync_status().await {
+                Ok(status) if status.syncing || !status.game_files_ready => {
+                    info!(
+                        "{name}: waiting for sync-daemon (syncing={}, game_files_ready={})",
+                        status.syncing, status.game_files_ready
+                    );
+                    return Ok(Action::requeue(FAST_REQUEUE));
+                }
+                Ok(_) => {}
+                Err(e) => {
+                    warn!("{name}: failed to check sync-daemon status, retrying: {e:#}");
+                    return Ok(Action::requeue(ERROR_REQUEUE));
+                }
+            }
+
             let new_phase = match run_pending(ctx, obj).await {
                 Ok(()) => ArmaServerStatus {
                     phase: ArmaServerPhase::Running,

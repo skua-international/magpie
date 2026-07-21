@@ -88,6 +88,18 @@ service SyncService {
   // handler's own doc for why) -- the response still reaches the caller
   // first.
   rpc RefreshSteamAuth(RefreshSteamAuthRequest) returns (RefreshSteamAuthResponse);
+
+  // Whether the golden content tree is safe to snapshot from right now --
+  // the controller polls this before creating an ArmaServer's Deployment
+  // so a launcher Pod never gets a CSI snapshot of a base-game/CDLC sync
+  // that's still mid-download (confirmed live: a server started against a
+  // partial sync fails to even spawn arma3server_x64, "Permission denied",
+  // since steamcmd doesn't set the binary's final mode/content until its
+  // download actually completes). Deliberately not folded into
+  // GetSyncStats -- that reports totals regardless of whether a sync is
+  // currently touching them, this reports the one boolean the controller
+  // actually needs to gate on.
+  rpc GetSyncStatus(GetSyncStatusRequest) returns (GetSyncStatusResponse);
 }
 
 message ListSyncedModsRequest {}
@@ -194,3 +206,17 @@ message DeregisterSourceResponse {}
 message SyncContentRequest {}
 
 message SyncContentResponse {}
+
+message GetSyncStatusRequest {}
+
+message GetSyncStatusResponse {
+  // True while any sync_content pass (RPC-triggered, the reconciler's
+  // auto-sync-on-first-resolve, or the startup sync) is actually running.
+  bool syncing = 1;
+  // True once the base game/CDLC depots have been synced at least once --
+  // false both before the very first sync and while game_files_bytes'
+  // last-known content isn't actually complete yet (i.e. while syncing is
+  // also true and this is still the first sync ever). A server with this
+  // false has no arma3server_x64 to run at all yet, regardless of syncing.
+  bool game_files_ready = 2;
+}
