@@ -477,6 +477,16 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.screen, m.cursor, m.loaded, m.err, m.status = screenMenu, 0, false, nil, ""
 		}
 		return m, nil
+	case "f5":
+		// On-demand counterpart to the background tick (see tickCmd) --
+		// same reloadCmdForScreen, same loadOrKeep-based error handling,
+		// just fired immediately instead of waiting up to
+		// refreshInterval. A no-op on any screen with nothing live to
+		// reload (wizards, menu).
+		if reload := m.reloadCmdForScreen(); reload != nil {
+			return m, reload
+		}
+		return m, nil
 	}
 
 	// Per-screen action keys (start/stop/delete/... -- see
@@ -713,7 +723,7 @@ func (m Model) View() tea.View {
 				return fmt.Sprintf("%-20s port=%-5d phase=%-12s desired=%s", s.Id, s.Port, s.Phase.String(), s.DesiredState.String())
 			})
 		}
-		b.WriteString("\n" + dimStyle.Render("n: new, s: start, x: stop, u: resync, d: delete, esc to go back"))
+		b.WriteString("\n" + dimStyle.Render("n: new, s: start, x: stop, u: resync, d: delete, f5: refresh, esc to go back"))
 
 	case screenServersCreate:
 		b.WriteString(m.viewCreateServer())
@@ -732,7 +742,7 @@ func (m Model) View() tea.View {
 				return fmt.Sprintf("%-38s kind=%-11s %s", s.Id, s.Kind.String(), actions.ModSourceLabel(s))
 			})
 		}
-		b.WriteString("\n" + dimStyle.Render("a: add, s: sync, d: delete, esc to go back"))
+		b.WriteString("\n" + dimStyle.Render("a: add, s: sync, d: delete, f5: refresh, esc to go back"))
 
 	case screenModSourcesAdd:
 		b.WriteString(m.viewModSourcesAdd())
@@ -754,7 +764,7 @@ func (m Model) View() tea.View {
 				return fmt.Sprintf("%-38s %s", ms.Id, ms.Name)
 			})
 		}
-		b.WriteString("\n" + dimStyle.Render("u: upload, d: delete, esc to go back"))
+		b.WriteString("\n" + dimStyle.Render("u: upload, d: delete, f5: refresh, esc to go back"))
 
 	case screenMissionsUpload:
 		b.WriteString(m.viewMissionsUpload())
@@ -771,7 +781,7 @@ func (m Model) View() tea.View {
 			b.WriteString(fmt.Sprintf("game files: %s\n", actions.HumanBytes(m.diskUsage.GameFilesBytes)))
 			b.WriteString(fmt.Sprintf("total:      %s\n", actions.HumanBytes(m.diskUsage.TotalBytes)))
 		}
-		b.WriteString("\n" + dimStyle.Render("e: edit baseline config, r: refresh Steam auth, x: export state, m: import state, esc to go back"))
+		b.WriteString("\n" + dimStyle.Render("e: edit baseline config, r: refresh Steam auth, x: export state, m: import state, f5: refresh, esc to go back"))
 
 	case screenAdminExportState:
 		b.WriteString(m.viewAdminExportState())

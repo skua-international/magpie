@@ -80,6 +80,6 @@ func (m Model) viewSyncedMods() string {
 			return fmt.Sprintf("%-12s size=%-10s %s", strconv.FormatUint(mod.ModId, 10), actions.HumanBytes(mod.SizeBytes), title)
 		})
 	}
-	b.WriteString("\n" + dimStyle.Render("i: invalidate verification cache, esc to go back"))
+	b.WriteString("\n" + dimStyle.Render("i: invalidate verification cache, f5: refresh, esc to go back"))
 	return b.String()
 }
