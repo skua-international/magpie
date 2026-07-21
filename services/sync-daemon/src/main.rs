@@ -141,6 +141,31 @@ async fn main() -> Result<()> {
         });
     }
 
+    // Passive background re-sync on a timer, on top of the explicit
+    // triggers above (RPC, a server starting, a ModSource's first
+    // resolve) -- otherwise content nothing has explicitly touched in a
+    // while (a server sitting Stopped, a mod source nobody's restarted
+    // against) can silently drift out of date against Steam's current
+    // manifests indefinitely. `interval.tick()` fires immediately on its
+    // own first call, which would just duplicate the startup sync above
+    // -- skipped with one throwaway tick before entering the loop.
+    if cfg.content_sync_interval_secs > 0 {
+        let shared = shared.clone();
+        let period = std::time::Duration::from_secs(cfg.content_sync_interval_secs);
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(period);
+            interval.tick().await;
+            loop {
+                interval.tick().await;
+                info!("running scheduled background content sync");
+                match shared.sync_content().await {
+                    Ok(()) => info!("scheduled content sync complete"),
+                    Err(e) => warn!("scheduled content sync failed: {e:#}"),
+                }
+            }
+        });
+    }
+
     let sync_service = SyncServiceImpl::new(shared);
     let connect = ConnectRouter::new().add_service(sync_service);
 

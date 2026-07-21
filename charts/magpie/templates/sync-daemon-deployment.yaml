@@ -65,6 +65,8 @@ spec:
               value: {{ .Values.syncDaemon.poolSize | quote }}
             - name: POLL_INTERVAL_SECS
               value: {{ .Values.syncDaemon.pollIntervalSecs | quote }}
+            - name: CONTENT_SYNC_INTERVAL_SECS
+              value: {{ .Values.syncDaemon.contentSyncIntervalSecs | quote }}
             - name: STEAM_SESSION_SECRET_NAME
               value: {{ .Values.syncDaemon.steamAuth.sessionSecretName | quote }}
             {{- if .Values.syncDaemon.steamAuth.anonymous }}

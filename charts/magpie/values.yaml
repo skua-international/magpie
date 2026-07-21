@@ -217,6 +217,13 @@ syncDaemon:
   # SQLite is a single-writer store -- never raise this.
   replicas: 1
   pollIntervalSecs: 1800
+  # How often to passively re-download/re-verify already-synced content
+  # on a timer, on top of the explicit triggers (SyncModSource RPC, a
+  # server starting, a ModSource's first resolve) -- catches upstream
+  # depot/mod updates for content nothing has explicitly touched in a
+  # while. 0 disables this timer (every sync stays purely
+  # trigger-driven).
+  contentSyncIntervalSecs: 21600
   poolSize: 4
   image:
     repository: "ghcr.io/skua-international/magpie/sync-daemon"

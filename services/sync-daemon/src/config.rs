@@ -48,6 +48,14 @@ pub struct Config {
     /// anything re-registering it -- catches upstream collection-membership
     /// drift even for a source nothing is actively touching right now.
     pub poll_interval_secs: u64,
+    /// How often to passively re-run a full `sync_content` pass (server/
+    /// CDLC depots plus every registered source's mods) on a timer, on
+    /// top of the explicit triggers (`SyncContent` RPC, a server
+    /// starting, a ModSource's first resolve). Catches upstream depot/mod
+    /// updates for content nothing has explicitly touched in a while --
+    /// `0` disables this timer entirely (every sync stays purely
+    /// trigger-driven, the behavior before this existed).
+    pub content_sync_interval_secs: u64,
     /// Namespace the ModSource reconciler watches, and where the session
     /// Secret (see `secrets.rs`) lives.
     pub namespace: String,
@@ -80,6 +88,14 @@ impl Config {
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(1800),
+            content_sync_interval_secs: env::var("CONTENT_SYNC_INTERVAL_SECS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                // 6h -- frequent enough to catch depot/mod updates within
+                // a normal play session's own timescale, infrequent
+                // enough not to hammer Steam or waste bandwidth
+                // re-verifying content that rarely actually changes.
+                .unwrap_or(21600),
             namespace: env::var("NAMESPACE").unwrap_or_else(|_| "default".into()),
             steam_session_secret_name: env::var("STEAM_SESSION_SECRET_NAME")
                 .unwrap_or_else(|_| "arma-steam-session".into()),
