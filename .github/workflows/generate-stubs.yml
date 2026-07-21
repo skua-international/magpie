@@ -31,9 +31,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: bufbuild/buf-setup-action@v1
+      - uses: bufbuild/buf-action@v1
         with:
           version: "1.71.0"
+          # buf-setup-action is deprecated in favor of this consolidated
+          # action; setup_only makes it behave the same as before (just
+          # installs the CLI) instead of running its own default lint/
+          # breaking/push steps, which don't apply to this manual-regen
+          # workflow at all.
+          setup_only: true
 
       - uses: actions/setup-go@v7
         with:

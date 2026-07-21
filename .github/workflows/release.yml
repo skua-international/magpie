@@ -25,7 +25,7 @@ name: Release
 # nothing is committed here -- semantic-release's config has no git/exec
 # plugin, so the tag lands directly on the chosen commit, not on some new
 # bump commit. Requires the Skua International GitHub App to be installed
-# on this repo with Contents: Read & Write, and its APP_ID/APP_PRIVATE_KEY
+# on this repo with Contents: Read & Write, and its APP_CLIENT_ID/APP_PRIVATE_KEY
 # set as repo secrets (see skua-armory's .github/RELEASING.md for how the
 # App itself was registered -- it's already installed org-wide, this repo
 # just needs the secrets). The App token matters, not just convenience: a
@@ -60,7 +60,11 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ secrets.APP_ID }}
+          # app-id is deprecated in favor of client-id (find it on the
+          # GitHub App's own settings page, distinct from the numeric
+          # App ID) -- requires an APP_CLIENT_ID repo secret in place of
+          # the old APP_ID one.
+          client-id: ${{ secrets.APP_CLIENT_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
       - uses: actions/checkout@v7
@@ -79,13 +83,21 @@ jobs:
         id: week
         run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
 
-      - uses: bufbuild/buf-setup-action@v1
+      - uses: bufbuild/buf-action@v1
         with:
           version: "1.71.0"
-          # Unauthenticated: buf-setup-action's own GitHub API calls (to
-          # fetch the release asset) hit the anonymous, much lower rate
-          # limit otherwise. The default GITHUB_TOKEN is enough for this
-          # -- it's just downloading a public release, not touching this
+          # buf-setup-action is deprecated in favor of this consolidated
+          # action; setup_only makes it behave the same as before (just
+          # installs the CLI) instead of running its own default lint/
+          # breaking/push steps -- the "Check for breaking proto changes"
+          # step below already does exactly the breaking check this
+          # workflow actually wants, against the last release tag
+          # specifically, not buf-action's own default target.
+          setup_only: true
+          # Unauthenticated: buf-action's own GitHub API calls (to fetch
+          # the release asset) hit the anonymous, much lower rate limit
+          # otherwise. The default GITHUB_TOKEN is enough for this --
+          # it's just downloading a public release, not touching this
           # repo -- no need for the App token here.
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
