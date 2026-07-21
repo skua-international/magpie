@@ -24,8 +24,8 @@ use futures::StreamExt;
 use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec};
 use k8s_openapi::api::core::v1::{
     Container, EnvVar, EnvVarSource, HostPathVolumeSource, LocalObjectReference,
-    PersistentVolumeClaimVolumeSource, PodSpec, PodTemplateSpec, SecretKeySelector, Volume,
-    VolumeMount,
+    PersistentVolumeClaimVolumeSource, PodSecurityContext, PodSpec, PodTemplateSpec,
+    SecretKeySelector, Volume, VolumeMount,
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
 use kube::api::{Api, DeleteParams, Patch, PatchParams};
@@ -49,6 +49,19 @@ const SLOW_REQUEUE: Duration = Duration::from_secs(300);
 // blip while still Pending parked the object for 5 minutes before the
 // controller looked at it again.
 const ERROR_REQUEUE: Duration = Duration::from_secs(10);
+
+/// The fixed UID/GID every distroless "nonroot" image in this chart runs
+/// as (see cli/magpie/internal/deploy/bootstrap.go's own
+/// distrolessNonrootID) -- the launcher's own image isn't distroless
+/// (arma3server needs a real userland), so unlike those it has no `USER`
+/// baked in and needs this set explicitly. Matters in practice: the
+/// controller (already running as this UID) is what creates
+/// server-root's config files in the first place, so a launcher running
+/// as this same UID can actually read/write them -- confirmed live that
+/// running the launcher as root instead left it able to read everything
+/// (root ignores DAC checks) but out of step with everything else this
+/// UID convention is meant to keep consistent.
+const LAUNCHER_UID: i64 = 65532;
 
 /// `kube-runtime`'s `finalizer`/`Controller::run` both require their error
 /// type to implement `std::error::Error`, which `anyhow::Error` deliberately
@@ -449,6 +462,15 @@ async fn ensure_deployment(
                 }),
                 spec: Some(PodSpec {
                     host_network: Some(true),
+                    // Nothing here needs root -- see LAUNCHER_UID's own
+                    // doc for why this specific UID and not just "some
+                    // non-root user".
+                    security_context: Some(PodSecurityContext {
+                        run_as_non_root: Some(true),
+                        run_as_user: Some(LAUNCHER_UID),
+                        run_as_group: Some(LAUNCHER_UID),
+                        ..Default::default()
+                    }),
                     image_pull_secrets: (!ctx.cfg.image_pull_secrets.is_empty()).then(|| {
                         ctx.cfg
                             .image_pull_secrets
