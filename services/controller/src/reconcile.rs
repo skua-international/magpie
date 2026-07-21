@@ -253,11 +253,38 @@ async fn run_pending(ctx: &Ctx, obj: &ArmaServer) -> anyhow::Result<()> {
 
 async fn cleanup(obj: &ArmaServer, ctx: &Ctx) -> anyhow::Result<Action> {
     let name = obj.name_any();
-    scale_down(ctx, &name).await?;
+    delete_deployment(ctx, &name).await?;
     Ok(Action::await_change())
 }
 
+/// `desired_state: Stopped` -- scale to 0 rather than deleting outright.
+/// `ensure_deployment` always re-applies the full `DeploymentSpec`
+/// (`replicas: Some(1)` baked in) via SSA on every `Pending` transition,
+/// so a subsequent start already resets this back to 1 with no extra
+/// handling needed here -- scaling down is strictly cheaper than a
+/// delete + full recreate for the exact same end state, and leaves the
+/// object (and its events/history) around for `kubectl describe` while
+/// stopped, more in line with how a plain Kubernetes Deployment is
+/// normally scaled down rather than destroyed.
 async fn scale_down(ctx: &Ctx, name: &str) -> anyhow::Result<()> {
+    let deployments: Api<Deployment> = Api::namespaced(ctx.client.clone(), &ctx.cfg.namespace);
+    let patch = serde_json::json!({ "spec": { "replicas": 0 } });
+    match deployments
+        .patch(name, &PatchParams::default(), &Patch::Merge(patch))
+        .await
+    {
+        Ok(_) => info!("{name}: scaled launcher deployment to 0 replicas"),
+        Err(kube::Error::Api(e)) if e.code == 404 => {}
+        Err(e) => return Err(e.into()),
+    }
+    Ok(())
+}
+
+/// Real deletion (the `ArmaServer` itself is going away, via the
+/// finalizer) -- unlike a plain stop, there's no reason to leave a
+/// 0-replica Deployment object behind for something that no longer
+/// exists at all.
+async fn delete_deployment(ctx: &Ctx, name: &str) -> anyhow::Result<()> {
     let deployments: Api<Deployment> = Api::namespaced(ctx.client.clone(), &ctx.cfg.namespace);
     match deployments.delete(name, &DeleteParams::default()).await {
         Ok(_) => info!("{name}: deleted launcher deployment"),
