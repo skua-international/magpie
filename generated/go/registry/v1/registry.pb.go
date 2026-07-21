@@ -475,12 +475,7 @@ func (x *SyncModSourceRequest) GetId() string {
 }
 
 type SyncModSourceResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// The claim job ID sync-daemon started -- purely informational, no RPC
-	// currently exposes polling it from this side; the next real Claim()
-	// (e.g. a server actually starting/restarting) will see the refreshed
-	// content either way.
-	JobId         string `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -513,13 +508,6 @@ func (x *SyncModSourceResponse) ProtoReflect() protoreflect.Message {
 // Deprecated: Use SyncModSourceResponse.ProtoReflect.Descriptor instead.
 func (*SyncModSourceResponse) Descriptor() ([]byte, []int) {
 	return file_registry_v1_registry_proto_rawDescGZIP(), []int{6}
-}
-
-func (x *SyncModSourceResponse) GetJobId() string {
-	if x != nil {
-		return x.JobId
-	}
-	return ""
 }
 
 type ListSyncedModsRequest struct {
@@ -2063,9 +2051,8 @@ const file_registry_v1_registry_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x19\n" +
 	"\x17DeleteModSourceResponse\"&\n" +
 	"\x14SyncModSourceRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\".\n" +
-	"\x15SyncModSourceResponse\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\"\x17\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\x17\n" +
+	"\x15SyncModSourceResponse\"\x17\n" +
 	"\x15ListSyncedModsRequest\"x\n" +
 	"\tSyncedMod\x12\x15\n" +
 	"\x06mod_id\x18\x01 \x01(\x04R\x05modId\x12\x1f\n" +

@@ -72,15 +72,16 @@ ingress:
   # needs to reach them.
   baseDomain: magpie.local
 
-# sync-daemon's content/claims live on a PersistentVolumeClaim against
-# the magpie-reflink StorageClass (see reflink-storageclass.yaml and
-# services/magpie-csi) -- content/claims must be on the very same real
-# filesystem for sync-daemon's reflink claims to work (`cp
-# --reflink=always` can't CoW across filesystems), which is why they're
-# subPaths of one PVC rather than two separate ones. magpie-csi's own
-# Node plugin loop-mounts a growable btrfs blob for this regardless of
-# what filesystem the host itself actually has -- see its own doc for
-# why that's still necessary even though this isn't hostPath any more.
+# sync-daemon's golden content tree lives on a PersistentVolumeClaim
+# against the magpie-golden-content StorageClass (see
+# golden-content-storageclass.yaml and services/magpie-csi). Every
+# ArmaServer's own content comes from a CSI inline ephemeral volume
+# instead (no separate StorageClass/PVC/size setting -- it's a fresh
+# read-only btrfs snapshot of this same tree, taken on demand). magpie-
+# csi's own Node plugin loop-mounts a growable btrfs blob for this
+# regardless of what filesystem the host itself actually has -- see its
+# own doc for why that's still necessary even though this isn't hostPath
+# any more.
 reflinkStorage:
   sizeGiB: 40
 

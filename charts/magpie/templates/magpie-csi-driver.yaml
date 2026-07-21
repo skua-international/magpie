@@ -15,3 +15,11 @@ spec:
   podInfoOnMount: false
   volumeLifecycleModes:
     - Persistent
+    # Every ArmaServer's own content volume is a CSI inline ephemeral
+    # volume (see the launcher Pod spec in reconcile.rs) -- no PVC/PV,
+    # no CreateVolume/DeleteVolume round-trip at all, just
+    # NodePublishVolume/NodeUnpublishVolume handling the whole snapshot
+    # lifecycle directly (see driver.NodePublishVolume's own doc). Only
+    # the golden content PVC (golden-content-pvc.yaml) uses the regular
+    # Persistent path above.
+    - Ephemeral

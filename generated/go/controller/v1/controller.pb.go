@@ -26,11 +26,10 @@ type ServerPhase int32
 const (
 	ServerPhase_SERVER_PHASE_UNSPECIFIED ServerPhase = 0
 	// desired_state is STOPPED and no instance is running.
-	ServerPhase_SERVER_PHASE_STOPPED  ServerPhase = 1
-	ServerPhase_SERVER_PHASE_PENDING  ServerPhase = 2
-	ServerPhase_SERVER_PHASE_CLAIMING ServerPhase = 3
-	ServerPhase_SERVER_PHASE_RUNNING  ServerPhase = 4
-	ServerPhase_SERVER_PHASE_FAILED   ServerPhase = 5
+	ServerPhase_SERVER_PHASE_STOPPED ServerPhase = 1
+	ServerPhase_SERVER_PHASE_PENDING ServerPhase = 2
+	ServerPhase_SERVER_PHASE_RUNNING ServerPhase = 4
+	ServerPhase_SERVER_PHASE_FAILED  ServerPhase = 5
 )
 
 // Enum value maps for ServerPhase.
@@ -39,7 +38,6 @@ var (
 		0: "SERVER_PHASE_UNSPECIFIED",
 		1: "SERVER_PHASE_STOPPED",
 		2: "SERVER_PHASE_PENDING",
-		3: "SERVER_PHASE_CLAIMING",
 		4: "SERVER_PHASE_RUNNING",
 		5: "SERVER_PHASE_FAILED",
 	}
@@ -47,7 +45,6 @@ var (
 		"SERVER_PHASE_UNSPECIFIED": 0,
 		"SERVER_PHASE_STOPPED":     1,
 		"SERVER_PHASE_PENDING":     2,
-		"SERVER_PHASE_CLAIMING":    3,
 		"SERVER_PHASE_RUNNING":     4,
 		"SERVER_PHASE_FAILED":      5,
 	}
@@ -243,7 +240,6 @@ type ServerInfo struct {
 	Port          uint32                 `protobuf:"varint,3,opt,name=port,proto3" json:"port,omitempty"`
 	ModSourceIds  []string               `protobuf:"bytes,4,rep,name=mod_source_ids,json=modSourceIds,proto3" json:"mod_source_ids,omitempty"`
 	Phase         ServerPhase            `protobuf:"varint,5,opt,name=phase,proto3,enum=controller.v1.ServerPhase" json:"phase,omitempty"`
-	ClaimPath     string                 `protobuf:"bytes,6,opt,name=claim_path,json=claimPath,proto3" json:"claim_path,omitempty"`
 	Message       string                 `protobuf:"bytes,7,opt,name=message,proto3" json:"message,omitempty"`
 	DesiredState  DesiredState           `protobuf:"varint,8,opt,name=desired_state,json=desiredState,proto3,enum=controller.v1.DesiredState" json:"desired_state,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -313,13 +309,6 @@ func (x *ServerInfo) GetPhase() ServerPhase {
 		return x.Phase
 	}
 	return ServerPhase_SERVER_PHASE_UNSPECIFIED
-}
-
-func (x *ServerInfo) GetClaimPath() string {
-	if x != nil {
-		return x.ClaimPath
-	}
-	return ""
 }
 
 func (x *ServerInfo) GetMessage() string {
@@ -694,13 +683,12 @@ const file_controller_v1_controller_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
 	"\x04port\x18\x03 \x01(\rR\x04port\x12$\n" +
 	"\x0emod_source_ids\x18\x04 \x03(\tR\fmodSourceIds\x120\n" +
-	"\x05phase\x18\x05 \x01(\x0e2\x1a.controller.v1.ServerPhaseR\x05phase\x12\x1d\n" +
-	"\n" +
-	"claim_path\x18\x06 \x01(\tR\tclaimPath\x12\x18\n" +
+	"\x05phase\x18\x05 \x01(\x0e2\x1a.controller.v1.ServerPhaseR\x05phase\x12\x18\n" +
 	"\amessage\x18\a \x01(\tR\amessage\x12@\n" +
-	"\rdesired_state\x18\b \x01(\x0e2\x1b.controller.v1.DesiredStateR\fdesiredStateJ\x04\b\t\x10\n" +
+	"\rdesired_state\x18\b \x01(\x0e2\x1b.controller.v1.DesiredStateR\fdesiredStateJ\x04\b\x06\x10\aJ\x04\b\t\x10\n" +
 	"J\x04\b\n" +
-	"\x10\vR\varma_configR\x0enetwork_config\"\x14\n" +
+	"\x10\vR\n" +
+	"claim_pathR\vcontent_pvcR\varma_configR\x0enetwork_config\"\x14\n" +
 	"\x12ListServersRequest\"J\n" +
 	"\x13ListServersResponse\x123\n" +
 	"\aservers\x18\x01 \x03(\v2\x19.controller.v1.ServerInfoR\aservers\"\"\n" +
@@ -714,14 +702,13 @@ const file_controller_v1_controller_proto_rawDesc = "" +
 	"\x12StartServerRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"#\n" +
 	"\x11StopServerRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id*\xad\x01\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id*\xaf\x01\n" +
 	"\vServerPhase\x12\x1c\n" +
 	"\x18SERVER_PHASE_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14SERVER_PHASE_STOPPED\x10\x01\x12\x18\n" +
-	"\x14SERVER_PHASE_PENDING\x10\x02\x12\x19\n" +
-	"\x15SERVER_PHASE_CLAIMING\x10\x03\x12\x18\n" +
+	"\x14SERVER_PHASE_PENDING\x10\x02\x12\x18\n" +
 	"\x14SERVER_PHASE_RUNNING\x10\x04\x12\x17\n" +
-	"\x13SERVER_PHASE_FAILED\x10\x05*c\n" +
+	"\x13SERVER_PHASE_FAILED\x10\x05\"\x04\b\x03\x10\x03*\x15SERVER_PHASE_CLAIMING*c\n" +
 	"\fDesiredState\x12\x1d\n" +
 	"\x19DESIRED_STATE_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15DESIRED_STATE_RUNNING\x10\x01\x12\x19\n" +

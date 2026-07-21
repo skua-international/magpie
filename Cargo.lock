@@ -667,6 +667,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
@@ -2219,7 +2220,6 @@ dependencies = [
  "anyhow",
  "libc",
  "regex",
- "sync-client",
  "tokio",
  "tracing",
  "tracing-subscriber",

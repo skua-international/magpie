@@ -158,7 +158,6 @@ fn phase_to_proto(phase: ArmaServerPhase) -> ServerPhase {
     match phase {
         ArmaServerPhase::Stopped => ServerPhase::Stopped,
         ArmaServerPhase::Pending => ServerPhase::Pending,
-        ArmaServerPhase::Claiming => ServerPhase::Claiming,
         ArmaServerPhase::Running => ServerPhase::Running,
         ArmaServerPhase::Failed => ServerPhase::Failed,
     }
@@ -179,7 +178,6 @@ fn to_info(obj: &ArmaServer) -> ServerInfo {
         port: obj.spec.port as u32,
         mod_source_ids: obj.spec.mod_source_ids.clone(),
         phase: EnumValue::Known(phase_to_proto(status.phase)),
-        claim_path: status.claim_path,
         message: status.message,
         desired_state: EnumValue::Known(desired_state_to_proto(obj.spec.desired_state)),
         ..Default::default()

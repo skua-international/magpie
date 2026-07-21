@@ -103,11 +103,6 @@ pub enum DesiredState {
 pub struct ArmaServerStatus {
     #[serde(default)]
     pub phase: ArmaServerPhase,
-    /// The claim path returned by sync-daemon's last successful `Claim`,
-    /// mounted into the launcher Pod as `CLAIM_PATH`. Empty until the first
-    /// claim completes.
-    #[serde(default)]
-    pub claim_path: String,
     #[serde(default)]
     pub message: String,
 }
@@ -120,7 +115,6 @@ pub enum ArmaServerPhase {
     #[default]
     Stopped,
     Pending,
-    Claiming,
     Running,
     Failed,
 }

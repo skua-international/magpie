@@ -115,18 +115,17 @@ func modsDeleteCmd() *cobra.Command {
 func modsSyncCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "sync <id>",
-		Short: "Force a Steam-backed source to re-resolve and start a claim job",
+		Short: "Force a Steam-backed source to re-resolve and kick off a content sync",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			cl, err := clients(c.Context())
 			if err != nil {
 				return err
 			}
-			jobID, err := actions.SyncModSource(c.Context(), cl, args[0])
-			if err != nil {
+			if err := actions.SyncModSource(c.Context(), cl, args[0]); err != nil {
 				return err
 			}
-			fmt.Println("claim job started:", jobID)
+			fmt.Println("sync started")
 			return nil
 		},
 	}

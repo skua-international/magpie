@@ -167,20 +167,19 @@ func (m *Manager) bootstrap(ctx context.Context, minSizeBytes int64) error {
 }
 
 // ensureContentSubvolume makes sure <mountPath>/content is a real btrfs
-// subvolume, not a plain directory -- crates/steam-sync's claim() needs
-// a genuine subvolume as the source for `btrfs subvolume snapshot`
-// (magpie's per-server "claims" are now read-only snapshots of this,
-// not `cp --reflink=always` copies; see that crate's own doc for the
-// full rationale). Idempotent: a plain `os.Stat` existence check is
+// subvolume, not a plain directory -- driver.NodeStageVolume needs a
+// genuine subvolume as the source for `btrfs subvolume snapshot`, one
+// per ModeSnapshot volume (every ArmaServer's own PVC); sync-daemon's
+// own ModeGolden PVC bind-mounts this path directly instead, read-write,
+// no snapshot involved. Idempotent: a plain `os.Stat` existence check is
 // enough to skip re-creating it on every restart -- `btrfs subvolume
 // create` on a path that already exists (subvolume or not) just fails,
 // so this only ever runs once per blob's lifetime, on the very first
 // bootstrap.
 //
-// <mountPath>/claims (the parent directory individual per-claim
-// subvolumes get created under, at claim time, by sync-daemon -- not
-// this package's job) stays a plain directory; only content itself
-// needs to be a subvolume.
+// <mountPath>/claims (the parent directory individual per-volume
+// snapshot subvolumes get created under -- driver.snapshotPath) stays a
+// plain directory; only content itself needs to be a subvolume.
 func (m *Manager) ensureContentSubvolume(ctx context.Context) error {
 	contentPath := filepath.Join(m.mountPath, "content")
 	claimsPath := filepath.Join(m.mountPath, "claims")

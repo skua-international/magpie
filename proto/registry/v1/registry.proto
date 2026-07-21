@@ -86,13 +86,7 @@ message SyncModSourceRequest {
   string id = 1;
 }
 
-message SyncModSourceResponse {
-  // The claim job ID sync-daemon started -- purely informational, no RPC
-  // currently exposes polling it from this side; the next real Claim()
-  // (e.g. a server actually starting/restarting) will see the refreshed
-  // content either way.
-  string job_id = 1;
-}
+message SyncModSourceResponse {}
 
 message ListSyncedModsRequest {}
 

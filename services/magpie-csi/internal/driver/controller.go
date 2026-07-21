@@ -50,12 +50,16 @@ func (d *Driver) CreateVolume(_ context.Context, req *csi.CreateVolumeRequest) (
 	}, nil
 }
 
-// DeleteVolume is a no-op beyond acknowledging the request -- the
-// backing directory under the node-local blob is intentionally left in
-// place (see NodeUnstageVolume's own doc: this is the golden,
-// continuously-synced content tree, not something a PVC delete should
-// destroy; the StorageClass's own reclaimPolicy: Retain already makes
-// that explicit at the Kubernetes level).
+// DeleteVolume is a no-op beyond acknowledging the request -- the only
+// volume that ever goes through the Controller service at all is the
+// one golden content PVC (golden-content-pvc.yaml); every ArmaServer's
+// own content is a CSI inline ephemeral volume instead (see
+// NodePublishVolume's own doc), which never calls CreateVolume/
+// DeleteVolume in the first place. The golden PVC's backing directory
+// is intentionally left in place either way -- it's the continuously-
+// synced content tree, not something a PVC delete should destroy; the
+// StorageClass's own reclaimPolicy: Retain already makes that explicit
+// at the Kubernetes level.
 func (d *Driver) DeleteVolume(context.Context, *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	return &csi.DeleteVolumeResponse{}, nil
 }

@@ -98,15 +98,12 @@ func DeleteModSource(ctx context.Context, c *client.Clients, id string) error {
 	return err
 }
 
-// SyncModSource forces a Steam-backed source to re-resolve and starts a
-// claim job covering the full current desired state -- doesn't wait for
-// that job to finish (see the RPC's own proto doc).
-func SyncModSource(ctx context.Context, c *client.Clients, id string) (string, error) {
-	resp, err := c.ModSources.SyncModSource(ctx, connect.NewRequest(&registryv1.SyncModSourceRequest{Id: id}))
-	if err != nil {
-		return "", err
-	}
-	return resp.Msg.JobId, nil
+// SyncModSource forces a Steam-backed source to re-resolve and kicks off
+// a content sync covering the full current desired state -- doesn't
+// wait for that sync to finish (see the RPC's own proto doc).
+func SyncModSource(ctx context.Context, c *client.Clients, id string) error {
+	_, err := c.ModSources.SyncModSource(ctx, connect.NewRequest(&registryv1.SyncModSourceRequest{Id: id}))
+	return err
 }
 
 func ListSyncedMods(ctx context.Context, c *client.Clients) ([]*registryv1.SyncedMod, error) {

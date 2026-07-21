@@ -1,48 +1,28 @@
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest, ServiceResult};
 use protocol::proto::sync::v1::{
-    ClaimJobState, ClaimRequest, ClaimResponse, DeleteClaimRequest, DeleteClaimResponse,
-    DeregisterSourceRequest, DeregisterSourceResponse, GetClaimStatusRequest,
-    GetClaimStatusResponse, GetSourceModsRequest, GetSourceModsResponse, GetSyncStatsRequest,
-    GetSyncStatsResponse, GetSyncedModRequest, GetSyncedModResponse, InvalidateModRequest,
-    InvalidateModResponse, ListSyncedModsRequest, ListSyncedModsResponse, RefreshSourceRequest,
-    RefreshSourceResponse, RefreshSteamAuthRequest, RefreshSteamAuthResponse,
-    RegisterSourceRequest, RegisterSourceResponse, ResolvedMod as ProtoResolvedMod, SyncService,
+    DeregisterSourceRequest, DeregisterSourceResponse, GetSourceModsRequest,
+    GetSourceModsResponse, GetSyncStatsRequest, GetSyncStatsResponse, GetSyncedModRequest,
+    GetSyncedModResponse, InvalidateModRequest, InvalidateModResponse, ListSyncedModsRequest,
+    ListSyncedModsResponse, RefreshSourceRequest, RefreshSourceResponse, RefreshSteamAuthRequest,
+    RefreshSteamAuthResponse, RegisterSourceRequest, RegisterSourceResponse,
+    ResolvedMod as ProtoResolvedMod, SyncContentRequest, SyncContentResponse, SyncService,
     SyncedMod,
 };
 use steam_sync::cache::SyncState;
 use steam_sync::steam::{self, CmPool, ResolvedMod, SyncTasks};
 use steam_sync::workshop;
 use tokio::sync::Semaphore;
-use tracing::{error, info};
-use uuid::Uuid;
+use tracing::{info, warn};
 
 use crate::secrets::{self, Session};
 
-/// A `Claim` job's current state -- `Claim` starts one and returns its ID
-/// immediately rather than blocking for the (potentially minutes-long,
-/// cold-cache) duration of the whole resolve+sync+claim; `GetClaimStatus`
-/// polls this.
-#[derive(Clone)]
-enum JobStatus {
-    Running,
-    Done { claim_path: String },
-    Failed { error: String },
-}
-
-/// In-memory job table. Deliberately simple -- an unbounded map that never
-/// evicts finished jobs is fine for a first pass (the daemon's own
-/// lifetime between restarts bounds it in practice), but worth revisiting
-/// (TTL / explicit ack-and-remove) before this sees real traffic volume.
-type Jobs = Mutex<HashMap<String, JobStatus>>;
-
 /// Shared state, `Arc`-wrapped so it can be cloned cheaply into a spawned
-/// `Claim` job -- kept separate from [`SyncServiceImpl`] (which only
-/// borrows `&self` per the trait's method signatures) specifically so
-/// spawning doesn't need a self-referential `Arc<Self>`.
+/// background sync task -- kept separate from [`SyncServiceImpl`] (which
+/// only borrows `&self` per the trait's method signatures) specifically
+/// so spawning doesn't need a self-referential `Arc<Self>`.
 pub struct Shared {
     /// `None` if no Steam session has ever been established (no stored
     /// session Secret, no STEAM_USER/STEAM_PASSWORD configured) or the
@@ -56,11 +36,9 @@ pub struct Shared {
     pub pool: Option<Arc<CmPool>>,
     pub sync_state: Arc<SyncState>,
     pub content_root: PathBuf,
-    pub claims_root: PathBuf,
     pub client: kube::Client,
     pub namespace: String,
     pub steam_session_secret_name: String,
-    jobs: Jobs,
 }
 
 impl Shared {
@@ -68,7 +46,6 @@ impl Shared {
         pool: Option<Arc<CmPool>>,
         sync_state: Arc<SyncState>,
         content_root: PathBuf,
-        claims_root: PathBuf,
         client: kube::Client,
         namespace: String,
         steam_session_secret_name: String,
@@ -77,11 +54,9 @@ impl Shared {
             pool,
             sync_state,
             content_root,
-            claims_root,
             client,
             namespace,
             steam_session_secret_name,
-            jobs: Mutex::new(HashMap::new()),
         })
     }
 
@@ -152,27 +127,16 @@ impl Shared {
         self.register_source_impl(&candidate_ids, source_id).await
     }
 
-    async fn run_claim_job(self: Arc<Self>, job_id: String) {
-        let result = self.do_claim().await;
-        let status = match result {
-            Ok(claim_path) => JobStatus::Done { claim_path },
-            Err(e) => {
-                error!("claim job {job_id} failed: {e:#}");
-                JobStatus::Failed {
-                    error: format!("{e:#}"),
-                }
-            }
-        };
-        self.jobs.lock().unwrap().insert(job_id, status);
-    }
-
     /// Downloads server/CDLC depots plus every currently-registered
-    /// source's resolved mods into the shared golden tree -- no claim/
-    /// snapshot involved, so nothing to leak or clean up. Shared by
-    /// `do_claim` (which snapshots the result for a specific caller) and
-    /// callers that just want content warmed without anyone waiting on a
-    /// claim path right now: the reconciler's auto-sync-on-first-resolve
-    /// (`reconcile.rs`) and main.rs's sync-on-startup.
+    /// source's resolved mods into the shared golden tree. Every
+    /// ArmaServer's own content comes from a read-only btrfs snapshot of
+    /// this tree (services/magpie-csi's NodeStageVolume, mode: snapshot)
+    /// taken whenever its PVC is created -- this only has to keep the
+    /// golden tree itself current, nothing here produces or tracks a
+    /// claim/snapshot of its own anymore. Called from three places: the
+    /// `SyncContent` RPC (spawned, not awaited -- see that handler),
+    /// the reconciler's auto-sync-on-first-resolve (`reconcile.rs`), and
+    /// main.rs's sync-on-startup.
     pub async fn sync_content(&self) -> anyhow::Result<()> {
         let sem = Arc::new(Semaphore::new(steam::SYNC_CONCURRENCY));
         let tasks: Mutex<SyncTasks> = Mutex::new(SyncTasks::new());
@@ -225,14 +189,6 @@ impl Shared {
             result??;
         }
         Ok(())
-    }
-
-    async fn do_claim(&self) -> anyhow::Result<String> {
-        self.sync_content().await?;
-        let claim_id = Uuid::now_v7();
-        let claim_dir = self.claims_root.join(claim_id.to_string());
-        let claim_path = steam_sync::claim::claim(&self.content_root, &claim_dir)?;
-        Ok(claim_path.display().to_string())
     }
 }
 
@@ -294,27 +250,20 @@ impl SyncService for SyncServiceImpl {
         Response::ok(DeregisterSourceResponse::default())
     }
 
-    async fn claim<'a>(
+    async fn sync_content<'a>(
         &'a self,
         _ctx: RequestContext,
-        _request: ServiceRequest<'_, ClaimRequest>,
-    ) -> ServiceResult<impl connectrpc::Encodable<ClaimResponse> + Send + use<'a>> {
-        let job_id = Uuid::now_v7().to_string();
-        self.shared
-            .jobs
-            .lock()
-            .unwrap()
-            .insert(job_id.clone(), JobStatus::Running);
-
+        _request: ServiceRequest<'_, SyncContentRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<SyncContentResponse> + Send + use<'a>> {
         let shared = self.shared.clone();
-        let spawned_job_id = job_id.clone();
-        tokio::spawn(async move { shared.run_claim_job(spawned_job_id).await });
-
-        info!("started claim job {job_id}");
-        Response::ok(ClaimResponse {
-            job_id,
-            ..Default::default()
-        })
+        tokio::spawn(async move {
+            info!("syncing content (SyncContent RPC)");
+            match shared.sync_content().await {
+                Ok(()) => info!("content synced"),
+                Err(e) => warn!("failed to sync content: {e:#}"),
+            }
+        });
+        Response::ok(SyncContentResponse::default())
     }
 
     async fn get_source_mods<'a>(
@@ -356,80 +305,6 @@ impl SyncService for SyncServiceImpl {
             mods,
             ..Default::default()
         })
-    }
-
-    async fn get_claim_status<'a>(
-        &'a self,
-        _ctx: RequestContext,
-        request: ServiceRequest<'_, GetClaimStatusRequest>,
-    ) -> ServiceResult<impl connectrpc::Encodable<GetClaimStatusResponse> + Send + use<'a>> {
-        let jobs = self.shared.jobs.lock().unwrap();
-        let status = jobs
-            .get(request.job_id)
-            .ok_or_else(|| ConnectError::not_found(format!("unknown job {}", request.job_id)))?
-            .clone();
-        drop(jobs);
-
-        use buffa::enumeration::EnumValue;
-        let response = match status {
-            JobStatus::Running => GetClaimStatusResponse {
-                state: EnumValue::Known(ClaimJobState::Running),
-                ..Default::default()
-            },
-            JobStatus::Done { claim_path } => GetClaimStatusResponse {
-                state: EnumValue::Known(ClaimJobState::Done),
-                claim_path,
-                ..Default::default()
-            },
-            JobStatus::Failed { error } => GetClaimStatusResponse {
-                state: EnumValue::Known(ClaimJobState::Failed),
-                error,
-                ..Default::default()
-            },
-        };
-        Response::ok(response)
-    }
-
-    async fn delete_claim<'a>(
-        &'a self,
-        _ctx: RequestContext,
-        request: ServiceRequest<'_, DeleteClaimRequest>,
-    ) -> ServiceResult<impl connectrpc::Encodable<DeleteClaimResponse> + Send + use<'a>> {
-        let claim_path = PathBuf::from(request.claim_path.to_string());
-
-        // Resolve both sides through canonicalize (not a plain prefix
-        // check on the raw strings) so a `..`-laden or symlink-laced
-        // claim_path can't talk this into deleting something outside
-        // claims_root -- request.claim_path only ever legitimately came
-        // from a GetClaimStatusResponse this same process generated, but
-        // there's no reason to trust an RPC input further than that.
-        // Already-gone is fine (claim_path.claim's own doc: not an error).
-        let canonical = match claim_path.canonicalize() {
-            Ok(p) => p,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                return Response::ok(DeleteClaimResponse::default());
-            }
-            Err(e) => {
-                return Err(ConnectError::internal(format!(
-                    "failed to resolve claim path {}: {e}",
-                    claim_path.display()
-                )));
-            }
-        };
-        let claims_root =
-            self.shared.claims_root.canonicalize().map_err(|e| {
-                ConnectError::internal(format!("failed to resolve claims_root: {e}"))
-            })?;
-        if !canonical.starts_with(&claims_root) {
-            return Err(ConnectError::invalid_argument(format!(
-                "{} is not under this daemon's claims_root",
-                claim_path.display()
-            )));
-        }
-
-        steam_sync::claim::delete_claim(&canonical)
-            .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
-        Response::ok(DeleteClaimResponse::default())
     }
 
     async fn list_synced_mods<'a>(

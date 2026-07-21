@@ -1,0 +1,24 @@
+# Backs the one golden-content-pvc.yaml PVC (sync-daemon's own
+# continuously-synced content tree) via services/magpie-csi --
+# NodeStageVolume bind-mounts the shared blob's content/ subvolume
+# directly here, read-write. Every ArmaServer's own content is a
+# separate CSI inline ephemeral volume instead (no PVC/StorageClass at
+# all -- see reconcile.rs's launcher Pod spec and driver.NodePublishVolume's
+# own doc), a fresh read-only btrfs snapshot of this same content/
+# subvolume taken on demand.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: magpie-golden-content
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+provisioner: csi.magpie.skua.io
+# This is the golden, continuously-synced content tree every server's
+# snapshot comes from -- losing it because a PVC got deleted (e.g.
+# during a botched upgrade) would mean a full re-sync of everything, not
+# just one server. Retain, not Delete.
+reclaimPolicy: Retain
+# Local storage is host-pinned -- delay binding until a Pod referencing
+# the PVC is actually scheduled, so the CSI provisioner knows which
+# node's blob to create the volume on instead of guessing.
+volumeBindingMode: WaitForFirstConsumer

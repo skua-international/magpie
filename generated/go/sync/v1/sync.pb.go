@@ -21,58 +21,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type ClaimJobState int32
-
-const (
-	ClaimJobState_CLAIM_JOB_STATE_UNSPECIFIED ClaimJobState = 0
-	ClaimJobState_CLAIM_JOB_STATE_RUNNING     ClaimJobState = 1
-	ClaimJobState_CLAIM_JOB_STATE_DONE        ClaimJobState = 2
-	ClaimJobState_CLAIM_JOB_STATE_FAILED      ClaimJobState = 3
-)
-
-// Enum value maps for ClaimJobState.
-var (
-	ClaimJobState_name = map[int32]string{
-		0: "CLAIM_JOB_STATE_UNSPECIFIED",
-		1: "CLAIM_JOB_STATE_RUNNING",
-		2: "CLAIM_JOB_STATE_DONE",
-		3: "CLAIM_JOB_STATE_FAILED",
-	}
-	ClaimJobState_value = map[string]int32{
-		"CLAIM_JOB_STATE_UNSPECIFIED": 0,
-		"CLAIM_JOB_STATE_RUNNING":     1,
-		"CLAIM_JOB_STATE_DONE":        2,
-		"CLAIM_JOB_STATE_FAILED":      3,
-	}
-)
-
-func (x ClaimJobState) Enum() *ClaimJobState {
-	p := new(ClaimJobState)
-	*p = x
-	return p
-}
-
-func (x ClaimJobState) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (ClaimJobState) Descriptor() protoreflect.EnumDescriptor {
-	return file_sync_v1_sync_proto_enumTypes[0].Descriptor()
-}
-
-func (ClaimJobState) Type() protoreflect.EnumType {
-	return &file_sync_v1_sync_proto_enumTypes[0]
-}
-
-func (x ClaimJobState) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use ClaimJobState.Descriptor instead.
-func (ClaimJobState) EnumDescriptor() ([]byte, []int) {
-	return file_sync_v1_sync_proto_rawDescGZIP(), []int{0}
-}
-
 type ListSyncedModsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -1007,26 +955,26 @@ func (*DeregisterSourceResponse) Descriptor() ([]byte, []int) {
 	return file_sync_v1_sync_proto_rawDescGZIP(), []int{19}
 }
 
-type ClaimRequest struct {
+type SyncContentRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ClaimRequest) Reset() {
-	*x = ClaimRequest{}
+func (x *SyncContentRequest) Reset() {
+	*x = SyncContentRequest{}
 	mi := &file_sync_v1_sync_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ClaimRequest) String() string {
+func (x *SyncContentRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ClaimRequest) ProtoMessage() {}
+func (*SyncContentRequest) ProtoMessage() {}
 
-func (x *ClaimRequest) ProtoReflect() protoreflect.Message {
+func (x *SyncContentRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_sync_v1_sync_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1038,32 +986,31 @@ func (x *ClaimRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ClaimRequest.ProtoReflect.Descriptor instead.
-func (*ClaimRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use SyncContentRequest.ProtoReflect.Descriptor instead.
+func (*SyncContentRequest) Descriptor() ([]byte, []int) {
 	return file_sync_v1_sync_proto_rawDescGZIP(), []int{20}
 }
 
-type ClaimResponse struct {
+type SyncContentResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ClaimResponse) Reset() {
-	*x = ClaimResponse{}
+func (x *SyncContentResponse) Reset() {
+	*x = SyncContentResponse{}
 	mi := &file_sync_v1_sync_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ClaimResponse) String() string {
+func (x *SyncContentResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ClaimResponse) ProtoMessage() {}
+func (*SyncContentResponse) ProtoMessage() {}
 
-func (x *ClaimResponse) ProtoReflect() protoreflect.Message {
+func (x *SyncContentResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_sync_v1_sync_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1075,204 +1022,9 @@ func (x *ClaimResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ClaimResponse.ProtoReflect.Descriptor instead.
-func (*ClaimResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use SyncContentResponse.ProtoReflect.Descriptor instead.
+func (*SyncContentResponse) Descriptor() ([]byte, []int) {
 	return file_sync_v1_sync_proto_rawDescGZIP(), []int{21}
-}
-
-func (x *ClaimResponse) GetJobId() string {
-	if x != nil {
-		return x.JobId
-	}
-	return ""
-}
-
-type GetClaimStatusRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetClaimStatusRequest) Reset() {
-	*x = GetClaimStatusRequest{}
-	mi := &file_sync_v1_sync_proto_msgTypes[22]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetClaimStatusRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetClaimStatusRequest) ProtoMessage() {}
-
-func (x *GetClaimStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_v1_sync_proto_msgTypes[22]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetClaimStatusRequest.ProtoReflect.Descriptor instead.
-func (*GetClaimStatusRequest) Descriptor() ([]byte, []int) {
-	return file_sync_v1_sync_proto_rawDescGZIP(), []int{22}
-}
-
-func (x *GetClaimStatusRequest) GetJobId() string {
-	if x != nil {
-		return x.JobId
-	}
-	return ""
-}
-
-type GetClaimStatusResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	State         ClaimJobState          `protobuf:"varint,1,opt,name=state,proto3,enum=sync.v1.ClaimJobState" json:"state,omitempty"`
-	ClaimPath     string                 `protobuf:"bytes,2,opt,name=claim_path,json=claimPath,proto3" json:"claim_path,omitempty"` // set when state == DONE
-	Error         string                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`                          // set when state == FAILED
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetClaimStatusResponse) Reset() {
-	*x = GetClaimStatusResponse{}
-	mi := &file_sync_v1_sync_proto_msgTypes[23]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetClaimStatusResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetClaimStatusResponse) ProtoMessage() {}
-
-func (x *GetClaimStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_v1_sync_proto_msgTypes[23]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetClaimStatusResponse.ProtoReflect.Descriptor instead.
-func (*GetClaimStatusResponse) Descriptor() ([]byte, []int) {
-	return file_sync_v1_sync_proto_rawDescGZIP(), []int{23}
-}
-
-func (x *GetClaimStatusResponse) GetState() ClaimJobState {
-	if x != nil {
-		return x.State
-	}
-	return ClaimJobState_CLAIM_JOB_STATE_UNSPECIFIED
-}
-
-func (x *GetClaimStatusResponse) GetClaimPath() string {
-	if x != nil {
-		return x.ClaimPath
-	}
-	return ""
-}
-
-func (x *GetClaimStatusResponse) GetError() string {
-	if x != nil {
-		return x.Error
-	}
-	return ""
-}
-
-type DeleteClaimRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// The exact claim_path a prior GetClaimStatusResponse returned --
-	// sync-daemon validates it actually falls under its own claims_root
-	// before deleting anything, so a malformed/malicious path can't reach
-	// outside that directory.
-	ClaimPath     string `protobuf:"bytes,1,opt,name=claim_path,json=claimPath,proto3" json:"claim_path,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *DeleteClaimRequest) Reset() {
-	*x = DeleteClaimRequest{}
-	mi := &file_sync_v1_sync_proto_msgTypes[24]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DeleteClaimRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DeleteClaimRequest) ProtoMessage() {}
-
-func (x *DeleteClaimRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_v1_sync_proto_msgTypes[24]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DeleteClaimRequest.ProtoReflect.Descriptor instead.
-func (*DeleteClaimRequest) Descriptor() ([]byte, []int) {
-	return file_sync_v1_sync_proto_rawDescGZIP(), []int{24}
-}
-
-func (x *DeleteClaimRequest) GetClaimPath() string {
-	if x != nil {
-		return x.ClaimPath
-	}
-	return ""
-}
-
-type DeleteClaimResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *DeleteClaimResponse) Reset() {
-	*x = DeleteClaimResponse{}
-	mi := &file_sync_v1_sync_proto_msgTypes[25]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DeleteClaimResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DeleteClaimResponse) ProtoMessage() {}
-
-func (x *DeleteClaimResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_v1_sync_proto_msgTypes[25]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DeleteClaimResponse.ProtoReflect.Descriptor instead.
-func (*DeleteClaimResponse) Descriptor() ([]byte, []int) {
-	return file_sync_v1_sync_proto_rawDescGZIP(), []int{25}
 }
 
 var File_sync_v1_sync_proto protoreflect.FileDescriptor
@@ -1329,32 +1081,13 @@ const file_sync_v1_sync_proto_rawDesc = "" +
 	"root_title\x18\x02 \x01(\tR\trootTitle\"6\n" +
 	"\x17DeregisterSourceRequest\x12\x1b\n" +
 	"\tsource_id\x18\x01 \x01(\tR\bsourceId\"\x1a\n" +
-	"\x18DeregisterSourceResponse\"\x0e\n" +
-	"\fClaimRequest\"&\n" +
-	"\rClaimResponse\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\".\n" +
-	"\x15GetClaimStatusRequest\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\"{\n" +
-	"\x16GetClaimStatusResponse\x12,\n" +
-	"\x05state\x18\x01 \x01(\x0e2\x16.sync.v1.ClaimJobStateR\x05state\x12\x1d\n" +
-	"\n" +
-	"claim_path\x18\x02 \x01(\tR\tclaimPath\x12\x14\n" +
-	"\x05error\x18\x03 \x01(\tR\x05error\"3\n" +
-	"\x12DeleteClaimRequest\x12\x1d\n" +
-	"\n" +
-	"claim_path\x18\x01 \x01(\tR\tclaimPath\"\x15\n" +
-	"\x13DeleteClaimResponse*\x83\x01\n" +
-	"\rClaimJobState\x12\x1f\n" +
-	"\x1bCLAIM_JOB_STATE_UNSPECIFIED\x10\x00\x12\x1b\n" +
-	"\x17CLAIM_JOB_STATE_RUNNING\x10\x01\x12\x18\n" +
-	"\x14CLAIM_JOB_STATE_DONE\x10\x02\x12\x1a\n" +
-	"\x16CLAIM_JOB_STATE_FAILED\x10\x032\xc4\a\n" +
+	"\x18DeregisterSourceResponse\"\x14\n" +
+	"\x12SyncContentRequest\"\x15\n" +
+	"\x13SyncContentResponse2\xb9\x06\n" +
 	"\vSyncService\x12Q\n" +
 	"\x0eRegisterSource\x12\x1e.sync.v1.RegisterSourceRequest\x1a\x1f.sync.v1.RegisterSourceResponse\x12W\n" +
-	"\x10DeregisterSource\x12 .sync.v1.DeregisterSourceRequest\x1a!.sync.v1.DeregisterSourceResponse\x126\n" +
-	"\x05Claim\x12\x15.sync.v1.ClaimRequest\x1a\x16.sync.v1.ClaimResponse\x12Q\n" +
-	"\x0eGetClaimStatus\x12\x1e.sync.v1.GetClaimStatusRequest\x1a\x1f.sync.v1.GetClaimStatusResponse\x12H\n" +
-	"\vDeleteClaim\x12\x1b.sync.v1.DeleteClaimRequest\x1a\x1c.sync.v1.DeleteClaimResponse\x12N\n" +
+	"\x10DeregisterSource\x12 .sync.v1.DeregisterSourceRequest\x1a!.sync.v1.DeregisterSourceResponse\x12H\n" +
+	"\vSyncContent\x12\x1b.sync.v1.SyncContentRequest\x1a\x1c.sync.v1.SyncContentResponse\x12N\n" +
 	"\rGetSourceMods\x12\x1d.sync.v1.GetSourceModsRequest\x1a\x1e.sync.v1.GetSourceModsResponse\x12N\n" +
 	"\rRefreshSource\x12\x1d.sync.v1.RefreshSourceRequest\x1a\x1e.sync.v1.RefreshSourceResponse\x12Q\n" +
 	"\x0eListSyncedMods\x12\x1e.sync.v1.ListSyncedModsRequest\x1a\x1f.sync.v1.ListSyncedModsResponse\x12N\n" +
@@ -1375,72 +1108,61 @@ func file_sync_v1_sync_proto_rawDescGZIP() []byte {
 	return file_sync_v1_sync_proto_rawDescData
 }
 
-var file_sync_v1_sync_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_sync_v1_sync_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
+var file_sync_v1_sync_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_sync_v1_sync_proto_goTypes = []any{
-	(ClaimJobState)(0),               // 0: sync.v1.ClaimJobState
-	(*ListSyncedModsRequest)(nil),    // 1: sync.v1.ListSyncedModsRequest
-	(*SyncedMod)(nil),                // 2: sync.v1.SyncedMod
-	(*ListSyncedModsResponse)(nil),   // 3: sync.v1.ListSyncedModsResponse
-	(*GetSyncedModRequest)(nil),      // 4: sync.v1.GetSyncedModRequest
-	(*GetSyncedModResponse)(nil),     // 5: sync.v1.GetSyncedModResponse
-	(*GetSyncStatsRequest)(nil),      // 6: sync.v1.GetSyncStatsRequest
-	(*GetSyncStatsResponse)(nil),     // 7: sync.v1.GetSyncStatsResponse
-	(*RefreshSteamAuthRequest)(nil),  // 8: sync.v1.RefreshSteamAuthRequest
-	(*RefreshSteamAuthResponse)(nil), // 9: sync.v1.RefreshSteamAuthResponse
-	(*InvalidateModRequest)(nil),     // 10: sync.v1.InvalidateModRequest
-	(*InvalidateModResponse)(nil),    // 11: sync.v1.InvalidateModResponse
-	(*RefreshSourceRequest)(nil),     // 12: sync.v1.RefreshSourceRequest
-	(*RefreshSourceResponse)(nil),    // 13: sync.v1.RefreshSourceResponse
-	(*GetSourceModsRequest)(nil),     // 14: sync.v1.GetSourceModsRequest
-	(*GetSourceModsResponse)(nil),    // 15: sync.v1.GetSourceModsResponse
-	(*RegisterSourceRequest)(nil),    // 16: sync.v1.RegisterSourceRequest
-	(*ResolvedMod)(nil),              // 17: sync.v1.ResolvedMod
-	(*RegisterSourceResponse)(nil),   // 18: sync.v1.RegisterSourceResponse
-	(*DeregisterSourceRequest)(nil),  // 19: sync.v1.DeregisterSourceRequest
-	(*DeregisterSourceResponse)(nil), // 20: sync.v1.DeregisterSourceResponse
-	(*ClaimRequest)(nil),             // 21: sync.v1.ClaimRequest
-	(*ClaimResponse)(nil),            // 22: sync.v1.ClaimResponse
-	(*GetClaimStatusRequest)(nil),    // 23: sync.v1.GetClaimStatusRequest
-	(*GetClaimStatusResponse)(nil),   // 24: sync.v1.GetClaimStatusResponse
-	(*DeleteClaimRequest)(nil),       // 25: sync.v1.DeleteClaimRequest
-	(*DeleteClaimResponse)(nil),      // 26: sync.v1.DeleteClaimResponse
+	(*ListSyncedModsRequest)(nil),    // 0: sync.v1.ListSyncedModsRequest
+	(*SyncedMod)(nil),                // 1: sync.v1.SyncedMod
+	(*ListSyncedModsResponse)(nil),   // 2: sync.v1.ListSyncedModsResponse
+	(*GetSyncedModRequest)(nil),      // 3: sync.v1.GetSyncedModRequest
+	(*GetSyncedModResponse)(nil),     // 4: sync.v1.GetSyncedModResponse
+	(*GetSyncStatsRequest)(nil),      // 5: sync.v1.GetSyncStatsRequest
+	(*GetSyncStatsResponse)(nil),     // 6: sync.v1.GetSyncStatsResponse
+	(*RefreshSteamAuthRequest)(nil),  // 7: sync.v1.RefreshSteamAuthRequest
+	(*RefreshSteamAuthResponse)(nil), // 8: sync.v1.RefreshSteamAuthResponse
+	(*InvalidateModRequest)(nil),     // 9: sync.v1.InvalidateModRequest
+	(*InvalidateModResponse)(nil),    // 10: sync.v1.InvalidateModResponse
+	(*RefreshSourceRequest)(nil),     // 11: sync.v1.RefreshSourceRequest
+	(*RefreshSourceResponse)(nil),    // 12: sync.v1.RefreshSourceResponse
+	(*GetSourceModsRequest)(nil),     // 13: sync.v1.GetSourceModsRequest
+	(*GetSourceModsResponse)(nil),    // 14: sync.v1.GetSourceModsResponse
+	(*RegisterSourceRequest)(nil),    // 15: sync.v1.RegisterSourceRequest
+	(*ResolvedMod)(nil),              // 16: sync.v1.ResolvedMod
+	(*RegisterSourceResponse)(nil),   // 17: sync.v1.RegisterSourceResponse
+	(*DeregisterSourceRequest)(nil),  // 18: sync.v1.DeregisterSourceRequest
+	(*DeregisterSourceResponse)(nil), // 19: sync.v1.DeregisterSourceResponse
+	(*SyncContentRequest)(nil),       // 20: sync.v1.SyncContentRequest
+	(*SyncContentResponse)(nil),      // 21: sync.v1.SyncContentResponse
 }
 var file_sync_v1_sync_proto_depIdxs = []int32{
-	2,  // 0: sync.v1.ListSyncedModsResponse.mods:type_name -> sync.v1.SyncedMod
-	2,  // 1: sync.v1.GetSyncedModResponse.mod:type_name -> sync.v1.SyncedMod
-	17, // 2: sync.v1.RefreshSourceResponse.mods:type_name -> sync.v1.ResolvedMod
-	17, // 3: sync.v1.RegisterSourceResponse.mods:type_name -> sync.v1.ResolvedMod
-	0,  // 4: sync.v1.GetClaimStatusResponse.state:type_name -> sync.v1.ClaimJobState
-	16, // 5: sync.v1.SyncService.RegisterSource:input_type -> sync.v1.RegisterSourceRequest
-	19, // 6: sync.v1.SyncService.DeregisterSource:input_type -> sync.v1.DeregisterSourceRequest
-	21, // 7: sync.v1.SyncService.Claim:input_type -> sync.v1.ClaimRequest
-	23, // 8: sync.v1.SyncService.GetClaimStatus:input_type -> sync.v1.GetClaimStatusRequest
-	25, // 9: sync.v1.SyncService.DeleteClaim:input_type -> sync.v1.DeleteClaimRequest
-	14, // 10: sync.v1.SyncService.GetSourceMods:input_type -> sync.v1.GetSourceModsRequest
-	12, // 11: sync.v1.SyncService.RefreshSource:input_type -> sync.v1.RefreshSourceRequest
-	1,  // 12: sync.v1.SyncService.ListSyncedMods:input_type -> sync.v1.ListSyncedModsRequest
-	10, // 13: sync.v1.SyncService.InvalidateMod:input_type -> sync.v1.InvalidateModRequest
-	4,  // 14: sync.v1.SyncService.GetSyncedMod:input_type -> sync.v1.GetSyncedModRequest
-	6,  // 15: sync.v1.SyncService.GetSyncStats:input_type -> sync.v1.GetSyncStatsRequest
-	8,  // 16: sync.v1.SyncService.RefreshSteamAuth:input_type -> sync.v1.RefreshSteamAuthRequest
-	18, // 17: sync.v1.SyncService.RegisterSource:output_type -> sync.v1.RegisterSourceResponse
-	20, // 18: sync.v1.SyncService.DeregisterSource:output_type -> sync.v1.DeregisterSourceResponse
-	22, // 19: sync.v1.SyncService.Claim:output_type -> sync.v1.ClaimResponse
-	24, // 20: sync.v1.SyncService.GetClaimStatus:output_type -> sync.v1.GetClaimStatusResponse
-	26, // 21: sync.v1.SyncService.DeleteClaim:output_type -> sync.v1.DeleteClaimResponse
-	15, // 22: sync.v1.SyncService.GetSourceMods:output_type -> sync.v1.GetSourceModsResponse
-	13, // 23: sync.v1.SyncService.RefreshSource:output_type -> sync.v1.RefreshSourceResponse
-	3,  // 24: sync.v1.SyncService.ListSyncedMods:output_type -> sync.v1.ListSyncedModsResponse
-	11, // 25: sync.v1.SyncService.InvalidateMod:output_type -> sync.v1.InvalidateModResponse
-	5,  // 26: sync.v1.SyncService.GetSyncedMod:output_type -> sync.v1.GetSyncedModResponse
-	7,  // 27: sync.v1.SyncService.GetSyncStats:output_type -> sync.v1.GetSyncStatsResponse
-	9,  // 28: sync.v1.SyncService.RefreshSteamAuth:output_type -> sync.v1.RefreshSteamAuthResponse
-	17, // [17:29] is the sub-list for method output_type
-	5,  // [5:17] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	1,  // 0: sync.v1.ListSyncedModsResponse.mods:type_name -> sync.v1.SyncedMod
+	1,  // 1: sync.v1.GetSyncedModResponse.mod:type_name -> sync.v1.SyncedMod
+	16, // 2: sync.v1.RefreshSourceResponse.mods:type_name -> sync.v1.ResolvedMod
+	16, // 3: sync.v1.RegisterSourceResponse.mods:type_name -> sync.v1.ResolvedMod
+	15, // 4: sync.v1.SyncService.RegisterSource:input_type -> sync.v1.RegisterSourceRequest
+	18, // 5: sync.v1.SyncService.DeregisterSource:input_type -> sync.v1.DeregisterSourceRequest
+	20, // 6: sync.v1.SyncService.SyncContent:input_type -> sync.v1.SyncContentRequest
+	13, // 7: sync.v1.SyncService.GetSourceMods:input_type -> sync.v1.GetSourceModsRequest
+	11, // 8: sync.v1.SyncService.RefreshSource:input_type -> sync.v1.RefreshSourceRequest
+	0,  // 9: sync.v1.SyncService.ListSyncedMods:input_type -> sync.v1.ListSyncedModsRequest
+	9,  // 10: sync.v1.SyncService.InvalidateMod:input_type -> sync.v1.InvalidateModRequest
+	3,  // 11: sync.v1.SyncService.GetSyncedMod:input_type -> sync.v1.GetSyncedModRequest
+	5,  // 12: sync.v1.SyncService.GetSyncStats:input_type -> sync.v1.GetSyncStatsRequest
+	7,  // 13: sync.v1.SyncService.RefreshSteamAuth:input_type -> sync.v1.RefreshSteamAuthRequest
+	17, // 14: sync.v1.SyncService.RegisterSource:output_type -> sync.v1.RegisterSourceResponse
+	19, // 15: sync.v1.SyncService.DeregisterSource:output_type -> sync.v1.DeregisterSourceResponse
+	21, // 16: sync.v1.SyncService.SyncContent:output_type -> sync.v1.SyncContentResponse
+	14, // 17: sync.v1.SyncService.GetSourceMods:output_type -> sync.v1.GetSourceModsResponse
+	12, // 18: sync.v1.SyncService.RefreshSource:output_type -> sync.v1.RefreshSourceResponse
+	2,  // 19: sync.v1.SyncService.ListSyncedMods:output_type -> sync.v1.ListSyncedModsResponse
+	10, // 20: sync.v1.SyncService.InvalidateMod:output_type -> sync.v1.InvalidateModResponse
+	4,  // 21: sync.v1.SyncService.GetSyncedMod:output_type -> sync.v1.GetSyncedModResponse
+	6,  // 22: sync.v1.SyncService.GetSyncStats:output_type -> sync.v1.GetSyncStatsResponse
+	8,  // 23: sync.v1.SyncService.RefreshSteamAuth:output_type -> sync.v1.RefreshSteamAuthResponse
+	14, // [14:24] is the sub-list for method output_type
+	4,  // [4:14] is the sub-list for method input_type
+	4,  // [4:4] is the sub-list for extension type_name
+	4,  // [4:4] is the sub-list for extension extendee
+	0,  // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_sync_v1_sync_proto_init() }
@@ -1454,14 +1176,13 @@ func file_sync_v1_sync_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sync_v1_sync_proto_rawDesc), len(file_sync_v1_sync_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   26,
+			NumEnums:      0,
+			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_sync_v1_sync_proto_goTypes,
 		DependencyIndexes: file_sync_v1_sync_proto_depIdxs,
-		EnumInfos:         file_sync_v1_sync_proto_enumTypes,
 		MessageInfos:      file_sync_v1_sync_proto_msgTypes,
 	}.Build()
 	File_sync_v1_sync_proto = out.File

@@ -4,20 +4,13 @@
 
 use connectrpc::client::{ClientConfig, HttpClient};
 use protocol::proto::sync::v1::{
-    ClaimJobState, ClaimRequest, DeleteClaimRequest, DeregisterSourceRequest,
-    GetClaimStatusRequest, GetSourceModsRequest, GetSyncStatsRequest, GetSyncedModRequest,
+    DeregisterSourceRequest, GetSourceModsRequest, GetSyncStatsRequest, GetSyncedModRequest,
     InvalidateModRequest, ListSyncedModsRequest, RefreshSourceRequest, RefreshSteamAuthRequest,
-    RegisterSourceRequest, SyncServiceClient,
+    RegisterSourceRequest, SyncContentRequest, SyncServiceClient,
 };
 
 pub struct SyncClient {
     inner: SyncServiceClient<HttpClient>,
-}
-
-pub enum ClaimStatus {
-    Running,
-    Done { claim_path: String },
-    Failed { error: String },
 }
 
 pub struct SyncedMod {
@@ -115,28 +108,18 @@ impl SyncClient {
         Ok(())
     }
 
-    /// Kick off a claim job covering the full current desired state (every
-    /// registered source, not just this one) and return its job ID.
-    pub async fn claim(&self) -> anyhow::Result<String> {
-        let response = self
-            .inner
-            .claim(ClaimRequest::default())
-            .await
-            .map_err(|e| anyhow::anyhow!("Claim failed: {e}"))?;
-        Ok(response.view().job_id.to_string())
-    }
-
-    /// Releases a claim -- see sync.proto's own doc on `DeleteClaim` for
-    /// why this is caller-triggered (the launcher, on exit) rather than
-    /// sync-daemon tracking claim ownership itself.
-    pub async fn delete_claim(&self, claim_path: &str) -> anyhow::Result<()> {
+    /// Fire-and-forget: tells sync-daemon to sync server/CDLC depots plus
+    /// every registered source's resolved mods into the golden content
+    /// tree. Doesn't wait for completion -- see sync.proto's own doc on
+    /// `SyncContent` for why. Each ArmaServer's own content comes from a
+    /// PVC backed by a read-only btrfs snapshot of that tree instead
+    /// (services/magpie-csi), created/deleted by Kubernetes' normal PVC
+    /// lifecycle -- not this crate's concern.
+    pub async fn sync_content(&self) -> anyhow::Result<()> {
         self.inner
-            .delete_claim(DeleteClaimRequest {
-                claim_path: claim_path.to_string(),
-                ..Default::default()
-            })
+            .sync_content(SyncContentRequest::default())
             .await
-            .map_err(|e| anyhow::anyhow!("DeleteClaim failed: {e}"))?;
+            .map_err(|e| anyhow::anyhow!("SyncContent failed: {e}"))?;
         Ok(())
     }
 
@@ -233,27 +216,5 @@ impl SyncClient {
             .await
             .map_err(|e| anyhow::anyhow!("RefreshSteamAuth failed: {e}"))?;
         Ok(())
-    }
-
-    pub async fn claim_status(&self, job_id: &str) -> anyhow::Result<ClaimStatus> {
-        let response = self
-            .inner
-            .get_claim_status(GetClaimStatusRequest {
-                job_id: job_id.to_string(),
-                ..Default::default()
-            })
-            .await
-            .map_err(|e| anyhow::anyhow!("GetClaimStatus failed: {e}"))?;
-        let view = response.view();
-        let status = match view.state {
-            buffa::enumeration::EnumValue::Known(ClaimJobState::Done) => ClaimStatus::Done {
-                claim_path: view.claim_path.to_string(),
-            },
-            buffa::enumeration::EnumValue::Known(ClaimJobState::Failed) => ClaimStatus::Failed {
-                error: view.error.to_string(),
-            },
-            _ => ClaimStatus::Running,
-        };
-        Ok(status)
     }
 }

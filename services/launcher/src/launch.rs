@@ -189,10 +189,9 @@ pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Inst
 
     // No handler at all used to mean Kubernetes' SIGTERM (pod deletion,
     // or the Recreate rollover a resync triggers) killed this process
-    // immediately, forwarding nothing to arma3server and never releasing
-    // its claim -- confirmed live as a real gap once claims actually
-    // needed releasing (see release_claim below). Forward SIGTERM and
-    // wait for the real exit instead of dying immediately ourselves.
+    // immediately, forwarding nothing to arma3server and giving it no
+    // chance at a clean shutdown. Forward SIGTERM and wait for the real
+    // exit instead of dying immediately ourselves.
     let mut sigterm =
         signal(SignalKind::terminate()).context("failed to install SIGTERM handler")?;
     let status = tokio::select! {
@@ -209,8 +208,6 @@ pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Inst
         }
     };
 
-    release_claim(cfg).await;
-
     if !status.success() {
         anyhow::bail!(
             "arma3server exited with status {}",
@@ -221,33 +218,6 @@ pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Inst
     }
 
     Ok(())
-}
-
-/// Releases this run's claim right before the launcher process itself
-/// exits, whatever the reason (arma3server exited normally, crashed, or
-/// this got SIGTERM'd -- see the caller). Best-effort: a failure here
-/// only warns, never fails the whole process -- the game server's own
-/// exit status is what actually matters to whatever's watching this
-/// Pod, and a claim that doesn't get released this way just leaks the
-/// same way every claim did before this existed at all (see sync.proto's
-/// own doc on DeleteClaim).
-async fn release_claim(cfg: &Config) {
-    let Some(url) = &cfg.sync_daemon_url else {
-        tracing::warn!("SYNC_DAEMON_URL not set -- skipping claim release");
-        return;
-    };
-    let claim_path = cfg.claim_path.to_string_lossy();
-    let client = match sync_client::SyncClient::new(url) {
-        Ok(client) => client,
-        Err(e) => {
-            tracing::warn!("failed to build sync-daemon client, claim {claim_path} not released: {e:#}");
-            return;
-        }
-    };
-    match client.delete_claim(&claim_path).await {
-        Ok(()) => tracing::info!("released claim {claim_path}"),
-        Err(e) => tracing::warn!("failed to release claim {claim_path}: {e:#}"),
-    }
 }
 
 fn glob_hc_scripts() -> Result<Vec<std::path::PathBuf>> {

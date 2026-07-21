@@ -75,8 +75,8 @@ func (m Model) deleteModSourceCmd(id string) tea.Cmd {
 
 func (m Model) syncModSourceCmd(id string) tea.Cmd {
 	return func() tea.Msg {
-		jobID, err := actions.SyncModSource(m.ctx, m.clients, id)
-		return modSourceActionDoneMsg{verb: "sync job " + jobID + " started", id: id, err: err}
+		err := actions.SyncModSource(m.ctx, m.clients, id)
+		return modSourceActionDoneMsg{verb: "sync started", id: id, err: err}
 	}
 }
 

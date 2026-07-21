@@ -30,18 +30,13 @@ spec:
         - name: sync-daemon
           image: {{ include "magpie.image" (dict "root" $ "override" .Values.syncDaemon.image) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          # CAP_SYS_ADMIN, not full privileged: true -- crates/steam-sync's
-          # claim()/delete_claim() shell out to `btrfs subvolume
-          # snapshot`/`delete`, and those ioctls need this capability
-          # regardless of the filesystem's own mount options (there's no
-          # user_subvol_rm_allowed-style opt-out for create/snapshot the
-          # way there is for delete). Kept as narrow as the actual need --
-          # everything else this container does (Postgres/K8s API calls,
-          # Steam sync) needs nothing beyond a normal container's default
-          # capability set.
-          securityContext:
-            capabilities:
-              add: ["SYS_ADMIN"]
+          # No elevated capabilities needed -- sync-daemon only ever
+          # writes into its own plain, already-mounted content directory
+          # now (Postgres/K8s API calls, Steam sync). The btrfs subvolume
+          # snapshot/delete work per ArmaServer moved entirely into
+          # services/magpie-csi's own NodeStageVolume/NodeUnstageVolume
+          # (see that driver's own doc), which is where the SYS_ADMIN
+          # capability this container used to need now actually lives.
           ports:
             - name: http
               containerPort: 8080
@@ -52,8 +47,6 @@ spec:
               value: {{ include "magpie.namespace" . }}
             - name: CONTENT_ROOT
               value: /content
-            - name: CLAIMS_ROOT
-              value: /claims
             - name: POOL_SIZE
               value: {{ .Values.syncDaemon.poolSize | quote }}
             - name: POLL_INTERVAL_SECS
@@ -65,12 +58,8 @@ spec:
               value: "true"
             {{- end }}
           volumeMounts:
-            - name: reflink
+            - name: golden-content
               mountPath: /content
-              subPath: content
-            - name: reflink
-              mountPath: /claims
-              subPath: claims
           readinessProbe:
             httpGet:
               path: /healthz
@@ -81,16 +70,16 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
       volumes:
-        # content and claims are subPaths of one PVC, not two separate
-        # ones -- they must be on the very same real btrfs filesystem for
-        # `btrfs subvolume snapshot` to work at all (can't snapshot across
-        # filesystems any more than `cp --reflink=always`, the mechanism
-        # this used before, could). See reflink-pvc.yaml/reflink-
-        # storageclass.yaml, services/magpie-csi, and crates/steam-sync's
-        # claim() doc comment.
-        - name: reflink
+        # This PVC's own StorageClass (magpie-golden-content) makes
+        # NodeStageVolume bind-mount the shared blob's content/
+        # subvolume directly here, read-write -- this is the one real
+        # copy of every synced depot/mod. Every ArmaServer's own content
+        # is a CSI inline ephemeral volume instead (no PVC at all), a
+        # read-only btrfs snapshot of it taken on demand -- see
+        # services/magpie-csi's NodePublishVolume doc for the split.
+        - name: golden-content
           persistentVolumeClaim:
-            claimName: {{ include "magpie.fullname" . }}-reflink-content
+            claimName: {{ include "magpie.fullname" . }}-golden-content
 ---
 apiVersion: v1
 kind: Service

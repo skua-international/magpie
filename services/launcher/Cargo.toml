@@ -8,7 +8,6 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "si
 anyhow = "1"
 libc = "0.2"
 regex = "1"
-sync-client = { path = "../../crates/sync-client" }
 walkdir = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

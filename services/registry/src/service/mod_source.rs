@@ -241,15 +241,11 @@ impl protocol::proto::registry::v1::ModSourceService for ModSourceServiceImpl {
             .refresh_source(request.id)
             .await
             .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
-        let job_id = self
-            .sync_client
-            .claim()
+        self.sync_client
+            .sync_content()
             .await
             .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
-        Response::ok(SyncModSourceResponse {
-            job_id,
-            ..Default::default()
-        })
+        Response::ok(SyncModSourceResponse::default())
     }
 
     async fn list_synced_mods<'a>(

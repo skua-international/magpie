@@ -11,10 +11,9 @@ use kube::api::{Api, ListParams};
 use tracing::warn;
 
 const POLL_INTERVAL: Duration = Duration::from_secs(30);
-const PHASES: [ArmaServerPhase; 5] = [
+const PHASES: [ArmaServerPhase; 4] = [
     ArmaServerPhase::Stopped,
     ArmaServerPhase::Pending,
-    ArmaServerPhase::Claiming,
     ArmaServerPhase::Running,
     ArmaServerPhase::Failed,
 ];

@@ -2,15 +2,15 @@
 // @generated from file sync/v1/sync.proto (package sync.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file sync/v1/sync.proto.
  */
 export const file_sync_v1_sync: GenFile = /*@__PURE__*/
-  fileDesc("ChJzeW5jL3YxL3N5bmMucHJvdG8SB3N5bmMudjEiFwoVTGlzdFN5bmNlZE1vZHNSZXF1ZXN0IlMKCVN5bmNlZE1vZBIOCgZtb2RfaWQYASABKAQSEwoLbWFuaWZlc3RfaWQYAiABKAQSEgoKc2l6ZV9ieXRlcxgDIAEoBBINCgV0aXRsZRgEIAEoCSI6ChZMaXN0U3luY2VkTW9kc1Jlc3BvbnNlEiAKBG1vZHMYASADKAsyEi5zeW5jLnYxLlN5bmNlZE1vZCIlChNHZXRTeW5jZWRNb2RSZXF1ZXN0Eg4KBm1vZF9pZBgBIAEoBCJYChRHZXRTeW5jZWRNb2RSZXNwb25zZRIkCgNtb2QYASABKAsyEi5zeW5jLnYxLlN5bmNlZE1vZEgAiAEBEhIKCnNvdXJjZV9pZHMYAiADKAlCBgoEX21vZCIVChNHZXRTeW5jU3RhdHNSZXF1ZXN0IkQKFEdldFN5bmNTdGF0c1Jlc3BvbnNlEhIKCm1vZHNfYnl0ZXMYASABKAQSGAoQZ2FtZV9maWxlc19ieXRlcxgCIAEoBCJCChdSZWZyZXNoU3RlYW1BdXRoUmVxdWVzdBIQCgh1c2VybmFtZRgBIAEoCRIVCg1yZWZyZXNoX3Rva2VuGAIgASgJIhoKGFJlZnJlc2hTdGVhbUF1dGhSZXNwb25zZSImChRJbnZhbGlkYXRlTW9kUmVxdWVzdBIOCgZtb2RfaWQYASABKAQiFwoVSW52YWxpZGF0ZU1vZFJlc3BvbnNlIikKFFJlZnJlc2hTb3VyY2VSZXF1ZXN0EhEKCXNvdXJjZV9pZBgBIAEoCSI7ChVSZWZyZXNoU291cmNlUmVzcG9uc2USIgoEbW9kcxgBIAMoCzIULnN5bmMudjEuUmVzb2x2ZWRNb2QiKQoUR2V0U291cmNlTW9kc1JlcXVlc3QSEQoJc291cmNlX2lkGAEgASgJIigKFUdldFNvdXJjZU1vZHNSZXNwb25zZRIPCgdtb2RfaWRzGAEgAygEIkEKFVJlZ2lzdGVyU291cmNlUmVxdWVzdBIVCg1jYW5kaWRhdGVfaWRzGAEgAygEEhEKCXNvdXJjZV9pZBgCIAEoCSIsCgtSZXNvbHZlZE1vZBIOCgZtb2RfaWQYASABKAQSDQoFdGl0bGUYAiABKAkiUAoWUmVnaXN0ZXJTb3VyY2VSZXNwb25zZRIiCgRtb2RzGAEgAygLMhQuc3luYy52MS5SZXNvbHZlZE1vZBISCgpyb290X3RpdGxlGAIgASgJIiwKF0RlcmVnaXN0ZXJTb3VyY2VSZXF1ZXN0EhEKCXNvdXJjZV9pZBgBIAEoCSIaChhEZXJlZ2lzdGVyU291cmNlUmVzcG9uc2UiDgoMQ2xhaW1SZXF1ZXN0Ih8KDUNsYWltUmVzcG9uc2USDgoGam9iX2lkGAEgASgJIicKFUdldENsYWltU3RhdHVzUmVxdWVzdBIOCgZqb2JfaWQYASABKAkiYgoWR2V0Q2xhaW1TdGF0dXNSZXNwb25zZRIlCgVzdGF0ZRgBIAEoDjIWLnN5bmMudjEuQ2xhaW1Kb2JTdGF0ZRISCgpjbGFpbV9wYXRoGAIgASgJEg0KBWVycm9yGAMgASgJIigKEkRlbGV0ZUNsYWltUmVxdWVzdBISCgpjbGFpbV9wYXRoGAEgASgJIhUKE0RlbGV0ZUNsYWltUmVzcG9uc2UqgwEKDUNsYWltSm9iU3RhdGUSHwobQ0xBSU1fSk9CX1NUQVRFX1VOU1BFQ0lGSUVEEAASGwoXQ0xBSU1fSk9CX1NUQVRFX1JVTk5JTkcQARIYChRDTEFJTV9KT0JfU1RBVEVfRE9ORRACEhoKFkNMQUlNX0pPQl9TVEFURV9GQUlMRUQQAzLEBwoLU3luY1NlcnZpY2USUQoOUmVnaXN0ZXJTb3VyY2USHi5zeW5jLnYxLlJlZ2lzdGVyU291cmNlUmVxdWVzdBofLnN5bmMudjEuUmVnaXN0ZXJTb3VyY2VSZXNwb25zZRJXChBEZXJlZ2lzdGVyU291cmNlEiAuc3luYy52MS5EZXJlZ2lzdGVyU291cmNlUmVxdWVzdBohLnN5bmMudjEuRGVyZWdpc3RlclNvdXJjZVJlc3BvbnNlEjYKBUNsYWltEhUuc3luYy52MS5DbGFpbVJlcXVlc3QaFi5zeW5jLnYxLkNsYWltUmVzcG9uc2USUQoOR2V0Q2xhaW1TdGF0dXMSHi5zeW5jLnYxLkdldENsYWltU3RhdHVzUmVxdWVzdBofLnN5bmMudjEuR2V0Q2xhaW1TdGF0dXNSZXNwb25zZRJICgtEZWxldGVDbGFpbRIbLnN5bmMudjEuRGVsZXRlQ2xhaW1SZXF1ZXN0Ghwuc3luYy52MS5EZWxldGVDbGFpbVJlc3BvbnNlEk4KDUdldFNvdXJjZU1vZHMSHS5zeW5jLnYxLkdldFNvdXJjZU1vZHNSZXF1ZXN0Gh4uc3luYy52MS5HZXRTb3VyY2VNb2RzUmVzcG9uc2USTgoNUmVmcmVzaFNvdXJjZRIdLnN5bmMudjEuUmVmcmVzaFNvdXJjZVJlcXVlc3QaHi5zeW5jLnYxLlJlZnJlc2hTb3VyY2VSZXNwb25zZRJRCg5MaXN0U3luY2VkTW9kcxIeLnN5bmMudjEuTGlzdFN5bmNlZE1vZHNSZXF1ZXN0Gh8uc3luYy52MS5MaXN0U3luY2VkTW9kc1Jlc3BvbnNlEk4KDUludmFsaWRhdGVNb2QSHS5zeW5jLnYxLkludmFsaWRhdGVNb2RSZXF1ZXN0Gh4uc3luYy52MS5JbnZhbGlkYXRlTW9kUmVzcG9uc2USSwoMR2V0U3luY2VkTW9kEhwuc3luYy52MS5HZXRTeW5jZWRNb2RSZXF1ZXN0Gh0uc3luYy52MS5HZXRTeW5jZWRNb2RSZXNwb25zZRJLCgxHZXRTeW5jU3RhdHMSHC5zeW5jLnYxLkdldFN5bmNTdGF0c1JlcXVlc3QaHS5zeW5jLnYxLkdldFN5bmNTdGF0c1Jlc3BvbnNlElcKEFJlZnJlc2hTdGVhbUF1dGgSIC5zeW5jLnYxLlJlZnJlc2hTdGVhbUF1dGhSZXF1ZXN0GiEuc3luYy52MS5SZWZyZXNoU3RlYW1BdXRoUmVzcG9uc2VCQlpAZ2l0aHViLmNvbS9za3VhLWludGVybmF0aW9uYWwvbWFncGllL2dlbmVyYXRlZC9nby9zeW5jL3YxO3N5bmN2MWIGcHJvdG8z");
+  fileDesc("ChJzeW5jL3YxL3N5bmMucHJvdG8SB3N5bmMudjEiFwoVTGlzdFN5bmNlZE1vZHNSZXF1ZXN0IlMKCVN5bmNlZE1vZBIOCgZtb2RfaWQYASABKAQSEwoLbWFuaWZlc3RfaWQYAiABKAQSEgoKc2l6ZV9ieXRlcxgDIAEoBBINCgV0aXRsZRgEIAEoCSI6ChZMaXN0U3luY2VkTW9kc1Jlc3BvbnNlEiAKBG1vZHMYASADKAsyEi5zeW5jLnYxLlN5bmNlZE1vZCIlChNHZXRTeW5jZWRNb2RSZXF1ZXN0Eg4KBm1vZF9pZBgBIAEoBCJYChRHZXRTeW5jZWRNb2RSZXNwb25zZRIkCgNtb2QYASABKAsyEi5zeW5jLnYxLlN5bmNlZE1vZEgAiAEBEhIKCnNvdXJjZV9pZHMYAiADKAlCBgoEX21vZCIVChNHZXRTeW5jU3RhdHNSZXF1ZXN0IkQKFEdldFN5bmNTdGF0c1Jlc3BvbnNlEhIKCm1vZHNfYnl0ZXMYASABKAQSGAoQZ2FtZV9maWxlc19ieXRlcxgCIAEoBCJCChdSZWZyZXNoU3RlYW1BdXRoUmVxdWVzdBIQCgh1c2VybmFtZRgBIAEoCRIVCg1yZWZyZXNoX3Rva2VuGAIgASgJIhoKGFJlZnJlc2hTdGVhbUF1dGhSZXNwb25zZSImChRJbnZhbGlkYXRlTW9kUmVxdWVzdBIOCgZtb2RfaWQYASABKAQiFwoVSW52YWxpZGF0ZU1vZFJlc3BvbnNlIikKFFJlZnJlc2hTb3VyY2VSZXF1ZXN0EhEKCXNvdXJjZV9pZBgBIAEoCSI7ChVSZWZyZXNoU291cmNlUmVzcG9uc2USIgoEbW9kcxgBIAMoCzIULnN5bmMudjEuUmVzb2x2ZWRNb2QiKQoUR2V0U291cmNlTW9kc1JlcXVlc3QSEQoJc291cmNlX2lkGAEgASgJIigKFUdldFNvdXJjZU1vZHNSZXNwb25zZRIPCgdtb2RfaWRzGAEgAygEIkEKFVJlZ2lzdGVyU291cmNlUmVxdWVzdBIVCg1jYW5kaWRhdGVfaWRzGAEgAygEEhEKCXNvdXJjZV9pZBgCIAEoCSIsCgtSZXNvbHZlZE1vZBIOCgZtb2RfaWQYASABKAQSDQoFdGl0bGUYAiABKAkiUAoWUmVnaXN0ZXJTb3VyY2VSZXNwb25zZRIiCgRtb2RzGAEgAygLMhQuc3luYy52MS5SZXNvbHZlZE1vZBISCgpyb290X3RpdGxlGAIgASgJIiwKF0RlcmVnaXN0ZXJTb3VyY2VSZXF1ZXN0EhEKCXNvdXJjZV9pZBgBIAEoCSIaChhEZXJlZ2lzdGVyU291cmNlUmVzcG9uc2UiFAoSU3luY0NvbnRlbnRSZXF1ZXN0IhUKE1N5bmNDb250ZW50UmVzcG9uc2UyuQYKC1N5bmNTZXJ2aWNlElEKDlJlZ2lzdGVyU291cmNlEh4uc3luYy52MS5SZWdpc3RlclNvdXJjZVJlcXVlc3QaHy5zeW5jLnYxLlJlZ2lzdGVyU291cmNlUmVzcG9uc2USVwoQRGVyZWdpc3RlclNvdXJjZRIgLnN5bmMudjEuRGVyZWdpc3RlclNvdXJjZVJlcXVlc3QaIS5zeW5jLnYxLkRlcmVnaXN0ZXJTb3VyY2VSZXNwb25zZRJICgtTeW5jQ29udGVudBIbLnN5bmMudjEuU3luY0NvbnRlbnRSZXF1ZXN0Ghwuc3luYy52MS5TeW5jQ29udGVudFJlc3BvbnNlEk4KDUdldFNvdXJjZU1vZHMSHS5zeW5jLnYxLkdldFNvdXJjZU1vZHNSZXF1ZXN0Gh4uc3luYy52MS5HZXRTb3VyY2VNb2RzUmVzcG9uc2USTgoNUmVmcmVzaFNvdXJjZRIdLnN5bmMudjEuUmVmcmVzaFNvdXJjZVJlcXVlc3QaHi5zeW5jLnYxLlJlZnJlc2hTb3VyY2VSZXNwb25zZRJRCg5MaXN0U3luY2VkTW9kcxIeLnN5bmMudjEuTGlzdFN5bmNlZE1vZHNSZXF1ZXN0Gh8uc3luYy52MS5MaXN0U3luY2VkTW9kc1Jlc3BvbnNlEk4KDUludmFsaWRhdGVNb2QSHS5zeW5jLnYxLkludmFsaWRhdGVNb2RSZXF1ZXN0Gh4uc3luYy52MS5JbnZhbGlkYXRlTW9kUmVzcG9uc2USSwoMR2V0U3luY2VkTW9kEhwuc3luYy52MS5HZXRTeW5jZWRNb2RSZXF1ZXN0Gh0uc3luYy52MS5HZXRTeW5jZWRNb2RSZXNwb25zZRJLCgxHZXRTeW5jU3RhdHMSHC5zeW5jLnYxLkdldFN5bmNTdGF0c1JlcXVlc3QaHS5zeW5jLnYxLkdldFN5bmNTdGF0c1Jlc3BvbnNlElcKEFJlZnJlc2hTdGVhbUF1dGgSIC5zeW5jLnYxLlJlZnJlc2hTdGVhbUF1dGhSZXF1ZXN0GiEuc3luYy52MS5SZWZyZXNoU3RlYW1BdXRoUmVzcG9uc2VCQlpAZ2l0aHViLmNvbS9za3VhLWludGVybmF0aW9uYWwvbWFncGllL2dlbmVyYXRlZC9nby9zeW5jL3YxO3N5bmN2MWIGcHJvdG8z");
 
 /**
  * @generated from message sync.v1.ListSyncedModsRequest
@@ -408,148 +408,30 @@ export const DeregisterSourceResponseSchema: GenMessage<DeregisterSourceResponse
   messageDesc(file_sync_v1_sync, 19);
 
 /**
- * @generated from message sync.v1.ClaimRequest
+ * @generated from message sync.v1.SyncContentRequest
  */
-export type ClaimRequest = Message<"sync.v1.ClaimRequest"> & {
+export type SyncContentRequest = Message<"sync.v1.SyncContentRequest"> & {
 };
 
 /**
- * Describes the message sync.v1.ClaimRequest.
- * Use `create(ClaimRequestSchema)` to create a new message.
+ * Describes the message sync.v1.SyncContentRequest.
+ * Use `create(SyncContentRequestSchema)` to create a new message.
  */
-export const ClaimRequestSchema: GenMessage<ClaimRequest> = /*@__PURE__*/
+export const SyncContentRequestSchema: GenMessage<SyncContentRequest> = /*@__PURE__*/
   messageDesc(file_sync_v1_sync, 20);
 
 /**
- * @generated from message sync.v1.ClaimResponse
+ * @generated from message sync.v1.SyncContentResponse
  */
-export type ClaimResponse = Message<"sync.v1.ClaimResponse"> & {
-  /**
-   * @generated from field: string job_id = 1;
-   */
-  jobId: string;
+export type SyncContentResponse = Message<"sync.v1.SyncContentResponse"> & {
 };
 
 /**
- * Describes the message sync.v1.ClaimResponse.
- * Use `create(ClaimResponseSchema)` to create a new message.
+ * Describes the message sync.v1.SyncContentResponse.
+ * Use `create(SyncContentResponseSchema)` to create a new message.
  */
-export const ClaimResponseSchema: GenMessage<ClaimResponse> = /*@__PURE__*/
+export const SyncContentResponseSchema: GenMessage<SyncContentResponse> = /*@__PURE__*/
   messageDesc(file_sync_v1_sync, 21);
-
-/**
- * @generated from message sync.v1.GetClaimStatusRequest
- */
-export type GetClaimStatusRequest = Message<"sync.v1.GetClaimStatusRequest"> & {
-  /**
-   * @generated from field: string job_id = 1;
-   */
-  jobId: string;
-};
-
-/**
- * Describes the message sync.v1.GetClaimStatusRequest.
- * Use `create(GetClaimStatusRequestSchema)` to create a new message.
- */
-export const GetClaimStatusRequestSchema: GenMessage<GetClaimStatusRequest> = /*@__PURE__*/
-  messageDesc(file_sync_v1_sync, 22);
-
-/**
- * @generated from message sync.v1.GetClaimStatusResponse
- */
-export type GetClaimStatusResponse = Message<"sync.v1.GetClaimStatusResponse"> & {
-  /**
-   * @generated from field: sync.v1.ClaimJobState state = 1;
-   */
-  state: ClaimJobState;
-
-  /**
-   * set when state == DONE
-   *
-   * @generated from field: string claim_path = 2;
-   */
-  claimPath: string;
-
-  /**
-   * set when state == FAILED
-   *
-   * @generated from field: string error = 3;
-   */
-  error: string;
-};
-
-/**
- * Describes the message sync.v1.GetClaimStatusResponse.
- * Use `create(GetClaimStatusResponseSchema)` to create a new message.
- */
-export const GetClaimStatusResponseSchema: GenMessage<GetClaimStatusResponse> = /*@__PURE__*/
-  messageDesc(file_sync_v1_sync, 23);
-
-/**
- * @generated from message sync.v1.DeleteClaimRequest
- */
-export type DeleteClaimRequest = Message<"sync.v1.DeleteClaimRequest"> & {
-  /**
-   * The exact claim_path a prior GetClaimStatusResponse returned --
-   * sync-daemon validates it actually falls under its own claims_root
-   * before deleting anything, so a malformed/malicious path can't reach
-   * outside that directory.
-   *
-   * @generated from field: string claim_path = 1;
-   */
-  claimPath: string;
-};
-
-/**
- * Describes the message sync.v1.DeleteClaimRequest.
- * Use `create(DeleteClaimRequestSchema)` to create a new message.
- */
-export const DeleteClaimRequestSchema: GenMessage<DeleteClaimRequest> = /*@__PURE__*/
-  messageDesc(file_sync_v1_sync, 24);
-
-/**
- * @generated from message sync.v1.DeleteClaimResponse
- */
-export type DeleteClaimResponse = Message<"sync.v1.DeleteClaimResponse"> & {
-};
-
-/**
- * Describes the message sync.v1.DeleteClaimResponse.
- * Use `create(DeleteClaimResponseSchema)` to create a new message.
- */
-export const DeleteClaimResponseSchema: GenMessage<DeleteClaimResponse> = /*@__PURE__*/
-  messageDesc(file_sync_v1_sync, 25);
-
-/**
- * @generated from enum sync.v1.ClaimJobState
- */
-export enum ClaimJobState {
-  /**
-   * @generated from enum value: CLAIM_JOB_STATE_UNSPECIFIED = 0;
-   */
-  UNSPECIFIED = 0,
-
-  /**
-   * @generated from enum value: CLAIM_JOB_STATE_RUNNING = 1;
-   */
-  RUNNING = 1,
-
-  /**
-   * @generated from enum value: CLAIM_JOB_STATE_DONE = 2;
-   */
-  DONE = 2,
-
-  /**
-   * @generated from enum value: CLAIM_JOB_STATE_FAILED = 3;
-   */
-  FAILED = 3,
-}
-
-/**
- * Describes the enum sync.v1.ClaimJobState.
- */
-export const ClaimJobStateSchema: GenEnum<ClaimJobState> = /*@__PURE__*/
-  enumDesc(file_sync_v1_sync, 0);
 
 /**
  * Mod/collection sync registry and content-claim service. Owns all Steam
@@ -589,53 +471,24 @@ export const SyncService: GenService<{
     output: typeof DeregisterSourceResponseSchema;
   },
   /**
-   * Start a background job that syncs every mod/depot currently desired
-   * (the union of every registered source's resolved membership, plus
-   * server/CDLC depots) and issues a claim of the result: a read-only
-   * btrfs snapshot of the golden content tree (crates/steam-sync's own
-   * doc has the full rationale for snapshot over the old cp
-   * --reflink=always -- an atomic, whole-tree, single-ioctl operation
-   * instead of walking and reflinking file-by-file). Returns immediately
-   * with a job ID -- this does not block for the sync duration, which can
-   * range from instant (warm cache) to minutes (cold).
+   * Downloads server/CDLC depots plus every currently-registered
+   * source's resolved mods into the shared golden content tree --
+   * fire-and-forget (returns immediately, doesn't wait for the sync to
+   * finish, which can range from instant (warm cache) to minutes
+   * (cold)). No completion signal is returned at all -- the caller's
+   * real interest is "make sure this eventually happens", not knowing
+   * exactly when; GetSyncStats/ListSyncedMods reflect the result once
+   * it's done. Every ArmaServer's own content comes from a read-only
+   * btrfs snapshot of this tree instead (services/magpie-csi's
+   * NodeStageVolume, mode: snapshot -- not this service's concern at
+   * all anymore).
    *
-   * @generated from rpc sync.v1.SyncService.Claim
+   * @generated from rpc sync.v1.SyncService.SyncContent
    */
-  claim: {
+  syncContent: {
     methodKind: "unary";
-    input: typeof ClaimRequestSchema;
-    output: typeof ClaimResponseSchema;
-  },
-  /**
-   * Poll a job started by Claim.
-   *
-   * @generated from rpc sync.v1.SyncService.GetClaimStatus
-   */
-  getClaimStatus: {
-    methodKind: "unary";
-    input: typeof GetClaimStatusRequestSchema;
-    output: typeof GetClaimStatusResponseSchema;
-  },
-  /**
-   * Releases a claim -- `btrfs subvolume delete` on its directory.
-   * Deliberately caller-triggered (the launcher calls this itself right
-   * before it exits, whatever the reason -- game process exited, crashed,
-   * or SIGTERM from Kubernetes during a rollover) rather than sync-daemon
-   * tracking claim ownership/lifecycle itself: sync-daemon's own Claim RPC
-   * is completely anonymous (no server identity in ClaimRequest at all),
-   * and keeping it that way -- letting whoever actually held the claim be
-   * the one to say when they're done with it -- avoids needing a whole
-   * separate ownership-tracking/GC subsystem here. A claim that's never
-   * released this way (e.g. the launcher is SIGKILLed before it can call
-   * this) still leaks, same as every claim did before this RPC existed at
-   * all -- this fixes the common case, not every case.
-   *
-   * @generated from rpc sync.v1.SyncService.DeleteClaim
-   */
-  deleteClaim: {
-    methodKind: "unary";
-    input: typeof DeleteClaimRequestSchema;
-    output: typeof DeleteClaimResponseSchema;
+    input: typeof SyncContentRequestSchema;
+    output: typeof SyncContentResponseSchema;
   },
   /**
    * Read a previously-registered source's current resolved mod list

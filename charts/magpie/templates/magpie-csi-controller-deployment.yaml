@@ -1,10 +1,14 @@
 # CSI Controller plugin -- paired with the standard external-provisioner
 # sidecar, which watches PersistentVolumeClaims against the
-# magpie-reflink StorageClass and calls magpie-csi's own CreateVolume/
-# DeleteVolume over the shared Unix socket in /csi (an emptyDir, purely
-# local IPC between the two containers in this Pod -- not the same
-# socket kubelet talks to, that's the Node plugin's own, registered via
-# node-driver-registrar in magpie-csi-node-daemonset.yaml).
+# magpie-golden-content StorageClass (the only one that uses this path
+# at all -- every ArmaServer's own content is a CSI inline ephemeral
+# volume instead, which skips the Controller service entirely, see
+# services/magpie-csi/internal/driver/node.go's NodePublishVolume doc)
+# and calls magpie-csi's own CreateVolume/DeleteVolume over the shared
+# Unix socket in /csi (an emptyDir, purely local IPC between the two
+# containers in this Pod -- not the same socket kubelet talks to, that's
+# the Node plugin's own, registered via node-driver-registrar in
+# magpie-csi-node-daemonset.yaml).
 #
 # Deliberately not privileged -- CreateVolume/DeleteVolume do no host
 # work at all (see services/magpie-csi/internal/driver/controller.go's

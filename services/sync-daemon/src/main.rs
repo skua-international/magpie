@@ -28,7 +28,6 @@ async fn main() -> Result<()> {
     let cfg = Config::from_env()?;
 
     std::fs::create_dir_all(&cfg.content_root)?;
-    std::fs::create_dir_all(&cfg.claims_root)?;
 
     let sync_state = SyncState::open(&cfg.content_root)?;
 
@@ -112,7 +111,6 @@ async fn main() -> Result<()> {
         pool,
         sync_state,
         cfg.content_root,
-        cfg.claims_root,
         client.clone(),
         cfg.namespace.clone(),
         cfg.steam_session_secret_name.clone(),

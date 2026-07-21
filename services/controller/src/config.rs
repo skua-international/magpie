@@ -7,18 +7,6 @@ pub struct Config {
     pub launcher_image: String,
     /// Base URL of sync-daemon's Connect API.
     pub sync_daemon_url: String,
-    /// PersistentVolumeClaim (magpie-reflink StorageClass, see
-    /// magpie-csi) sync-daemon writes claims to, mounted read-only (via
-    /// its `claims` subPath -- `content` is the other) into every
-    /// launcher Pod at the same in-container path (matching
-    /// sync-daemon's own `CLAIMS_ROOT`) -- the claim path `Claim`
-    /// returns is an absolute path under that shared tree, so it's
-    /// directly usable as `CLAIM_PATH` unmodified. Same PVC sync-daemon
-    /// itself mounts, so `content`/`claims` always land on the very same
-    /// real filesystem (required for `cp --reflink=always` to CoW at
-    /// all) without either side having to reason about it.
-    pub reflink_pvc_name: String,
-    pub claims_root: String,
     /// Host directory holding each server's own operator-provided content
     /// (configs/profiles/keys) -- `<server_root_base>/<ArmaServer name>` is
     /// bind-mounted into that server's Pod at `/arma3/server`. Not
@@ -88,9 +76,6 @@ impl Config {
                 .unwrap_or_else(|_| "arma3-launcher:latest".into()),
             sync_daemon_url: env::var("SYNC_DAEMON_URL")
                 .unwrap_or_else(|_| "http://sync-daemon:8080".into()),
-            reflink_pvc_name: env::var("REFLINK_PVC_NAME")
-                .unwrap_or_else(|_| "magpie-reflink-content".into()),
-            claims_root: env::var("CLAIMS_ROOT").unwrap_or_else(|_| "/claims".into()),
             server_root_base: env::var("SERVER_ROOT_BASE")
                 .unwrap_or_else(|_| "/srv/arma-servers".into()),
             local_content_root: env::var("LOCAL_CONTENT_ROOT")

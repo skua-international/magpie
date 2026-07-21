@@ -27,10 +27,11 @@ pub enum SteamAuthConfig {
 pub struct Config {
     pub steam_auth: SteamAuthConfig,
     /// Root of the golden, continuously-synced content tree (server depots
-    /// under it directly, workshop mods under `workshop/`).
+    /// under it directly, workshop mods under `workshop/`). Every
+    /// ArmaServer's own content is a read-only btrfs snapshot of this,
+    /// taken by services/magpie-csi when its PVC is created -- not this
+    /// process's concern at all.
     pub content_root: PathBuf,
-    /// Where per-request reflink claims get written.
-    pub claims_root: PathBuf,
     pub listen_addr: String,
     pub pool_size: usize,
     /// How often the ModSource reconciler re-resolves an already-`Synced`
@@ -60,9 +61,6 @@ impl Config {
             steam_auth,
             content_root: env::var("CONTENT_ROOT")
                 .unwrap_or_else(|_| "/content".into())
-                .into(),
-            claims_root: env::var("CLAIMS_ROOT")
-                .unwrap_or_else(|_| "/claims".into())
                 .into(),
             listen_addr: env::var("LISTEN_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".into()),
             pool_size: env::var("POOL_SIZE")

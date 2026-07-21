@@ -39,13 +39,8 @@ const (
 	// SyncServiceDeregisterSourceProcedure is the fully-qualified name of the SyncService's
 	// DeregisterSource RPC.
 	SyncServiceDeregisterSourceProcedure = "/sync.v1.SyncService/DeregisterSource"
-	// SyncServiceClaimProcedure is the fully-qualified name of the SyncService's Claim RPC.
-	SyncServiceClaimProcedure = "/sync.v1.SyncService/Claim"
-	// SyncServiceGetClaimStatusProcedure is the fully-qualified name of the SyncService's
-	// GetClaimStatus RPC.
-	SyncServiceGetClaimStatusProcedure = "/sync.v1.SyncService/GetClaimStatus"
-	// SyncServiceDeleteClaimProcedure is the fully-qualified name of the SyncService's DeleteClaim RPC.
-	SyncServiceDeleteClaimProcedure = "/sync.v1.SyncService/DeleteClaim"
+	// SyncServiceSyncContentProcedure is the fully-qualified name of the SyncService's SyncContent RPC.
+	SyncServiceSyncContentProcedure = "/sync.v1.SyncService/SyncContent"
 	// SyncServiceGetSourceModsProcedure is the fully-qualified name of the SyncService's GetSourceMods
 	// RPC.
 	SyncServiceGetSourceModsProcedure = "/sync.v1.SyncService/GetSourceMods"
@@ -84,31 +79,18 @@ type SyncServiceClient interface {
 	// using it. Only removes this source_id's membership; a mod still
 	// referenced by another source keeps syncing.
 	DeregisterSource(context.Context, *connect.Request[v1.DeregisterSourceRequest]) (*connect.Response[v1.DeregisterSourceResponse], error)
-	// Start a background job that syncs every mod/depot currently desired
-	// (the union of every registered source's resolved membership, plus
-	// server/CDLC depots) and issues a claim of the result: a read-only
-	// btrfs snapshot of the golden content tree (crates/steam-sync's own
-	// doc has the full rationale for snapshot over the old cp
-	// --reflink=always -- an atomic, whole-tree, single-ioctl operation
-	// instead of walking and reflinking file-by-file). Returns immediately
-	// with a job ID -- this does not block for the sync duration, which can
-	// range from instant (warm cache) to minutes (cold).
-	Claim(context.Context, *connect.Request[v1.ClaimRequest]) (*connect.Response[v1.ClaimResponse], error)
-	// Poll a job started by Claim.
-	GetClaimStatus(context.Context, *connect.Request[v1.GetClaimStatusRequest]) (*connect.Response[v1.GetClaimStatusResponse], error)
-	// Releases a claim -- `btrfs subvolume delete` on its directory.
-	// Deliberately caller-triggered (the launcher calls this itself right
-	// before it exits, whatever the reason -- game process exited, crashed,
-	// or SIGTERM from Kubernetes during a rollover) rather than sync-daemon
-	// tracking claim ownership/lifecycle itself: sync-daemon's own Claim RPC
-	// is completely anonymous (no server identity in ClaimRequest at all),
-	// and keeping it that way -- letting whoever actually held the claim be
-	// the one to say when they're done with it -- avoids needing a whole
-	// separate ownership-tracking/GC subsystem here. A claim that's never
-	// released this way (e.g. the launcher is SIGKILLed before it can call
-	// this) still leaks, same as every claim did before this RPC existed at
-	// all -- this fixes the common case, not every case.
-	DeleteClaim(context.Context, *connect.Request[v1.DeleteClaimRequest]) (*connect.Response[v1.DeleteClaimResponse], error)
+	// Downloads server/CDLC depots plus every currently-registered
+	// source's resolved mods into the shared golden content tree --
+	// fire-and-forget (returns immediately, doesn't wait for the sync to
+	// finish, which can range from instant (warm cache) to minutes
+	// (cold)). No completion signal is returned at all -- the caller's
+	// real interest is "make sure this eventually happens", not knowing
+	// exactly when; GetSyncStats/ListSyncedMods reflect the result once
+	// it's done. Every ArmaServer's own content comes from a read-only
+	// btrfs snapshot of this tree instead (services/magpie-csi's
+	// NodeStageVolume, mode: snapshot -- not this service's concern at
+	// all anymore).
+	SyncContent(context.Context, *connect.Request[v1.SyncContentRequest]) (*connect.Response[v1.SyncContentResponse], error)
 	// Read a previously-registered source's current resolved mod list
 	// without re-registering it (no candidate IDs needed, no Steam calls --
 	// a plain read of what RegisterSource/the background poller last
@@ -181,22 +163,10 @@ func NewSyncServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(syncServiceMethods.ByName("DeregisterSource")),
 			connect.WithClientOptions(opts...),
 		),
-		claim: connect.NewClient[v1.ClaimRequest, v1.ClaimResponse](
+		syncContent: connect.NewClient[v1.SyncContentRequest, v1.SyncContentResponse](
 			httpClient,
-			baseURL+SyncServiceClaimProcedure,
-			connect.WithSchema(syncServiceMethods.ByName("Claim")),
-			connect.WithClientOptions(opts...),
-		),
-		getClaimStatus: connect.NewClient[v1.GetClaimStatusRequest, v1.GetClaimStatusResponse](
-			httpClient,
-			baseURL+SyncServiceGetClaimStatusProcedure,
-			connect.WithSchema(syncServiceMethods.ByName("GetClaimStatus")),
-			connect.WithClientOptions(opts...),
-		),
-		deleteClaim: connect.NewClient[v1.DeleteClaimRequest, v1.DeleteClaimResponse](
-			httpClient,
-			baseURL+SyncServiceDeleteClaimProcedure,
-			connect.WithSchema(syncServiceMethods.ByName("DeleteClaim")),
+			baseURL+SyncServiceSyncContentProcedure,
+			connect.WithSchema(syncServiceMethods.ByName("SyncContent")),
 			connect.WithClientOptions(opts...),
 		),
 		getSourceMods: connect.NewClient[v1.GetSourceModsRequest, v1.GetSourceModsResponse](
@@ -248,9 +218,7 @@ func NewSyncServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 type syncServiceClient struct {
 	registerSource   *connect.Client[v1.RegisterSourceRequest, v1.RegisterSourceResponse]
 	deregisterSource *connect.Client[v1.DeregisterSourceRequest, v1.DeregisterSourceResponse]
-	claim            *connect.Client[v1.ClaimRequest, v1.ClaimResponse]
-	getClaimStatus   *connect.Client[v1.GetClaimStatusRequest, v1.GetClaimStatusResponse]
-	deleteClaim      *connect.Client[v1.DeleteClaimRequest, v1.DeleteClaimResponse]
+	syncContent      *connect.Client[v1.SyncContentRequest, v1.SyncContentResponse]
 	getSourceMods    *connect.Client[v1.GetSourceModsRequest, v1.GetSourceModsResponse]
 	refreshSource    *connect.Client[v1.RefreshSourceRequest, v1.RefreshSourceResponse]
 	listSyncedMods   *connect.Client[v1.ListSyncedModsRequest, v1.ListSyncedModsResponse]
@@ -270,19 +238,9 @@ func (c *syncServiceClient) DeregisterSource(ctx context.Context, req *connect.R
 	return c.deregisterSource.CallUnary(ctx, req)
 }
 
-// Claim calls sync.v1.SyncService.Claim.
-func (c *syncServiceClient) Claim(ctx context.Context, req *connect.Request[v1.ClaimRequest]) (*connect.Response[v1.ClaimResponse], error) {
-	return c.claim.CallUnary(ctx, req)
-}
-
-// GetClaimStatus calls sync.v1.SyncService.GetClaimStatus.
-func (c *syncServiceClient) GetClaimStatus(ctx context.Context, req *connect.Request[v1.GetClaimStatusRequest]) (*connect.Response[v1.GetClaimStatusResponse], error) {
-	return c.getClaimStatus.CallUnary(ctx, req)
-}
-
-// DeleteClaim calls sync.v1.SyncService.DeleteClaim.
-func (c *syncServiceClient) DeleteClaim(ctx context.Context, req *connect.Request[v1.DeleteClaimRequest]) (*connect.Response[v1.DeleteClaimResponse], error) {
-	return c.deleteClaim.CallUnary(ctx, req)
+// SyncContent calls sync.v1.SyncService.SyncContent.
+func (c *syncServiceClient) SyncContent(ctx context.Context, req *connect.Request[v1.SyncContentRequest]) (*connect.Response[v1.SyncContentResponse], error) {
+	return c.syncContent.CallUnary(ctx, req)
 }
 
 // GetSourceMods calls sync.v1.SyncService.GetSourceMods.
@@ -335,31 +293,18 @@ type SyncServiceHandler interface {
 	// using it. Only removes this source_id's membership; a mod still
 	// referenced by another source keeps syncing.
 	DeregisterSource(context.Context, *connect.Request[v1.DeregisterSourceRequest]) (*connect.Response[v1.DeregisterSourceResponse], error)
-	// Start a background job that syncs every mod/depot currently desired
-	// (the union of every registered source's resolved membership, plus
-	// server/CDLC depots) and issues a claim of the result: a read-only
-	// btrfs snapshot of the golden content tree (crates/steam-sync's own
-	// doc has the full rationale for snapshot over the old cp
-	// --reflink=always -- an atomic, whole-tree, single-ioctl operation
-	// instead of walking and reflinking file-by-file). Returns immediately
-	// with a job ID -- this does not block for the sync duration, which can
-	// range from instant (warm cache) to minutes (cold).
-	Claim(context.Context, *connect.Request[v1.ClaimRequest]) (*connect.Response[v1.ClaimResponse], error)
-	// Poll a job started by Claim.
-	GetClaimStatus(context.Context, *connect.Request[v1.GetClaimStatusRequest]) (*connect.Response[v1.GetClaimStatusResponse], error)
-	// Releases a claim -- `btrfs subvolume delete` on its directory.
-	// Deliberately caller-triggered (the launcher calls this itself right
-	// before it exits, whatever the reason -- game process exited, crashed,
-	// or SIGTERM from Kubernetes during a rollover) rather than sync-daemon
-	// tracking claim ownership/lifecycle itself: sync-daemon's own Claim RPC
-	// is completely anonymous (no server identity in ClaimRequest at all),
-	// and keeping it that way -- letting whoever actually held the claim be
-	// the one to say when they're done with it -- avoids needing a whole
-	// separate ownership-tracking/GC subsystem here. A claim that's never
-	// released this way (e.g. the launcher is SIGKILLed before it can call
-	// this) still leaks, same as every claim did before this RPC existed at
-	// all -- this fixes the common case, not every case.
-	DeleteClaim(context.Context, *connect.Request[v1.DeleteClaimRequest]) (*connect.Response[v1.DeleteClaimResponse], error)
+	// Downloads server/CDLC depots plus every currently-registered
+	// source's resolved mods into the shared golden content tree --
+	// fire-and-forget (returns immediately, doesn't wait for the sync to
+	// finish, which can range from instant (warm cache) to minutes
+	// (cold)). No completion signal is returned at all -- the caller's
+	// real interest is "make sure this eventually happens", not knowing
+	// exactly when; GetSyncStats/ListSyncedMods reflect the result once
+	// it's done. Every ArmaServer's own content comes from a read-only
+	// btrfs snapshot of this tree instead (services/magpie-csi's
+	// NodeStageVolume, mode: snapshot -- not this service's concern at
+	// all anymore).
+	SyncContent(context.Context, *connect.Request[v1.SyncContentRequest]) (*connect.Response[v1.SyncContentResponse], error)
 	// Read a previously-registered source's current resolved mod list
 	// without re-registering it (no candidate IDs needed, no Steam calls --
 	// a plain read of what RegisterSource/the background poller last
@@ -428,22 +373,10 @@ func NewSyncServiceHandler(svc SyncServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(syncServiceMethods.ByName("DeregisterSource")),
 		connect.WithHandlerOptions(opts...),
 	)
-	syncServiceClaimHandler := connect.NewUnaryHandler(
-		SyncServiceClaimProcedure,
-		svc.Claim,
-		connect.WithSchema(syncServiceMethods.ByName("Claim")),
-		connect.WithHandlerOptions(opts...),
-	)
-	syncServiceGetClaimStatusHandler := connect.NewUnaryHandler(
-		SyncServiceGetClaimStatusProcedure,
-		svc.GetClaimStatus,
-		connect.WithSchema(syncServiceMethods.ByName("GetClaimStatus")),
-		connect.WithHandlerOptions(opts...),
-	)
-	syncServiceDeleteClaimHandler := connect.NewUnaryHandler(
-		SyncServiceDeleteClaimProcedure,
-		svc.DeleteClaim,
-		connect.WithSchema(syncServiceMethods.ByName("DeleteClaim")),
+	syncServiceSyncContentHandler := connect.NewUnaryHandler(
+		SyncServiceSyncContentProcedure,
+		svc.SyncContent,
+		connect.WithSchema(syncServiceMethods.ByName("SyncContent")),
 		connect.WithHandlerOptions(opts...),
 	)
 	syncServiceGetSourceModsHandler := connect.NewUnaryHandler(
@@ -494,12 +427,8 @@ func NewSyncServiceHandler(svc SyncServiceHandler, opts ...connect.HandlerOption
 			syncServiceRegisterSourceHandler.ServeHTTP(w, r)
 		case SyncServiceDeregisterSourceProcedure:
 			syncServiceDeregisterSourceHandler.ServeHTTP(w, r)
-		case SyncServiceClaimProcedure:
-			syncServiceClaimHandler.ServeHTTP(w, r)
-		case SyncServiceGetClaimStatusProcedure:
-			syncServiceGetClaimStatusHandler.ServeHTTP(w, r)
-		case SyncServiceDeleteClaimProcedure:
-			syncServiceDeleteClaimHandler.ServeHTTP(w, r)
+		case SyncServiceSyncContentProcedure:
+			syncServiceSyncContentHandler.ServeHTTP(w, r)
 		case SyncServiceGetSourceModsProcedure:
 			syncServiceGetSourceModsHandler.ServeHTTP(w, r)
 		case SyncServiceRefreshSourceProcedure:
@@ -531,16 +460,8 @@ func (UnimplementedSyncServiceHandler) DeregisterSource(context.Context, *connec
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sync.v1.SyncService.DeregisterSource is not implemented"))
 }
 
-func (UnimplementedSyncServiceHandler) Claim(context.Context, *connect.Request[v1.ClaimRequest]) (*connect.Response[v1.ClaimResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sync.v1.SyncService.Claim is not implemented"))
-}
-
-func (UnimplementedSyncServiceHandler) GetClaimStatus(context.Context, *connect.Request[v1.GetClaimStatusRequest]) (*connect.Response[v1.GetClaimStatusResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sync.v1.SyncService.GetClaimStatus is not implemented"))
-}
-
-func (UnimplementedSyncServiceHandler) DeleteClaim(context.Context, *connect.Request[v1.DeleteClaimRequest]) (*connect.Response[v1.DeleteClaimResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sync.v1.SyncService.DeleteClaim is not implemented"))
+func (UnimplementedSyncServiceHandler) SyncContent(context.Context, *connect.Request[v1.SyncContentRequest]) (*connect.Response[v1.SyncContentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sync.v1.SyncService.SyncContent is not implemented"))
 }
 
 func (UnimplementedSyncServiceHandler) GetSourceMods(context.Context, *connect.Request[v1.GetSourceModsRequest]) (*connect.Response[v1.GetSourceModsResponse], error) {

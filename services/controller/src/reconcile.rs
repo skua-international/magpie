@@ -1,13 +1,24 @@
 //! `ArmaServer` reconciler. Servers are deployment-like: `spec.desired_state`
 //! (`Running`/`Stopped`) is the "should this be up" knob, and `status.phase`
 //! tracks how far the reconciler has gotten toward that --
-//! `Stopped -> Pending -> Claiming -> Running`, with `Failed` on error.
-//! Each `ArmaServer` backs a Kubernetes `Deployment` (not a bare `Pod`) with
+//! `Stopped -> Pending -> Running`, with `Failed` on error. Each
+//! `ArmaServer` backs a Kubernetes `Deployment` (not a bare `Pod`) with
 //! `strategy: Recreate` -- since it's `hostNetwork: true`, two instances can
 //! never coexist on the same port anyway, and using a Deployment means a
 //! content/mod change picked up by `UpdateServer`/`StartServer` rolls the
 //! server onto a new Pod natively (new PodTemplateSpec -> new ReplicaSet)
 //! instead of the reconciler having to delete/recreate a bare Pod by hand.
+//!
+//! `Pending` used to mean "sync-daemon Claim job in flight, poll until
+//! Done" (a `Claiming` phase in between). That's gone: every launcher
+//! Pod's own content now comes from a CSI inline ephemeral volume (see
+//! `ensure_deployment`'s own doc) that provisions itself -- a fresh
+//! read-only btrfs snapshot of sync-daemon's golden tree, taken by
+//! services/magpie-csi's `NodePublishVolume` the moment the Pod is
+//! actually scheduled -- so there's nothing left for this reconciler to
+//! create or poll beforehand at all. `Pending` now just means "resolve
+//! mods, render config, apply the Deployment", synchronously, in one
+//! reconcile pass.
 //!
 //! Uses a finalizer so the Deployment is cleaned up before an `ArmaServer`
 //! is actually deleted -- deliberately does *not* call sync-daemon's
@@ -23,9 +34,8 @@ use crd::{ArmaServer, ArmaServerPhase, ArmaServerStatus, DesiredState, ModSource
 use futures::StreamExt;
 use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec};
 use k8s_openapi::api::core::v1::{
-    Container, EnvVar, EnvVarSource, HostPathVolumeSource, LocalObjectReference,
-    PersistentVolumeClaimVolumeSource, PodSecurityContext, PodSpec, PodTemplateSpec,
-    SecretKeySelector, Volume, VolumeMount,
+    CSIVolumeSource, Container, EnvVar, EnvVarSource, HostPathVolumeSource, LocalObjectReference,
+    PodSecurityContext, PodSpec, PodTemplateSpec, SecretKeySelector, Volume, VolumeMount,
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
 use kube::api::{Api, DeleteParams, Patch, PatchParams};
@@ -34,8 +44,9 @@ use kube::runtime::controller::Action;
 use kube::runtime::finalizer::{Event as FinalizerEvent, finalizer};
 use kube::runtime::watcher;
 use kube::{Client, Resource, ResourceExt};
-use sync_client::{ClaimStatus, SyncClient};
+use sync_client::SyncClient;
 use tracing::{error, info, warn};
+use uuid::Uuid;
 
 use crate::config::Config;
 
@@ -154,69 +165,18 @@ async fn apply(obj: &ArmaServer, ctx: &Ctx) -> anyhow::Result<Action> {
         }
 
         ArmaServerPhase::Pending => {
-            let job_id = ctx.sync_client.claim().await?;
-            set_status(
-                ctx,
-                &name,
-                ArmaServerStatus {
-                    phase: ArmaServerPhase::Claiming,
-                    claim_path: job_id,
+            let new_phase = match run_pending(ctx, obj).await {
+                Ok(()) => ArmaServerStatus {
+                    phase: ArmaServerPhase::Running,
                     message: String::new(),
                 },
-            )
-            .await?;
-            Ok(Action::requeue(FAST_REQUEUE))
-        }
-        ArmaServerPhase::Claiming => {
-            // `status.claim_path` is repurposed to hold the in-flight job ID
-            // while claiming -- overwritten with the real claim path once
-            // `Done`, so it never leaks the job ID past this phase. The
-            // Deployment (if one already exists, from a prior Running
-            // period) is left untouched until we have a real claim path to
-            // roll it onto -- a resync-in-progress never tears down a
-            // currently-serving instance speculatively.
-            let job_id = status.claim_path.clone();
-            match ctx.sync_client.claim_status(&job_id).await? {
-                ClaimStatus::Running => Ok(Action::requeue(FAST_REQUEUE)),
-                ClaimStatus::Failed { error } => {
-                    set_status(
-                        ctx,
-                        &name,
-                        ArmaServerStatus {
-                            phase: ArmaServerPhase::Failed,
-                            claim_path: String::new(),
-                            message: error,
-                        },
-                    )
-                    .await?;
-                    Ok(Action::requeue(SLOW_REQUEUE))
-                }
-                ClaimStatus::Done { claim_path } => {
-                    let mod_paths = resolve_mod_paths(ctx, obj).await?;
-                    let extra_env = crate::arma_config::render_and_write(
-                        &ctx.client,
-                        &ctx.pool,
-                        &ctx.cfg.namespace,
-                        &ctx.cfg.user_secrets_namespace,
-                        &ctx.cfg.server_root_base,
-                        &ctx.cfg.arma_config_baseline,
-                        obj,
-                    )
-                    .await?;
-                    ensure_deployment(ctx, obj, &claim_path, &mod_paths, extra_env).await?;
-                    set_status(
-                        ctx,
-                        &name,
-                        ArmaServerStatus {
-                            phase: ArmaServerPhase::Running,
-                            claim_path,
-                            message: String::new(),
-                        },
-                    )
-                    .await?;
-                    Ok(Action::requeue(SLOW_REQUEUE))
-                }
-            }
+                Err(e) => ArmaServerStatus {
+                    phase: ArmaServerPhase::Failed,
+                    message: format!("{e:#}"),
+                },
+            };
+            set_status(ctx, &name, new_phase).await?;
+            Ok(Action::requeue(SLOW_REQUEUE))
         }
         ArmaServerPhase::Running => {
             // Steady state -- nothing to do until UpdateServer/StartServer
@@ -241,6 +201,26 @@ async fn apply(obj: &ArmaServer, ctx: &Ctx) -> anyhow::Result<Action> {
             Ok(Action::requeue(FAST_REQUEUE))
         }
     }
+}
+
+/// The actual `Pending` work: resolve this server's `-mod=` paths, render
+/// its config, and apply the Deployment. Split out from `apply`'s own
+/// `Pending` arm purely so that arm can catch any failure in one place
+/// and report it as `Failed` with a message, instead of the whole
+/// three-step sequence needing its own nested error handling.
+async fn run_pending(ctx: &Ctx, obj: &ArmaServer) -> anyhow::Result<()> {
+    let mod_paths = resolve_mod_paths(ctx, obj).await?;
+    let extra_env = crate::arma_config::render_and_write(
+        &ctx.client,
+        &ctx.pool,
+        &ctx.cfg.namespace,
+        &ctx.cfg.user_secrets_namespace,
+        &ctx.cfg.server_root_base,
+        &ctx.cfg.arma_config_baseline,
+        obj,
+    )
+    .await?;
+    ensure_deployment(ctx, obj, &mod_paths, extra_env).await
 }
 
 async fn cleanup(obj: &ArmaServer, ctx: &Ctx) -> anyhow::Result<Action> {
@@ -296,10 +276,15 @@ async fn resolve_mod_paths(ctx: &Ctx, obj: &ArmaServer) -> anyhow::Result<Vec<St
     Ok(paths)
 }
 
+/// Fixed in-container mount point for the CSI inline ephemeral content
+/// volume every launcher Pod gets (see this function's own doc) -- no
+/// longer a per-launch dynamic path (there's no job/claim ID to embed
+/// in it anymore), so this can just be a constant.
+const CLAIM_PATH: &str = "/arma3/content";
+
 async fn ensure_deployment(
     ctx: &Ctx,
     obj: &ArmaServer,
-    claim_path: &str,
     mod_paths: &[String],
     extra_env: Vec<(String, String)>,
 ) -> anyhow::Result<()> {
@@ -309,16 +294,7 @@ async fn ensure_deployment(
     let mut env = vec![
         EnvVar {
             name: "CLAIM_PATH".into(),
-            value: Some(claim_path.to_string()),
-            ..Default::default()
-        },
-        // So the launcher can release its own claim on exit (see
-        // services/launcher/src/launch.rs's release_claim) -- this is
-        // the one env var the launcher container needs that isn't about
-        // its own launch args.
-        EnvVar {
-            name: "SYNC_DAEMON_URL".into(),
-            value: Some(ctx.cfg.sync_daemon_url.clone()),
+            value: Some(CLAIM_PATH.to_string()),
             ..Default::default()
         },
         EnvVar {
@@ -418,16 +394,29 @@ async fn ensure_deployment(
     // themselves with (see charts/magpie/templates/*-deployment.yaml),
     // so it doesn't depend on prometheus-operator's CRDs existing in the
     // cluster just because an operator wants their own exporter scraped.
-    let pod_annotations = obj.spec.metrics.as_ref().map(|m| {
-        std::collections::BTreeMap::from([
-            ("prometheus.io/scrape".to_string(), "true".to_string()),
-            ("prometheus.io/port".to_string(), m.port.to_string()),
-            (
-                "prometheus.io/path".to_string(),
-                m.path_or_default().to_string(),
-            ),
-        ])
-    });
+    let mut pod_annotations = std::collections::BTreeMap::new();
+    if let Some(m) = &obj.spec.metrics {
+        pod_annotations.insert("prometheus.io/scrape".to_string(), "true".to_string());
+        pod_annotations.insert("prometheus.io/port".to_string(), m.port.to_string());
+        pod_annotations.insert(
+            "prometheus.io/path".to_string(),
+            m.path_or_default().to_string(),
+        );
+    }
+    // A fresh value on every call (every Pending transition -- see
+    // run_pending) so the PodTemplateSpec is never byte-identical to
+    // its predecessor even when nothing else changed (same mods, same
+    // env). Without this, Kubernetes has no reason to actually replace
+    // the Pod on a plain resync (StartServer resetting phase back to
+    // Pending with an otherwise-unchanged spec), and the CSI inline
+    // ephemeral content volume (see this Pod spec's own "content"
+    // volume below) only ever provisions a fresh snapshot when a new
+    // Pod actually gets scheduled -- an unchanged Pod means stale
+    // content, defeating the entire point of a resync.
+    pod_annotations.insert(
+        "magpie.skua.io/content-generation".to_string(),
+        Uuid::now_v7().to_string(),
+    );
 
     let deployment = Deployment {
         metadata: ObjectMeta {
@@ -448,8 +437,9 @@ async fn ensure_deployment(
             // hostNetwork Pods can't run two-at-a-time on the same port on
             // the same node anyway (this project's single-node k3s scope
             // makes that doubly true) -- Recreate guarantees the old Pod is
-            // fully torn down before the new one (new claim path/mod list)
-            // starts, rather than RollingUpdate's default overlap.
+            // fully torn down before the new one (new content snapshot/
+            // mod list) starts, rather than RollingUpdate's default
+            // overlap.
             strategy: Some(k8s_openapi::api::apps::v1::DeploymentStrategy {
                 type_: Some("Recreate".into()),
                 rolling_update: None,
@@ -457,7 +447,7 @@ async fn ensure_deployment(
             template: PodTemplateSpec {
                 metadata: Some(ObjectMeta {
                     labels: Some(labels),
-                    annotations: pod_annotations,
+                    annotations: Some(pod_annotations),
                     ..Default::default()
                 }),
                 spec: Some(PodSpec {
@@ -494,10 +484,15 @@ async fn ensure_deployment(
                         env: Some(env),
                         volume_mounts: Some(vec![
                             VolumeMount {
-                                name: "claims".into(),
-                                mount_path: ctx.cfg.claims_root.clone(),
-                                sub_path: Some("claims".into()),
-                                read_only: Some(true),
+                                name: "content".into(),
+                                mount_path: CLAIM_PATH.into(),
+                                // Read-write, not read-only: nothing
+                                // arma3server might write in here (temp
+                                // files, locks, whatever) needs to
+                                // persist past this Pod's own lifetime
+                                // anyway -- it's a fresh CoW snapshot
+                                // either way -- so there's no reason to
+                                // risk it hitting an unexpected EROFS.
                                 ..Default::default()
                             },
                             VolumeMount {
@@ -526,11 +521,20 @@ async fn ensure_deployment(
                         ..Default::default()
                     }],
                     volumes: Some(vec![
+                        // CSI inline ephemeral volume -- no PVC/PV object
+                        // at all (see services/magpie-csi's
+                        // NodePublishVolume doc). Kubelet calls
+                        // NodePublishVolume on this directly the moment
+                        // this Pod is scheduled, which is where the
+                        // fresh btrfs snapshot of sync-daemon's golden
+                        // content tree actually gets taken -- nothing
+                        // before that point (not CreateVolume, not this
+                        // reconciler) provisions anything.
                         Volume {
-                            name: "claims".into(),
-                            persistent_volume_claim: Some(PersistentVolumeClaimVolumeSource {
-                                claim_name: ctx.cfg.reflink_pvc_name.clone(),
-                                read_only: Some(true),
+                            name: "content".into(),
+                            csi: Some(CSIVolumeSource {
+                                driver: "csi.magpie.skua.io".into(),
+                                ..Default::default()
                             }),
                             ..Default::default()
                         },

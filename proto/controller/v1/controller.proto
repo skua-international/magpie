@@ -81,7 +81,8 @@ enum ServerPhase {
   // desired_state is STOPPED and no instance is running.
   SERVER_PHASE_STOPPED = 1;
   SERVER_PHASE_PENDING = 2;
-  SERVER_PHASE_CLAIMING = 3;
+  reserved 3;
+  reserved "SERVER_PHASE_CLAIMING";
   SERVER_PHASE_RUNNING = 4;
   SERVER_PHASE_FAILED = 5;
 }
@@ -98,11 +99,10 @@ message ServerInfo {
   uint32 port = 3;
   repeated string mod_source_ids = 4;
   ServerPhase phase = 5;
-  string claim_path = 6;
   string message = 7;
   DesiredState desired_state = 8;
-  reserved 9, 10;
-  reserved "arma_config", "network_config";
+  reserved 6, 9, 10;
+  reserved "claim_path", "content_pvc", "arma_config", "network_config";
 }
 
 message ListServersRequest {}

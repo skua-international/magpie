@@ -1,0 +1,18 @@
+# The one golden, continuously-synced content tree -- sync-daemon writes
+# here directly. Every ArmaServer's own content instead comes from a CSI
+# inline ephemeral volume (no PVC/StorageClass at all -- see
+# services/controller/src/reconcile.rs's launcher Pod spec), a read-only
+# btrfs snapshot of this one taken on demand by services/magpie-csi.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "magpie.fullname" . }}-golden-content
+  namespace: {{ include "magpie.namespace" . }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: magpie-golden-content
+  resources:
+    requests:
+      storage: {{ .Values.reflinkStorage.sizeGiB }}Gi

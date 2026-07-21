@@ -24,8 +24,23 @@ breaking:
   # files as a selectable ModSource let the create-server picker store
   # its synthetic id in mod_source_ids, which the controller then tried
   # to fetch as a real CR and 404'd on. Never shipped in a real release;
-  # nothing depends on it.
+  # nothing depends on it. Also covers SyncModSourceResponse.job_id's
+  # removal (registry/v1), same PVC-per-ArmaServer rework as sync/v1
+  # below -- job_id was already vestigial (see its own doc before
+  # removal: "no RPC currently exposes polling it from this side").
+  #
+  # sync/v1: Claim/GetClaimStatus/DeleteClaim (+ ClaimRequest/
+  # ClaimResponse/GetClaimStatusRequest/GetClaimStatusResponse/
+  # ClaimJobState/DeleteClaimRequest/DeleteClaimResponse) removed
+  # outright -- claims stop being a sync-daemon-owned RPC lifecycle
+  # (job polling, launcher-triggered release-on-exit) and become plain
+  # per-ArmaServer PVCs backed by a CSI-driver-owned btrfs snapshot
+  # instead (services/magpie-csi's NodeStageVolume/NodeUnstageVolume,
+  # mode: snapshot). Replaced by the much smaller fire-and-forget
+  # SyncContent RPC. Deliberate, already-shipped-as-of-this-change
+  # removal, not something worth chasing compatibility for.
   ignore:
     - volume
     - controller
     - registry
+    - sync
