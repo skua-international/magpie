@@ -25,6 +25,7 @@ RUN apt-get update \
         libstdc++6 \
         libssl3 \
         libc6 \
+        net-tools \
     && \
     apt-get remove --purge -y \
     && \
