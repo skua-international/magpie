@@ -83,6 +83,15 @@ ingress:
   # IP via /etc/hosts (or real DNS, if you have it) on whatever machine
   # needs to reach them.
   baseDomain: magpie.local
+  tls:
+    # Off by default -- the local magpie.local flow above has no real
+    # cert to get anyway. A real public deployment (a cert-manager
+    # ClusterIssuer already installed cluster-wide, e.g. by a sibling
+    # infra chart) sets this true and names that issuer; each Ingress
+    # above then gets the cert-manager.io/cluster-issuer annotation and
+    # its own TLS secret.
+    enabled: false
+    clusterIssuer: letsencrypt-prod
 
 # sync-daemon's golden content tree lives on a PersistentVolumeClaim
 # against the magpie-golden-content StorageClass (see

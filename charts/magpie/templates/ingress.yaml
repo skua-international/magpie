@@ -9,8 +9,18 @@ metadata:
   labels:
     {{- include "magpie.labels" $ | nindent 4 }}
     app.kubernetes.io/component: {{ $svc }}
+  {{- if $.Values.ingress.tls.enabled }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ $.Values.ingress.tls.clusterIssuer | quote }}
+  {{- end }}
 spec:
   ingressClassName: {{ $.Values.ingress.className }}
+  {{- if $.Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ printf "%s.%s" $svc $.Values.ingress.baseDomain }}
+      secretName: {{ include "magpie.fullname" $ }}-{{ $svc }}-tls
+  {{- end }}
   rules:
     - host: {{ printf "%s.%s" $svc $.Values.ingress.baseDomain }}
       http:
