@@ -34,8 +34,9 @@ use crd::{ArmaServer, ArmaServerPhase, ArmaServerStatus, DesiredState, ModSource
 use futures::StreamExt;
 use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec};
 use k8s_openapi::api::core::v1::{
-    CSIVolumeSource, Container, EnvVar, EnvVarSource, HostPathVolumeSource, LocalObjectReference,
-    PodSecurityContext, PodSpec, PodTemplateSpec, SecretKeySelector, Volume, VolumeMount,
+    Capabilities, CSIVolumeSource, Container, EnvVar, EnvVarSource, HostPathVolumeSource,
+    LocalObjectReference, PodSecurityContext, PodSpec, PodTemplateSpec, SecretKeySelector,
+    SecurityContext, Volume, VolumeMount,
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
 use kube::api::{Api, DeleteParams, Patch, PatchParams};
@@ -61,18 +62,6 @@ const SLOW_REQUEUE: Duration = Duration::from_secs(300);
 // controller looked at it again.
 const ERROR_REQUEUE: Duration = Duration::from_secs(10);
 
-/// The fixed UID/GID every distroless "nonroot" image in this chart runs
-/// as (see cli/magpie/internal/deploy/bootstrap.go's own
-/// distrolessNonrootID) -- the launcher's own image isn't distroless
-/// (arma3server needs a real userland), so unlike those it has no `USER`
-/// baked in and needs this set explicitly. Matters in practice: the
-/// controller (already running as this UID) is what creates
-/// server-root's config files in the first place, so a launcher running
-/// as this same UID can actually read/write them -- confirmed live that
-/// running the launcher as root instead left it able to read everything
-/// (root ignores DAC checks) but out of step with everything else this
-/// UID convention is meant to keep consistent.
-const LAUNCHER_UID: i64 = 65532;
 
 /// `kube-runtime`'s `finalizer`/`Controller::run` both require their error
 /// type to implement `std::error::Error`, which `anyhow::Error` deliberately
@@ -452,13 +441,27 @@ async fn ensure_deployment(
                 }),
                 spec: Some(PodSpec {
                     host_network: Some(true),
-                    // Nothing here needs root -- see LAUNCHER_UID's own
-                    // doc for why this specific UID and not just "some
-                    // non-root user".
+                    // Non-root here too, like every other Pod this chart
+                    // creates -- what looked like a genuine "needs UID 0"
+                    // requirement (three isolated tests: plain non-root
+                    // crashes, non-root + CAP_SYS_NICE crashes
+                    // identically, non-root + every capability root has
+                    // still crashes identically) turned out to be a
+                    // single missing /etc/passwd entry for the fixed
+                    // nonroot UID: confirmed live that SteamAPI_Init()
+                    // crashes outright (not gracefully) when getpwuid()
+                    // has nothing to return for the running UID, and
+                    // that a real useradd-created entry for that UID
+                    // fixes it with zero other changes. The launcher
+                    // image moved to distroless:nonroot specifically
+                    // because it bakes in exactly that passwd entry for
+                    // its own nonroot UID for free -- confirmed live
+                    // (this securityContext, ALL capabilities dropped)
+                    // against the real content volume: arma3server_x64
+                    // starts, loads mods, and binds its game port
+                    // exactly as it did running as root.
                     security_context: Some(PodSecurityContext {
                         run_as_non_root: Some(true),
-                        run_as_user: Some(LAUNCHER_UID),
-                        run_as_group: Some(LAUNCHER_UID),
                         ..Default::default()
                     }),
                     image_pull_secrets: (!ctx.cfg.image_pull_secrets.is_empty()).then(|| {
@@ -471,6 +474,14 @@ async fn ensure_deployment(
                     containers: vec![Container {
                         name: "launcher".into(),
                         image: Some(ctx.cfg.launcher_image.clone()),
+                        security_context: Some(SecurityContext {
+                            allow_privilege_escalation: Some(false),
+                            capabilities: Some(Capabilities {
+                                drop: Some(vec!["ALL".into()]),
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        }),
                         // Explicit, not left to Kubernetes' default: a
                         // `:latest`-tagged image (this project's own
                         // convention -- see LAUNCHER_IMAGE) defaults to
