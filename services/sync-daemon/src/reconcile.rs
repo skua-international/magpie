@@ -136,14 +136,20 @@ async fn resolve(obj: &ModSource, ctx: &Ctx) -> anyhow::Result<Action> {
                 .filter_map(|id| sizes.iter().find(|m| m.mod_id == *id).map(|m| m.size_bytes))
                 .sum();
 
-            // A single-candidate SteamUrl that resolved to exactly itself is
-            // a plain mod; anything else (collection expansion) came from a
-            // collection. HtmlUrl/HtmlContent are always presets.
+            // A SteamUrl's kind is "collection" exactly when Steam itself
+            // reports the candidate's own file_type as a collection --
+            // *not* whether the resolved set changed shape relative to
+            // candidate_ids (confirmed live: a plain mod with required
+            // items, e.g. ACE3 depending on CBA_A3, also grows the
+            // resolved set via `children`, without the candidate itself
+            // being a collection at all -- see
+            // steam::ResolveOutcome::candidate_is_collection's own doc).
+            // HtmlUrl/HtmlContent are always presets.
             let kind = kind_hint
-                .unwrap_or(if resolved_mod_ids == candidate_ids {
-                    "mod"
-                } else {
+                .unwrap_or(if outcome.root_is_collection == Some(true) {
                     "collection"
+                } else {
+                    "mod"
                 })
                 .to_string();
 

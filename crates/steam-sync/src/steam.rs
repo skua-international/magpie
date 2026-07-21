@@ -1785,6 +1785,8 @@ pub async fn resolve_source_ids(
     // that ever sees an original candidate ID.
     let mut candidate_titles: std::collections::HashMap<u64, String> =
         std::collections::HashMap::new();
+    let mut candidate_is_collection: std::collections::HashMap<u64, bool> =
+        std::collections::HashMap::new();
     let mut frontier: Vec<u64> = candidate_ids.to_vec();
     let mut depth = 0;
 
@@ -1841,10 +1843,11 @@ pub async fn resolve_source_ids(
                 continue;
             }
             let title = details.title.clone().unwrap_or_default();
+            let file_type = details.file_type.unwrap_or(0);
             if depth == 1 {
                 candidate_titles.insert(id, title.clone());
+                candidate_is_collection.insert(id, file_type == WORKSHOP_FILE_TYPE_COLLECTION);
             }
-            let file_type = details.file_type.unwrap_or(0);
             if file_type != WORKSHOP_FILE_TYPE_COLLECTION {
                 // 0 (not just missing) for a collection's own entry, which
                 // never reaches here anyway -- only genuinely unset for a
@@ -1872,6 +1875,7 @@ pub async fn resolve_source_ids(
             })
             .collect(),
         candidate_titles,
+        candidate_is_collection,
     })
 }
 
@@ -1886,4 +1890,14 @@ pub struct ResolvedMod {
 pub struct ResolveOutcome {
     pub mods: Vec<ResolvedMod>,
     pub candidate_titles: std::collections::HashMap<u64, String>,
+    /// Which of the originally-requested `candidate_ids` are themselves a
+    /// *pure* Steam Workshop collection (`file_type ==
+    /// WORKSHOP_FILE_TYPE_COLLECTION`), keyed by id -- only ever populated
+    /// from the first request round (depth 1), same as `candidate_titles`.
+    /// The real signal for "is this a collection", as opposed to comparing
+    /// `mods` against `candidate_ids`: that comparison also changes shape
+    /// for a plain mod with required items (e.g. ACE3 depending on
+    /// CBA_A3), which populates `children` (and so changes the resolved
+    /// set) without the candidate itself being a collection at all.
+    pub candidate_is_collection: std::collections::HashMap<u64, bool>,
 }

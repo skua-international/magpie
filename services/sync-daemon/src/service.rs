@@ -122,18 +122,22 @@ impl Shared {
             self.sync_state.record_mod_title(m.mod_id, &m.title);
         }
 
-        let root_title = match candidate_ids {
-            [single] => outcome
-                .candidate_titles
-                .get(single)
-                .cloned()
-                .unwrap_or_default(),
-            _ => String::new(),
+        let (root_title, root_is_collection) = match candidate_ids {
+            [single] => (
+                outcome
+                    .candidate_titles
+                    .get(single)
+                    .cloned()
+                    .unwrap_or_default(),
+                outcome.candidate_is_collection.get(single).copied(),
+            ),
+            _ => (String::new(), None),
         };
 
         Ok(RegisterSourceOutcome {
             mods: outcome.mods,
             root_title,
+            root_is_collection,
         })
     }
 
@@ -222,6 +226,13 @@ impl Shared {
 pub struct RegisterSourceOutcome {
     pub mods: Vec<ResolvedMod>,
     pub root_title: String,
+    /// True when `candidate_ids` was a single id and that id is itself a
+    /// pure Steam Workshop collection -- `None` for a multi-candidate
+    /// source (e.g. a preset), where "is this one thing a collection"
+    /// doesn't apply. See `steam::ResolveOutcome::candidate_is_collection`
+    /// for why this can't just be inferred from whether `mods` changed
+    /// shape relative to `candidate_ids`.
+    pub root_is_collection: Option<bool>,
 }
 
 pub struct SyncServiceImpl {
