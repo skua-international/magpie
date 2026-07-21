@@ -1766,12 +1766,13 @@ const WORKSHOP_FILE_TYPE_COLLECTION: u32 = 2;
 /// WORKSHOP_FILE_TYPE_COLLECTION`, not by whether `children` is
 /// non-empty -- confirmed live: a plain Mod with required items (e.g. one
 /// depending on CBA_A3) also populates `children` with those
-/// dependencies, and treating that as "this is a collection, don't
-/// include the item itself" silently dropped the mod itself from the
-/// resolved list, keeping only its dependency. Every resolved item's own
-/// children (a collection's members, or a mod's required items) are
-/// still expanded into the next frontier either way -- the only
-/// difference is whether the item itself also gets added to `resolved`.
+/// dependencies. Only a real collection's `children` get expanded into
+/// the next frontier; a plain mod's own `children` (its declared Required
+/// Items) are deliberately left alone -- auto-pulling a mod's
+/// dependencies gave an operator no way to pin a fork/specific version of
+/// one instead (e.g. a custom CBA_A3 build) for anything that declares it
+/// as required. A dependency an operator actually wants synced has to be
+/// registered as its own separate mod source, same as any other mod.
 pub async fn resolve_source_ids(
     conn: &mut CmConnection,
     candidate_ids: &[u64],
@@ -1848,18 +1849,28 @@ pub async fn resolve_source_ids(
                 candidate_titles.insert(id, title.clone());
                 candidate_is_collection.insert(id, file_type == WORKSHOP_FILE_TYPE_COLLECTION);
             }
-            if file_type != WORKSHOP_FILE_TYPE_COLLECTION {
+            if file_type == WORKSHOP_FILE_TYPE_COLLECTION {
+                // Only a real collection's children get expanded --
+                // deliberately not a plain mod's own `children` (Steam
+                // populates that identically for a mod's declared
+                // Required Items, e.g. ACE3 listing CBA_A3). Auto-pulling
+                // those in was silently forcing whatever CBA_A3 build
+                // Steam resolves, with no way for an operator to pin a
+                // fork/specific version instead -- a dependency an
+                // operator actually wants has to be registered as its
+                // own separate mod source now, same as any other mod.
+                for child in details.children {
+                    if let Some(child_id) = child.publishedfileid {
+                        next_frontier.push(child_id);
+                    }
+                }
+            } else {
                 // 0 (not just missing) for a collection's own entry, which
                 // never reaches here anyway -- only genuinely unset for a
                 // handful of legacy items GetDetails doesn't report a size
                 // for at all, treated as "unknown" (0).
                 let file_size = details.file_size.unwrap_or(0);
                 resolved.insert(id, (title, file_size));
-            }
-            for child in details.children {
-                if let Some(child_id) = child.publishedfileid {
-                    next_frontier.push(child_id);
-                }
             }
         }
         frontier = next_frontier;
