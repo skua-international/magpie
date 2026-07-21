@@ -210,8 +210,18 @@ syncDaemon:
     repository: "ghcr.io/skua-international/magpie/sync-daemon"
     tag: ""
   steamAuth:
-    # Anonymous Steam login (no credentials) -- fine for public workshop
-    # content, not for private/unlisted mods or collections.
+    # Anonymous Steam login (no credentials) -- confirmed live: this can
+    # sync already-public workshop mods (not private/unlisted ones), but
+    # can NEVER sync the base game or CDLC depots at all. Steam's
+    # RequestFreeLicense (what makes the free Arma 3 Dedicated Server
+    # depot downloadable without actually owning Arma 3) is explicitly
+    # refused for anonymous sessions ("Not for anonymous users" from
+    # steamcmd's own app_license_request) -- only a real, logged-in
+    # account works for that, and it doesn't need to own Arma 3 either,
+    # just not be anonymous. So: fine for warming/testing workshop mod
+    # syncing in isolation, but a real deployment (anything that needs
+    # to actually launch a server) always needs a real account via
+    # `magpiectl admin refresh-steam-auth`, regardless of this setting.
     anonymous: false
     # There is deliberately no "existing Secret with STEAM_USER/
     # STEAM_PASSWORD" option -- a Steam password should never reach a

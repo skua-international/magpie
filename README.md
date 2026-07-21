@@ -90,6 +90,8 @@ There's no password-based bootstrap Secret at all -- a Steam password should nev
 
 This isn't elevated access — visibility into private/unlisted mods and collections is scoped to whatever that specific Steam account can actually see (its own subscriptions, friends-only shares, etc.), same as browsing the Workshop as that account normally would. Use an account that's actually subscribed to / has visibility into whatever private content the servers need.
 
+`syncDaemon.steamAuth.anonymous: true` exists (skips `refresh-steam-auth` entirely) but can only ever sync already-public workshop mods — Steam refuses the free-license grant that makes the Arma 3 Dedicated Server depot downloadable at all ("Not for anonymous users") for anonymous sessions, confirmed live. A real deployment always needs a real account via `refresh-steam-auth` regardless — that account doesn't need to own Arma 3 itself, just not be anonymous.
+
 ### OAuth2 login (Discord/GitHub/Google)
 
 Steam is the only login method that works out of the box — Discord/GitHub/Google are fully implemented (`services/identity/src/oauth.rs`: generic Authorization Code flow + each provider's own userinfo REST endpoint, uniformly), but each needs its own app registered with that provider (a `client_id`/`client_secret` pair), which this chart deliberately doesn't create or default for you.

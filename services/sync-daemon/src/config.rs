@@ -15,6 +15,15 @@ use anyhow::Result;
 /// out-of-band via `RefreshSteamAuth` (see its own proto doc) and read
 /// back from the session Secret below.
 pub enum SteamAuthConfig {
+    /// Can sync already-public workshop mods, but can never sync the
+    /// base game/CDLC depots at all -- Steam's RequestFreeLicense
+    /// (what makes those downloadable without actually owning Arma 3)
+    /// is refused for anonymous sessions outright, confirmed live via
+    /// steamcmd's own `app_license_request` ("Not for anonymous
+    /// users"). A real deployment always needs a real, non-anonymous
+    /// account (doesn't need to own Arma 3 either) via
+    /// `RefreshSteamAuth`/`magpiectl admin refresh-steam-auth`
+    /// regardless of this setting.
     Anonymous,
     /// Anonymous login isn't configured either -- fine as long as the
     /// session Secret already has a valid refresh token (established via
