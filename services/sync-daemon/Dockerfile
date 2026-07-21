@@ -2,29 +2,24 @@
 # See services/launcher/Dockerfile's own copy of this comment: compilation
 # happens once, natively, in build-images.yml's build-workspace job, not
 # in Docker -- this Dockerfile only packages the already-built binary.
-FROM debian:trixie-slim
-
-# Needs a real userland, not distroless: steam_sync::claim shells out to
-# `btrfs subvolume snapshot`/`delete` (see crates/steam-sync/src/claim.rs)
-# rather than binding the ioctls directly, so the `btrfs` CLI (btrfs-progs)
-# has to actually be present in the image -- it isn't part of any Debian
-# base install.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends --no-install-suggests \
-        ca-certificates \
-        btrfs-progs \
-    && rm -rf /var/lib/apt/lists/*
+#
+# Pure Rust binary, no subprocess/shell use at all any more -- the btrfs
+# subvolume snapshot/delete work per ArmaServer moved entirely into
+# services/magpie-csi's own driver (a CSI inline ephemeral volume, not
+# something this process touches or even knows about), so this can go
+# distroless like everything else now: no shell, no package manager,
+# nothing beyond libc and CA certs (for TLS to Steam's own CDN/CM
+# servers).
+FROM gcr.io/distroless/cc-debian13:nonroot
 
 ENV CONTENT_ROOT=/content
-ENV CLAIMS_ROOT=/claims
 ENV LISTEN_ADDR=0.0.0.0:8080
 ENV POOL_SIZE=4
 
 EXPOSE 8080
 
 VOLUME /content
-VOLUME /claims
 
 COPY --chmod=755 dist/sync-daemon /sync-daemon
 
-CMD ["/sync-daemon"]
+ENTRYPOINT ["/sync-daemon"]

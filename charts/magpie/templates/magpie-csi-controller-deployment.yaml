@@ -62,6 +62,24 @@ spec:
         - name: magpie-csi
           image: {{ include "magpie.image" (dict "root" $ "override" .Values.magpieCsi.image) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # Same image the privileged Node plugin uses (it needs real
+          # root for losetup/mount/btrfs -- see magpie-csi-node-
+          # daemonset.yaml), so it can't bake a nonroot USER into the
+          # image itself the way the other services do. This container
+          # specifically does none of that (see this file's own top
+          # comment: CreateVolume/DeleteVolume do no host work at all),
+          # so it can still run locked down -- just declared here
+          # instead of in the Dockerfile. Only this container, not the
+          # csi-provisioner/liveness-probe sidecars above (third-party
+          # images; not worth the risk of assuming their own UID/
+          # capability expectations without verifying live).
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           env:
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock

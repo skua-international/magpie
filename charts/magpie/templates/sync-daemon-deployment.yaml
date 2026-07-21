@@ -26,6 +26,15 @@ spec:
     spec:
       {{- include "magpie.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "magpie.fullname" . }}-sync-daemon
+      # distroless:nonroot (see the image's own Dockerfile) already bakes
+      # in USER 65532 -- runAsNonRoot here is just belt-and-suspenders,
+      # same as every other distroless service in this chart. The golden
+      # content subvolume this writes into is pre-chowned to that same
+      # UID/GID by magpie-csi's own privileged Node plugin (see blob.go's
+      # ensureContentSubvolume) specifically so this can run non-root at
+      # all.
+      securityContext:
+        runAsNonRoot: true
       containers:
         - name: sync-daemon
           image: {{ include "magpie.image" (dict "root" $ "override" .Values.syncDaemon.image) }}
@@ -34,9 +43,14 @@ spec:
           # writes into its own plain, already-mounted content directory
           # now (Postgres/K8s API calls, Steam sync). The btrfs subvolume
           # snapshot/delete work per ArmaServer moved entirely into
-          # services/magpie-csi's own NodeStageVolume/NodeUnstageVolume
+          # services/magpie-csi's own NodePublishVolume/NodeUnpublishVolume
           # (see that driver's own doc), which is where the SYS_ADMIN
           # capability this container used to need now actually lives.
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           ports:
             - name: http
               containerPort: 8080

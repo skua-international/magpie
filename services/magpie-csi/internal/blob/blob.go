@@ -25,6 +25,14 @@ import (
 	"sync"
 )
 
+// nonrootUID is the fixed UID/GID every non-distroless container in
+// this chart that needs to run non-root uses explicitly (distroless
+// images bake it into their own USER directive instead -- see
+// cli/magpie/internal/deploy/bootstrap.go's own distrolessNonrootID,
+// the same value, kept in sync by convention rather than by sharing
+// code across these two separate Go modules).
+const nonrootUID = "65532"
+
 type Manager struct {
 	imagePath        string
 	mountPath        string
@@ -187,6 +195,17 @@ func (m *Manager) ensureContentSubvolume(ctx context.Context) error {
 	if _, err := os.Stat(contentPath); os.IsNotExist(err) {
 		if err := run(ctx, "btrfs", "subvolume", "create", contentPath); err != nil {
 			return fmt.Errorf("failed to create content subvolume: %w", err)
+		}
+		// `btrfs subvolume create` runs as root (this Node plugin is the
+		// one privileged component in the whole stack) -- chown to the
+		// fixed nonroot UID/GID every other container in this chart
+		// runs as, so sync-daemon (which writes here directly) can
+		// actually run non-root too. Every per-server snapshot taken
+		// from this tree (driver.NodePublishVolume) inherits this same
+		// ownership automatically -- btrfs snapshot preserves it -- so
+		// the launcher Pods reading those don't need their own chown.
+		if err := run(ctx, "chown", nonrootUID+":"+nonrootUID, contentPath); err != nil {
+			return fmt.Errorf("failed to chown content subvolume: %w", err)
 		}
 	} else if err != nil {
 		return fmt.Errorf("failed to stat %s: %w", contentPath, err)
