@@ -245,9 +245,28 @@ async fn resolve_secret_ref(
 
 fn substitute_simple(value: &str, server_name: &str, prefix: &str, suffix: &str) -> String {
     value
-        .replace("{{server_name}}", server_name)
+        .replace("{{server_name}}", &title_case(server_name))
         .replace("{{prefix}}", prefix)
         .replace("{{suffix}}", suffix)
+}
+
+/// Kubernetes object names are lowercase-hyphenated (DNS-1123) --
+/// "ops"/"skua-ops" reads a lot worse in a rendered hostname than "Ops"/
+/// "Skua Ops" does, so `{{server_name}}` gets title-cased on the way in:
+/// split on `-`/`_`, capitalize each word's first character, join with
+/// spaces.
+fn title_case(name: &str) -> String {
+    name.split(['-', '_'])
+        .filter(|w| !w.is_empty())
+        .map(|w| {
+            let mut chars = w.chars();
+            match chars.next() {
+                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn parse_bool(m: &BTreeMap<String, String>, key: &str) -> Option<bool> {
@@ -702,7 +721,15 @@ mod tests {
                 "[TEST] ",
                 " EU"
             ),
-            "[TEST] skua-main EU"
+            "[TEST] Skua Main EU"
         );
+    }
+
+    #[test]
+    fn server_name_title_case_variants() {
+        assert_eq!(title_case("ops"), "Ops");
+        assert_eq!(title_case("skua-ops"), "Skua Ops");
+        assert_eq!(title_case("skua_training"), "Skua Training");
+        assert_eq!(title_case(""), "");
     }
 }
