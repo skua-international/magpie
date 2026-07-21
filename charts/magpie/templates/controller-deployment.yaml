@@ -56,7 +56,7 @@ spec:
             - name: NAMESPACE
               value: {{ include "magpie.controllerNamespace" . }}
             - name: LAUNCHER_IMAGE
-              value: {{ .Values.launcherImage | quote }}
+              value: {{ include "magpie.image" (dict "root" $ "override" .Values.launcherImage) | quote }}
             - name: IMAGE_PULL_SECRETS
               value: {{ join "," .Values.imagePullSecrets | quote }}
             - name: SYNC_DAEMON_URL

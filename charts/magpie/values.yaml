@@ -29,8 +29,20 @@ image:
 imagePullSecrets: []
 
 # Image the controller's reconciler tells k8s to run for each ArmaServer's
-# launcher Pod. Not deployed by this chart itself -- just referenced.
-launcherImage: ghcr.io/skua-international/magpie/launcher:latest
+# launcher Pod. Not deployed by this chart itself -- just referenced, via
+# the same magpie.image helper every other service's own image uses (see
+# controller-deployment.yaml's LAUNCHER_IMAGE env var) -- tag defaults to
+# image.tag/Chart.AppVersion, same as everything else, rather than
+# hardcoding :latest. That distinction actually matters here: the
+# controller explicitly sets every launcher Pod's imagePullPolicy to
+# IfNotPresent (see reconcile.rs's own comment) specifically because a
+# real version tag is expected to be immutable -- :latest broke that
+# assumption, confirmed live (a launcher Pod kept running an old cached
+# binary indefinitely across reinstalls, since the tag string itself
+# never changed).
+launcherImage:
+  repository: "ghcr.io/skua-international/magpie/launcher"
+  tag: ""
 
 # Every resource this chart creates lands here, regardless of what
 # namespace `helm install`/`upgrade` itself was invoked with -- a plain
