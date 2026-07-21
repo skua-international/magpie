@@ -83,21 +83,25 @@ jobs:
         id: week
         run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
 
-      - uses: bufbuild/buf-action@v1
+      - uses: bufbuild/buf-setup-action@v1
         with:
           version: "1.71.0"
-          # buf-setup-action is deprecated in favor of this consolidated
-          # action; setup_only makes it behave the same as before (just
-          # installs the CLI) instead of running its own default lint/
-          # breaking/push steps -- the "Check for breaking proto changes"
-          # step below already does exactly the breaking check this
-          # workflow actually wants, against the last release tag
-          # specifically, not buf-action's own default target.
-          setup_only: true
-          # Unauthenticated: buf-action's own GitHub API calls (to fetch
-          # the release asset) hit the anonymous, much lower rate limit
-          # otherwise. The default GITHUB_TOKEN is enough for this --
-          # it's just downloading a public release, not touching this
+          # Tried migrating to the consolidated bufbuild/buf-action (with
+          # setup_only: true) -- confirmed broken on this repo's
+          # self-hosted runner (see pick-runner.yml): its core.addPath()
+          # call runs (logged "Setup buf (1.71.0) at
+          # /opt/hostedtoolcache/buf/..."), but the very next step still
+          # gets "buf: command not found", and buf-action's own post-job
+          # cleanup step then fails the same way trying to find buf
+          # itself. Unclear whether that's a buf-action bug or a quirk of
+          # this runner's PATH-file handling; reverted to buf-setup-action
+          # (proven working, same install pattern) rather than debug it
+          # further this session.
+          #
+          # Unauthenticated: buf-setup-action's own GitHub API calls (to
+          # fetch the release asset) hit the anonymous, much lower rate
+          # limit otherwise. The default GITHUB_TOKEN is enough for this
+          # -- it's just downloading a public release, not touching this
           # repo -- no need for the App token here.
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
