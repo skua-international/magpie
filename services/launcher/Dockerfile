@@ -49,9 +49,6 @@ RUN apt-get update \
 # not anything about capabilities or root's own DAC bypass.
 FROM gcr.io/distroless/cc-debian13:nonroot
 
-LABEL maintainer="Brett - github.com/brettmayson"
-LABEL org.opencontainers.image.source=https://github.com/brettmayson/arma3server
-
 COPY --from=tools /bin/dash /bin/sh
 COPY --from=tools /sbin/ifconfig /sbin/ifconfig
 
