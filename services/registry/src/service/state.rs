@@ -150,13 +150,13 @@ impl AdminServiceImpl {
                 config_map: obj.spec.config_map.clone(),
                 cdlc: obj.spec.cdlc.clone(),
                 profiling: obj.spec.profiling,
-                params: obj.spec.params.clone(),
                 desired_state: EnumValue::Known(match obj.spec.desired_state {
                     DesiredState::Running => ExportedDesiredState::Running,
                     DesiredState::Stopped => ExportedDesiredState::Stopped,
                 }),
                 metrics_port: obj.spec.metrics.as_ref().map(|m| m.port as u32),
                 metrics_path: obj.spec.metrics.as_ref().and_then(|m| m.path.clone()),
+                headless_clients: obj.spec.headless_clients,
                 ..Default::default()
             });
         }
@@ -312,19 +312,13 @@ impl AdminServiceImpl {
                 port: server.port as u16,
                 cdlc: server.cdlc.clone(),
                 profiling: server.profiling,
-                params: server.params.clone(),
                 desired_state,
                 config_map: server.config_map.clone(),
                 metrics: server.metrics_port.map(|port| crd::ArmaServerMetrics {
                     port: port as u16,
                     path: server.metrics_path.clone(),
                 }),
-                // Not in ExportedServer yet (backend-only for now, see
-                // issue #26) -- silently drops headless_clients across
-                // an export/import round trip, same class of gap
-                // flagged on #22/#23/#28 for other ArmaServerSpec
-                // fields that predate their own proto plumbing.
-                headless_clients: 0,
+                headless_clients: server.headless_clients,
             };
             let obj = ArmaServer {
                 metadata: ObjectMeta {

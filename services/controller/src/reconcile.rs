@@ -480,19 +480,6 @@ async fn ensure_deployment(
             value: Some(obj.spec.port.to_string()),
             ..Default::default()
         },
-        // arma_config.rs always writes exactly these two filenames --
-        // there's no operator-selectable filename anymore (see
-        // CreateServerRequest's own reserved fields 4/5 for why).
-        EnvVar {
-            name: "ARMA_CONFIG".into(),
-            value: Some("main.cfg".into()),
-            ..Default::default()
-        },
-        EnvVar {
-            name: "NETWORK_CONFIG".into(),
-            value: Some("basic.cfg".into()),
-            ..Default::default()
-        },
         // Consumed by whatever Postgres-backed extension the Arma server
         // process itself loads (not anything this repo owns) -- role
         // provisioned once on controller startup, see
@@ -530,13 +517,6 @@ async fn ensure_deployment(
             ..Default::default()
         },
     ];
-    if !obj.spec.params.is_empty() {
-        env.push(EnvVar {
-            name: "ARMA_PARAMS".into(),
-            value: Some(obj.spec.params.join(" ")),
-            ..Default::default()
-        });
-    }
     // From the merged arma-config ConfigMap's own `env.*` keys -- see
     // arma_config::extract_env_vars. Appended last so an operator can
     // override any of the fixed vars above via the same ConfigMap
@@ -850,13 +830,13 @@ async fn hc_apply(obj: &HeadlessClient, ctx: &Ctx) -> anyhow::Result<Action> {
 
     let mod_paths = resolve_mod_paths(ctx, &server).await?;
     // A headless client is just another connecting client as far as
-    // password[] is concerned -- resolved independently here (not
-    // passed through from the main server's own last render_and_write
-    // call) so this reconciler stays self-contained and correct even if
-    // it runs out of step with the ArmaServer's own reconcile pass (e.g.
-    // right after a controller restart, before either side's watch
-    // cache has settled).
-    let password = crate::arma_config::resolve_password(
+    // password[]/launch flags are concerned -- resolved independently
+    // here (not passed through from the main server's own last
+    // render_and_write call) so this reconciler stays self-contained and
+    // correct even if it runs out of step with the ArmaServer's own
+    // reconcile pass (e.g. right after a controller restart, before
+    // either side's watch cache has settled).
+    let launch_config = crate::arma_config::resolve_headless_client_config(
         &ctx.client,
         &ctx.cfg.namespace,
         &ctx.cfg.user_secrets_namespace,
@@ -865,7 +845,8 @@ async fn hc_apply(obj: &HeadlessClient, ctx: &Ctx) -> anyhow::Result<Action> {
     )
     .await?;
 
-    let new_status = match ensure_hc_deployment(ctx, obj, &server, &mod_paths, &password).await {
+    let new_status = match ensure_hc_deployment(ctx, obj, &server, &mod_paths, &launch_config).await
+    {
         Ok(()) => HeadlessClientStatus {
             phase: HeadlessClientPhase::Running,
             message: String::new(),
@@ -919,7 +900,7 @@ async fn ensure_hc_deployment(
     obj: &HeadlessClient,
     server: &ArmaServer,
     mod_paths: &[String],
-    password: &str,
+    launch_config: &crate::arma_config::HeadlessClientLaunchConfig,
 ) -> anyhow::Result<()> {
     let name = obj.name_any();
     let deployments: Api<Deployment> = Api::namespaced(ctx.client.clone(), &ctx.cfg.namespace);
@@ -966,18 +947,23 @@ async fn ensure_hc_deployment(
             value: Some("127.0.0.1".into()),
             ..Default::default()
         },
+        EnvVar {
+            name: "ARMA_LIMITFPS".into(),
+            value: Some(launch_config.limit_fps.to_string()),
+            ..Default::default()
+        },
     ];
-    if !server.spec.params.is_empty() {
+    if !launch_config.additional_params.is_empty() {
         env.push(EnvVar {
             name: "ARMA_PARAMS".into(),
-            value: Some(server.spec.params.join(" ")),
+            value: Some(launch_config.additional_params.clone()),
             ..Default::default()
         });
     }
-    if !password.is_empty() {
+    if !launch_config.password.is_empty() {
         env.push(EnvVar {
             name: "ARMA_SERVER_PASSWORD".into(),
-            value: Some(password.to_string()),
+            value: Some(launch_config.password.clone()),
             ..Default::default()
         });
     }

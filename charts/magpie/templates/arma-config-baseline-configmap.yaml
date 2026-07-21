@@ -60,6 +60,8 @@ data:
   server_command_password: {{ .Values.armaConfig.main.serverCommandPassword | quote }}
   motd: {{ .Values.armaConfig.main.motd | join "," | quote }}
   motd_interval: {{ .Values.armaConfig.main.motdInterval | toString | quote }}
+  limit_fps: {{ .Values.armaConfig.main.limitFps | toString | quote }}
+  additional_params: {{ .Values.armaConfig.main.additionalParams | quote }}
   other_properties: {{ .Values.armaConfig.main.otherProperties | quote }}
   max_msg_send: {{ .Values.armaConfig.basic.maxMsgSend | toString | quote }}
   max_size_guaranteed: {{ .Values.armaConfig.basic.maxSizeGuaranteed | toString | quote }}

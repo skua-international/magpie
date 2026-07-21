@@ -211,7 +211,6 @@ impl protocol::proto::controller::v1::ServerService for ServerServiceImpl {
             port,
             cdlc: Vec::new(),
             profiling: false,
-            params: Vec::new(),
             desired_state: DesiredState::Running,
             // The ConfigMap named here isn't created/validated by this
             // call at all (server-api has no ConfigMap RBAC) -- it's the

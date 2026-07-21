@@ -22,16 +22,21 @@ const SERVER_ROOT: &str = "/arma3/server";
 /// but `-client -connect=<...> -port=<owning server's port>` instead of
 /// hosting anything, and no `-config=`/`-cfg=` at all -- neither applies
 /// to a connecting client, only to whatever process is actually hosting.
+///
+/// `-world=empty` and the `main.cfg`/`basic.cfg` filenames are hardcoded,
+/// not configurable -- the ConfigMap-driven config (arma_config.rs) is
+/// the single source of truth for what a server actually needs tuned,
+/// and neither of these has ever had a real reason to vary: "empty" is
+/// what every dedicated server uses (a genuinely different world is an
+/// `additional_params` concern, not a first-class knob), and
+/// arma_config.rs itself only ever writes those two exact filenames.
 pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Instant) -> Result<()> {
     let mut args = vec![
         format!(
             "-limitFPS={}",
-            std::env::var("ARMA_LIMITFPS").unwrap_or_else(|_| "1000".into())
+            std::env::var("ARMA_LIMITFPS").unwrap_or_else(|_| "300".into())
         ),
-        format!(
-            "-world={}",
-            std::env::var("ARMA_WORLD").unwrap_or_else(|_| "empty".into())
-        ),
+        "-world=empty".to_string(),
     ];
     // Extra operator-supplied flags, appended verbatim after the
     // generated -mod=/CDLC ones below -- split on whitespace since
@@ -75,14 +80,11 @@ pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Inst
         args.push(format!("-name={arma_profile}"));
         args.push(format!("-profiles={SERVER_ROOT}/configs/profiles"));
     } else {
-        let config_file = std::env::var("ARMA_CONFIG").context("missing ARMA_CONFIG")?;
-        args.push(format!("-config={SERVER_ROOT}/configs/{config_file}"));
-
-        let network_config = std::env::var("NETWORK_CONFIG").context("missing NETWORK_CONFIG")?;
+        args.push(format!("-config={SERVER_ROOT}/configs/main.cfg"));
         args.push(format!("-port={port}"));
         args.push(format!("-name={arma_profile}"));
         args.push(format!("-profiles={SERVER_ROOT}/configs/profiles"));
-        args.push(format!("-cfg={SERVER_ROOT}/configs/{network_config}"));
+        args.push(format!("-cfg={SERVER_ROOT}/configs/basic.cfg"));
     }
 
     tracing::info!(

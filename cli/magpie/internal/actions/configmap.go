@@ -54,6 +54,13 @@ const ArmaConfigFieldGuide = `main.cfg keys (all string values; bools/numbers as
 basic.cfg keys (all default unset/omitted): max_msg_send, max_size_guaranteed,
   max_size_nonguaranteed, min_bandwidth, max_bandwidth, min_error_to_send,
   min_error_to_send_near, basic_other_properties.
+launch flag keys (not main.cfg/basic.cfg content -- these become the
+  launcher's own -limitFPS=/extra argv, same merged ConfigMap regardless):
+  limit_fps               -> -limitFPS= (default 300)
+  additional_params        extra launch args, appended verbatim after
+                            the generated -mod=/CDLC ones (replaces the
+                            old per-server spec.params field -- this is
+                            the one way to set them now)
 env.<NAME> keys become extra launcher container env vars (same
   placeholder/secret support). Full docs: README.md "Arma server config".`
 

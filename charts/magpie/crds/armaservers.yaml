@@ -97,14 +97,6 @@ spec:
                 items:
                   type: string
                 type: array
-              params:
-                default: []
-                description: |-
-                  Extra launch args, appended verbatim after the generated `-mod=`/CDLC
-                  args.
-                items:
-                  type: string
-                type: array
               port:
                 description: |-
                   Base game port. Arma binds a 5-port range starting here

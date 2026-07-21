@@ -1425,13 +1425,15 @@ type ExportedServer struct {
 	ConfigMap           *string              `protobuf:"bytes,4,opt,name=config_map,json=configMap,proto3,oneof" json:"config_map,omitempty"`
 	Cdlc                []string             `protobuf:"bytes,5,rep,name=cdlc,proto3" json:"cdlc,omitempty"`
 	Profiling           bool                 `protobuf:"varint,6,opt,name=profiling,proto3" json:"profiling,omitempty"`
-	Params              []string             `protobuf:"bytes,7,rep,name=params,proto3" json:"params,omitempty"`
 	DesiredState        ExportedDesiredState `protobuf:"varint,8,opt,name=desired_state,json=desiredState,proto3,enum=registry.v1.ExportedDesiredState" json:"desired_state,omitempty"`
 	// Mirrors ArmaServerSpec.metrics -- see its own doc.
-	MetricsPort   *uint32 `protobuf:"varint,9,opt,name=metrics_port,json=metricsPort,proto3,oneof" json:"metrics_port,omitempty"`
-	MetricsPath   *string `protobuf:"bytes,10,opt,name=metrics_path,json=metricsPath,proto3,oneof" json:"metrics_path,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	MetricsPort *uint32 `protobuf:"varint,9,opt,name=metrics_port,json=metricsPort,proto3,oneof" json:"metrics_port,omitempty"`
+	MetricsPath *string `protobuf:"bytes,10,opt,name=metrics_path,json=metricsPath,proto3,oneof" json:"metrics_path,omitempty"`
+	// How many HeadlessClient objects this server wants -- mirrors
+	// ArmaServerSpec.headless_clients, see its own doc.
+	HeadlessClients uint32 `protobuf:"varint,11,opt,name=headless_clients,json=headlessClients,proto3" json:"headless_clients,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *ExportedServer) Reset() {
@@ -1506,13 +1508,6 @@ func (x *ExportedServer) GetProfiling() bool {
 	return false
 }
 
-func (x *ExportedServer) GetParams() []string {
-	if x != nil {
-		return x.Params
-	}
-	return nil
-}
-
 func (x *ExportedServer) GetDesiredState() ExportedDesiredState {
 	if x != nil {
 		return x.DesiredState
@@ -1532,6 +1527,13 @@ func (x *ExportedServer) GetMetricsPath() string {
 		return *x.MetricsPath
 	}
 	return ""
+}
+
+func (x *ExportedServer) GetHeadlessClients() uint32 {
+	if x != nil {
+		return x.HeadlessClients
+	}
+	return 0
 }
 
 type ExportStateRequest struct {
@@ -2112,7 +2114,7 @@ const file_registry_v1_registry_proto_rawDesc = "" +
 	"\x04data\x18\x02 \x03(\v2(.registry.v1.ExportedConfigMap.DataEntryR\x04data\x1a7\n" +
 	"\tDataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa3\x03\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xc4\x03\n" +
 	"\x0eExportedServer\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\rR\x04port\x122\n" +
@@ -2120,15 +2122,15 @@ const file_registry_v1_registry_proto_rawDesc = "" +
 	"\n" +
 	"config_map\x18\x04 \x01(\tH\x00R\tconfigMap\x88\x01\x01\x12\x12\n" +
 	"\x04cdlc\x18\x05 \x03(\tR\x04cdlc\x12\x1c\n" +
-	"\tprofiling\x18\x06 \x01(\bR\tprofiling\x12\x16\n" +
-	"\x06params\x18\a \x03(\tR\x06params\x12F\n" +
+	"\tprofiling\x18\x06 \x01(\bR\tprofiling\x12F\n" +
 	"\rdesired_state\x18\b \x01(\x0e2!.registry.v1.ExportedDesiredStateR\fdesiredState\x12&\n" +
 	"\fmetrics_port\x18\t \x01(\rH\x01R\vmetricsPort\x88\x01\x01\x12&\n" +
 	"\fmetrics_path\x18\n" +
-	" \x01(\tH\x02R\vmetricsPath\x88\x01\x01B\r\n" +
+	" \x01(\tH\x02R\vmetricsPath\x88\x01\x01\x12)\n" +
+	"\x10headless_clients\x18\v \x01(\rR\x0fheadlessClientsB\r\n" +
 	"\v_config_mapB\x0f\n" +
 	"\r_metrics_portB\x0f\n" +
-	"\r_metrics_path\"\x14\n" +
+	"\r_metrics_pathJ\x04\b\a\x10\bR\x06params\"\x14\n" +
 	"\x12ExportStateRequest\"\x9a\x02\n" +
 	"\x13ExportStateResponse\x12.\n" +
 	"\x13exported_at_rfc3339\x18\x01 \x01(\tR\x11exportedAtRfc3339\x12?\n" +

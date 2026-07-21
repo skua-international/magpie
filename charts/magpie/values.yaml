@@ -389,6 +389,18 @@ armaConfig:
     serverCommandPassword: ""
     motd: []
     motdInterval: ""
+    # -limitFPS= -- a launch flag, not main.cfg content (render_main_cfg
+    # never touches it), resolved from this same merged ConfigMap purely
+    # because that's the one place "configure this server" already means.
+    limitFps: 300
+    # Extra launch args, appended verbatim after the generated -mod=/CDLC
+    # ones -- the ConfigMap-driven replacement for the old per-server
+    # spec.params field (removed: this is the single source of truth for
+    # extra flags now, cluster-wide via this default or per-server via
+    # spec.configMap, same as every other field here). Old-fleet default:
+    # load missions from memory (faster mission start) and bandwidth
+    # algorithm 2 (Arma's own newer/recommended congestion control).
+    additionalParams: "-loadMissionToMemory -bandwidthAlg=2"
     # Raw text appended verbatim at the end of main.cfg. Defaults to the
     # old fleet's own allowed*Extensions[] lists (issue #25) -- a sane
     # cluster-level default, not typed/per-server-overridable fields of

@@ -145,6 +145,13 @@ magpiectl admin armaconfig
 | `motd_interval` | number | *unset* | `motdInterval` |
 | `other_properties` | raw text | `allowedLoadFileExtensions[]`/`allowedPreprocessFileExtensions[]`/`allowedHTMLLoadExtensions[]` (see `values.yaml`) | appended verbatim at the end |
 
+**ConfigMap keys → launch flags** (not `main.cfg`/`basic.cfg` content -- these become the launcher's own argv, same merged ConfigMap regardless):
+
+| Key | Type | Default | Launch flag |
+|---|---|---|---|
+| `limit_fps` | number | `300` | `-limitFPS=` |
+| `additional_params` | raw text | *(empty)* | appended verbatim after the generated `-mod=`/CDLC args -- the one way to set extra launch flags now (replaces the old per-server `spec.params` field) |
+
 `admins[]`/`filePatchingExceptions[]` are **never** ConfigMap keys — computed on every reconcile from identities holding the `arma:admin`/`arma:filepatch` scopes (`magpiectl` doesn't grant scopes today; use `registry_db::grant_scopes` directly, or the first-ever login, which gets `*`). This reads `linked_accounts`' Steam OpenID `provider_user_id`, already the exact SteamID64 string Arma wants.
 
 **ConfigMap keys → `basic.cfg`**: `max_msg_send`, `max_size_guaranteed`, `max_size_nonguaranteed`, `min_bandwidth`, `max_bandwidth`, `min_error_to_send`, `min_error_to_send_near`, `basic_other_properties` — all default **unset** (omitted from the file entirely, not written as `0`).

@@ -272,6 +272,9 @@ message ExportedConfigMap {
 }
 
 message ExportedServer {
+  reserved 7;
+  reserved "params";
+
   string name = 1;
   uint32 port = 2;
   // ExportedModSource.reference strings this server's mod_source_ids
@@ -280,11 +283,13 @@ message ExportedServer {
   optional string config_map = 4;
   repeated string cdlc = 5;
   bool profiling = 6;
-  repeated string params = 7;
   ExportedDesiredState desired_state = 8;
   // Mirrors ArmaServerSpec.metrics -- see its own doc.
   optional uint32 metrics_port = 9;
   optional string metrics_path = 10;
+  // How many HeadlessClient objects this server wants -- mirrors
+  // ArmaServerSpec.headless_clients, see its own doc.
+  uint32 headless_clients = 11;
 }
 
 message ExportStateRequest {}

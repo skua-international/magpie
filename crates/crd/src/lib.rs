@@ -36,10 +36,6 @@ pub struct ArmaServerSpec {
     pub cdlc: Vec<String>,
     #[serde(default)]
     pub profiling: bool,
-    /// Extra launch args, appended verbatim after the generated `-mod=`/CDLC
-    /// args.
-    #[serde(default)]
-    pub params: Vec<String>,
     /// Servers are deployment-like: this is the "should it be up" knob
     /// (`ServerService::StartServer`/`StopServer`/`CreateServer`), separate
     /// from `status.phase`, which tracks how far the reconciler has

@@ -65,7 +65,20 @@ pub async fn render_and_write(
     )
     .await?;
     let basic = resolve_basic_config(&merged);
-    let extra_env = extract_env_vars(client, user_secrets_namespace, &merged, &name).await?;
+
+    // ARMA_LIMITFPS always present (limit_fps has a real default, unlike
+    // most other fields here), ARMA_PARAMS only when additional_params is
+    // actually set -- launch.rs's own read of it is optional. Ahead of
+    // extract_env_vars's own output below, not after: that's the
+    // deliberate last-word override (an operator setting env.ARMA_PARAMS
+    // directly still wins over additional_params), same precedent as
+    // every other fixed env var already established.
+    let (limit_fps, additional_params) = resolve_launch_params(&merged);
+    let mut extra_env = vec![("ARMA_LIMITFPS".to_string(), limit_fps.to_string())];
+    if !additional_params.is_empty() {
+        extra_env.push(("ARMA_PARAMS".to_string(), additional_params));
+    }
+    extra_env.extend(extract_env_vars(client, user_secrets_namespace, &merged, &name).await?);
 
     let dir = format!("{server_root_base}/{name}/configs");
     tokio::fs::create_dir_all(&dir)
@@ -76,18 +89,42 @@ pub async fn render_and_write(
     Ok(extra_env)
 }
 
-/// The resolved (secret-substituted) `password` value alone, without
-/// writing anything to disk or resolving the rest of `ResolvedMainConfig`
-/// -- used by the `HeadlessClient` reconciler to build an HC's own
-/// `-password=`, which is otherwise unrelated to any of the main
-/// server's own config-file rendering.
-pub async fn resolve_password(
+/// `-limitFPS=`/extra launch args -- deliberately not part of
+/// `ResolvedMainConfig`: neither is actual main.cfg *file content*
+/// (`render_main_cfg` never touches them), they're launcher argv values,
+/// resolved from the exact same merged ConfigMap as everything else here
+/// purely because that's the one place "configure this server" already
+/// means, not because they belong next to hostname/password/etc.
+/// `limit_fps` always has a value (default 300); `additional_params` is
+/// `""` when unset, same as every other raw-passthrough field.
+fn resolve_launch_params(m: &BTreeMap<String, String>) -> (i64, String) {
+    let limit_fps = parse_num(m, "limit_fps").unwrap_or(300);
+    let additional_params = m.get("additional_params").cloned().unwrap_or_default();
+    (limit_fps, additional_params)
+}
+
+/// What a `HeadlessClient` needs from the owning server's own merged
+/// config -- resolved independently from `render_and_write` (not passed
+/// through from the main server's own last reconcile pass) so
+/// `services/controller/src/reconcile.rs`'s `hc_apply` stays correct
+/// even if it runs out of step with the ArmaServer's own reconcile (e.g.
+/// right after a controller restart). A headless client is just another
+/// connecting client as far as `password[]`/launch flags are concerned,
+/// so it needs the exact same resolved values the main server's own
+/// config was (or will be) written with.
+pub struct HeadlessClientLaunchConfig {
+    pub password: String,
+    pub limit_fps: i64,
+    pub additional_params: String,
+}
+
+pub async fn resolve_headless_client_config(
     client: &Client,
     namespace: &str,
     user_secrets_namespace: &str,
     baseline_configmap: &str,
     obj: &ArmaServer,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<HeadlessClientLaunchConfig> {
     let merged = fetch_and_merge(
         client,
         namespace,
@@ -100,13 +137,19 @@ pub async fn resolve_password(
         .get("suffix")
         .cloned()
         .unwrap_or_else(|| " | Powered by MAGPIE".to_string());
-    let raw = substitute_simple(
+    let raw_password = substitute_simple(
         merged.get("password").map(String::as_str).unwrap_or(""),
         &obj.name_any(),
         &prefix,
         &suffix,
     );
-    resolve_secret_ref(client, user_secrets_namespace, &raw).await
+    let password = resolve_secret_ref(client, user_secrets_namespace, &raw_password).await?;
+    let (limit_fps, additional_params) = resolve_launch_params(&merged);
+    Ok(HeadlessClientLaunchConfig {
+        password,
+        limit_fps,
+        additional_params,
+    })
 }
 
 /// Any merged-config key of the form `env.<NAME>` becomes an extra
