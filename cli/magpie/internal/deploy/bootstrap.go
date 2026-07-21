@@ -250,13 +250,33 @@ func EnsureInstallSecrets(ctx context.Context, externalPostgresURL, ghcrUser, gh
 	var setArgs []string
 
 	if externalPostgresURL == "" {
-		fmt.Println("==> Creating arma-postgres-creds (random password)...")
-		password, err := randomPassword()
+		// Not just re-applied unconditionally like ghcr-pull-secret below
+		// -- kubectlApplySecret's underlying `kubectl apply` would happily
+		// overwrite an existing Secret with a brand new random password
+		// on every install re-run, confirmed live: the chart-managed
+		// Postgres StatefulSet's own data volume (and thus the actual
+		// role's password inside it) persists across re-installs, so a
+		// regenerated Secret just desyncs from what the database itself
+		// still expects -- every app then fails to authenticate until
+		// the database is rebuilt from scratch. Only ever create this
+		// once; a rotation is a deliberate, separate operation (delete
+		// the Secret and the StatefulSet's PVC together), not a side
+		// effect of re-running install.
+		exists, err := secretExists(ctx, "arma-postgres-creds")
 		if err != nil {
 			return nil, err
 		}
-		if err := kubectlApplySecret(ctx, "generic", "arma-postgres-creds", []string{"--from-literal=POSTGRES_PASSWORD=" + password}); err != nil {
-			return nil, err
+		if exists {
+			fmt.Println("==> arma-postgres-creds already exists -- leaving it as-is")
+		} else {
+			fmt.Println("==> Creating arma-postgres-creds (random password)...")
+			password, err := randomPassword()
+			if err != nil {
+				return nil, err
+			}
+			if err := kubectlApplySecret(ctx, "generic", "arma-postgres-creds", []string{"--from-literal=POSTGRES_PASSWORD=" + password}); err != nil {
+				return nil, err
+			}
 		}
 		setArgs = append(setArgs, "--set", "postgres.existingSecret=arma-postgres-creds")
 	} else {
@@ -280,6 +300,18 @@ func EnsureInstallSecrets(ctx context.Context, externalPostgresURL, ghcrUser, gh
 	fmt.Println("==> Steam auth: no password-based bootstrap secret to create -- run 'magpiectl admin refresh-steam-auth' after install (QR-code login, no password ever touches the cluster), or --set syncDaemon.steamAuth.anonymous=true for anonymous-only access")
 
 	return setArgs, nil
+}
+
+// secretExists checks the live cluster directly rather than assuming
+// anything from a prior run's own state -- `magpiectl install` has no
+// other memory of what it already did.
+func secretExists(ctx context.Context, name string) (bool, error) {
+	out, err := exec.CommandContext(ctx, "kubectl", "get", "secret", name,
+		"-n", chartNamespace, "--ignore-not-found", "-o", "name").Output()
+	if err != nil {
+		return false, fmt.Errorf("kubectl get secret %s: %w", name, err)
+	}
+	return len(strings.TrimSpace(string(out))) > 0, nil
 }
 
 func kubectlApplySecret(ctx context.Context, kind, name string, extraArgs []string) error {
