@@ -92,7 +92,7 @@ async fn extract_env_vars(
     let suffix = m
         .get("suffix")
         .cloned()
-        .unwrap_or_else(|| "Powered by MAGPIE".to_string());
+        .unwrap_or_else(|| " | Powered by MAGPIE".to_string());
 
     let mut out = Vec::new();
     for (key, raw_value) in m {
@@ -274,7 +274,7 @@ async fn resolve_main_config(
     let suffix = m
         .get("suffix")
         .cloned()
-        .unwrap_or_else(|| "Powered by MAGPIE".to_string());
+        .unwrap_or_else(|| " | Powered by MAGPIE".to_string());
     let subst = |v: &str| substitute_simple(v, server_name, &prefix, &suffix);
 
     let hostname_raw = m

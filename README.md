@@ -125,7 +125,7 @@ magpiectl admin armaconfig
 | Key | Type | Default | main.cfg field |
 |---|---|---|---|
 | `hostname` | string, placeholders | *(computed, see below)* | `hostname` |
-| `prefix` / `suffix` | string | `""` / `"Powered by MAGPIE"` | *(placeholders only)* |
+| `prefix` / `suffix` | string | `""` / `" | Powered by MAGPIE"` | *(placeholders only)* |
 | `max_players` | number | `64` | `maxPlayers` |
 | `force_difficulty` / `forced_difficulty` | bool / string | `false` / `"veteran"` | `forcedDifficulty` (omitted unless forced) |
 | `missions_whitelist` | comma-separated list | *(empty)* | `missionWhitelist[]` |

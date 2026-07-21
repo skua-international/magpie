@@ -347,7 +347,7 @@ armaConfig:
     # Empty means "use the computed default": "{{prefix}}{{server_name}}{{suffix}}".
     hostname: ""
     prefix: ""
-    suffix: "Powered by MAGPIE"
+    suffix: " | Powered by MAGPIE"
     maxPlayers: 64
     forceDifficulty: false
     forcedDifficulty: veteran
