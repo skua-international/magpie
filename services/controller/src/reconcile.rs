@@ -34,9 +34,9 @@ use crd::{ArmaServer, ArmaServerPhase, ArmaServerStatus, DesiredState, ModSource
 use futures::StreamExt;
 use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec};
 use k8s_openapi::api::core::v1::{
-    Capabilities, CSIVolumeSource, Container, EnvVar, EnvVarSource, HostPathVolumeSource,
-    LocalObjectReference, PodSecurityContext, PodSpec, PodTemplateSpec, SecretKeySelector,
-    SecurityContext, Volume, VolumeMount,
+    Capabilities, CSIVolumeSource, Container, EnvVar, EnvVarSource, ExecAction,
+    HostPathVolumeSource, LocalObjectReference, PodSecurityContext, PodSpec, PodTemplateSpec,
+    Probe, SecretKeySelector, SecurityContext, Volume, VolumeMount,
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
 use kube::api::{Api, DeleteParams, Patch, PatchParams};
@@ -568,6 +568,43 @@ async fn ensure_deployment(
                                 ..Default::default()
                             },
                         ]),
+                        // A real Source-engine A2S_INFO round trip against
+                        // arma3server_x64's own Steam query port (see
+                        // healthcheck.rs's own doc), not just "is PID 1
+                        // still running" -- a hung/deadlocked-but-alive
+                        // process would pass a bare process check forever.
+                        // No httpGet/tcpSocket option exists for this:
+                        // Kubernetes probes have no native UDP support, so
+                        // this has to be exec'd. Long initialDelay/period --
+                        // a cold start genuinely takes ~10s+ just for
+                        // PhysX/movesType init (confirmed live) before the
+                        // query port is even listening, and this is not a
+                        // service that benefits from a tight probe cadence.
+                        readiness_probe: Some(Probe {
+                            exec: Some(ExecAction {
+                                command: Some(vec!["/launcher".into(), "healthcheck".into()]),
+                            }),
+                            initial_delay_seconds: Some(20),
+                            period_seconds: Some(10),
+                            timeout_seconds: Some(5),
+                            failure_threshold: Some(6),
+                            ..Default::default()
+                        }),
+                        liveness_probe: Some(Probe {
+                            exec: Some(ExecAction {
+                                command: Some(vec!["/launcher".into(), "healthcheck".into()]),
+                            }),
+                            initial_delay_seconds: Some(60),
+                            period_seconds: Some(30),
+                            timeout_seconds: Some(5),
+                            // Generous on purpose -- a long mission
+                            // load/save or save-related hitch stalling
+                            // query responses briefly is a false positive
+                            // this shouldn't restart the whole server
+                            // over.
+                            failure_threshold: Some(5),
+                            ..Default::default()
+                        }),
                         ..Default::default()
                     }],
                     volumes: Some(vec![
