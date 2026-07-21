@@ -196,17 +196,6 @@ func (m *Manager) ensureContentSubvolume(ctx context.Context) error {
 		if err := run(ctx, "btrfs", "subvolume", "create", contentPath); err != nil {
 			return fmt.Errorf("failed to create content subvolume: %w", err)
 		}
-		// `btrfs subvolume create` runs as root (this Node plugin is the
-		// one privileged component in the whole stack) -- chown to the
-		// fixed nonroot UID/GID every other container in this chart
-		// runs as, so sync-daemon (which writes here directly) can
-		// actually run non-root too. Every per-server snapshot taken
-		// from this tree (driver.NodePublishVolume) inherits this same
-		// ownership automatically -- btrfs snapshot preserves it -- so
-		// the launcher Pods reading those don't need their own chown.
-		if err := run(ctx, "chown", nonrootUID+":"+nonrootUID, contentPath); err != nil {
-			return fmt.Errorf("failed to chown content subvolume: %w", err)
-		}
 	} else if err != nil {
 		return fmt.Errorf("failed to stat %s: %w", contentPath, err)
 	}
@@ -215,6 +204,26 @@ func (m *Manager) ensureContentSubvolume(ctx context.Context) error {
 	// (btrfs has no in-place directory->subvolume conversion) --
 	// deliberately not handled here, this deployment predates any real
 	// upgrade-compatibility guarantee.
+
+	// Unconditional, not just on first creation -- confirmed live this
+	// has to run every bootstrap, not only when the subvolume is brand
+	// new: a content subvolume created before this chown existed at all
+	// stayed root:root forever otherwise (chown only ever ran once, at
+	// creation, same class of bug as the kubelet hostPath
+	// DirectoryOrCreate gotcha documented elsewhere in this codebase --
+	// "only fixes it if freshly created" quietly never fixes a
+	// pre-existing wrong state). `btrfs subvolume create` runs as root
+	// (this Node plugin is the one privileged component in the whole
+	// stack) -- chown to the fixed nonroot UID/GID every other
+	// container in this chart runs as, so sync-daemon (which writes
+	// here directly) can actually run non-root too. Every per-server
+	// snapshot taken from this tree (driver.NodePublishVolume)
+	// inherits this same ownership automatically -- btrfs snapshot
+	// preserves it -- so the launcher Pods reading/writing those need
+	// no chown of their own.
+	if err := run(ctx, "chown", nonrootUID+":"+nonrootUID, contentPath); err != nil {
+		return fmt.Errorf("failed to chown content subvolume: %w", err)
+	}
 
 	return os.MkdirAll(claimsPath, 0o755)
 }
