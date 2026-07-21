@@ -469,6 +469,10 @@ fn pair_array(items: &[(i64, i64)]) -> String {
 
 pub fn render_main_cfg(cfg: &ResolvedMainConfig) -> String {
     let mut out = String::new();
+    // Not configurable -- old-fleet convention (BI wiki's own default is
+    // 1024), hardcoded rather than added as another ConfigMap key since
+    // it's never actually varied per-server in practice.
+    out += "steamProtocolMaxDataSize = 8192;\n\n";
     out += &format!("hostname = \"{}\";\n\n", escape(&cfg.hostname));
     out += &format!("maxPlayers = {};\n\n", cfg.max_players);
     out += &format!("admins[] = {};\n", string_array(&cfg.admins));
