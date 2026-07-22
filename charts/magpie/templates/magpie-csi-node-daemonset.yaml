@@ -75,6 +75,25 @@ spec:
             - name: pods-mount-dir
               mountPath: {{ .Values.magpieCsi.kubeletDir }}/pods
               mountPropagation: Bidirectional
+            # kubelet's own generic per-driver staging directory --
+            # where it computes StagingTargetPath for any Stage/Unstage-
+            # capable volume (only the golden-content PVC uses this;
+            # every ArmaServer's own content is a CSI inline ephemeral
+            # volume, which skips Stage/Unstage per the CSI spec and
+            # only ever needs the pods-mount-dir above). Confirmed live
+            # this was missing entirely: NodeStageVolume's own
+            # mount --bind happened only inside this container's own
+            # mount namespace (StagingTargetPath resolved to a path
+            # that existed nowhere on the real host), so it silently
+            # stopped working the moment this container's process
+            # itself ever restarted -- NodePublishVolume's later bind
+            # mount from that same path then failed outright ("special
+            # device ... does not exist", since nothing was ever really
+            # there from the host's -- or a freshly restarted
+            # container's -- point of view).
+            - name: kubelet-plugins-csi-dir
+              mountPath: {{ .Values.magpieCsi.kubeletDir }}/plugins/kubernetes.io/csi
+              mountPropagation: Bidirectional
             - name: blob-storage
               mountPath: /var/lib/magpie-csi
           livenessProbe:
@@ -109,6 +128,10 @@ spec:
         - name: pods-mount-dir
           hostPath:
             path: {{ .Values.magpieCsi.kubeletDir }}/pods
+            type: DirectoryOrCreate
+        - name: kubelet-plugins-csi-dir
+          hostPath:
+            path: {{ .Values.magpieCsi.kubeletDir }}/plugins/kubernetes.io/csi
             type: DirectoryOrCreate
         - name: blob-storage
           hostPath:
