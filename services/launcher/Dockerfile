@@ -27,7 +27,7 @@
 FROM debian:trixie-slim AS tools
 RUN apt-get update \
     && apt-get install -y --no-install-recommends --no-install-suggests \
-        busybox-static \
+        busybox-static libavahi-client3 \
     && rm -rf /var/lib/apt/lists/*
 # Staged under /out, not installed into this stage's own /usr/bin
 # directly -- debian:trixie-slim already ships real cat/grep/sed/uniq
@@ -39,12 +39,18 @@ RUN apt-get update \
 # also drag in every *other* Debian userland binary along with it,
 # defeating the point of a minimal image. Building a clean tree from
 # scratch and copying only that instead avoids both problems.
-RUN mkdir -p /out/usr/bin /out/bin /out/sbin \
+RUN mkdir -p /out/usr/bin /out/bin /out/sbin /out/usr/lib/x86_64-linux-gnu \
     && cp /usr/bin/busybox /out/usr/bin/busybox \
     && /out/usr/bin/busybox --install -s /out/usr/bin \
     && ln -s /usr/bin/busybox /out/bin/sh \
     && ln -s /usr/bin/busybox /out/bin/cat \
-    && ln -s /usr/bin/busybox /out/sbin/ifconfig
+    && ln -s /usr/bin/busybox /out/sbin/ifconfig \
+    && cp -P /usr/lib/x86_64-linux-gnu/libavahi-client.so.3* \
+             /usr/lib/x86_64-linux-gnu/libavahi-common.so.3* \
+             /usr/lib/x86_64-linux-gnu/libdbus-1.so.3* \
+             /usr/lib/x86_64-linux-gnu/libsystemd.so.0* \
+             /usr/lib/x86_64-linux-gnu/libcap.so.2* \
+             /out/usr/lib/x86_64-linux-gnu/
 
 # distroless:nonroot, like every other service in this chart -- unlike
 # them, this needed a real userland Dockerfile until very recently
@@ -55,14 +61,19 @@ RUN mkdir -p /out/usr/bin /out/bin /out/sbin \
 # live via ldd against the actual synced binaries: arma3server_x64/
 # libsteam_api.so/steamclient.so need only libpthread/librt/libdl/libm/
 # libgcc_s/libc -- all already in distroless/cc -- plus busybox above
-# (statically linked, so it needs none of those either). The real,
-# separate bug that made this launcher *seem* to need root all along
-# was actually a missing /etc/passwd entry for the fixed nonroot UID
-# (confirmed live: SteamAPI_Init() crashes outright, not gracefully,
-# when getpwuid() has nothing to return) -- distroless:nonroot's own
-# baked-in nonroot user fixes that for free, which is the actual reason
-# this now works non-root at all, not anything about capabilities or
-# root's own DAC bypass.
+# (statically linked, so it needs none of those either), plus
+# libavahi-client (a new dedicated-server dependency on Linux -- Avahi
+# is used for LAN server discovery) and its own transitive closure
+# (libavahi-common, libdbus-1, libsystemd, libcap -- confirmed via ldd
+# against libavahi-client.so.3 itself, none of these are in
+# distroless/cc by default). The real, separate bug that made this
+# launcher *seem* to need root all along was actually a missing
+# /etc/passwd entry for the fixed nonroot UID (confirmed live:
+# SteamAPI_Init() crashes outright, not gracefully, when getpwuid() has
+# nothing to return) -- distroless:nonroot's own baked-in nonroot user
+# fixes that for free, which is the actual reason this now works
+# non-root at all, not anything about capabilities or root's own DAC
+# bypass.
 FROM gcr.io/distroless/cc-debian13:nonroot
 
 # The real busybox binary plus every applet name (grep/sed/uniq/etc.)
@@ -73,14 +84,13 @@ FROM gcr.io/distroless/cc-debian13:nonroot
 COPY --from=tools /out/usr/bin/ /usr/bin/
 COPY --from=tools /out/bin/ /bin/
 COPY --from=tools /out/sbin/ /sbin/
+COPY --from=tools /out/usr/lib/x86_64-linux-gnu/ /usr/lib/x86_64-linux-gnu/
 ENV PATH=/usr/bin:/bin:/sbin
 
 ENV ARMA_BINARY=./arma3server_x64
-ENV ARMA_CONFIG=main.cfg
 ENV ARMA_PARAMS=
 ENV ARMA_PROFILE=main
-ENV ARMA_WORLD=empty
-ENV ARMA_LIMITFPS=1000
+ENV ARMA_LIMITFPS=300
 ENV ARMA_CDLC=
 ENV PORT=2302
 ENV CLEAR_KEYS=true
