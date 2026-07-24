@@ -118,9 +118,28 @@ never appears in a template-rendered value). Called as:
       key: POSTGRES_PASSWORD
 - name: DATABASE_URL
   value: "postgres://{{ .Values.postgres.user }}:$(PGPASSWORD)@{{ include "magpie.fullname" . }}-postgres:{{ .Values.postgres.port }}/{{ .Values.postgres.database }}"
+{{- else if .Values.postgres.existingSecret }}
+{{/*
+Same $(PGPASSWORD) dependent-env-var composition as the chart-managed
+case above, just pointed at an operator-provided Secret (same
+namespace this chart's own resources land in -- Secret references are
+namespace-local, no way around that) and discrete host/port/user/
+database instead of the in-chart Service name. Preferred over
+externalUrl below when set: resolved dynamically at pod-start time
+from a Secret, not baked into a Helm value at template-render time --
+lets a caller point this at a shared external Postgres without ever
+having to read a password back out and pass it via --set.
+*/}}
+- name: PGPASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.postgres.existingSecret }}
+      key: POSTGRES_PASSWORD
+- name: DATABASE_URL
+  value: "postgres://{{ .Values.postgres.user }}:$(PGPASSWORD)@{{ include "magpie.postgresHost" . }}:{{ .Values.postgres.port }}/{{ .Values.postgres.database }}"
 {{- else }}
 - name: DATABASE_URL
-  value: {{ required "postgres.externalUrl is required when postgres.enabled is false" .Values.postgres.externalUrl | quote }}
+  value: {{ required "postgres.externalUrl is required when postgres.enabled is false and postgres.existingSecret is unset" .Values.postgres.externalUrl | quote }}
 {{- end }}
 {{- end -}}
 

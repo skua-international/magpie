@@ -192,8 +192,9 @@ identity:
 # services/controller (read-only, for resolving mod source kind/reference).
 postgres:
   # Chart-managed: a single-replica StatefulSet + PVC, bundled here like
-  # every other component. Set enabled: false and fill in externalUrl to
-  # point at a Postgres you already run instead.
+  # every other component. Set enabled: false and either fill in
+  # existingSecret (preferred -- see below) or externalUrl to point at
+  # a Postgres you already run instead.
   enabled: true
   image: postgres:18-alpine
   port: 56275
@@ -202,7 +203,14 @@ postgres:
   # Name of an existing Secret with a POSTGRES_PASSWORD key. Not created by
   # this chart -- `kubectl create secret generic <name>
   # --from-literal=POSTGRES_PASSWORD=...` ahead of `helm install`, so the
-  # password never lives in values.yaml.
+  # password never lives in values.yaml. Required when postgres.enabled is
+  # true; when it's false, setting this too (paired with host/port/user/
+  # database below) is the preferred way to point at an external Postgres
+  # -- DATABASE_URL gets composed the same $(PGPASSWORD)-from-Secret way
+  # either way, resolved at pod-start time, so nothing ever needs to read
+  # a password back out and pass it as a literal Helm value. externalUrl
+  # below is the fallback for callers that would rather pass one
+  # connection string than a Secret reference.
   existingSecret: ""
   storage:
     className: ""
@@ -212,11 +220,12 @@ postgres:
   # the network. Only meaningful with postgres.enabled: true.
   exposeOnHost: true
   # Used instead of the chart-managed StatefulSet when postgres.enabled is
-  # false. Full connection string, e.g.
+  # false AND existingSecret is left empty. Full connection string, e.g.
   # postgres://user:pass@host:5432/dbname.
   externalUrl: ""
-  # Only used when enabled: false -- a discrete host, paired with the
-  # port/database fields above (also used by the chart-managed case).
+  # A discrete host, paired with the port/database/user fields above --
+  # required whenever postgres.enabled is false, regardless of whether
+  # existingSecret or externalUrl is what actually supplies the password.
   # Needed alongside externalUrl (rather than parsing it apart) because
   # the launcher's DATABASE_HOST/PORT/USER/PASSWORD/NAME env vars
   # (consumed by whatever Arma-side extension the launcher process runs,
