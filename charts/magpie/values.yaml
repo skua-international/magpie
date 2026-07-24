@@ -92,6 +92,22 @@ ingress:
     # its own TLS secret.
     enabled: false
     clusterIssuer: letsencrypt-prod
+  # Per-service opt-in label for an external-dns install using a
+  # matching --label-filter (e.g. --source=ingress
+  # --label-filter=external-dns.skua.io/expose=true) -- the label
+  # alone does nothing without that; this chart never installs
+  # external-dns itself. A map, not one shared toggle: not every
+  # service necessarily needs public DNS reachability (e.g. one meant
+  # for internal/VPN-only access), so each of the three Ingresses this
+  # chart creates opts in independently. All off by default -- inert
+  # for any deployment that never wires up external-dns at all.
+  dns:
+    labelKey: external-dns.skua.io/expose
+    labelValue: "true"
+    services:
+      identity: false
+      registry: false
+      server-api: false
 
 # sync-daemon's golden content tree lives on a PersistentVolumeClaim
 # against the magpie-golden-content StorageClass (see

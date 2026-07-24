@@ -9,6 +9,9 @@ metadata:
   labels:
     {{- include "magpie.labels" $ | nindent 4 }}
     app.kubernetes.io/component: {{ $svc }}
+    {{- if (index $.Values.ingress.dns.services $svc) }}
+    {{ $.Values.ingress.dns.labelKey }}: {{ $.Values.ingress.dns.labelValue | quote }}
+    {{- end }}
   {{- if $.Values.ingress.tls.enabled }}
   annotations:
     cert-manager.io/cluster-issuer: {{ $.Values.ingress.tls.clusterIssuer | quote }}
