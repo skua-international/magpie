@@ -37,6 +37,49 @@ import (
 // for an interactive sudo password prompt over a non-interactive ssh
 // command.
 func RunRemoteInstall(ctx context.Context, sshHost, sshIdentity string, opts Options) error {
+	if _, err := runRemoteNodeSetup(ctx, sshHost, sshIdentity, opts); err != nil {
+		return err
+	}
+
+	// Everything else -- CheckTools, secrets, helm pull/upgrade -- runs
+	// locally from here, against the cluster over the network via the
+	// kubeconfig above (runRemoteNodeSetup already set KUBECONFIG).
+	// helm/kubectl only need to be installed on this machine, never the
+	// remote one.
+	opts.BootstrapK3s = false
+	// kubeletRootDir is deterministic (same dataDir -> same path), so
+	// this doesn't need anything fetched back from the remote host --
+	// the k3s install that just happened there (via --node-setup-only)
+	// used this exact same derivation. See Options.KubeletDir's own doc
+	// for why this has to be exactly right.
+	opts.KubeletDir = kubeletRootDir(opts.DataDir)
+	fmt.Println("==> Continuing the install locally against the new cluster...")
+	return Run(ctx, opts)
+}
+
+// RunRemoteNodeSetupOnly does everything RunRemoteInstall does up through
+// fetching the kubeconfig back, then stops -- no chart install, local or
+// otherwise. For callers (like a sibling umbrella chart's own install
+// script) that need k3s bootstrapped on a remote host and a local
+// kubeconfig pointed at it, but want to own the chart install themselves
+// rather than getting magpie's own standalone chart installed as a side
+// effect. Confirmed live this distinction matters: `--ssh <host>
+// --node-setup-only` used to silently ignore --ssh entirely and bootstrap
+// k3s on the *local* machine instead, because installCmd's dispatch
+// checked --node-setup-only before ever looking at --ssh -- this function
+// (and installCmd's now-corrected dispatch order) is the actual fix.
+func RunRemoteNodeSetupOnly(ctx context.Context, sshHost, sshIdentity string, opts Options) error {
+	_, err := runRemoteNodeSetup(ctx, sshHost, sshIdentity, opts)
+	return err
+}
+
+// runRemoteNodeSetup does the actual ssh work shared by RunRemoteInstall
+// and RunRemoteNodeSetupOnly: detect the remote arch, download+run
+// magpiectl there with --node-setup-only (no --ssh -- it's already
+// running on the target), fetch the resulting kubeconfig back, rewrite
+// its server address, save it locally, and set KUBECONFIG. Returns the
+// local kubeconfig path.
+func runRemoteNodeSetup(ctx context.Context, sshHost, sshIdentity string, opts Options) (string, error) {
 	sshArgs := []string{"-o", "BatchMode=yes"}
 	if sshIdentity != "" {
 		sshArgs = append(sshArgs, "-i", sshIdentity)
@@ -44,13 +87,13 @@ func RunRemoteInstall(ctx context.Context, sshHost, sshIdentity string, opts Opt
 
 	token, err := ghToken()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	fmt.Printf("==> Detecting %s's architecture...\n", sshHost)
 	archOut, err := exec.CommandContext(ctx, "ssh", append(append([]string{}, sshArgs...), sshHost, "uname -m")...).Output()
 	if err != nil {
-		return fmt.Errorf("failed to detect %s's architecture: %w", sshHost, err)
+		return "", fmt.Errorf("failed to detect %s's architecture: %w", sshHost, err)
 	}
 	arch := archToGoArch(strings.TrimSpace(string(archOut)))
 	assetName := fmt.Sprintf("magpiectl_linux_%s.tar.gz", arch)
@@ -59,14 +102,16 @@ func RunRemoteInstall(ctx context.Context, sshHost, sshIdentity string, opts Opt
 	fmt.Printf("==> Resolving %s from release %s...\n", assetName, tag)
 	assetURL, err := releaseAssetURL(ctx, tag, assetName, token)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// A single remote shell command, not scp+ssh separately: downloads
 	// the correct-platform magpiectl straight to the remote host (never
 	// transits through this machine at all), runs it with only the
 	// node-setup-only invocation (k3s, nothing else), and cleans up
-	// after itself regardless of exit status.
+	// after itself regardless of exit status. No --ssh here -- this
+	// literally is the remote side, --ssh would (per the bug this
+	// function exists to avoid) just be ignored anyway.
 	remoteArgs := []string{
 		"install", "--bootstrap-k3s", "--node-setup-only",
 		"--data-dir", opts.DataDir,
@@ -82,14 +127,14 @@ func RunRemoteInstall(ctx context.Context, sshHost, sshIdentity string, opts Opt
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("remote node setup failed: %w", err)
+		return "", fmt.Errorf("remote node setup failed: %w", err)
 	}
 
 	fmt.Printf("==> Fetching kubeconfig from %s...\n", sshHost)
 	catArgs := append(append([]string{}, sshArgs...), sshHost, `cat "$HOME/.kube/config"`)
 	kubeconfig, err := exec.CommandContext(ctx, "ssh", catArgs...).Output()
 	if err != nil {
-		return fmt.Errorf("failed to fetch kubeconfig from %s: %w", sshHost, err)
+		return "", fmt.Errorf("failed to fetch kubeconfig from %s: %w", sshHost, err)
 	}
 
 	// Not just sshHost's own hostname part: it may be a bare alias
@@ -102,7 +147,7 @@ func RunRemoteInstall(ctx context.Context, sshHost, sshIdentity string, opts Opt
 	// already a real hostname/IP.
 	remoteHost, err := resolveSSHHostname(ctx, sshHost, sshArgs)
 	if err != nil {
-		return fmt.Errorf("failed to resolve %s's real hostname via ssh -G: %w", sshHost, err)
+		return "", fmt.Errorf("failed to resolve %s's real hostname via ssh -G: %w", sshHost, err)
 	}
 	rewritten := strings.NewReplacer(
 		"https://127.0.0.1:", "https://"+remoteHost+":",
@@ -111,35 +156,23 @@ func RunRemoteInstall(ctx context.Context, sshHost, sshIdentity string, opts Opt
 
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return err
+		return "", err
 	}
 	kubeDir := filepath.Join(home, ".kube")
 	if err := os.MkdirAll(kubeDir, 0o755); err != nil {
-		return err
+		return "", err
 	}
 	safeName := strings.NewReplacer(":", "-", ".", "-").Replace(remoteHost)
 	localPath := filepath.Join(kubeDir, "config-"+safeName)
 	if err := os.WriteFile(localPath, []byte(rewritten), 0o600); err != nil {
-		return err
+		return "", err
 	}
 	fmt.Printf("==> kubeconfig saved to %s\n", localPath)
 	if err := os.Setenv("KUBECONFIG", localPath); err != nil {
-		return err
+		return "", err
 	}
 
-	// Everything else -- CheckTools, secrets, helm pull/upgrade -- runs
-	// locally from here, against the cluster over the network via the
-	// kubeconfig above. helm/kubectl only need to be installed on this
-	// machine, never the remote one.
-	opts.BootstrapK3s = false
-	// kubeletRootDir is deterministic (same dataDir -> same path), so
-	// this doesn't need anything fetched back from the remote host --
-	// the k3s install that just happened there (via --node-setup-only)
-	// used this exact same derivation. See Options.KubeletDir's own doc
-	// for why this has to be exactly right.
-	opts.KubeletDir = kubeletRootDir(opts.DataDir)
-	fmt.Println("==> Continuing the install locally against the new cluster...")
-	return Run(ctx, opts)
+	return localPath, nil
 }
 
 // resolveSSHHostname returns whatever `ssh -G` says it would actually
@@ -157,7 +190,7 @@ func resolveSSHHostname(ctx context.Context, host string, sshArgs []string) (str
 	if err != nil {
 		return "", err
 	}
-	for _, line := range strings.Split(string(out), "\n") {
+	for line := range strings.SplitSeq(string(out), "\n") {
 		if name, ok := strings.CutPrefix(line, "hostname "); ok {
 			return strings.TrimSpace(name), nil
 		}

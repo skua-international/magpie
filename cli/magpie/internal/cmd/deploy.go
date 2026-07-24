@@ -149,6 +149,22 @@ func installCmd() *cobra.Command {
 				IdentityBaseURL:     i.identityBaseURL,
 				IngressBaseDomain:   i.ingressBaseDomain,
 			}
+			// --node-setup-only was being checked before --ssh here,
+			// which meant `--ssh <host> --node-setup-only` silently
+			// ignored --ssh entirely and bootstrapped k3s on the local
+			// machine instead of the remote target -- confirmed live.
+			// --ssh is checked first now; nodeSetupOnly on its own
+			// (no --ssh) still means "run node-setup locally," used by
+			// RunRemoteInstall's own remote invocation of this exact
+			// binary on the target host, where --ssh has no meaning.
+			if sshHost != "" && nodeSetupOnly {
+				version, err := deploy.ResolveVersion(cc.Context(), opts.Version)
+				if err != nil {
+					return err
+				}
+				opts.Version = version
+				return deploy.RunRemoteNodeSetupOnly(cc.Context(), sshHost, sshIdentity, opts)
+			}
 			if nodeSetupOnly {
 				return deploy.RunNodeSetup(cc.Context(), opts.DataDir)
 			}
