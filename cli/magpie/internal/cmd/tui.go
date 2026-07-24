@@ -22,13 +22,15 @@ func runTUI(ctx context.Context) error {
 		return err
 	}
 	cl := client.New(client.Config{ServerAPIURL: serverAPIURL, RegistryURL: registryURL}, creds.AccessToken)
-	// "magpie"/"arma" match every other subcommand's own --namespace/
-	// --release defaults (servers.go, armaconfig.go) -- not configurable
-	// here yet since the bare TUI entrypoint takes no flags of its own at
-	// all. The access token is a point-in-time snapshot -- if it expires
-	// mid-session, the Account screen's link flow just fails and the
-	// operator restarts the TUI, same as any other subcommand's session
-	// ultimately would.
-	_, err = tea.NewProgram(tui.New(ctx, cl, "magpie", "arma", identityURL, creds.AccessToken), tea.WithContext(ctx)).Run()
+	// namespace/release default to "magpie"/"arma", matching every other
+	// subcommand's own --namespace/--release defaults (servers.go,
+	// armaconfig.go) -- override via the bare invocation's own
+	// `magpiectl --namespace ... --release ...` (root.go's persistent
+	// flags), not per-command flags, since the TUI itself takes no
+	// subcommand. The access token is a point-in-time snapshot -- if it
+	// expires mid-session, the Account screen's link flow just fails and
+	// the operator restarts the TUI, same as any other subcommand's
+	// session ultimately would.
+	_, err = tea.NewProgram(tui.New(ctx, cl, namespace, release, identityURL, creds.AccessToken), tea.WithContext(ctx)).Run()
 	return err
 }

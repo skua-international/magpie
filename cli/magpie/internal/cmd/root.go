@@ -26,6 +26,8 @@ var (
 	serverAPIURL  string
 	registryURL   string
 	loginProvider string
+	namespace     string
+	release       string
 
 	// providerFlagChanged is captured once in Root's PersistentPreRun,
 	// before any subcommand's RunE -- doLogin can be reached from many
@@ -64,6 +66,8 @@ func Root() *cobra.Command {
 	root.PersistentFlags().StringVar(&serverAPIURL, "server-api-url", "http://server-api.magpie.local", "base URL of server-api")
 	root.PersistentFlags().StringVar(&registryURL, "registry-url", "http://registry.magpie.local", "base URL of registry")
 	root.PersistentFlags().StringVar(&loginProvider, "provider", "steam", "login provider: steam, discord, github, or google (prompts interactively if omitted on a TTY)")
+	root.PersistentFlags().StringVar(&namespace, "namespace", "magpie", "target namespace (bare TUI invocation only -- subcommands like `servers create`/`arma-config edit` have their own --namespace)")
+	root.PersistentFlags().StringVar(&release, "release", "arma", "helm release name (bare TUI invocation only -- same caveat as --namespace)")
 
 	root.AddCommand(loginCmd(), authCmd(), accountCmd(), serversCmd(), modsCmd(), missionsCmd(), adminCmd(), completionCmd(), deployCmd(), installCmd(), upgradeCmd())
 	return root
