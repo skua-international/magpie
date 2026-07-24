@@ -223,7 +223,7 @@ func writeKubeconfig(ctx context.Context) (string, error) {
 	return path, nil
 }
 
-// EnsureInstallSecrets creates arma-postgres-creds (random password,
+// EnsureInstallSecrets creates magpie-postgres-creds (random password,
 // unless externalPostgresURL is set) and, if ghcrUser/ghcrToken are both
 // given, ghcr-pull-secret -- mirroring deploy/k3s-bootstrap.sh's own
 // secret-resolution step (kept in sync deliberately; see that script's
@@ -262,23 +262,23 @@ func EnsureInstallSecrets(ctx context.Context, externalPostgresURL, ghcrUser, gh
 		// once; a rotation is a deliberate, separate operation (delete
 		// the Secret and the StatefulSet's PVC together), not a side
 		// effect of re-running install.
-		exists, err := secretExists(ctx, "arma-postgres-creds")
+		exists, err := secretExists(ctx, "magpie-postgres-creds")
 		if err != nil {
 			return nil, err
 		}
 		if exists {
-			fmt.Println("==> arma-postgres-creds already exists -- leaving it as-is")
+			fmt.Println("==> magpie-postgres-creds already exists -- leaving it as-is")
 		} else {
-			fmt.Println("==> Creating arma-postgres-creds (random password)...")
+			fmt.Println("==> Creating magpie-postgres-creds (random password)...")
 			password, err := randomPassword()
 			if err != nil {
 				return nil, err
 			}
-			if err := kubectlApplySecret(ctx, "generic", "arma-postgres-creds", []string{"--from-literal=POSTGRES_PASSWORD=" + password}); err != nil {
+			if err := kubectlApplySecret(ctx, "generic", "magpie-postgres-creds", []string{"--from-literal=POSTGRES_PASSWORD=" + password}); err != nil {
 				return nil, err
 			}
 		}
-		setArgs = append(setArgs, "--set", "postgres.existingSecret=arma-postgres-creds")
+		setArgs = append(setArgs, "--set", "postgres.existingSecret=magpie-postgres-creds")
 	} else {
 		setArgs = append(setArgs, "--set", "postgres.enabled=false", "--set", "postgres.externalUrl="+externalPostgresURL)
 	}

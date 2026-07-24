@@ -214,7 +214,7 @@ async fn fetch_and_merge(
 /// `user_secrets_namespace` -- deliberately never the `ArmaServer`'s own
 /// namespace (see `Config::user_secrets_namespace`'s doc for why: an
 /// operator-controlled ConfigMap value naming a Secret to read would
-/// otherwise be able to reach arma-postgres-creds/ghcr-pull-secret/etc.
+/// otherwise be able to reach magpie-postgres-creds/ghcr-pull-secret/etc.
 /// alongside it). Anything else (including an empty string) passes
 /// through unchanged.
 async fn resolve_secret_ref(

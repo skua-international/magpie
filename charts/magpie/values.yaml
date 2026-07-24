@@ -58,7 +58,7 @@ namespace: magpie
 # server config" section of README.md. Chart-created (templates/
 # user-secrets-namespace.yaml), kept separate from `namespace` above so
 # the controller's cross-namespace read access can be scoped to just
-# this namespace, not the one holding arma-postgres-creds/
+# this namespace, not the one holding magpie-postgres-creds/
 # ghcr-pull-secret/etc.
 userSecretsNamespace: magpie-user-secrets
 
@@ -181,8 +181,8 @@ postgres:
   enabled: true
   image: postgres:18-alpine
   port: 56275
-  database: arma
-  user: arma
+  database: magpie-cluster
+  user: magpie-operator
   # Name of an existing Secret with a POSTGRES_PASSWORD key. Not created by
   # this chart -- `kubectl create secret generic <name>
   # --from-literal=POSTGRES_PASSWORD=...` ahead of `helm install`, so the
@@ -215,11 +215,11 @@ postgres:
   # gets access to anything magpie's own services already own.
   # Provisioned even when postgres.enabled is false, against whatever
   # externalUrl points at.
-  appUser: arma_app
+  appUser: magpie-operator-arma
   # See templates/app-postgres-secret.yaml -- created by the chart
   # itself (stable across upgrades), read by the controller for the
   # plaintext password it needs to run the SQL above.
-  appSecretName: arma-app-postgres-creds
+  appSecretName: magpie-app-postgres-creds
   resources: {}
 
 syncDaemon:

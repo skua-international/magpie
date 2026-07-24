@@ -58,7 +58,7 @@ pub struct Config {
     pub arma_config_baseline: String,
     /// Namespace `{{secret:<name>/<key>}}` references (arma_config.rs)
     /// resolve against -- deliberately *not* this reconciler's own
-    /// namespace, which also holds arma-postgres-creds/ghcr-pull-secret/
+    /// namespace, which also holds magpie-postgres-creds/ghcr-pull-secret/
     /// etc. An operator-controlled ConfigMap value naming a Secret to
     /// read is effectively an exfiltration primitive if it can reach any
     /// secret in the platform's own namespace; scoping it to a separate,
@@ -93,11 +93,12 @@ impl Config {
                 })
                 .unwrap_or_default(),
             database_url: env::var("DATABASE_URL").unwrap_or_default(),
-            app_postgres_role: env::var("APP_POSTGRES_ROLE").unwrap_or_else(|_| "arma_app".into()),
+            app_postgres_role: env::var("APP_POSTGRES_ROLE")
+                .unwrap_or_else(|_| "magpie-operator-arma".into()),
             app_postgres_secret_name: env::var("APP_POSTGRES_SECRET_NAME")
-                .unwrap_or_else(|_| "arma-app-postgres-creds".into()),
+                .unwrap_or_else(|_| "magpie-app-postgres-creds".into()),
             app_postgres_database: env::var("APP_POSTGRES_DATABASE")
-                .unwrap_or_else(|_| "arma".into()),
+                .unwrap_or_else(|_| "magpie-cluster".into()),
             app_postgres_host: env::var("APP_POSTGRES_HOST").unwrap_or_default(),
             app_postgres_port: env::var("APP_POSTGRES_PORT").unwrap_or_else(|_| "5432".into()),
             arma_config_baseline: env::var("ARMA_CONFIG_BASELINE_CONFIGMAP")

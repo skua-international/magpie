@@ -164,7 +164,7 @@ magpiectl admin armaconfig
 - `{{prefix}}` / `{{suffix}}` — the merged config's own `prefix`/`suffix` keys
 - Sane default: `hostname = "{{prefix}}{{server_name}}{{suffix}}"` (only applied when `hostname` is entirely absent from the merge, not when it's present-but-empty)
 
-**Secret references**: `password`-family fields and any `env.<NAME>` key (see below) may be `{{secret:<name>/<key>}}` instead of a literal value, resolved via a live lookup — but *not* against the chart's own namespace. Secrets referenceable this way live in a dedicated `magpie-user-secrets` namespace (`userSecretsNamespace` in `values.yaml`, chart-created), kept separate on purpose: an operator-controlled ConfigMap value naming a Secret to read would otherwise be able to reach `arma-postgres-creds`/`ghcr-pull-secret`/etc. alongside it. Create your own Secrets there for anything you want referenceable this way.
+**Secret references**: `password`-family fields and any `env.<NAME>` key (see below) may be `{{secret:<name>/<key>}}` instead of a literal value, resolved via a live lookup — but *not* against the chart's own namespace. Secrets referenceable this way live in a dedicated `magpie-user-secrets` namespace (`userSecretsNamespace` in `values.yaml`, chart-created), kept separate on purpose: an operator-controlled ConfigMap value naming a Secret to read would otherwise be able to reach `magpie-postgres-creds`/`ghcr-pull-secret`/etc. alongside it. Create your own Secrets there for anything you want referenceable this way.
 
 **Extra env vars**: any merged-config key of the form `env.<NAME>` becomes an extra `<NAME>` env var on the launcher container (same placeholder/`{{secret:...}}` support), e.g. `env.SOME_API_KEY = "{{secret:my-secret/key}}"`.
 
