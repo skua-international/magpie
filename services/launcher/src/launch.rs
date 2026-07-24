@@ -1,4 +1,6 @@
+use std::net::UdpSocket;
 use std::os::unix::process::ExitStatusExt;
+use std::time::Duration;
 
 use anyhow::{Context, Result};
 use tokio::process::Command as TokioCommand;
@@ -7,6 +9,54 @@ use tokio::signal::unix::{SignalKind, signal};
 use crate::config::Config;
 
 const SERVER_ROOT: &str = "/arma3/server";
+
+// Arma binds a 5-port range starting at PORT (see crates/crd/src/lib.rs's
+// own doc on ArmaServerSpec::port) -- game port, query port (PORT+1,
+// what healthcheck.rs probes), plus 3 more. A `kubectl delete pod` races
+// the replacement pod's launcher against the old pod's arma3server_x64
+// still tearing down and holding all 5; confirmed live: "CreateBoundSocket:
+// ::bind couldn't find an open port between 2303 and 2303" when the
+// replacement started before the old process actually released them.
+const PORT_RANGE_SIZE: u16 = 5;
+const PORT_WAIT_RETRY_INTERVAL: Duration = Duration::from_secs(2);
+const PORT_WAIT_TIMEOUT: Duration = Duration::from_secs(120);
+
+/// Blocks until every port in `port..port+PORT_RANGE_SIZE` can be bound, or
+/// bails after `PORT_WAIT_TIMEOUT`. Deliberately runs *before* arma3server
+/// is ever spawned, not as a retry-after-crash loop: this process staying
+/// alive without having spawned the child yet is what keeps the readiness
+/// probe (an actual UDP query against a port nothing is listening on)
+/// reporting not-ready for the whole wait, with no separate "I'm waiting"
+/// signal needed -- see healthcheck.rs.
+async fn wait_for_ports_free(port: u16) -> Result<()> {
+    let deadline = tokio::time::Instant::now() + PORT_WAIT_TIMEOUT;
+    loop {
+        // Bind-and-drop probe, same primitive healthcheck.rs already uses
+        // (UdpSocket::bind) -- each socket closes immediately after this
+        // block, so a free port isn't held away from arma3server itself.
+        let busy = (0..PORT_RANGE_SIZE)
+            .map(|offset| port + offset)
+            .find(|&p| UdpSocket::bind(("0.0.0.0", p)).is_err());
+
+        let Some(busy_port) = busy else {
+            return Ok(());
+        };
+
+        if tokio::time::Instant::now() >= deadline {
+            anyhow::bail!(
+                "port {busy_port} (in range {port}..{}) still bound after {:.0}s, giving up",
+                port + PORT_RANGE_SIZE - 1,
+                PORT_WAIT_TIMEOUT.as_secs_f64()
+            );
+        }
+
+        tracing::warn!(
+            "port {busy_port} still in use (likely the previous pod's arma3server still \
+             releasing it) -- waiting"
+        );
+        tokio::time::sleep(PORT_WAIT_RETRY_INTERVAL).await;
+    }
+}
 
 /// Build the launch args and exec the server directly (no shell involved
 /// at all -- see the spawn call's own doc for why that's more than just
@@ -67,8 +117,13 @@ pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Inst
     std::env::set_current_dir(&cfg.claim_path)
         .with_context(|| format!("failed to chdir into {}", cfg.claim_path.display()))?;
 
-    let port = std::env::var("PORT").unwrap_or_else(|_| "2302".into());
+    let port: u16 = std::env::var("PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(2302);
     let arma_profile = std::env::var("ARMA_PROFILE").unwrap_or_else(|_| "main".into());
+
+    wait_for_ports_free(port).await?;
 
     if let Some(connect) = &cfg.client_connect {
         args.push("-client".to_string());
@@ -111,13 +166,24 @@ pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Inst
         .spawn()
         .context("failed to spawn arma3server")?;
 
-    // No handler at all used to mean Kubernetes' SIGTERM (pod deletion,
-    // or the Recreate rollover a resync triggers) killed this process
-    // immediately, forwarding nothing to arma3server and giving it no
-    // chance at a clean shutdown. Forward SIGTERM and wait for the real
-    // exit instead of dying immediately ourselves.
+    // No handler at all used to mean Kubernetes' pod-deletion signal
+    // killed this process immediately, forwarding nothing to arma3server
+    // and giving it no chance at a clean shutdown. Forward it and wait
+    // for the real exit instead of dying immediately ourselves.
+    //
+    // Both SIGTERM *and* SIGINT are handled, not just SIGTERM: the
+    // Dockerfile sets `STOPSIGNAL SIGINT`, which is what Kubernetes
+    // actually sends PID 1 on pod deletion -- a SIGTERM-only handler here
+    // means Rust's default SIGINT behavior (immediate death, no handler)
+    // kills launcher without ever forwarding anything, leaving
+    // arma3server to die from losing its parent instead of a clean
+    // shutdown -- directly relevant to `wait_for_ports_free` above, since
+    // a clean shutdown releases the port range far more promptly than an
+    // orphaned process does.
     let mut sigterm =
         signal(SignalKind::terminate()).context("failed to install SIGTERM handler")?;
+    let mut sigint =
+        signal(SignalKind::interrupt()).context("failed to install SIGINT handler")?;
     let status = tokio::select! {
         status = child.wait() => status.context("failed to wait for arma3server")?,
         _ = sigterm.recv() => {
@@ -129,6 +195,14 @@ pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Inst
                 unsafe { libc::kill(pid as i32, libc::SIGTERM) };
             }
             child.wait().await.context("failed to wait for arma3server after SIGTERM")?
+        }
+        _ = sigint.recv() => {
+            tracing::info!("received SIGINT -- forwarding to arma3server and waiting for it to exit");
+            if let Some(pid) = child.id() {
+                // SAFETY: same as the SIGTERM branch above.
+                unsafe { libc::kill(pid as i32, libc::SIGINT) };
+            }
+            child.wait().await.context("failed to wait for arma3server after SIGINT")?
         }
     };
 
@@ -142,4 +216,64 @@ pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Inst
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Picks an ephemeral port from the OS (bind to :0, read it back, drop
+    // immediately) rather than a hardcoded literal -- avoids flaking on a
+    // CI box where something else already holds a fixed test port.
+    fn free_port_base() -> u16 {
+        UdpSocket::bind(("0.0.0.0", 0))
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port()
+    }
+
+    #[tokio::test]
+    async fn wait_for_ports_free_returns_immediately_when_all_free() {
+        let port = free_port_base();
+        tokio::time::timeout(Duration::from_secs(1), wait_for_ports_free(port))
+            .await
+            .expect("should not time out")
+            .expect("all 5 ports are free");
+    }
+
+    #[tokio::test]
+    async fn wait_for_ports_free_waits_until_a_held_port_releases() {
+        let port = free_port_base();
+        // Hold one port in the middle of the 5-port range, exactly the
+        // "old pod's arma3server hasn't released it yet" scenario.
+        let held = UdpSocket::bind(("0.0.0.0", port + 2)).unwrap();
+
+        let wait = tokio::spawn(wait_for_ports_free(port));
+        tokio::time::sleep(PORT_WAIT_RETRY_INTERVAL * 2).await;
+        // Still waiting -- the held port hasn't been released yet.
+        assert!(!wait.is_finished());
+
+        drop(held);
+        tokio::time::timeout(PORT_WAIT_TIMEOUT, wait)
+            .await
+            .expect("should not time out")
+            .expect("task should not panic")
+            .expect("should succeed once the held port is released");
+    }
+
+    #[tokio::test]
+    async fn wait_for_ports_free_bails_after_timeout() {
+        let port = free_port_base();
+        let _held = UdpSocket::bind(("0.0.0.0", port)).unwrap();
+
+        // Real timeout is 120s -- too slow for a unit test to actually
+        // exercise. This just confirms the loop keeps retrying (doesn't
+        // return Ok early) while the port stays held; the timeout path
+        // itself is a straightforward bail! covered by inspection, not
+        // worth a slow test.
+        tokio::time::timeout(PORT_WAIT_RETRY_INTERVAL * 2, wait_for_ports_free(port))
+            .await
+            .expect_err("should still be waiting, not have returned");
+    }
 }

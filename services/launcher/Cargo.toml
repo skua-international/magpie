@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "signal"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "signal", "time"] }
 anyhow = "1"
 libc = "0.2"
 walkdir = "2"
