@@ -7,11 +7,11 @@ edition.workspace = true
 anyhow = "1.0.103"
 authn = { path = "../../crates/authn" }
 axum = { version = "0.8.9", features = ["query"] }
-base64 = "0.22.1"
+base64 = "0.23.0"
 chrono = { version = "0.4.45", features = ["serde"] }
 jsonwebtoken = { version = "10.4.0", default-features = false, features = ["rust_crypto"] }
 metrics = "0.24"
-metrics-exporter-prometheus = { version = "0.16", default-features = false }
+metrics-exporter-prometheus = { version = "0.18", default-features = false }
 oauth2 = "5.0.0"
 registry-db = { path = "../../crates/registry-db" }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
