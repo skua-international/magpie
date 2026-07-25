@@ -19,13 +19,8 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  pick-runner:
-    uses: ./.github/workflows/pick-runner.yml
-    secrets: inherit
-
   generate:
-    needs: pick-runner
-    runs-on: ${{ fromJSON(needs.pick-runner.outputs.labels) }}
+    runs-on: elephant-runners
     permissions:
       contents: write
     steps:
@@ -36,7 +31,7 @@ jobs:
           version: "1.71.0"
           # Tried migrating to the consolidated bufbuild/buf-action (with
           # setup_only: true) -- confirmed broken on this repo's
-          # self-hosted runner (see pick-runner.yml): its core.addPath()
+          # self-hosted runner (elephant, via ARC): its core.addPath()
           # call runs (logged "Setup buf (1.71.0) at
           # /opt/hostedtoolcache/buf/..."), but the very next step still
           # gets "buf: command not found", and buf-action's own post-job

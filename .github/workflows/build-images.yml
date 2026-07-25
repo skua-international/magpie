@@ -25,10 +25,6 @@ env:
   IMAGE_BASE: ghcr.io/skua-international/magpie
 
 jobs:
-  pick-runner:
-    uses: ./.github/workflows/pick-runner.yml
-    secrets: inherit
-
   # Compiles all 6 Rust service binaries once (Dockerfile.workspace, exported
   # locally via buildx rather than run/pushed), and hands them to the
   # build matrix below as a job artifact.
@@ -64,8 +60,7 @@ jobs:
   # different commit. Compiling once removes both failure classes
   # outright -- there's only one job now, nothing to race.
   build-workspace:
-    needs: pick-runner
-    runs-on: ${{ fromJSON(needs.pick-runner.outputs.labels) }}
+    runs-on: elephant-runners
     steps:
       - uses: actions/checkout@v7
 
@@ -95,8 +90,8 @@ jobs:
           retention-days: 1
 
   build:
-    needs: [pick-runner, build-workspace]
-    runs-on: ${{ fromJSON(needs.pick-runner.outputs.labels) }}
+    needs: build-workspace
+    runs-on: elephant-runners
     permissions:
       contents: read
       packages: write

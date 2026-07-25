@@ -14,13 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  pick-runner:
-    uses: ./.github/workflows/pick-runner.yml
-    secrets: inherit
-
   goreleaser:
-    needs: pick-runner
-    runs-on: ${{ fromJSON(needs.pick-runner.outputs.labels) }}
+    runs-on: elephant-runners
     permissions:
       contents: read
     steps:
