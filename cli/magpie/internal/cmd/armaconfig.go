@@ -101,7 +101,7 @@ func adminArmaConfigCmd() *cobra.Command {
 			return editBaselineConfigMap(c.Context(), namespace, release)
 		},
 	}
-	c.Flags().StringVar(&namespace, "namespace", "magpie", "target namespace")
-	c.Flags().StringVar(&release, "release", "arma", "helm release name")
+	c.Flags().StringVar(&namespace, "namespace", defaults.namespace, "target namespace (env MAGPIE_NAMESPACE, or 'magpiectl target')")
+	c.Flags().StringVar(&release, "release", defaults.release, "helm release name (env MAGPIE_RELEASE, or 'magpiectl target')")
 	return c
 }

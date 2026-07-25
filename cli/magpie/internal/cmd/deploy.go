@@ -18,8 +18,8 @@ type deployFlags struct {
 
 func addDeployFlags(c *cobra.Command, f *deployFlags) {
 	c.Flags().StringVar(&f.imageTag, "image-tag", "", "override just the image tag (chart stays at the resolved version)")
-	c.Flags().StringVar(&f.namespace, "namespace", "magpie", "target namespace")
-	c.Flags().StringVar(&f.release, "release", "arma", "helm release name")
+	c.Flags().StringVar(&f.namespace, "namespace", defaults.namespace, "target namespace (env MAGPIE_NAMESPACE, or 'magpiectl target')")
+	c.Flags().StringVar(&f.release, "release", defaults.release, "helm release name (env MAGPIE_RELEASE, or 'magpiectl target')")
 	c.Flags().StringVar(&f.timeout, "timeout", "10m", "helm --wait timeout")
 	c.Flags().BoolVar(&f.dryRun, "dry-run", false, "render + apply nothing")
 }

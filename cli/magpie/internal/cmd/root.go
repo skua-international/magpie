@@ -62,14 +62,14 @@ func Root() *cobra.Command {
 		},
 	}
 
-	root.PersistentFlags().StringVar(&identityURL, "identity-url", "http://identity.magpie.local", "base URL of the identity service")
-	root.PersistentFlags().StringVar(&serverAPIURL, "server-api-url", "http://server-api.magpie.local", "base URL of server-api")
-	root.PersistentFlags().StringVar(&registryURL, "registry-url", "http://registry.magpie.local", "base URL of registry")
+	root.PersistentFlags().StringVar(&identityURL, "identity-url", defaults.identityURL, "base URL of the identity service (env MAGPIE_IDENTITY_URL, or 'magpiectl target')")
+	root.PersistentFlags().StringVar(&serverAPIURL, "server-api-url", defaults.serverAPIURL, "base URL of server-api (env MAGPIE_SERVER_API_URL, or 'magpiectl target')")
+	root.PersistentFlags().StringVar(&registryURL, "registry-url", defaults.registryURL, "base URL of registry (env MAGPIE_REGISTRY_URL, or 'magpiectl target')")
 	root.PersistentFlags().StringVar(&loginProvider, "provider", "steam", "login provider: steam, discord, github, or google (prompts interactively if omitted on a TTY)")
-	root.PersistentFlags().StringVar(&namespace, "namespace", "magpie", "target namespace (bare TUI invocation only -- subcommands like `servers create`/`arma-config edit` have their own --namespace)")
-	root.PersistentFlags().StringVar(&release, "release", "arma", "helm release name (bare TUI invocation only -- same caveat as --namespace)")
+	root.PersistentFlags().StringVar(&namespace, "namespace", defaults.namespace, "target namespace (bare TUI invocation only -- subcommands like 'servers create'/'arma-config edit' have their own --namespace; env MAGPIE_NAMESPACE, or 'magpiectl target')")
+	root.PersistentFlags().StringVar(&release, "release", defaults.release, "helm release name (bare TUI invocation only -- same caveat as --namespace; env MAGPIE_RELEASE, or 'magpiectl target')")
 
-	root.AddCommand(loginCmd(), authCmd(), accountCmd(), serversCmd(), modsCmd(), missionsCmd(), adminCmd(), completionCmd(), deployCmd(), installCmd(), upgradeCmd())
+	root.AddCommand(loginCmd(), authCmd(), accountCmd(), serversCmd(), modsCmd(), missionsCmd(), adminCmd(), completionCmd(), deployCmd(), installCmd(), upgradeCmd(), targetCmd())
 	return root
 }
 
