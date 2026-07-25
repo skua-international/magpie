@@ -67,8 +67,8 @@ spec:
               value: /var/lib/magpie-csi/blob/content.img
             - name: BLOB_MOUNT_PATH
               value: /var/lib/magpie-csi/mnt
-            - name: INITIAL_SIZE_GIB
-              value: {{ .Values.reflinkStorage.sizeGiB | quote }}
+            - name: MAX_SIZE_GIB
+              value: {{ .Values.reflinkStorage.maxSizeGiB | quote }}
           volumeMounts:
             - name: plugin-dir
               mountPath: /csi

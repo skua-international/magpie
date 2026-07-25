@@ -120,7 +120,14 @@ ingress:
 # own doc for why that's still necessary even though this isn't hostPath
 # any more.
 reflinkStorage:
-  sizeGiB: 40
+  # Caps how large magpie-csi's node-local btrfs blob is ever allowed to
+  # grow -- 0 means unlimited (grows to fit whatever content/workshop
+  # actually needs, minus 5GiB always kept free for burst headroom).
+  # There's no separate "initial size" setting anymore: that's now
+  # computed automatically as (current non-workshop game content size +
+  # 5GiB), not configured -- see services/magpie-csi/internal/blob's own
+  # doc for why.
+  maxSizeGiB: 0
 
 # Node-local directory holding registry-owned local (zip-uploaded) mods
 # and missions -- hostPath, not a PVC: this chart targets single-node

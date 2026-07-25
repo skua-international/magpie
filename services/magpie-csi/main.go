@@ -10,10 +10,12 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc"
@@ -28,12 +30,25 @@ func main() {
 		socketPath = socketPath[7:]
 	}
 
-	nodeID := envOr("NODE_ID", "unknown")
+	// NODE_ID is only ever set by the Node DaemonSet (a fieldRef to
+	// spec.nodeName) -- the Controller Deployment doesn't set it, isn't
+	// privileged, and has no hostPath access to the blob at all, so this
+	// doubles as this process's only signal for whether it's safe (or
+	// even possible) to run the capacity watchdog below.
+	rawNodeID := os.Getenv("NODE_ID")
+	nodeID := rawNodeID
+	if nodeID == "" {
+		nodeID = "unknown"
+	}
 	blobImage := envOr("BLOB_IMAGE_PATH", "/var/lib/magpie-csi/blob/content.img")
 	blobMount := envOr("BLOB_MOUNT_PATH", "/var/lib/magpie-csi/mnt")
-	initialGB, err := strconv.ParseInt(envOr("INITIAL_SIZE_GIB", "40"), 10, 64)
+	maxSizeGB, err := strconv.ParseInt(envOr("MAX_SIZE_GIB", "0"), 10, 64)
 	if err != nil {
-		log.Fatalf("invalid INITIAL_SIZE_GIB: %v", err)
+		log.Fatalf("invalid MAX_SIZE_GIB: %v", err)
+	}
+	capacityCheckInterval, err := time.ParseDuration(envOr("CAPACITY_CHECK_INTERVAL", "5m"))
+	if err != nil {
+		log.Fatalf("invalid CAPACITY_CHECK_INTERVAL: %v", err)
 	}
 
 	// A stale socket from a previous run (e.g. an unclean restart) makes
@@ -49,11 +64,15 @@ func main() {
 		log.Fatalf("failed to listen on %s: %v", socketPath, err)
 	}
 
-	d := driver.New(nodeID, blobImage, blobMount, initialGB)
+	d := driver.New(nodeID, blobImage, blobMount, maxSizeGB)
 	server := grpc.NewServer()
 	csi.RegisterIdentityServer(server, d)
 	csi.RegisterControllerServer(server, d)
 	csi.RegisterNodeServer(server, d)
+
+	if rawNodeID != "" {
+		go d.Blob().Watch(context.Background(), capacityCheckInterval)
+	}
 
 	log.Printf("magpie-csi listening on %s (node_id=%s)", endpoint, nodeID)
 	if err := server.Serve(listener); err != nil {

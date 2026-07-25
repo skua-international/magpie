@@ -17,12 +17,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // nonrootUID is the fixed UID/GID every non-distroless container in
@@ -33,10 +35,23 @@ import (
 // code across these two separate Go modules).
 const nonrootUID = "65532"
 
+// headroomBytes is the free space EnsureCapacity always tries to
+// maintain -- hardcoded, not chart-configurable, on the same reasoning
+// as the initial floor below: this is a correctness property of the
+// driver (enough room for an in-flight download or snapshot to land
+// without racing the filesystem filling up), not a deployment-specific
+// tuning knob.
+const headroomBytes = 5 << 30
+
+// shrinkHysteresisBytes guards against grow/shrink thrashing every tick
+// -- only shrink once there's meaningfully more free space than the
+// target actually needs, not the instant it's 1 byte over.
+const shrinkHysteresisBytes = 1 << 30
+
 type Manager struct {
-	imagePath        string
-	mountPath        string
-	initialSizeBytes int64
+	imagePath    string
+	mountPath    string
+	maxSizeBytes int64 // 0 == unlimited
 
 	mu sync.Mutex
 }
@@ -45,20 +60,36 @@ type GrowOutcome struct {
 	TotalBytes int64
 	FreeBytes  int64
 	Grew       bool
+	Shrunk     bool
 }
 
-func NewManager(imagePath, mountPath string, initialSizeBytes int64) *Manager {
+// NewManager builds a Manager for the one shared node-local blob.
+// maxSizeBytes caps how large EnsureCapacity will ever grow it to; 0
+// means unlimited (chart default -- see reflinkStorage.maxSizeGiB).
+func NewManager(imagePath, mountPath string, maxSizeBytes int64) *Manager {
 	return &Manager{
-		imagePath:        imagePath,
-		mountPath:        mountPath,
-		initialSizeBytes: initialSizeBytes,
+		imagePath:    imagePath,
+		mountPath:    mountPath,
+		maxSizeBytes: maxSizeBytes,
 	}
 }
 
-// EnsureCapacity ensures bytesNeeded free space exists, growing (or
-// first-time bootstrapping) if not. Idempotent -- safe to call even
-// when nothing actually needs to happen.
-func (m *Manager) EnsureCapacity(ctx context.Context, bytesNeeded int64) (GrowOutcome, error) {
+// EnsureCapacity bootstraps the blob if it isn't mounted yet, then
+// reconciles its size toward (current non-workshop game content +
+// headroomBytes) at minimum, and (current total usage + headroomBytes)
+// in general -- growing if that's short, shrinking back down if there's
+// well more free space than that (e.g. after mod sources/snapshots got
+// deleted). This is deliberately parameter-free: there is no
+// "bytesNeeded" a caller could pass 0 for and silently skip real
+// reconciliation -- every single call, from every call site (see
+// node.go's NodeStageVolume/NodePublishVolume, and Watch below), does
+// the same real check. That's a direct fix for a live incident
+// (2026-07-25): every existing call site used to pass a hardcoded
+// bytesNeeded=0, which is trivially satisfied by any amount of free
+// space including zero, so the blob silently filled to 100% and never
+// grew until nothing could be written at all (sync-daemon crash-looping
+// on SIGBUS from an mmap page fault into a completely full filesystem).
+func (m *Manager) EnsureCapacity(ctx context.Context) (GrowOutcome, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -67,11 +98,16 @@ func (m *Manager) EnsureCapacity(ctx context.Context, bytesNeeded int64) (GrowOu
 		return GrowOutcome{}, err
 	}
 	if !mounted {
-		minSize := bytesNeeded
-		if m.initialSizeBytes > minSize {
-			minSize = m.initialSizeBytes
+		// Nothing's been synced onto a not-yet-mounted blob, so
+		// gameContentBytes is always 0 here -- this naturally bootstraps
+		// at just headroomBytes, then grows for real once sync-daemon's
+		// startup game-file sync (main.rs: "syncing game files at
+		// startup") actually lands content and the next tick sees it.
+		floor, err := m.desiredFloor(ctx)
+		if err != nil {
+			return GrowOutcome{}, err
 		}
-		if err := m.bootstrap(ctx, minSize); err != nil {
+		if err := m.bootstrap(ctx, m.clamp(floor)); err != nil {
 			return GrowOutcome{}, fmt.Errorf("failed to bootstrap blob filesystem: %w", err)
 		}
 		total, free, err := m.statvfs(ctx)
@@ -85,19 +121,118 @@ func (m *Manager) EnsureCapacity(ctx context.Context, bytesNeeded int64) (GrowOu
 	if err != nil {
 		return GrowOutcome{}, err
 	}
-	if free >= bytesNeeded {
-		return GrowOutcome{TotalBytes: total, FreeBytes: free, Grew: false}, nil
+	floor, err := m.desiredFloor(ctx)
+	if err != nil {
+		return GrowOutcome{}, err
+	}
+	used := total - free
+	target := m.clamp(max(used+headroomBytes, floor))
+
+	switch {
+	case target > total:
+		if err := m.growTo(ctx, target); err != nil {
+			return GrowOutcome{}, fmt.Errorf("failed to grow blob filesystem: %w", err)
+		}
+	case total-target >= shrinkHysteresisBytes:
+		if err := m.shrinkTo(ctx, target); err != nil {
+			return GrowOutcome{}, fmt.Errorf("failed to shrink blob filesystem: %w", err)
+		}
+	default:
+		return GrowOutcome{TotalBytes: total, FreeBytes: free}, nil
 	}
 
-	target := total + (bytesNeeded - free)
-	if err := m.growTo(ctx, target); err != nil {
-		return GrowOutcome{}, fmt.Errorf("failed to grow blob filesystem: %w", err)
-	}
 	total, free, err = m.statvfs(ctx)
 	if err != nil {
 		return GrowOutcome{}, err
 	}
-	return GrowOutcome{TotalBytes: total, FreeBytes: free, Grew: true}, nil
+	return GrowOutcome{TotalBytes: total, FreeBytes: free, Grew: target > total, Shrunk: target < total}, nil
+}
+
+// clamp caps target at maxSizeBytes, if one's configured (0 == no cap).
+// A configured max below what headroomBytes/the game-content floor
+// actually needs is a misconfiguration, not something to silently
+// enforce past the point of being able to hold the game's own files --
+// the caller (EnsureCapacity) logs when this actually bites.
+func (m *Manager) clamp(target int64) int64 {
+	if m.maxSizeBytes > 0 && target > m.maxSizeBytes {
+		return m.maxSizeBytes
+	}
+	return target
+}
+
+// desiredFloor is (current on-disk size of everything under content/
+// except content/workshop) + headroomBytes -- the minimum this blob
+// should ever be, regardless of how much workshop content has been
+// deleted. Computed fresh every call (via `du`, same shell-out
+// convention as the rest of this package) rather than cached: the game
+// content tree only changes on a CDLC release, so this is cheap relative
+// to how rarely it actually changes, and caching it would just be one
+// more thing that could go stale.
+func (m *Manager) desiredFloor(ctx context.Context) (int64, error) {
+	contentPath := filepath.Join(m.mountPath, "content")
+	totalBytes, err := duBytes(ctx, contentPath)
+	if err != nil {
+		return 0, err
+	}
+	workshopBytes, err := duBytes(ctx, filepath.Join(contentPath, "workshop"))
+	if err != nil {
+		return 0, err
+	}
+	return (totalBytes - workshopBytes) + headroomBytes, nil
+}
+
+// duBytes returns 0, not an error, for a path that doesn't exist yet --
+// both content/ (pre-bootstrap) and content/workshop (before the first
+// mod source ever syncs) are legitimately missing at times this gets
+// called.
+func duBytes(ctx context.Context, path string) (int64, error) {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return 0, nil
+	}
+	var stdout, stderr bytes.Buffer
+	cmd := exec.CommandContext(ctx, "du", "-sb", path)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return 0, fmt.Errorf("du -sb %s failed: %s", path, strings.TrimSpace(stderr.String()))
+	}
+	fields := strings.Fields(stdout.String())
+	if len(fields) < 1 {
+		return 0, fmt.Errorf("unexpected du output: %s", stdout.String())
+	}
+	n, err := strconv.ParseInt(fields[0], 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("unexpected du output: %s", stdout.String())
+	}
+	return n, nil
+}
+
+// Watch periodically reconciles capacity on its own schedule -- the
+// only thing that guarantees this happens even when no volume RPC comes
+// in for a while (sync-daemon writes directly to the mounted blob, not
+// through any CSI call the Node plugin would otherwise observe). Blocks
+// until ctx is cancelled; call this in its own goroutine.
+func (m *Manager) Watch(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			outcome, err := m.EnsureCapacity(ctx)
+			if err != nil {
+				log.Printf("capacity watchdog: EnsureCapacity failed: %v", err)
+				continue
+			}
+			switch {
+			case outcome.Grew:
+				log.Printf("capacity watchdog: grew blob to %d bytes (%d free)", outcome.TotalBytes, outcome.FreeBytes)
+			case outcome.Shrunk:
+				log.Printf("capacity watchdog: shrunk blob to %d bytes (%d free)", outcome.TotalBytes, outcome.FreeBytes)
+			}
+		}
+	}
 }
 
 func (m *Manager) Status(ctx context.Context) (total, free int64, err error) {
@@ -241,6 +376,29 @@ func (m *Manager) growTo(ctx context.Context, newSizeBytes int64) error {
 		return err
 	}
 	return run(ctx, "btrfs", "filesystem", "resize", "max", m.mountPath)
+}
+
+// shrinkTo is growTo's mirror image, in reverse order for the same
+// reason growTo's order matters: the btrfs resize has to happen first,
+// while the loop device (and its backing file) are still the *old*,
+// larger size, so btrfs has room to actually relocate any data/metadata
+// currently living past the new, smaller boundary. Only once that
+// succeeds is it safe to truncate the backing file down and tell the
+// kernel (losetup -c) to notice the smaller size -- doing this before
+// the btrfs resize could truncate away data btrfs hadn't relocated yet.
+func (m *Manager) shrinkTo(ctx context.Context, newSizeBytes int64) error {
+	if err := run(ctx, "btrfs", "filesystem", "resize", strconv.FormatInt(newSizeBytes, 10), m.mountPath); err != nil {
+		return err
+	}
+	if err := run(ctx, "truncate", "-s", strconv.FormatInt(newSizeBytes, 10), m.imagePath); err != nil {
+		return err
+	}
+	loopDev, err := m.attachLoopDevice(ctx)
+	if err != nil {
+		return err
+	}
+	// Tells the kernel to re-read the backing file's now-smaller size.
+	return run(ctx, "losetup", "-c", loopDev)
 }
 
 // attachLoopDevice is idempotent: reuses an existing loop association

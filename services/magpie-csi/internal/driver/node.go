@@ -9,18 +9,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	"github.com/skua-international/magpie/services/magpie-csi/internal/blob"
 )
-
-// blobManager is created once, lazily, on the first NodeStageVolume/
-// NodePublishVolume that needs it -- every volume this driver ever
-// touches shares the one node-local blob (see blob.Manager's own doc
-// for why: golden content and every snapshot taken from it need to
-// live on one real filesystem).
-func (d *Driver) blobManager() *blob.Manager {
-	return blob.NewManager(d.blobImage, d.blobMount, d.initialGB<<30)
-}
 
 // snapshotPath is where a given ephemeral volume's own btrfs snapshot
 // lives, under the shared blob's "claims" directory (see blob.go's
@@ -50,7 +39,10 @@ func (d *Driver) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRe
 		return nil, status.Error(codes.InvalidArgument, "staging_target_path is required")
 	}
 
-	if _, err := d.blobManager().EnsureCapacity(ctx, 0); err != nil {
+	// Reconciles size (grow or shrink) same as every other call site --
+	// see blob.Manager.EnsureCapacity's own doc for why this is
+	// deliberately parameter-free now.
+	if _, err := d.blob.EnsureCapacity(ctx); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to mount blob: %v", err)
 	}
 
@@ -124,7 +116,7 @@ func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolu
 	if req.GetVolumeId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume_id is required")
 	}
-	if _, err := d.blobManager().EnsureCapacity(ctx, 0); err != nil {
+	if _, err := d.blob.EnsureCapacity(ctx); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to mount blob: %v", err)
 	}
 	contentPath := filepath.Join(d.blobMount, "content")

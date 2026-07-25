@@ -15,4 +15,9 @@ spec:
   storageClassName: magpie-golden-content
   resources:
     requests:
-      storage: {{ .Values.reflinkStorage.sizeGiB }}Gi
+      # Non-binding: magpie-csi's CreateVolume echoes this back but
+      # never actually enforces it (storageCapacity: false in its
+      # CSIDriver spec) -- real sizing is the capacity watchdog's job at
+      # runtime (see values.yaml's reflinkStorage.maxSizeGiB). Just a
+      # large nominal value so the PVC object itself is valid.
+      storage: 1000Gi
