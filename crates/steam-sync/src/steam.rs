@@ -172,6 +172,12 @@ pub struct CmPool {
     /// waiting on, or worse re-churning, slots that already proved
     /// anonymous just to re-confirm it).
     authenticated: Vec<AtomicBool>,
+    /// One permit, shared by every slot's [`login_with_retry`] call (both
+    /// the initial concurrent logins in [`CmPool::start`] and later
+    /// [`CmPool::relogin_slot`] reconnects) -- see that function's own
+    /// doc for why a single shared gate is what actually staggers retries
+    /// in wall-clock time, not just each slot's own backoff delay.
+    retry_gate: Arc<Semaphore>,
 }
 
 /// Retries a single connection's login up to [`LOGIN_ATTEMPTS`] times with
@@ -182,7 +188,11 @@ pub struct CmPool {
 /// batch (the previous behavior, via `try_join_all` with no per-slot retry).
 const LOGIN_ATTEMPTS: usize = 3;
 
-async fn login_with_retry<F, Fut>(slot: usize, mut attempt_login: F) -> Result<CmConnection>
+async fn login_with_retry<F, Fut>(
+    slot: usize,
+    retry_gate: &Semaphore,
+    mut attempt_login: F,
+) -> Result<CmConnection>
 where
     F: FnMut() -> Fut,
     Fut: std::future::Future<Output = Result<CmConnection>>,
@@ -194,6 +204,20 @@ where
                 warn!(
                     "pool slot {slot} login attempt {attempt}/{LOGIN_ATTEMPTS} failed, retrying: {e:#}"
                 );
+                // Confirmed live: every slot starts retrying from the same
+                // instant with the same `2 * attempt` formula, so each
+                // slot's own backoff genuinely grows but the *set* of
+                // retries across all slots still lands in synchronized
+                // bursts hitting Steam together -- the backoff buys
+                // nothing against the thing backoff is actually for
+                // (spacing out load on the far end) if every slot waits
+                // the same amount and then fires at once anyway. One
+                // permit, shared across every slot in this pool (held for
+                // the sleep *and* the re-attempt, not just the network
+                // call), forces retries to genuinely interleave in real
+                // time instead of each slot independently believing it
+                // backed off.
+                let _permit = retry_gate.acquire().await.expect("never closed");
                 tokio::time::sleep(std::time::Duration::from_secs(2 * attempt as u64)).await;
             }
             Err(e) => return Err(e),
@@ -207,19 +231,23 @@ where
 /// workshop depot 107410 (no license grant needed), just not the
 /// server/CDLC depots under app 233780, so a slot losing its Steam
 /// session becomes mod-sync-only instead of taking the whole pool down.
-async fn login_or_degrade_to_anonymous<F, Fut>(slot: usize, authed_login: F) -> Result<CmConnection>
+async fn login_or_degrade_to_anonymous<F, Fut>(
+    slot: usize,
+    retry_gate: &Semaphore,
+    authed_login: F,
+) -> Result<CmConnection>
 where
     F: FnMut() -> Fut,
     Fut: std::future::Future<Output = Result<CmConnection>>,
 {
-    match login_with_retry(slot, authed_login).await {
+    match login_with_retry(slot, retry_gate, authed_login).await {
         Ok(conn) => Ok(conn),
         Err(e) => {
             warn!(
                 "pool slot {slot} failed to authenticate after {LOGIN_ATTEMPTS} attempts, \
                  degrading to anonymous (workshop mod syncs only, no server/CDLC depot access): {e:#}"
             );
-            login_with_retry(slot, login_anonymous).await
+            login_with_retry(slot, retry_gate, login_anonymous).await
         }
     }
 }
@@ -230,14 +258,22 @@ impl CmPool {
     /// process restarts (see [`negotiate_or_reuse_refresh_token`]) -- has no
     /// effect for anonymous or already-tokened auth.
     pub async fn start(n: usize, auth: &SteamAuth, install_dir: &Path) -> Result<Arc<Self>> {
+        // One permit, shared by every slot -- see login_with_retry's own
+        // doc for why. Built once up front and stored on the pool
+        // afterward (below) so relogin_slot shares the exact same gate,
+        // not a fresh one per call.
+        let retry_gate = Arc::new(Semaphore::new(1));
         let (conns, relogin): (Vec<(usize, CmConnection)>, Option<(String, String)>) = match auth {
             SteamAuth::Anonymous => {
                 // Anonymous login is already just one lightweight ClientLogon
                 // per connection -- nothing to negotiate once and reuse.
-                let logins = (0..n).map(|slot| async move {
-                    let conn = login_with_retry(slot, login_anonymous).await?;
-                    debug!("pool slot {slot} logged in");
-                    Ok::<_, anyhow::Error>((slot, conn))
+                let logins = (0..n).map(|slot| {
+                    let retry_gate = &retry_gate;
+                    async move {
+                        let conn = login_with_retry(slot, retry_gate, login_anonymous).await?;
+                        debug!("pool slot {slot} logged in");
+                        Ok::<_, anyhow::Error>((slot, conn))
+                    }
                 });
                 let conns = futures::future::try_join_all(logins)
                     .await
@@ -258,8 +294,9 @@ impl CmPool {
                     negotiate_or_reuse_refresh_token(user, password, install_dir).await?;
                 let logins = (0..n).map(|slot| {
                     let refresh_token = refresh_token.clone();
+                    let retry_gate = &retry_gate;
                     async move {
-                        let conn = login_or_degrade_to_anonymous(slot, || {
+                        let conn = login_or_degrade_to_anonymous(slot, retry_gate, || {
                             login_with_refresh_token(user, &refresh_token)
                         })
                         .await?;
@@ -281,8 +318,9 @@ impl CmPool {
                 // call) and handed to us directly.
                 let logins = (0..n).map(|slot| {
                     let refresh_token = refresh_token.clone();
+                    let retry_gate = &retry_gate;
                     async move {
-                        let conn = login_or_degrade_to_anonymous(slot, || {
+                        let conn = login_or_degrade_to_anonymous(slot, retry_gate, || {
                             login_with_refresh_token(user, &refresh_token)
                         })
                         .await?;
@@ -311,6 +349,7 @@ impl CmPool {
             idle: Mutex::new(conns),
             relogin,
             authenticated,
+            retry_gate,
         }))
     }
 
@@ -338,9 +377,12 @@ impl CmPool {
     async fn relogin_slot(self: Arc<Self>, slot: usize, permit: tokio::sync::OwnedSemaphorePermit) {
         let result = match &self.relogin {
             Some((user, token)) => {
-                login_or_degrade_to_anonymous(slot, || login_with_refresh_token(user, token)).await
+                login_or_degrade_to_anonymous(slot, &self.retry_gate, || {
+                    login_with_refresh_token(user, token)
+                })
+                .await
             }
-            None => login_with_retry(slot, login_anonymous).await,
+            None => login_with_retry(slot, &self.retry_gate, login_anonymous).await,
         };
         match result {
             Ok(conn) => {
@@ -767,8 +809,27 @@ pub async fn login_anonymous() -> Result<CmConnection> {
     Ok(conn)
 }
 
+/// Builds the `reqwest::Client` used for CDN chunk/manifest downloads (and
+/// the occasional plain HTTP call like the CM server list). Explicitly
+/// tunes HTTP/2 flow control: reqwest/hyper's h2 connections default to
+/// window sizes sized for typical low-concurrency web traffic, not for
+/// many concurrent high-bandwidth chunk streams multiplexed over the
+/// single connection h2 opens per host. Without this, HTTP/2 (see
+/// steamdepot's own Cargo.toml -- it was accidentally compiled out via
+/// `default-features = false` dropping reqwest's `http2` default feature)
+/// risks *coalescing* many parallel chunk downloads onto one flow-control-
+/// limited connection, undoing the concurrency DOWNLOAD_WORKERS is meant
+/// to provide. `http2_adaptive_window` lets hyper auto-tune the window
+/// based on observed bandwidth-delay product instead of a fixed guess.
+pub(crate) fn build_http_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .http2_adaptive_window(true)
+        .build()
+        .expect("reqwest client builder has no fallible config here (no custom TLS/proxy)")
+}
+
 async fn connect_ws() -> Result<CmConnection> {
-    let http = reqwest::Client::new();
+    let http = build_http_client();
     let cm_list = cm_list::get_cm_list(&http)
         .await
         .context("failed to fetch CM server list")?;
@@ -1047,7 +1108,7 @@ async fn spawn_plan_downloads(
     sync_state: Arc<cache::SyncState>,
     download_workers: usize,
 ) -> Result<()> {
-    let http = reqwest::Client::new();
+    let http = build_http_client();
     let app_id = plan.app_id;
 
     // Same split as workshop resolution: manifest-request-codes are
@@ -1503,7 +1564,7 @@ pub async fn resolve_workshop_items(
         bail!("no CDN servers available");
     }
     let server = cdn_servers[0].clone();
-    let http = reqwest::Client::new();
+    let http = build_http_client();
 
     let mut manifest_tasks = FuturesUnordered::new();
     for (item, key, request_code) in pending {
