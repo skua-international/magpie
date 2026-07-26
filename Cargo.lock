@@ -3773,6 +3773,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "sync-client",
+ "tempfile",
  "time",
  "tokio",
  "tower",

@@ -95,14 +95,11 @@ pub fn delete_local_mod(root: &Path, unique_id: &str) -> Result<()> {
     Ok(())
 }
 
-/// Stored as `<uuid>__<sanitized name>` -- the UUID keeps the filename
-/// stable and collision-free across re-uploads (a mission can be
-/// overwritten with a different original filename), while keeping the
-/// human-meaningful name in the actual file on disk, since Arma's mission
-/// browser and mission-selection config reference missions by filename.
-fn mission_filename(id: Uuid, name: &str) -> String {
-    let sanitized: String = name
-        .chars()
+/// Sanitizes a mission's original filename for on-disk use -- doesn't
+/// touch the UUID (that's the directory, see `write_mission`), just the
+/// leaf name itself.
+fn sanitize_mission_name(name: &str) -> String {
+    name.chars()
         .map(|c| {
             if c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-') {
                 c
@@ -110,35 +107,45 @@ fn mission_filename(id: Uuid, name: &str) -> String {
                 '_'
             }
         })
-        .collect();
-    format!("{id}__{sanitized}")
+        .collect()
+}
+
+/// Stored as `<uuid>/<sanitized name>` -- confirmed live: Arma does walk
+/// mpmissions/ subdirectories looking for mission pbos, so nesting one
+/// level per mission is enough to keep the UUID (stable and
+/// collision-free across re-uploads, since a mission can be overwritten
+/// with a different original filename) out of the leaf filename
+/// entirely. That matters because Arma's mission browser and
+/// mission-selection config (missionWhitelist[] etc.) key off exactly
+/// that leaf filename's own `<name>.<world>` stem -- a `<uuid>__` prefix
+/// baked into the filename itself (the previous scheme) became part of
+/// that identity and broke whitelist matching outright.
+fn mission_dir(root: &Path, id: Uuid) -> PathBuf {
+    missions_dir(root).join(id.to_string())
 }
 
 pub fn write_mission(root: &Path, id: Uuid, name: &str, pbo_bytes: &[u8]) -> Result<PathBuf> {
-    let dir = missions_dir(root);
-    std::fs::create_dir_all(&dir).context("failed to create missions directory")?;
+    let dir = mission_dir(root, id);
 
-    // A re-upload (overwrite) may change the filename -- remove whatever
-    // this UUID previously wrote before writing the new one.
+    // A re-upload (overwrite) may change the filename -- drop this UUID's
+    // whole directory before writing the new one, same idempotent
+    // "start clean" approach as before, just scoped to a directory now
+    // instead of a filename prefix.
     delete_mission_file(root, id)?;
+    std::fs::create_dir_all(&dir).context("failed to create mission directory")?;
 
-    let path = dir.join(mission_filename(id, name));
+    let path = dir.join(sanitize_mission_name(name));
     std::fs::write(&path, pbo_bytes).context("failed to write mission file")?;
     Ok(path)
 }
 
 pub fn delete_mission_file(root: &Path, id: Uuid) -> Result<()> {
-    let dir = missions_dir(root);
-    let Ok(entries) = std::fs::read_dir(&dir) else {
-        return Ok(());
-    };
-    let prefix = format!("{id}__");
-    for entry in entries.filter_map(|e| e.ok()) {
-        if entry.file_name().to_string_lossy().starts_with(&prefix) {
-            std::fs::remove_file(entry.path()).context("failed to delete mission file")?;
-        }
+    let dir = mission_dir(root, id);
+    match std::fs::remove_dir_all(&dir) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e).context("failed to delete mission directory"),
     }
-    Ok(())
 }
 
 /// Guards against a `unique_id` containing path traversal (`..`, `/`) --
@@ -148,4 +155,55 @@ fn validate_path_component(s: &str) -> Result<()> {
         bail!("invalid identifier: {s:?}");
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn write_mission_leaf_filename_has_no_uuid_prefix() {
+        let root = tempfile::tempdir().unwrap();
+        let id = Uuid::now_v7();
+        let path = write_mission(root.path(), id, "skua_training.Malden.pbo", b"pbo bytes").unwrap();
+
+        assert_eq!(
+            path.file_name().unwrap().to_str().unwrap(),
+            "skua_training.Malden.pbo",
+            "Arma keys mission identity off exactly this leaf filename's <name>.<world> stem -- \
+             a uuid baked into it (the previous scheme) broke missionWhitelist matching"
+        );
+        assert_eq!(std::fs::read(&path).unwrap(), b"pbo bytes");
+    }
+
+    #[test]
+    fn delete_mission_file_removes_the_whole_directory() {
+        let root = tempfile::tempdir().unwrap();
+        let id = Uuid::now_v7();
+        let path = write_mission(root.path(), id, "outpost.Altis.pbo", b"data").unwrap();
+        assert!(path.exists());
+
+        delete_mission_file(root.path(), id).unwrap();
+
+        assert!(!path.exists());
+        assert!(!mission_dir(root.path(), id).exists());
+    }
+
+    #[test]
+    fn delete_mission_file_on_nonexistent_id_is_not_an_error() {
+        let root = tempfile::tempdir().unwrap();
+        delete_mission_file(root.path(), Uuid::now_v7()).unwrap();
+    }
+
+    #[test]
+    fn reupload_with_different_name_replaces_the_old_file() {
+        let root = tempfile::tempdir().unwrap();
+        let id = Uuid::now_v7();
+        write_mission(root.path(), id, "old_name.Altis.pbo", b"v1").unwrap();
+
+        let path = write_mission(root.path(), id, "new_name.Altis.pbo", b"v2").unwrap();
+
+        assert!(!mission_dir(root.path(), id).join("old_name.Altis.pbo").exists());
+        assert_eq!(std::fs::read(&path).unwrap(), b"v2");
+    }
 }

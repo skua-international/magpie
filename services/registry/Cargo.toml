@@ -29,3 +29,6 @@ uuid = { version = "1.24.0", features = ["v7"] }
 walkdir = "2.5.0"
 workshop-parse = { path = "../../crates/workshop-parse" }
 zip = "8.6.0"
+
+[dev-dependencies]
+tempfile = "3"
