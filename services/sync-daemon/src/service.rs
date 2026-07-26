@@ -180,27 +180,42 @@ impl Shared {
         let sem = Arc::new(Semaphore::new(steam::SYNC_CONCURRENCY));
         let tasks: Mutex<SyncTasks> = Mutex::new(SyncTasks::new());
 
-        let mut conn = self.pool()?.acquire().await;
-        // Server/CDLC depots aren't part of the source registry -- they're
-        // always wanted, same as before this rework.
-        let result = steam::resolve_and_spawn_server(
-            &mut conn,
-            &self.content_root,
-            false,
-            &[],
-            sem.clone(),
-            &tasks,
-            self.sync_state.clone(),
-            self.download_workers,
-        )
-        .await;
-        if let Err(e) = &result {
-            if steam::is_transient(e) {
-                conn.mark_bad();
+        let pool = self.pool()?;
+        // Server/CDLC depots need a licensed (authenticated) session --
+        // anonymous can't reach them at all (see login_or_degrade_to_anonymous
+        // in steam-sync). Checking any_authenticated() first avoids
+        // hammering Steam with a doomed request when every slot has
+        // degraded, and -- just as importantly -- a failure here no longer
+        // aborts the whole sync_content call via `?`: mod syncing below is
+        // independent and should still proceed even if server content is
+        // currently unreachable.
+        if pool.any_authenticated() {
+            let mut conn = pool.acquire().await;
+            let result = steam::resolve_and_spawn_server(
+                &mut conn,
+                &self.content_root,
+                false,
+                &[],
+                sem.clone(),
+                &tasks,
+                self.sync_state.clone(),
+                self.download_workers,
+            )
+            .await;
+            if let Err(e) = &result {
+                if steam::is_transient(e) {
+                    conn.mark_bad();
+                }
             }
+            drop(conn);
+            if let Err(e) = result {
+                warn!("server/CDLC content sync failed, will retry next cycle: {e:#}");
+            }
+        } else {
+            warn!(
+                "skipping server/CDLC content sync -- no authenticated Steam session in the pool (running anonymous), only workshop mods will sync"
+            );
         }
-        drop(conn);
-        result?;
 
         let desired = self.sync_state.desired_mod_ids().await?;
         if !desired.is_empty() {

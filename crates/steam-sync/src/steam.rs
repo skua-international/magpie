@@ -1,6 +1,6 @@
 use std::future::Future;
 use std::path::Path;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result, bail};
@@ -21,9 +21,11 @@ use tracing::{debug, error, info, warn};
 
 use crate::cache;
 
-/// Steam login mode: either an anonymous session (works for the base
-/// server + Linux binary depots, but not CDLC or workshop content, since
-/// Steam won't grant free licenses or item access to anonymous sessions),
+/// Steam login mode: either an anonymous session (works for workshop
+/// content under depot 107410, which needs no license grant at all, but
+/// NOT the base server binary or CDLC depots under app 233780, which
+/// require a free license Steam only grants to authenticated sessions --
+/// verified directly against real anonymous-login behavior, not assumed),
 /// or a real account.
 #[derive(Clone)]
 pub enum SteamAuth {
@@ -162,6 +164,14 @@ pub struct CmPool {
     /// `Some((username, refresh_token))` otherwise, reusing whatever
     /// token this pool already logged in with, never a password again.
     relogin: Option<(String, String)>,
+    /// Per-slot authenticated flag, updated only when that slot itself
+    /// logs in or relogs in (see [`login_or_degrade_to_anonymous`]) --
+    /// lets [`CmPool::any_authenticated`] answer "is anything in this pool
+    /// still authenticated" as a cheap lock-free read, without needing
+    /// every slot to be simultaneously idle to inspect (which would force
+    /// waiting on, or worse re-churning, slots that already proved
+    /// anonymous just to re-confirm it).
+    authenticated: Vec<AtomicBool>,
 }
 
 /// Retries a single connection's login up to [`LOGIN_ATTEMPTS`] times with
@@ -190,6 +200,28 @@ where
         }
     }
     unreachable!("loop above always returns by the final attempt")
+}
+
+/// Retries an authenticated login, then degrades that one slot to
+/// anonymous if every attempt still fails -- anonymous can still reach
+/// workshop depot 107410 (no license grant needed), just not the
+/// server/CDLC depots under app 233780, so a slot losing its Steam
+/// session becomes mod-sync-only instead of taking the whole pool down.
+async fn login_or_degrade_to_anonymous<F, Fut>(slot: usize, authed_login: F) -> Result<CmConnection>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<CmConnection>>,
+{
+    match login_with_retry(slot, authed_login).await {
+        Ok(conn) => Ok(conn),
+        Err(e) => {
+            warn!(
+                "pool slot {slot} failed to authenticate after {LOGIN_ATTEMPTS} attempts, \
+                 degrading to anonymous (workshop mod syncs only, no server/CDLC depot access): {e:#}"
+            );
+            login_with_retry(slot, login_anonymous).await
+        }
+    }
 }
 
 impl CmPool {
@@ -227,9 +259,10 @@ impl CmPool {
                 let logins = (0..n).map(|slot| {
                     let refresh_token = refresh_token.clone();
                     async move {
-                        let conn =
-                            login_with_retry(slot, || login_with_refresh_token(user, &refresh_token))
-                                .await?;
+                        let conn = login_or_degrade_to_anonymous(slot, || {
+                            login_with_refresh_token(user, &refresh_token)
+                        })
+                        .await?;
                         debug!("pool slot {slot} logged in");
                         Ok::<_, anyhow::Error>((slot, conn))
                     }
@@ -249,9 +282,10 @@ impl CmPool {
                 let logins = (0..n).map(|slot| {
                     let refresh_token = refresh_token.clone();
                     async move {
-                        let conn =
-                            login_with_retry(slot, || login_with_refresh_token(user, &refresh_token))
-                                .await?;
+                        let conn = login_or_degrade_to_anonymous(slot, || {
+                            login_with_refresh_token(user, &refresh_token)
+                        })
+                        .await?;
                         debug!("pool slot {slot} logged in");
                         Ok::<_, anyhow::Error>((slot, conn))
                     }
@@ -263,34 +297,62 @@ impl CmPool {
             }
         };
 
+        let authenticated: Vec<AtomicBool> = {
+            let flags: Vec<AtomicBool> = (0..n).map(|_| AtomicBool::new(false)).collect();
+            for (slot, conn) in &conns {
+                let is_auth = conn.session().map(|s| s.authenticated).unwrap_or(false);
+                flags[*slot].store(is_auth, Ordering::SeqCst);
+            }
+            flags
+        };
+
         Ok(Arc::new(Self {
             sem: Arc::new(Semaphore::new(n)),
             idle: Mutex::new(conns),
             relogin,
+            authenticated,
         }))
+    }
+
+    /// Whether *any* slot in this pool is currently authenticated -- used
+    /// to decide whether attempting license-gated server/CDLC resolution
+    /// is worth it at all, instead of finding out by attempting it on
+    /// whatever connection happens to be acquired and possibly failing on
+    /// an anonymous one while other slots are actually fine. Cheap and
+    /// lock-free: each slot's flag only changes when that slot itself
+    /// logs in or relogs in, so this never waits on or disturbs in-flight
+    /// work just to answer the question.
+    pub fn any_authenticated(&self) -> bool {
+        self.authenticated.iter().any(|a| a.load(Ordering::Relaxed))
     }
 
     /// Re-log-in a single slot after [`PooledConn::mark_bad`] discarded its
     /// connection, and push the fresh one back into the idle pool. Holds
-    /// `permit` for the whole attempt (including retries) so the
-    /// semaphore's live-permit count never exceeds `idle`'s real length --
-    /// dropping it only once either a replacement connection is in `idle`
-    /// or every attempt has failed, in which case the pool is left
-    /// permanently one slot short until the process restarts (a clear,
-    /// logged, rare-in-practice degradation rather than a silent one).
+    /// `permit` for the whole attempt (including retries and the anonymous
+    /// fallback) so the semaphore's live-permit count never exceeds `idle`'s
+    /// real length -- dropping it only once either a replacement connection
+    /// is in `idle` or even the anonymous fallback failed, in which case the
+    /// pool is left permanently one slot short until the process restarts
+    /// (a clear, logged, rare-in-practice degradation rather than a silent
+    /// one -- Steam itself would need to be unreachable for that to happen).
     async fn relogin_slot(self: Arc<Self>, slot: usize, permit: tokio::sync::OwnedSemaphorePermit) {
         let result = match &self.relogin {
-            Some((user, token)) => login_with_retry(slot, || login_with_refresh_token(user, token)).await,
+            Some((user, token)) => {
+                login_or_degrade_to_anonymous(slot, || login_with_refresh_token(user, token)).await
+            }
             None => login_with_retry(slot, login_anonymous).await,
         };
         match result {
             Ok(conn) => {
+                let is_auth = conn.session().map(|s| s.authenticated).unwrap_or(false);
+                self.authenticated[slot].store(is_auth, Ordering::SeqCst);
                 info!("pool slot {slot} reconnected after being marked bad");
                 self.idle.lock().unwrap().push((slot, conn));
             }
             Err(e) => {
+                self.authenticated[slot].store(false, Ordering::SeqCst);
                 error!(
-                    "pool slot {slot} failed to reconnect after {LOGIN_ATTEMPTS} attempts, giving up -- pool is now permanently short by one slot until process restart: {e:#}"
+                    "pool slot {slot} failed to reconnect, including the anonymous fallback -- pool is now permanently short by one slot until process restart: {e:#}"
                 );
             }
         }
@@ -691,9 +753,9 @@ async fn login_with_refresh_token(username: &str, refresh_token: &str) -> Result
     Ok(conn)
 }
 
-/// Log on anonymously. Works for the base server/Linux binary depots, but
-/// Steam won't grant free CDLC licenses or workshop item access to
-/// anonymous sessions -- see [`SteamAuth`].
+/// Log on anonymously. Works for workshop content (depot 107410, no
+/// license grant needed), but not the base server/CDLC depots under app
+/// 233780 -- see [`SteamAuth`].
 pub async fn login_anonymous() -> Result<CmConnection> {
     let mut conn = connect_ws()
         .await
