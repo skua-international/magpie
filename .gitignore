@@ -1,3 +1,6 @@
 /target
 node_modules/
-/dist
+# No leading slash -- every service stages its pre-built binary into its
+# own dist/ (services/*/dist/, packaged by that service's Dockerfile),
+# not just one at the repo root.
+dist/
