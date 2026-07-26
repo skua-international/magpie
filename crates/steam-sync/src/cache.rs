@@ -5,6 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
 use steamdepot::cdn::DepotManifest;
+use tokio::sync::Mutex;
 use turso::transaction::TransactionBehavior;
 
 /// One workshop mod's synced state, as returned by
@@ -203,10 +204,21 @@ async fn optional_row(
 /// transactions) gives real cross-process mutual exclusion for both the
 /// state table and the advisory lock table below.
 ///
-/// `conn` needs no `Mutex` wrapper -- turso's `Connection` is `Clone` +
-/// `Send` + `Sync` already (internally `Arc`-backed), unlike rusqlite's.
+/// `conn` is wrapped in a `tokio::sync::Mutex` (async-aware, doesn't block a
+/// worker thread while waiting) despite turso's `Connection` being `Clone` +
+/// `Send` + `Sync` -- that only means the *handle* is safely shareable, not
+/// that concurrent operations on the underlying session are safe. Confirmed
+/// live: turso's own `ConcurrentGuard` (sdk-kit/src/lib.rs) rejects any
+/// overlapping operation on the same session with `Misuse("concurrent use
+/// forbidden")`, regardless of which cloned handle initiates it -- two
+/// ModSources' auto-sync tasks racing `acquire_lock` concurrently hit this
+/// within minutes of the rusqlite->turso migration shipping without this
+/// Mutex. rusqlite's own `Connection` needed the same serialization for the
+/// same underlying reason (a single connection/session is not itself
+/// safe for concurrent use), just via `std::sync::Mutex` there since
+/// rusqlite is fully synchronous.
 pub struct SyncState {
-    conn: turso::Connection,
+    conn: Mutex<turso::Connection>,
 }
 
 impl SyncState {
@@ -264,7 +276,9 @@ impl SyncState {
         )
         .await
         .context("failed to initialize sync state schema")?;
-        Ok(Arc::new(Self { conn }))
+        Ok(Arc::new(Self {
+            conn: Mutex::new(conn),
+        }))
     }
 
     /// Record `source_id`'s originally-registered candidate IDs (the raw
@@ -275,6 +289,8 @@ impl SyncState {
         let json =
             serde_json::to_string(candidate_ids).context("failed to serialize candidate_ids")?;
         self.conn
+            .lock()
+            .await
             .execute(
                 "INSERT INTO sources (source_id, candidate_ids) VALUES (?1, ?2)
                  ON CONFLICT(source_id) DO UPDATE SET candidate_ids = excluded.candidate_ids",
@@ -292,7 +308,7 @@ impl SyncState {
     /// [`desired_mod_ids`](Self::desired_mod_ids), which unions across
     /// every source.
     pub async fn set_source_mods(&self, source_id: &str, mod_ids: &[u64]) -> Result<()> {
-        let mut conn = self.conn.clone();
+        let mut conn = self.conn.lock().await;
         let tx = conn
             .transaction()
             .await
@@ -341,20 +357,19 @@ impl SyncState {
     /// Does not touch any *other* source's rows -- a mod this source also
     /// referenced but that's still claimed by another source keeps syncing.
     pub async fn delete_source(&self, source_id: &str) -> Result<()> {
-        self.conn
-            .execute(
-                "DELETE FROM sources WHERE source_id = ?1",
-                turso::params![source_id],
-            )
-            .await
-            .context("failed to delete source")?;
-        self.conn
-            .execute(
-                "DELETE FROM source_mods WHERE source_id = ?1",
-                turso::params![source_id],
-            )
-            .await
-            .context("failed to delete source_mods")?;
+        let conn = self.conn.lock().await;
+        conn.execute(
+            "DELETE FROM sources WHERE source_id = ?1",
+            turso::params![source_id],
+        )
+        .await
+        .context("failed to delete source")?;
+        conn.execute(
+            "DELETE FROM source_mods WHERE source_id = ?1",
+            turso::params![source_id],
+        )
+        .await
+        .context("failed to delete source_mods")?;
         Ok(())
     }
 
@@ -363,6 +378,8 @@ impl SyncState {
     pub async fn desired_mod_ids(&self) -> Result<Vec<u64>> {
         let mut rows = self
             .conn
+            .lock()
+            .await
             .query("SELECT DISTINCT mod_id FROM source_mods", ())
             .await
             .context("failed to query desired_mod_ids")?;
@@ -380,8 +397,8 @@ impl SyncState {
     /// poller's full sweep. `None` if `source_id` was never registered (or
     /// was since deregistered).
     pub async fn candidate_ids_for_source(&self, source_id: &str) -> Result<Option<Vec<u64>>> {
-        let mut stmt = self
-            .conn
+        let conn = self.conn.lock().await;
+        let mut stmt = conn
             .prepare("SELECT candidate_ids FROM sources WHERE source_id = ?1")
             .await
             .context("failed to prepare candidate_ids_for_source query")?;
@@ -399,6 +416,8 @@ impl SyncState {
     pub async fn mod_ids_for_source(&self, source_id: &str) -> Result<Vec<u64>> {
         let mut rows = self
             .conn
+            .lock()
+            .await
             .query(
                 "SELECT mod_id FROM source_mods WHERE source_id = ?1",
                 turso::params![source_id],
@@ -424,6 +443,8 @@ impl SyncState {
     pub async fn all_source_candidates(&self) -> Result<Vec<(String, Vec<u64>)>> {
         let mut rows = self
             .conn
+            .lock()
+            .await
             .query("SELECT source_id, candidate_ids FROM sources", ())
             .await
             .context("failed to query all_source_candidates")?;
@@ -457,8 +478,8 @@ impl SyncState {
 
     /// The manifest_id `key` was last verified at, if any.
     pub async fn last_manifest_id(&self, key: &str) -> Option<u64> {
-        let mut stmt = self
-            .conn
+        let conn = self.conn.lock().await;
+        let mut stmt = conn
             .prepare("SELECT manifest_id FROM synced WHERE key = ?1")
             .await
             .ok()?;
@@ -484,7 +505,8 @@ impl SyncState {
     /// worst a missed skip (an item gets dispatched, then the live
     /// re-check catches that it's already synced), never an incorrect one.
     pub async fn snapshot(&self) -> HashMap<String, u64> {
-        let mut rows = match self.conn.query("SELECT key, manifest_id FROM synced", ()).await {
+        let conn = self.conn.lock().await;
+        let mut rows = match conn.query("SELECT key, manifest_id FROM synced", ()).await {
             Ok(rows) => rows,
             Err(e) => {
                 tracing::warn!("failed to prepare sync state snapshot query: {e:#}");
@@ -522,6 +544,8 @@ impl SyncState {
     pub async fn invalidate(&self, key: &str) {
         if let Err(e) = self
             .conn
+            .lock()
+            .await
             .execute("DELETE FROM synced WHERE key = ?1", turso::params![key])
             .await
         {
@@ -538,8 +562,8 @@ impl SyncState {
     /// same table.
     pub async fn list_synced_mods(&self) -> Vec<SyncedModRow> {
         const WORKSHOP_CONSUMER_APP_ID: &str = "107410";
-        let mut rows = match self
-            .conn
+        let conn = self.conn.lock().await;
+        let mut rows = match conn
             .query(
                 "SELECT s.key, s.manifest_id, s.size_bytes, COALESCE(t.title, '')
                  FROM synced s LEFT JOIN mod_titles t ON t.mod_id = CAST(substr(s.key, instr(s.key, '/') + 1) AS INTEGER)",
@@ -601,8 +625,8 @@ impl SyncState {
     /// Every source_id currently referencing `mod_id` -- a mod can be
     /// shared by more than one source (see `source_mods`'s own doc).
     pub async fn sources_for_mod(&self, mod_id: u64) -> Vec<String> {
-        let mut rows = match self
-            .conn
+        let conn = self.conn.lock().await;
+        let mut rows = match conn
             .query(
                 "SELECT source_id FROM source_mods WHERE mod_id = ?1",
                 turso::params![mod_id as i64],
@@ -659,7 +683,8 @@ impl SyncState {
     }
 
     async fn snapshot_with_size(&self) -> Vec<(String, u64)> {
-        let mut rows = match self.conn.query("SELECT key, size_bytes FROM synced", ()).await {
+        let conn = self.conn.lock().await;
+        let mut rows = match conn.query("SELECT key, size_bytes FROM synced", ()).await {
             Ok(rows) => rows,
             Err(e) => {
                 tracing::warn!("failed to prepare snapshot_with_size query: {e:#}");
@@ -696,6 +721,8 @@ impl SyncState {
         }
         let result = self
             .conn
+            .lock()
+            .await
             .execute(
                 "INSERT INTO mod_titles (mod_id, title) VALUES (?1, ?2)
                  ON CONFLICT(mod_id) DO UPDATE SET title = excluded.title",
@@ -718,6 +745,8 @@ impl SyncState {
     pub async fn mark_synced(&self, key: &str, manifest_id: u64, size_bytes: u64) {
         let result = self
             .conn
+            .lock()
+            .await
             .execute(
                 "INSERT INTO synced (key, manifest_id, size_bytes) VALUES (?1, ?2, ?3)
                  ON CONFLICT(key) DO UPDATE SET manifest_id = excluded.manifest_id, size_bytes = excluded.size_bytes",
@@ -735,13 +764,13 @@ impl SyncState {
     /// means someone else currently holds it.
     async fn try_acquire(&self, key: &str, holder: &str) -> Result<bool> {
         let now = now_unix();
+        let mut conn = self.conn.lock().await;
 
         // Fast path: a plain insert. The PRIMARY KEY constraint is the
         // actual atomicity guarantee here -- if two processes race this at
         // once, SQLite's own locking serializes their writes, and exactly
         // one INSERT succeeds.
-        match self
-            .conn
+        match conn
             .execute(
                 "INSERT INTO locks (key, holder, acquired_at) VALUES (?1, ?2, ?3)",
                 turso::params![key, holder, now],
@@ -757,7 +786,6 @@ impl SyncState {
         // releasing. Steal it only if clearly stale, inside one IMMEDIATE
         // transaction so a concurrent stale-check by another process can't
         // race us into double-stealing the same lock.
-        let mut conn = self.conn.clone();
         let tx = conn
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .await
@@ -800,6 +828,8 @@ impl SyncState {
     async fn release(&self, key: &str) {
         if let Err(e) = self
             .conn
+            .lock()
+            .await
             .execute("DELETE FROM locks WHERE key = ?1", turso::params![key])
             .await
         {
@@ -1024,6 +1054,8 @@ mod tests {
         let stale_at = now_unix() - STALE_LOCK_SECS - 60;
         state
             .conn
+            .lock()
+            .await
             .execute(
                 "INSERT INTO locks (key, holder, acquired_at) VALUES (?1, ?2, ?3)",
                 turso::params!["key1", "dead-holder", stale_at],
@@ -1046,6 +1078,8 @@ mod tests {
 
         state
             .conn
+            .lock()
+            .await
             .execute(
                 "INSERT INTO locks (key, holder, acquired_at) VALUES (?1, ?2, ?3)",
                 turso::params!["key1", "live-holder", now_unix()],
@@ -1060,5 +1094,25 @@ mod tests {
                 .expect("try_acquire (should not steal) failed"),
             "a fresh lock must not be stolen"
         );
+    }
+
+    /// The actual bug this Mutex fixes: two tasks calling methods that hit
+    /// the same underlying turso session concurrently used to fail with
+    /// `Misuse("concurrent use forbidden")` before this Mutex existed --
+    /// confirmed live in production (two ModSources' auto-sync tasks
+    /// racing `acquire_lock`). Exercises that same shape: two concurrent
+    /// callers hitting the connection at once.
+    #[tokio::test]
+    async fn concurrent_operations_do_not_error() {
+        let (_dir, state) = open_test_state().await;
+
+        let a = state.clone();
+        let b = state.clone();
+        let (ra, rb) = tokio::join!(
+            async move { a.upsert_source("src-a", &[1, 2]).await },
+            async move { b.upsert_source("src-b", &[3, 4]).await },
+        );
+        ra.expect("concurrent upsert_source (a) failed");
+        rb.expect("concurrent upsert_source (b) failed");
     }
 }
