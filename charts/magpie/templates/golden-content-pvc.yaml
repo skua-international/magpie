@@ -15,9 +15,16 @@ spec:
   storageClassName: magpie-golden-content
   resources:
     requests:
-      # Non-binding: magpie-csi's CreateVolume echoes this back but
-      # never actually enforces it (storageCapacity: false in its
-      # CSIDriver spec) -- real sizing is the capacity watchdog's job at
-      # runtime (see values.yaml's reflinkStorage.maxSizeGiB). Just a
-      # large nominal value so the PVC object itself is valid.
-      storage: 1000Gi
+      # DO NOT CHANGE THIS VALUE, ever -- confirmed live: the
+      # magpie-golden-content StorageClass supports no resize at all (no
+      # allowVolumeExpansion, no EXPAND_VOLUME capability), so the API
+      # server rejects `helm upgrade`/`kubectl apply` outright the moment
+      # this differs from whatever's already on the live PVC ("only
+      # dynamically provisioned pvc can be resized and the storageclass
+      # that provisions the pvc must support resize"). This number is
+      # otherwise non-binding -- magpie-csi's CreateVolume echoes it back
+      # but never enforces it (storageCapacity: false in its CSIDriver
+      # spec); real sizing is the capacity watchdog's job at runtime (see
+      # values.yaml's reflinkStorage.maxSizeGiB). 40Gi purely because
+      # that's what every existing cluster's PVC already has on disk.
+      storage: 40Gi
