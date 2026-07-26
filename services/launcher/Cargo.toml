@@ -5,9 +5,10 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "signal", "time"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "signal", "time", "io-util"] }
 anyhow = "1"
 libc = "0.2"
 walkdir = "2"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }

@@ -18,7 +18,28 @@ async fn main() -> Result<()> {
         return healthcheck::run();
     }
 
+    // Non-blocking: writes go over a channel to a dedicated writer thread
+    // instead of the logging call itself blocking on stdout's I/O.
+    // Matters more here than in this repo's other services -- launcher
+    // now forwards arma3server's own stdout/stderr line-by-line (see
+    // launch.rs's forward_stdout/forward_stderr), which can be a lot
+    // busier than launcher's own handful of lifecycle log lines, and
+    // none of it should be able to add I/O latency to the async tasks
+    // reading the child's pipes. `_guard` has to live for the rest of
+    // `main` -- dropping it early stops the writer thread and silently
+    // drops whatever's still buffered.
+    let (non_blocking_stdout, _guard) = tracing_appender::non_blocking(std::io::stdout());
+
+    // JSON, not the plain-text formatter every other service here still
+    // uses -- launcher's logs now include arbitrary text a game server
+    // chose to print, not just launcher's own structured lines. JSON
+    // keeps each line a single well-formed record (timestamp/level/
+    // message/fields) no matter what that text contains, instead of raw
+    // text that could itself look like a log line and confuse whatever
+    // parses this.
     tracing_subscriber::fmt()
+        .json()
+        .with_writer(non_blocking_stdout)
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )

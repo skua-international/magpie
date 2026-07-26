@@ -3,7 +3,8 @@ use std::os::unix::process::ExitStatusExt;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use tokio::process::Command as TokioCommand;
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::process::{ChildStderr, ChildStdout, Command as TokioCommand};
 use tokio::signal::unix::{SignalKind, signal};
 
 use crate::config::Config;
@@ -161,10 +162,27 @@ pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Inst
     // shell replaced itself instead of leaving arma3server as its
     // child) -- spawning the real binary directly makes that
     // indirection unnecessary rather than just avoiding it.
+    // Piped, not inherited -- inheriting would already put arma3server's
+    // raw output on this container's stdout/stderr (and `kubectl logs`
+    // does show it today), but unstructured: no timestamp, no level, not
+    // tagged as coming from the child process rather than launcher
+    // itself. Piping and forwarding each line through `tracing::info!`
+    // gets it the same structured formatting (and, once launcher's own
+    // subscriber emits JSON, the same machine-parseable shape) as every
+    // other log line this process produces.
     let mut child = TokioCommand::new(&cfg.arma_binary)
         .args(&args)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
         .spawn()
         .context("failed to spawn arma3server")?;
+
+    if let Some(stdout) = child.stdout.take() {
+        tokio::spawn(forward_stdout(stdout));
+    }
+    if let Some(stderr) = child.stderr.take() {
+        tokio::spawn(forward_stderr(stderr));
+    }
 
     // No handler at all used to mean Kubernetes' pod-deletion signal
     // killed this process immediately, forwarding nothing to arma3server
@@ -216,6 +234,47 @@ pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Inst
     }
 
     Ok(())
+}
+
+/// Reads arma3server's stdout line-by-line and re-emits each one through
+/// `tracing::info!`, tagged so it's distinguishable from launcher's own
+/// log lines. Runs until the pipe closes (the child exited and dropped
+/// its end) -- not awaited by `run` itself, deliberately: `child.wait()`
+/// already reaps the process and reports its exit status; this task's
+/// job ends when there's nothing left to read, whichever happens first.
+async fn forward_stdout(stdout: ChildStdout) {
+    let mut lines = BufReader::new(stdout).lines();
+    loop {
+        match lines.next_line().await {
+            Ok(Some(line)) => tracing::info!(stream = "stdout", "{line}"),
+            Ok(None) => return,
+            // A read error here is arma3server's pipe going away
+            // unexpectedly, not launcher's own concern to propagate --
+            // `run`'s own `child.wait()` is what surfaces a real failure.
+            Err(e) => {
+                tracing::warn!("stopped reading arma3server stdout: {e:#}");
+                return;
+            }
+        }
+    }
+}
+
+/// Same as `forward_stdout`, but for stderr, logged at `warn` -- arma
+/// itself doesn't distinguish "diagnostic" from "actual problem" on
+/// this stream any more clearly than most CLI tools do, but warn is a
+/// closer default than info for "the child chose to write here".
+async fn forward_stderr(stderr: ChildStderr) {
+    let mut lines = BufReader::new(stderr).lines();
+    loop {
+        match lines.next_line().await {
+            Ok(Some(line)) => tracing::warn!(stream = "stderr", "{line}"),
+            Ok(None) => return,
+            Err(e) => {
+                tracing::warn!("stopped reading arma3server stderr: {e:#}");
+                return;
+            }
+        }
+    }
 }
 
 #[cfg(test)]
