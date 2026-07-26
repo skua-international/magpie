@@ -129,7 +129,14 @@ async fn resolve(obj: &ModSource, ctx: &Ctx) -> anyhow::Result<Action> {
 
     match ctx.shared.register_source_impl(&candidate_ids, &name).await {
         Ok(outcome) => {
-            let resolved_mod_ids: Vec<u64> = outcome.mods.iter().map(|m| m.mod_id).collect();
+            // Sorted, not left in outcome.mods' own order -- that order
+            // comes from a HashMap::into_iter() in resolve_source_ids,
+            // with no run-to-run stability guarantee. An unsorted Vec here
+            // would defeat set_status's unchanged-status guard on reorder
+            // alone (PartialEq on Vec is order-sensitive), even when the
+            // actual resolved set hasn't changed at all.
+            let mut resolved_mod_ids: Vec<u64> = outcome.mods.iter().map(|m| m.mod_id).collect();
+            resolved_mod_ids.sort_unstable();
             let sizes = ctx.shared.sync_state.list_synced_mods().await;
             let size_bytes = resolved_mod_ids
                 .iter()
@@ -155,6 +162,7 @@ async fn resolve(obj: &ModSource, ctx: &Ctx) -> anyhow::Result<Action> {
 
             set_status(
                 ctx,
+                obj,
                 &name,
                 ModSourceStatus {
                     phase: ModSourcePhase::Synced,
@@ -195,6 +203,7 @@ async fn resolve(obj: &ModSource, ctx: &Ctx) -> anyhow::Result<Action> {
         Err(e) => {
             set_status(
                 ctx,
+                obj,
                 &name,
                 ModSourceStatus {
                     phase: ModSourcePhase::Failed,
@@ -217,7 +226,21 @@ async fn cleanup(obj: &ModSource, ctx: &Ctx) -> anyhow::Result<Action> {
     Ok(Action::await_change())
 }
 
-async fn set_status(ctx: &Ctx, name: &str, status: ModSourceStatus) -> anyhow::Result<()> {
+/// Skips the patch entirely if `status` already matches `obj`'s current
+/// status. `patch_status` bumps `resourceVersion` even when writing
+/// identical values, and this controller's watcher (`watcher::Config::
+/// default()`, no rate-limiting/predicate filtering) treats any
+/// `resourceVersion` bump as "object updated" and immediately re-triggers
+/// a reconcile -- without this guard, a no-op status write on an
+/// already-`Synced` source creates a self-sustaining reconcile loop
+/// (confirmed live: ~8 reconciles/sec continuously against Steam's API
+/// for 47+ minutes on two already-resolved ModSources, since every
+/// "nothing changed" drift recheck still unconditionally re-patched the
+/// identical status).
+async fn set_status(ctx: &Ctx, obj: &ModSource, name: &str, status: ModSourceStatus) -> anyhow::Result<()> {
+    if obj.status.as_ref() == Some(&status) {
+        return Ok(());
+    }
     let api: Api<ModSource> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
     let patch = serde_json::json!({ "status": status });
     api.patch_status(name, &PatchParams::default(), &Patch::Merge(patch))
