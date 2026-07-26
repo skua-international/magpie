@@ -46,7 +46,18 @@ func main() {
 	if err != nil {
 		log.Fatalf("invalid MAX_SIZE_GIB: %v", err)
 	}
-	capacityCheckInterval, err := time.ParseDuration(envOr("CAPACITY_CHECK_INTERVAL", "5m"))
+	// 30s, not the original 5m: confirmed live (2026-07-26) that a bulk
+	// sync-daemon startup sync (a dozen-plus depots downloading in
+	// parallel) can blow through the 5GiB headroom well inside a 5-minute
+	// gap between checks, with no other trigger catching it in between --
+	// mount-time EnsureCapacity calls (NodeStageVolume/NodePublishVolume)
+	// only fire once per Pod lifecycle, not per write. This narrows the
+	// exposure window; it doesn't eliminate the race outright (a fast
+	// enough burst can still outrun any fixed poll interval) -- see
+	// magpie#41 for the actual fix (sync-daemon reserving capacity
+	// upfront, sized to what it's about to download, instead of this
+	// driver polling blind).
+	capacityCheckInterval, err := time.ParseDuration(envOr("CAPACITY_CHECK_INTERVAL", "30s"))
 	if err != nil {
 		log.Fatalf("invalid CAPACITY_CHECK_INTERVAL: %v", err)
 	}
