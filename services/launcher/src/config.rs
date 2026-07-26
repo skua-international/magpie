@@ -35,6 +35,19 @@ pub struct Config {
     /// another connecting client as far as Arma's `password[]` check is
     /// concerned.
     pub client_password: Option<String>,
+    /// Path to a shared library to `LD_PRELOAD` into arma3server_x64
+    /// specifically (not this launcher process itself) -- e.g. mimalloc,
+    /// to override the Linux server binary's allocator. Arma 3's own
+    /// `-malloc=`/CMA DLL system is Windows-only (confirmed against BIS's
+    /// wiki: "Linux dedicated server uses allocator provided by operating
+    /// system. There are NO plans to allow its customization yet."), so
+    /// LD_PRELOAD is the only way to affect the Linux binary's allocator
+    /// at all -- it intercepts the standard malloc/free symbols at the
+    /// dynamic linker level, needing no cooperation from the game itself.
+    /// Opt-in (`None` by default) rather than baked into the image as a
+    /// default, so it can be validated on one server before becoming
+    /// standard for every ArmaServer instance.
+    pub ld_preload: Option<String>,
 }
 
 impl Config {
@@ -60,6 +73,7 @@ impl Config {
             client_password: env::var("ARMA_SERVER_PASSWORD")
                 .ok()
                 .filter(|s| !s.is_empty()),
+            ld_preload: env::var("ARMA_LD_PRELOAD").ok().filter(|s| !s.is_empty()),
         })
     }
 }

@@ -568,6 +568,13 @@ async fn ensure_deployment(
             ..Default::default()
         },
     ];
+    if !ctx.cfg.arma_ld_preload.is_empty() {
+        env.push(EnvVar {
+            name: "ARMA_LD_PRELOAD".into(),
+            value: Some(ctx.cfg.arma_ld_preload.clone()),
+            ..Default::default()
+        });
+    }
     // From the merged arma-config ConfigMap's own `env.*` keys -- see
     // arma_config::extract_env_vars. Appended last so an operator can
     // override any of the fixed vars above via the same ConfigMap
@@ -1004,6 +1011,13 @@ async fn ensure_hc_deployment(
             ..Default::default()
         },
     ];
+    if !ctx.cfg.arma_ld_preload.is_empty() {
+        env.push(EnvVar {
+            name: "ARMA_LD_PRELOAD".into(),
+            value: Some(ctx.cfg.arma_ld_preload.clone()),
+            ..Default::default()
+        });
+    }
     if !launch_config.additional_params.is_empty() {
         env.push(EnvVar {
             name: "ARMA_PARAMS".into(),

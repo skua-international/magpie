@@ -74,6 +74,22 @@ RUN mkdir -p /out/usr/bin /out/bin /out/sbin /out/usr/lib/x86_64-linux-gnu \
 # fixes that for free, which is the actual reason this now works
 # non-root at all, not anything about capabilities or root's own DAC
 # bypass.
+# Prebuilt Linux mimalloc release, for LD_PRELOAD into arma3server_x64 --
+# Arma's own -malloc=/CMA DLL system is Windows-only (confirmed against
+# BIS's wiki), so this is the only way to affect the Linux binary's
+# allocator at all. Opt-in via ARMA_LD_PRELOAD (see config.rs's own doc),
+# not a default -- baking the .so in costs nothing either way, but nothing
+# below sets the env var that would actually activate it.
+FROM debian:trixie-slim AS mimalloc
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends --no-install-suggests ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -fsSL -o /tmp/mimalloc.tar.gz \
+        https://github.com/microsoft/mimalloc/releases/download/v3.4.3/mimalloc-v3.4.3-linux-x64.tar.gz \
+    && mkdir -p /out /tmp/mimalloc \
+    && tar xzf /tmp/mimalloc.tar.gz -C /tmp/mimalloc \
+    && cp /tmp/mimalloc/lib/libmimalloc.so.3.4 /out/libmimalloc.so
+
 FROM gcr.io/distroless/cc-debian13:nonroot
 
 # The real busybox binary plus every applet name (grep/sed/uniq/etc.)
@@ -85,6 +101,7 @@ COPY --from=tools /out/usr/bin/ /usr/bin/
 COPY --from=tools /out/bin/ /bin/
 COPY --from=tools /out/sbin/ /sbin/
 COPY --from=tools /out/usr/lib/x86_64-linux-gnu/ /usr/lib/x86_64-linux-gnu/
+COPY --from=mimalloc /out/libmimalloc.so /opt/mimalloc/libmimalloc.so
 ENV PATH=/usr/bin:/bin:/sbin
 
 ENV ARMA_BINARY=./arma3server_x64
@@ -95,6 +112,9 @@ ENV ARMA_CDLC=
 ENV PORT=2302
 ENV CLEAR_KEYS=true
 ENV MODS=
+# Unset by default -- see the mimalloc build stage's own comment above.
+# Set to /opt/mimalloc/libmimalloc.so (chart values override) to enable.
+ENV ARMA_LD_PRELOAD=
 
 EXPOSE 2302/udp
 EXPOSE 2303/udp

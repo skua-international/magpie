@@ -88,6 +88,12 @@ spec:
               value: {{ printf "%s-arma-config-baseline" (include "magpie.fullname" .) | quote }}
             - name: USER_SECRETS_NAMESPACE
               value: {{ .Values.userSecretsNamespace | quote }}
+            # Empty/off by default -- see controller's Config::arma_ld_preload
+            # and launcher's Config::ld_preload for what this actually does
+            # (LD_PRELOAD an allocator, e.g. mimalloc, into arma3server_x64
+            # specifically; Arma's own -malloc=/CMA system is Windows-only).
+            - name: ARMA_LD_PRELOAD
+              value: {{ .Values.armaServer.ldPreload | default "" | quote }}
           {{- with .Values.controller.resources }}
           resources:
             {{- toYaml . | nindent 12 }}

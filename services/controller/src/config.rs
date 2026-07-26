@@ -66,6 +66,14 @@ pub struct Config {
     /// means the worst a malicious/mistaken ConfigMap value can do is
     /// read a secret an operator deliberately put there for this purpose.
     pub user_secrets_namespace: String,
+    /// Passed straight through as `ARMA_LD_PRELOAD` into every server and
+    /// headless-client Pod this reconciler creates -- see launcher's
+    /// `Config::ld_preload` for what it actually does (LD_PRELOAD an
+    /// allocator, e.g. mimalloc, into arma3server_x64 specifically). Empty
+    /// by default/off; a chart value, not per-`ArmaServer` spec, since
+    /// there's no reason to want it on for some servers and not others on
+    /// the same cluster.
+    pub arma_ld_preload: String,
 }
 
 impl Config {
@@ -105,6 +113,7 @@ impl Config {
                 .unwrap_or_else(|_| "arma-config-baseline".into()),
             user_secrets_namespace: env::var("USER_SECRETS_NAMESPACE")
                 .unwrap_or_else(|_| "magpie-user-secrets".into()),
+            arma_ld_preload: env::var("ARMA_LD_PRELOAD").unwrap_or_default(),
         })
     }
 }

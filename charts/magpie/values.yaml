@@ -62,6 +62,17 @@ namespace: magpie
 # ghcr-pull-secret/etc.
 userSecretsNamespace: magpie-user-secrets
 
+armaServer:
+  # LD_PRELOAD path set on every ArmaServer/HeadlessClient Pod's
+  # arma3server_x64 process -- e.g. "/opt/mimalloc/libmimalloc.so" (baked
+  # into the launcher image already) to override its allocator. Arma's own
+  # -malloc=/CMA plugin system is Windows-only (BIS's own wiki: "Linux
+  # dedicated server uses allocator provided by operating system. There
+  # are NO plans to allow its customization yet."), so LD_PRELOAD is the
+  # only way to affect the Linux binary's allocator at all. Empty/off by
+  # default -- not validated against a real server yet.
+  ldPreload: ""
+
 # services/server-api, services/identity, and services/registry are
 # ClusterIP-only -- reached from outside the cluster via the Ingress
 # resources this chart also creates (see ingress.* below), fronted by

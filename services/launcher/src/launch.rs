@@ -170,12 +170,27 @@ pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Inst
     // gets it the same structured formatting (and, once launcher's own
     // subscriber emits JSON, the same machine-parseable shape) as every
     // other log line this process produces.
-    let mut child = TokioCommand::new(&cfg.arma_binary)
-        .args(&args)
+    let mut cmd = TokioCommand::new(&cfg.arma_binary);
+    cmd.args(&args)
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .context("failed to spawn arma3server")?;
+        .stderr(std::process::Stdio::piped());
+    // Set on arma3server_x64 specifically, not this launcher process --
+    // see Config::ld_preload's own doc for why LD_PRELOAD is the only way
+    // to affect the Linux binary's allocator at all. The two MIMALLOC_*
+    // tuning vars ride along in the same conditional since they're
+    // meaningless without it: ALLOW_LARGE_OS_PAGES opportunistically uses
+    // 2MB pages (no explicit reservation needed, unlike RESERVE_HUGE_OS_
+    // PAGES); PURGE_DELAY bumped from mimalloc's 1000ms default to a full
+    // minute -- elephant is a shared host running multiple ArmaServer
+    // pods, so this should still give memory back like sync-daemon does,
+    // just not on a hair trigger for a process serving live players.
+    if let Some(ld_preload) = &cfg.ld_preload {
+        tracing::info!("LD_PRELOAD={ld_preload}");
+        cmd.env("LD_PRELOAD", ld_preload)
+            .env("MIMALLOC_ALLOW_LARGE_OS_PAGES", "1")
+            .env("MIMALLOC_PURGE_DELAY", "60000");
+    }
+    let mut child = cmd.spawn().context("failed to spawn arma3server")?;
 
     if let Some(stdout) = child.stdout.take() {
         tokio::spawn(forward_stdout(stdout));
