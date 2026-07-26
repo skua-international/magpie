@@ -1849,7 +1849,7 @@ pub async fn resolve_source_ids(
         )
         .await?;
         let resp = <steamdepot::proto::CPublishedFileGetDetailsResponse as prost::Message>::decode(
-            resp_bytes.as_slice(),
+            resp_bytes,
         )
         .context("failed to decode PublishedFile.GetDetails response")?;
 
