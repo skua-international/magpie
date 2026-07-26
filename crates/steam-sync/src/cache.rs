@@ -376,10 +376,16 @@ impl SyncState {
     /// The full set of mod IDs desired by *any* currently-registered
     /// source -- what an actual sync pass should treat as "wanted".
     pub async fn desired_mod_ids(&self) -> Result<Vec<u64>> {
-        let mut rows = self
-            .conn
-            .lock()
-            .await
+        // The guard must stay bound for the whole function, not just the
+        // `.query()` call -- turso's ConcurrentGuard considers the
+        // connection "in use" for as long as `rows` is alive and being
+        // iterated below, so dropping the guard right after `.query()`
+        // returns (as a temporary chained straight off `.lock().await`
+        // would) lets a second caller acquire the Mutex and start a real
+        // concurrent operation on the same connection mid-iteration --
+        // exactly the "concurrent use forbidden" panic seen in production.
+        let conn = self.conn.lock().await;
+        let mut rows = conn
             .query("SELECT DISTINCT mod_id FROM source_mods", ())
             .await
             .context("failed to query desired_mod_ids")?;
@@ -414,10 +420,11 @@ impl SyncState {
     /// whatever `RegisterSource`/`RefreshSource`/the background poller last
     /// resolved, no Steam calls. Used by `GetSourceMods`.
     pub async fn mod_ids_for_source(&self, source_id: &str) -> Result<Vec<u64>> {
-        let mut rows = self
-            .conn
-            .lock()
-            .await
+        // See desired_mod_ids' comment on why this must be a named binding
+        // held for the whole function, not a temporary dropped right after
+        // `.query()` returns.
+        let conn = self.conn.lock().await;
+        let mut rows = conn
             .query(
                 "SELECT mod_id FROM source_mods WHERE source_id = ?1",
                 turso::params![source_id],
@@ -441,10 +448,11 @@ impl SyncState {
     /// background poller to periodically re-resolve (picking up upstream
     /// collection membership changes even if nothing re-registers them).
     pub async fn all_source_candidates(&self) -> Result<Vec<(String, Vec<u64>)>> {
-        let mut rows = self
-            .conn
-            .lock()
-            .await
+        // See desired_mod_ids' comment on why this must be a named binding
+        // held for the whole function, not a temporary dropped right after
+        // `.query()` returns.
+        let conn = self.conn.lock().await;
+        let mut rows = conn
             .query("SELECT source_id, candidate_ids FROM sources", ())
             .await
             .context("failed to query all_source_candidates")?;
@@ -1114,5 +1122,68 @@ mod tests {
         );
         ra.expect("concurrent upsert_source (a) failed");
         rb.expect("concurrent upsert_source (b) failed");
+    }
+
+    /// Regression test for a real production failure (`RefreshSource`
+    /// calls firing back-to-back hit `Misuse("concurrent use forbidden")`)
+    /// that `concurrent_operations_do_not_error` above did *not* catch,
+    /// because it only exercises `.execute()` calls. The actual bug was in
+    /// row-iterating `.query()` methods: `self.conn.lock().await.query(...)`
+    /// drops the guard (a temporary) the moment `.query()` returns, before
+    /// the caller ever iterates `rows` -- so a query with enough rows to
+    /// need multiple `.next().await` polls leaves the connection
+    /// logically "in use" by an unguarded cursor while a second caller can
+    /// already acquire the Mutex and start a real concurrent operation.
+    /// Exercises exactly that shape: a query with many rows (forcing
+    /// several await points during iteration) racing against a write on
+    /// the same connection.
+    //
+    // Uses a real multi-threaded runtime with `tokio::spawn`, not
+    // `tokio::join!` on a current-thread runtime -- reproducing the race
+    // needs genuine overlapping calls into the connection from separate OS
+    // threads (matching how it actually happened in production, multiple
+    // RPC handlers on tokio's real worker pool), not just cooperative
+    // single-threaded interleaving at `.await` points, which didn't
+    // reliably reproduce it even with a many-row query.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn concurrent_query_iteration_and_write_do_not_error() {
+        let (_dir, state) = open_test_state().await;
+
+        // Enough rows that iterating them spans multiple `rows.next().await`
+        // polls, widening the window a concurrent write can land in.
+        let mod_ids: Vec<u64> = (0..200).collect();
+        state
+            .set_source_mods("src-many-rows", &mod_ids)
+            .await
+            .expect("setup: set_source_mods failed");
+
+        let mut handles = Vec::new();
+        for _ in 0..8 {
+            let reader = state.clone();
+            handles.push(tokio::spawn(async move {
+                for _ in 0..20 {
+                    reader.mod_ids_for_source("src-many-rows").await?;
+                    reader.desired_mod_ids().await?;
+                    reader.all_source_candidates().await?;
+                }
+                Ok::<(), anyhow::Error>(())
+            }));
+        }
+        for w in 0..8 {
+            let writer = state.clone();
+            handles.push(tokio::spawn(async move {
+                for i in 0..20 {
+                    writer
+                        .upsert_source(&format!("src-writer-{w}-{i}"), &[i as u64])
+                        .await?;
+                }
+                Ok::<(), anyhow::Error>(())
+            }));
+        }
+        for h in handles {
+            h.await
+                .expect("task panicked")
+                .expect("concurrent cache operation failed");
+        }
     }
 }
