@@ -37,6 +37,9 @@ pub struct Shared {
     pub pool: Option<Arc<CmPool>>,
     pub sync_state: Arc<SyncState>,
     pub content_root: PathBuf,
+    /// See steam::DEFAULT_DOWNLOAD_WORKERS' own doc -- chunk-level
+    /// concurrency within each depot/mod's own verify+download pass.
+    pub download_workers: usize,
     pub client: kube::Client,
     pub namespace: String,
     pub steam_session_secret_name: String,
@@ -74,6 +77,7 @@ impl Shared {
         client: kube::Client,
         namespace: String,
         steam_session_secret_name: String,
+        download_workers: usize,
     ) -> Arc<Self> {
         Arc::new(Self {
             pool,
@@ -82,6 +86,7 @@ impl Shared {
             client,
             namespace,
             steam_session_secret_name,
+            download_workers,
             syncing: AtomicUsize::new(0),
         })
     }
@@ -186,6 +191,7 @@ impl Shared {
             sem.clone(),
             &tasks,
             self.sync_state.clone(),
+            self.download_workers,
         )
         .await;
         if let Err(e) = &result {
@@ -207,6 +213,7 @@ impl Shared {
                 sem.clone(),
                 &tasks,
                 self.sync_state.clone(),
+                self.download_workers,
             )
             .await;
             if let Err(e) = &result {

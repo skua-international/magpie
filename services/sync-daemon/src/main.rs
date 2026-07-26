@@ -114,6 +114,7 @@ async fn main() -> Result<()> {
         client.clone(),
         cfg.namespace.clone(),
         cfg.steam_session_secret_name.clone(),
+        cfg.download_workers,
     );
 
     reconcile::spawn(

@@ -43,6 +43,11 @@ pub struct Config {
     pub content_root: PathBuf,
     pub listen_addr: String,
     pub pool_size: usize,
+    /// Chunk-level concurrency within each depot/mod's own verify+download
+    /// pass -- see steam::DEFAULT_DOWNLOAD_WORKERS' own doc for why this
+    /// is configurable rather than a hardcoded const (it's the CPU-bound
+    /// half of this process' concurrency, unlike SYNC_CONCURRENCY).
+    pub download_workers: usize,
     /// How often the ModSource reconciler re-resolves an already-`Synced`
     /// source's candidate IDs on its own periodic requeue, independent of
     /// anything re-registering it -- catches upstream collection-membership
@@ -84,6 +89,10 @@ impl Config {
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(4),
+            download_workers: env::var("DOWNLOAD_WORKERS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(steam_sync::steam::DEFAULT_DOWNLOAD_WORKERS),
             poll_interval_secs: env::var("POLL_INTERVAL_SECS")
                 .ok()
                 .and_then(|v| v.parse().ok())

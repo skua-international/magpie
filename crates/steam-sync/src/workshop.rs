@@ -76,6 +76,7 @@ pub async fn sync_mods(
     sem: Arc<Semaphore>,
     tasks: &Mutex<SyncTasks>,
     sync_state: Arc<cache::SyncState>,
+    download_workers: usize,
 ) -> Result<SyncModsResult> {
     let replace_app_id = !cdlc_force;
     let workshop_root = server_root.join("workshop");
@@ -102,7 +103,8 @@ pub async fn sync_mods(
         let id = item.published_file_id;
 
         let fut = async move {
-            steam::download_one_depot(item.plan, item_dir.clone(), http, pool, sync_state).await?;
+            steam::download_one_depot(item.plan, item_dir.clone(), http, pool, sync_state, download_workers)
+                .await?;
             patch_mod_metadata(&item_dir, id, replace_app_id)?;
             tracing::info!("[{id}] Finished");
             Ok(())

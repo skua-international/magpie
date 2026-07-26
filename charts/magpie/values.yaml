@@ -266,6 +266,19 @@ syncDaemon:
   # trigger-driven).
   contentSyncIntervalSecs: 21600
   poolSize: 4
+  # Chunk-level concurrency *within* each depot/mod's own verify+download
+  # pass (crates/steam-sync's DOWNLOAD_WORKERS) -- separate from, and
+  # multiplies against, SYNC_CONCURRENCY (how many depots/mods run at
+  # once, hardcoded at 128, left alone since most of that budget's time
+  # is CDN network I/O that async handles fine). This one's mostly CPU-
+  # bound (chunk hash verification), so a bad default here can genuinely
+  # saturate a small box: confirmed live at 24 (the CDN-limit-probing
+  # value it was bumped to, never re-tuned for this), a fresh multi-depot
+  # verification pass spiked to 11 real cores on an otherwise-idle
+  # 24-thread host. 8 was the prior known-good baseline before that bump.
+  # Configurable rather than hardcoded specifically so an operator on
+  # smaller/larger hardware can retune this without a rebuild.
+  downloadWorkers: 8
   image:
     repository: "ghcr.io/skua-international/magpie/sync-daemon"
     tag: ""
@@ -300,7 +313,16 @@ syncDaemon:
     # RefreshSteamAuth call) and reads from it on every subsequent boot,
     # skipping credentials entirely once it has one.
     sessionSecretName: arma-steam-session
-  resources: {}
+  # No limit deliberately -- Burstable QoS, not Guaranteed. The low
+  # request is the actual point: it sets a low relative CFS cpu.shares
+  # weight, so under real contention the scheduler favors higher-request
+  # pods (an ArmaServer) over this background sync work, while still
+  # letting it burst onto genuinely idle cores when nothing's contending.
+  # A hard limit would throttle syncs even when the node has room to
+  # spare, which isn't what's wanted here.
+  resources:
+    requests:
+      cpu: 250m
 
 # Reconciler only -- watches ArmaServer, creates/deletes launcher
 # Deployments. No external listener, no auth surface; the only thing that

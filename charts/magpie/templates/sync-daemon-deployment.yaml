@@ -63,6 +63,8 @@ spec:
               value: /content
             - name: POOL_SIZE
               value: {{ .Values.syncDaemon.poolSize | quote }}
+            - name: DOWNLOAD_WORKERS
+              value: {{ .Values.syncDaemon.downloadWorkers | quote }}
             - name: POLL_INTERVAL_SECS
               value: {{ .Values.syncDaemon.pollIntervalSecs | quote }}
             - name: CONTENT_SYNC_INTERVAL_SECS

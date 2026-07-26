@@ -78,11 +78,16 @@ pub fn cdlc_depot_ids(names: &[String]) -> Vec<u32> {
         })
         .collect()
 }
-// Steam's CDN can take a lot more than the old conservative defaults --
-// bumped from 8/6 to see where actual rate-limiting or bandwidth ceilings
-// show up. Watch for 429/503s in the logs (retried automatically, but a
-// rising rate means we've found the real limit) if pushing further.
-const DOWNLOAD_WORKERS: usize = 24;
+/// Chunk-level concurrency within one depot/mod's own verify+download pass
+/// -- configurable (sync-daemon's DOWNLOAD_WORKERS env var, see its
+/// config.rs) rather than a hardcoded value, since this is the CPU-bound
+/// half of this process' concurrency (chunk hash verification), unlike
+/// [`SYNC_CONCURRENCY`] which is mostly network-I/O-bound. Confirmed live:
+/// 24 (bumped from this same 8 baseline specifically to probe Steam's CDN
+/// rate-limiting/bandwidth ceilings, never re-tuned for real deployment)
+/// spiked a fresh multi-depot verification pass to 11 real cores on an
+/// otherwise-idle 24-thread host. 8 is the prior known-good default.
+pub const DEFAULT_DOWNLOAD_WORKERS: usize = 8;
 
 /// Global cap on how many depots/mods sync concurrently (server depots and
 /// workshop mods share this one budget, since their chunk downloads now run
@@ -914,6 +919,7 @@ pub async fn resolve_and_spawn_server(
     sem: Arc<Semaphore>,
     tasks: &Mutex<SyncTasks>,
     sync_state: Arc<cache::SyncState>,
+    download_workers: usize,
 ) -> Result<()> {
     let plan = resolve_wanted_depots(
         conn,
@@ -940,6 +946,7 @@ pub async fn resolve_and_spawn_server(
         sem,
         tasks,
         sync_state,
+        download_workers,
     )
     .await
 }
@@ -956,6 +963,7 @@ async fn spawn_plan_downloads(
     sem: Arc<Semaphore>,
     tasks: &Mutex<SyncTasks>,
     sync_state: Arc<cache::SyncState>,
+    download_workers: usize,
 ) -> Result<()> {
     let http = reqwest::Client::new();
     let app_id = plan.app_id;
@@ -1100,6 +1108,7 @@ async fn spawn_plan_downloads(
             http.clone(),
             pool.clone(),
             sync_state.clone(),
+            download_workers,
         );
         spawn_bounded(tasks, sem.clone(), fut);
     }
@@ -1484,6 +1493,7 @@ pub(crate) async fn download_one_depot(
     http: reqwest::Client,
     pool: Arc<Mutex<CdnPool>>,
     sync_state: Arc<cache::SyncState>,
+    download_workers: usize,
 ) -> Result<()> {
     let manifest = dp.manifest.as_mut().with_context(|| {
         format!(
@@ -1566,7 +1576,7 @@ pub(crate) async fn download_one_depot(
         manifest,
         &dp.key,
         &install_dir,
-        DOWNLOAD_WORKERS,
+        download_workers,
         move |p| {
             // Log on whole-percent thresholds only -- per-chunk would be
             // way too noisy for a real log stream.
