@@ -2,6 +2,7 @@
 name = "protocol"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 
 [dependencies]
 connectrpc = "0.8"

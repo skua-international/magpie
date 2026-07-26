@@ -11,3 +11,4 @@ edition = "2024"
 # `version.workspace = true` rather than carrying its own, so it's still
 # one shared value, just not one that reflects any real release.
 version = "0.0.0-unreleased"
+license = "Apache-2.0"

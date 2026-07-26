@@ -2,6 +2,7 @@
 name = "workshop-parse"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 
 [dependencies]
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
