@@ -9,13 +9,6 @@ updates:
         patterns: ["*"]
     open-pull-requests-limit: 10
     ignore:
-      # sqlx 0.9 pulls in sqlite regardless of feature selection, conflicting
-      # with steam-sync's own rusqlite (libsqlite3-sys "links" collision) --
-      # pinned to 0.8 deliberately, see crates/registry-db/Cargo.toml.
-      - dependency-name: "sqlx"
-        versions: [">=0.9.0"]
-      - dependency-name: "sqlx-*"
-        versions: [">=0.9.0"]
       # reqwest is pinned to the 0.12 line to match what the oauth2 crate
       # depends on internally -- a 0.13 bump here would reintroduce two
       # coexisting reqwest::Client types that don't implement each other's

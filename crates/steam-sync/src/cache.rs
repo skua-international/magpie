@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
-use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 use steamdepot::cdn::DepotManifest;
+use turso::transaction::TransactionBehavior;
 
 /// One workshop mod's synced state, as returned by
 /// [`SyncState::list_synced_mods`]/[`SyncState::get_synced_mod`].
@@ -177,30 +177,65 @@ fn holder_id() -> String {
     format!("{host}:{}", std::process::id())
 }
 
+/// Returns `Ok(None)` for `Error::QueryReturnedNoRows` instead of
+/// propagating it -- turso's analog of rusqlite's `.optional()` extension,
+/// which turso doesn't provide itself.
+async fn optional_row(
+    stmt: &mut turso::Statement,
+    params: impl turso::IntoParams,
+) -> Result<Option<turso::Row>> {
+    match stmt.query_row(params).await {
+        Ok(row) => Ok(Some(row)),
+        Err(turso::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(e.into()),
+    }
+}
+
 /// Cross-process state and locking for "has this depot/mod already been
 /// fully chunk-verified at its current manifest_id" -- backed by SQLite
 /// (not a hand-rolled JSON file) specifically because more than one server
 /// instance can share the same workshop/server content directory. A plain
 /// `std::fs::write` has no cross-process atomicity at all (not even a
-/// temp-file+rename), and an in-process `Mutex` only serializes writers
+/// temp-file+rename), and an in-process lock only serializes writers
 /// within one process -- neither stops two separate launcher processes from
 /// corrupting the same file, or worse, both writing into the same depot's
 /// files on disk at once. SQLite's own file locking (`BEGIN IMMEDIATE`
 /// transactions) gives real cross-process mutual exclusion for both the
 /// state table and the advisory lock table below.
+///
+/// `conn` needs no `Mutex` wrapper -- turso's `Connection` is `Clone` +
+/// `Send` + `Sync` already (internally `Arc`-backed), unlike rusqlite's.
 pub struct SyncState {
-    conn: Mutex<Connection>,
+    conn: turso::Connection,
 }
 
 impl SyncState {
-    pub fn open(root: &Path) -> Result<Arc<Self>> {
+    pub async fn open(root: &Path) -> Result<Arc<Self>> {
         let dir = cache_dir(root);
         std::fs::create_dir_all(&dir).context("failed to create cache dir")?;
-        let conn =
-            Connection::open(dir.join("sync.db")).context("failed to open sync state database")?;
-        conn.pragma_update(None, "journal_mode", "WAL")
+        let db_path = dir
+            .join("sync.db")
+            .to_str()
+            .context("cache dir path is not valid UTF-8")?
+            .to_string();
+        // experimental_multiprocess_wal: this cache is shared across
+        // multiple server instances on the same content directory (see
+        // this struct's own doc) -- needs real testing under actual
+        // concurrent-process access before fully trusting it, same as any
+        // experimental flag.
+        let db = turso::Builder::new_local(&db_path)
+            .experimental_multiprocess_wal(true)
+            .build()
+            .await
+            .context("failed to open sync state database")?;
+        let conn = db
+            .connect()
+            .context("failed to open sync state connection")?;
+        conn.pragma_update("journal_mode", "WAL")
+            .await
             .context("failed to set sync state database to WAL mode")?;
-        conn.pragma_update(None, "busy_timeout", 5000u32)
+        conn.pragma_update("busy_timeout", 5000u32)
+            .await
             .context("failed to set sync state database busy_timeout")?;
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS synced (
@@ -227,26 +262,26 @@ impl SyncState {
                 title TEXT NOT NULL
             );",
         )
+        .await
         .context("failed to initialize sync state schema")?;
-        Ok(Arc::new(Self {
-            conn: Mutex::new(conn),
-        }))
+        Ok(Arc::new(Self { conn }))
     }
 
     /// Record `source_id`'s originally-registered candidate IDs (the raw
     /// input to `resolve_source_ids`, not the resolved mod list) -- used by
     /// the background poller to know what to re-resolve later. Idempotent:
     /// re-registering the same `source_id` just overwrites its candidates.
-    pub fn upsert_source(&self, source_id: &str, candidate_ids: &[u64]) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+    pub async fn upsert_source(&self, source_id: &str, candidate_ids: &[u64]) -> Result<()> {
         let json =
             serde_json::to_string(candidate_ids).context("failed to serialize candidate_ids")?;
-        conn.execute(
-            "INSERT INTO sources (source_id, candidate_ids) VALUES (?1, ?2)
-             ON CONFLICT(source_id) DO UPDATE SET candidate_ids = excluded.candidate_ids",
-            params![source_id, json],
-        )
-        .context("failed to upsert source")?;
+        self.conn
+            .execute(
+                "INSERT INTO sources (source_id, candidate_ids) VALUES (?1, ?2)
+                 ON CONFLICT(source_id) DO UPDATE SET candidate_ids = excluded.candidate_ids",
+                turso::params![source_id, json],
+            )
+            .await
+            .context("failed to upsert source")?;
         Ok(())
     }
 
@@ -256,58 +291,87 @@ impl SyncState {
     /// necessarily stop it from being desired overall; see
     /// [`desired_mod_ids`](Self::desired_mod_ids), which unions across
     /// every source.
-    pub fn set_source_mods(&self, source_id: &str, mod_ids: &[u64]) -> Result<()> {
-        let mut conn = self.conn.lock().unwrap();
+    pub async fn set_source_mods(&self, source_id: &str, mod_ids: &[u64]) -> Result<()> {
+        let mut conn = self.conn.clone();
         let tx = conn
             .transaction()
+            .await
             .context("failed to begin source_mods update transaction")?;
         let existing: std::collections::HashSet<u64> = {
-            let mut stmt = tx.prepare("SELECT mod_id FROM source_mods WHERE source_id = ?1")?;
-            stmt.query_map([source_id], |r| r.get::<_, i64>(0))?
-                .filter_map(|r| r.ok())
-                .map(|v| v as u64)
-                .collect()
+            let mut rows = tx
+                .query(
+                    "SELECT mod_id FROM source_mods WHERE source_id = ?1",
+                    turso::params![source_id],
+                )
+                .await
+                .context("failed to query existing source_mods")?;
+            let mut set = std::collections::HashSet::new();
+            while let Some(row) = rows.next().await.context("failed to read source_mods row")? {
+                if let Ok(v) = row.get::<i64>(0) {
+                    set.insert(v as u64);
+                }
+            }
+            set
         };
         let wanted: std::collections::HashSet<u64> = mod_ids.iter().copied().collect();
 
         for mod_id in wanted.difference(&existing) {
             tx.execute(
                 "INSERT INTO source_mods (source_id, mod_id) VALUES (?1, ?2)",
-                params![source_id, *mod_id as i64],
-            )?;
+                turso::params![source_id, *mod_id as i64],
+            )
+            .await
+            .context("failed to insert source_mods row")?;
         }
         for mod_id in existing.difference(&wanted) {
             tx.execute(
                 "DELETE FROM source_mods WHERE source_id = ?1 AND mod_id = ?2",
-                params![source_id, *mod_id as i64],
-            )?;
+                turso::params![source_id, *mod_id as i64],
+            )
+            .await
+            .context("failed to delete source_mods row")?;
         }
-        tx.commit().context("failed to commit source_mods update")?;
+        tx.commit()
+            .await
+            .context("failed to commit source_mods update")?;
         Ok(())
     }
 
     /// Explicit, deliberate removal of a source and its membership rows.
     /// Does not touch any *other* source's rows -- a mod this source also
     /// referenced but that's still claimed by another source keeps syncing.
-    pub fn delete_source(&self, source_id: &str) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
-        conn.execute("DELETE FROM sources WHERE source_id = ?1", [source_id])
+    pub async fn delete_source(&self, source_id: &str) -> Result<()> {
+        self.conn
+            .execute(
+                "DELETE FROM sources WHERE source_id = ?1",
+                turso::params![source_id],
+            )
+            .await
             .context("failed to delete source")?;
-        conn.execute("DELETE FROM source_mods WHERE source_id = ?1", [source_id])
+        self.conn
+            .execute(
+                "DELETE FROM source_mods WHERE source_id = ?1",
+                turso::params![source_id],
+            )
+            .await
             .context("failed to delete source_mods")?;
         Ok(())
     }
 
     /// The full set of mod IDs desired by *any* currently-registered
     /// source -- what an actual sync pass should treat as "wanted".
-    pub fn desired_mod_ids(&self) -> Result<Vec<u64>> {
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT DISTINCT mod_id FROM source_mods")?;
-        let ids = stmt
-            .query_map([], |r| r.get::<_, i64>(0))?
-            .filter_map(|r| r.ok())
-            .map(|v| v as u64)
-            .collect();
+    pub async fn desired_mod_ids(&self) -> Result<Vec<u64>> {
+        let mut rows = self
+            .conn
+            .query("SELECT DISTINCT mod_id FROM source_mods", ())
+            .await
+            .context("failed to query desired_mod_ids")?;
+        let mut ids = Vec::new();
+        while let Some(row) = rows.next().await.context("failed to read desired_mod_ids row")? {
+            if let Ok(v) = row.get::<i64>(0) {
+                ids.push(v as u64);
+            }
+        }
         Ok(ids)
     }
 
@@ -315,42 +379,62 @@ impl SyncState {
     /// on-demand refresh (`RefreshSource`) rather than the background
     /// poller's full sweep. `None` if `source_id` was never registered (or
     /// was since deregistered).
-    pub fn candidate_ids_for_source(&self, source_id: &str) -> Result<Option<Vec<u64>>> {
-        let conn = self.conn.lock().unwrap();
-        let json: Option<String> = conn
-            .query_row(
-                "SELECT candidate_ids FROM sources WHERE source_id = ?1",
-                [source_id],
-                |r| r.get(0),
-            )
-            .optional()?;
+    pub async fn candidate_ids_for_source(&self, source_id: &str) -> Result<Option<Vec<u64>>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT candidate_ids FROM sources WHERE source_id = ?1")
+            .await
+            .context("failed to prepare candidate_ids_for_source query")?;
+        let json: Option<String> = optional_row(&mut stmt, turso::params![source_id])
+            .await?
+            .map(|row| row.get(0))
+            .transpose()
+            .context("failed to read candidate_ids")?;
         Ok(json.map(|json| serde_json::from_str(&json).unwrap_or_default()))
     }
 
     /// A single source's current resolved mod list -- a plain read of
     /// whatever `RegisterSource`/`RefreshSource`/the background poller last
     /// resolved, no Steam calls. Used by `GetSourceMods`.
-    pub fn mod_ids_for_source(&self, source_id: &str) -> Result<Vec<u64>> {
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT mod_id FROM source_mods WHERE source_id = ?1")?;
-        let ids = stmt
-            .query_map([source_id], |r| r.get::<_, i64>(0))?
-            .filter_map(|r| r.ok())
-            .map(|v| v as u64)
-            .collect();
+    pub async fn mod_ids_for_source(&self, source_id: &str) -> Result<Vec<u64>> {
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT mod_id FROM source_mods WHERE source_id = ?1",
+                turso::params![source_id],
+            )
+            .await
+            .context("failed to query mod_ids_for_source")?;
+        let mut ids = Vec::new();
+        while let Some(row) = rows
+            .next()
+            .await
+            .context("failed to read mod_ids_for_source row")?
+        {
+            if let Ok(v) = row.get::<i64>(0) {
+                ids.push(v as u64);
+            }
+        }
         Ok(ids)
     }
 
     /// Every registered source's original candidate IDs, for the
     /// background poller to periodically re-resolve (picking up upstream
     /// collection membership changes even if nothing re-registers them).
-    pub fn all_source_candidates(&self) -> Result<Vec<(String, Vec<u64>)>> {
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT source_id, candidate_ids FROM sources")?;
-        let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
+    pub async fn all_source_candidates(&self) -> Result<Vec<(String, Vec<u64>)>> {
+        let mut rows = self
+            .conn
+            .query("SELECT source_id, candidate_ids FROM sources", ())
+            .await
+            .context("failed to query all_source_candidates")?;
         let mut out = Vec::new();
-        for row in rows {
-            let (source_id, json) = row?;
+        while let Some(row) = rows
+            .next()
+            .await
+            .context("failed to read all_source_candidates row")?
+        {
+            let source_id: String = row.get(0).context("failed to read source_id")?;
+            let json: String = row.get(1).context("failed to read candidate_ids")?;
             let candidate_ids: Vec<u64> = serde_json::from_str(&json).unwrap_or_default();
             out.push((source_id, candidate_ids));
         }
@@ -364,25 +448,27 @@ impl SyncState {
     /// this run's live PICS/GetDetails result) is a sound proof that
     /// nothing changed since the last verified sync, since Steam's
     /// manifest_id changes whenever a depot's content changes.
-    pub fn is_synced(&self, key: &str, manifest_id: u64, dir_exists: bool) -> bool {
+    pub async fn is_synced(&self, key: &str, manifest_id: u64, dir_exists: bool) -> bool {
         if !dir_exists {
             return false;
         }
-        self.last_manifest_id(key) == Some(manifest_id)
+        self.last_manifest_id(key).await == Some(manifest_id)
     }
 
     /// The manifest_id `key` was last verified at, if any.
-    pub fn last_manifest_id(&self, key: &str) -> Option<u64> {
-        let conn = self.conn.lock().unwrap();
-        conn.query_row(
-            "SELECT manifest_id FROM synced WHERE key = ?1",
-            [key],
-            |r| r.get::<_, i64>(0),
-        )
-        .optional()
-        .ok()
-        .flatten()
-        .map(|v| v as u64)
+    pub async fn last_manifest_id(&self, key: &str) -> Option<u64> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT manifest_id FROM synced WHERE key = ?1")
+            .await
+            .ok()?;
+        optional_row(&mut stmt, turso::params![key])
+            .await
+            .ok()
+            .flatten()?
+            .get::<i64>(0)
+            .ok()
+            .map(|v| v as u64)
     }
 
     /// The entire `synced` table as an in-memory snapshot, for resolution
@@ -397,25 +483,30 @@ impl SyncState {
     /// doing any real work, so a microseconds-stale snapshot can cause at
     /// worst a missed skip (an item gets dispatched, then the live
     /// re-check catches that it's already synced), never an incorrect one.
-    pub fn snapshot(&self) -> HashMap<String, u64> {
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = match conn.prepare("SELECT key, manifest_id FROM synced") {
-            Ok(stmt) => stmt,
+    pub async fn snapshot(&self) -> HashMap<String, u64> {
+        let mut rows = match self.conn.query("SELECT key, manifest_id FROM synced", ()).await {
+            Ok(rows) => rows,
             Err(e) => {
                 tracing::warn!("failed to prepare sync state snapshot query: {e:#}");
                 return HashMap::new();
             }
         };
-        let rows = stmt.query_map([], |r| {
-            Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)? as u64))
-        });
-        match rows {
-            Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
-            Err(e) => {
-                tracing::warn!("failed to read sync state snapshot: {e:#}");
-                HashMap::new()
+        let mut out = HashMap::new();
+        loop {
+            match rows.next().await {
+                Ok(Some(row)) => {
+                    if let (Ok(k), Ok(v)) = (row.get::<String>(0), row.get::<i64>(1)) {
+                        out.insert(k, v as u64);
+                    }
+                }
+                Ok(None) => break,
+                Err(e) => {
+                    tracing::warn!("failed to read sync state snapshot: {e:#}");
+                    break;
+                }
             }
         }
+        out
     }
 
     /// Clear `key`'s "last verified" marker only -- never touches files on
@@ -428,9 +519,12 @@ impl SyncState {
     /// non-destructive half of "force refresh a mod" -- the caller-facing
     /// API surface (registry's `InvalidateMod`) is intentionally
     /// restricted to exactly this, not real file deletion.
-    pub fn invalidate(&self, key: &str) {
-        let conn = self.conn.lock().unwrap();
-        if let Err(e) = conn.execute("DELETE FROM synced WHERE key = ?1", [key]) {
+    pub async fn invalidate(&self, key: &str) {
+        if let Err(e) = self
+            .conn
+            .execute("DELETE FROM synced WHERE key = ?1", turso::params![key])
+            .await
+        {
             tracing::warn!("failed to invalidate sync state for {key}: {e:#}");
         }
     }
@@ -442,113 +536,152 @@ impl SyncState {
     /// (see `sync_key`'s doc), which is how this distinguishes mod
     /// entries from server/CDLC depot entries (under app 233780) in the
     /// same table.
-    pub fn list_synced_mods(&self) -> Vec<SyncedModRow> {
+    pub async fn list_synced_mods(&self) -> Vec<SyncedModRow> {
         const WORKSHOP_CONSUMER_APP_ID: &str = "107410";
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = match conn.prepare(
-            "SELECT s.key, s.manifest_id, s.size_bytes, COALESCE(t.title, '')
-             FROM synced s LEFT JOIN mod_titles t ON t.mod_id = CAST(substr(s.key, instr(s.key, '/') + 1) AS INTEGER)",
-        ) {
-            Ok(stmt) => stmt,
+        let mut rows = match self
+            .conn
+            .query(
+                "SELECT s.key, s.manifest_id, s.size_bytes, COALESCE(t.title, '')
+                 FROM synced s LEFT JOIN mod_titles t ON t.mod_id = CAST(substr(s.key, instr(s.key, '/') + 1) AS INTEGER)",
+                (),
+            )
+            .await
+        {
+            Ok(rows) => rows,
             Err(e) => {
                 tracing::warn!("failed to prepare list_synced_mods query: {e:#}");
                 return Vec::new();
             }
         };
-        let rows = stmt.query_map([], |r| {
-            Ok((
-                r.get::<_, String>(0)?,
-                r.get::<_, i64>(1)? as u64,
-                r.get::<_, i64>(2)? as u64,
-                r.get::<_, String>(3)?,
-            ))
-        });
-        match rows {
-            Ok(rows) => rows
-                .filter_map(|r| r.ok())
-                .filter_map(|(key, manifest_id, size_bytes, title)| {
-                    let (depot, leaf) = key.split_once('/')?;
-                    if depot != WORKSHOP_CONSUMER_APP_ID {
-                        return None;
-                    }
-                    leaf.parse::<u64>().ok().map(|mod_id| SyncedModRow {
-                        mod_id,
-                        manifest_id,
-                        size_bytes,
-                        title,
-                    })
-                })
-                .collect(),
-            Err(e) => {
-                tracing::warn!("failed to read list_synced_mods rows: {e:#}");
-                Vec::new()
+        let mut out = Vec::new();
+        loop {
+            let row = match rows.next().await {
+                Ok(Some(row)) => row,
+                Ok(None) => break,
+                Err(e) => {
+                    tracing::warn!("failed to read list_synced_mods rows: {e:#}");
+                    break;
+                }
+            };
+            let (Ok(key), Ok(manifest_id), Ok(size_bytes), Ok(title)) = (
+                row.get::<String>(0),
+                row.get::<i64>(1),
+                row.get::<i64>(2),
+                row.get::<String>(3),
+            ) else {
+                continue;
+            };
+            let Some((depot, leaf)) = key.split_once('/') else {
+                continue;
+            };
+            if depot != WORKSHOP_CONSUMER_APP_ID {
+                continue;
+            }
+            if let Ok(mod_id) = leaf.parse::<u64>() {
+                out.push(SyncedModRow {
+                    mod_id,
+                    manifest_id: manifest_id as u64,
+                    size_bytes: size_bytes as u64,
+                    title,
+                });
             }
         }
+        out
     }
 
     /// A single workshop mod's synced state, or `None` if it isn't
     /// currently tracked as synced at all.
-    pub fn get_synced_mod(&self, mod_id: u64) -> Option<SyncedModRow> {
+    pub async fn get_synced_mod(&self, mod_id: u64) -> Option<SyncedModRow> {
         self.list_synced_mods()
+            .await
             .into_iter()
             .find(|m| m.mod_id == mod_id)
     }
 
     /// Every source_id currently referencing `mod_id` -- a mod can be
     /// shared by more than one source (see `source_mods`'s own doc).
-    pub fn sources_for_mod(&self, mod_id: u64) -> Vec<String> {
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = match conn.prepare("SELECT source_id FROM source_mods WHERE mod_id = ?1") {
-            Ok(stmt) => stmt,
+    pub async fn sources_for_mod(&self, mod_id: u64) -> Vec<String> {
+        let mut rows = match self
+            .conn
+            .query(
+                "SELECT source_id FROM source_mods WHERE mod_id = ?1",
+                turso::params![mod_id as i64],
+            )
+            .await
+        {
+            Ok(rows) => rows,
             Err(e) => {
                 tracing::warn!("failed to prepare sources_for_mod query: {e:#}");
                 return Vec::new();
             }
         };
-        stmt.query_map([mod_id as i64], |r| r.get::<_, String>(0))
-            .map(|rows| rows.filter_map(|r| r.ok()).collect())
-            .unwrap_or_default()
+        let mut out = Vec::new();
+        loop {
+            match rows.next().await {
+                Ok(Some(row)) => {
+                    if let Ok(source_id) = row.get::<String>(0) {
+                        out.push(source_id);
+                    }
+                }
+                Ok(None) => break,
+                Err(e) => {
+                    tracing::warn!("failed to read sources_for_mod rows: {e:#}");
+                    break;
+                }
+            }
+        }
+        out
     }
 
     /// Total on-disk bytes across every currently-synced workshop mod,
     /// each counted exactly once regardless of how many sources reference
     /// it -- `synced` is keyed by mod, not by source, so this is naturally
     /// deduplicated already.
-    pub fn total_mods_size(&self) -> u64 {
-        self.list_synced_mods().iter().map(|m| m.size_bytes).sum()
+    pub async fn total_mods_size(&self) -> u64 {
+        self.list_synced_mods()
+            .await
+            .iter()
+            .map(|m| m.size_bytes)
+            .sum()
     }
 
     /// Total on-disk bytes of every currently-synced server/CDLC depot
     /// entry (the base game + selected CDLCs) -- everything in `synced`
     /// that *isn't* a workshop mod (see `list_synced_mods`'s filter).
-    pub fn total_game_files_size(&self) -> u64 {
+    pub async fn total_game_files_size(&self) -> u64 {
         const WORKSHOP_CONSUMER_APP_ID: &str = "107410";
         self.snapshot_with_size()
+            .await
             .into_iter()
             .filter(|(key, _)| !key.starts_with(&format!("{WORKSHOP_CONSUMER_APP_ID}/")))
             .map(|(_, size_bytes)| size_bytes)
             .sum()
     }
 
-    fn snapshot_with_size(&self) -> Vec<(String, u64)> {
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = match conn.prepare("SELECT key, size_bytes FROM synced") {
-            Ok(stmt) => stmt,
+    async fn snapshot_with_size(&self) -> Vec<(String, u64)> {
+        let mut rows = match self.conn.query("SELECT key, size_bytes FROM synced", ()).await {
+            Ok(rows) => rows,
             Err(e) => {
                 tracing::warn!("failed to prepare snapshot_with_size query: {e:#}");
                 return Vec::new();
             }
         };
-        let rows = stmt.query_map([], |r| {
-            Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)? as u64))
-        });
-        match rows {
-            Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
-            Err(e) => {
-                tracing::warn!("failed to read snapshot_with_size rows: {e:#}");
-                Vec::new()
+        let mut out = Vec::new();
+        loop {
+            match rows.next().await {
+                Ok(Some(row)) => {
+                    if let (Ok(k), Ok(v)) = (row.get::<String>(0), row.get::<i64>(1)) {
+                        out.push((k, v as u64));
+                    }
+                }
+                Ok(None) => break,
+                Err(e) => {
+                    tracing::warn!("failed to read snapshot_with_size rows: {e:#}");
+                    break;
+                }
             }
         }
+        out
     }
 
     /// Record/refresh a workshop mod's display title, seen from a real
@@ -557,16 +690,18 @@ impl SyncState {
     /// was never resolved through either of those in this process' cache
     /// lifetime just has an empty title in `list_synced_mods`/
     /// `get_synced_mod` until the next time it is.
-    pub fn record_mod_title(&self, mod_id: u64, title: &str) {
+    pub async fn record_mod_title(&self, mod_id: u64, title: &str) {
         if title.is_empty() {
             return;
         }
-        let conn = self.conn.lock().unwrap();
-        let result = conn.execute(
-            "INSERT INTO mod_titles (mod_id, title) VALUES (?1, ?2)
-             ON CONFLICT(mod_id) DO UPDATE SET title = excluded.title",
-            params![mod_id as i64, title],
-        );
+        let result = self
+            .conn
+            .execute(
+                "INSERT INTO mod_titles (mod_id, title) VALUES (?1, ?2)
+                 ON CONFLICT(mod_id) DO UPDATE SET title = excluded.title",
+                turso::params![mod_id as i64, title],
+            )
+            .await;
         if let Err(e) = result {
             tracing::warn!("failed to record title for mod {mod_id}: {e:#}");
         }
@@ -580,13 +715,15 @@ impl SyncState {
     /// it -- losing this run's persistence is a slower next run, not a
     /// correctness problem worth failing an otherwise-successful sync
     /// over.
-    pub fn mark_synced(&self, key: &str, manifest_id: u64, size_bytes: u64) {
-        let conn = self.conn.lock().unwrap();
-        let result = conn.execute(
-            "INSERT INTO synced (key, manifest_id, size_bytes) VALUES (?1, ?2, ?3)
-             ON CONFLICT(key) DO UPDATE SET manifest_id = excluded.manifest_id, size_bytes = excluded.size_bytes",
-            params![key, manifest_id as i64, size_bytes as i64],
-        );
+    pub async fn mark_synced(&self, key: &str, manifest_id: u64, size_bytes: u64) {
+        let result = self
+            .conn
+            .execute(
+                "INSERT INTO synced (key, manifest_id, size_bytes) VALUES (?1, ?2, ?3)
+                 ON CONFLICT(key) DO UPDATE SET manifest_id = excluded.manifest_id, size_bytes = excluded.size_bytes",
+                turso::params![key, manifest_id as i64, size_bytes as i64],
+            )
+            .await;
         if let Err(e) = result {
             tracing::warn!("failed to persist sync state for {key}: {e:#}");
         }
@@ -596,21 +733,23 @@ impl SyncState {
     /// means the caller now holds it (until the returned drop happens via
     /// [`acquire_lock`](Self::acquire_lock)'s `LockGuard`); `Ok(false)`
     /// means someone else currently holds it.
-    fn try_acquire(&self, key: &str, holder: &str) -> Result<bool> {
-        let mut conn = self.conn.lock().unwrap();
+    async fn try_acquire(&self, key: &str, holder: &str) -> Result<bool> {
         let now = now_unix();
 
         // Fast path: a plain insert. The PRIMARY KEY constraint is the
         // actual atomicity guarantee here -- if two processes race this at
         // once, SQLite's own locking serializes their writes, and exactly
         // one INSERT succeeds.
-        match conn.execute(
-            "INSERT INTO locks (key, holder, acquired_at) VALUES (?1, ?2, ?3)",
-            params![key, holder, now],
-        ) {
+        match self
+            .conn
+            .execute(
+                "INSERT INTO locks (key, holder, acquired_at) VALUES (?1, ?2, ?3)",
+                turso::params![key, holder, now],
+            )
+            .await
+        {
             Ok(_) => return Ok(true),
-            Err(rusqlite::Error::SqliteFailure(e, _))
-                if e.code == rusqlite::ErrorCode::ConstraintViolation => {}
+            Err(turso::Error::Constraint(_)) => {}
             Err(e) => return Err(e).context("failed to insert lock row"),
         }
 
@@ -618,23 +757,32 @@ impl SyncState {
         // releasing. Steal it only if clearly stale, inside one IMMEDIATE
         // transaction so a concurrent stale-check by another process can't
         // race us into double-stealing the same lock.
+        let mut conn = self.conn.clone();
         let tx = conn
             .transaction_with_behavior(TransactionBehavior::Immediate)
+            .await
             .context("failed to begin lock-steal transaction")?;
-        let existing: Option<i64> = tx
-            .query_row("SELECT acquired_at FROM locks WHERE key = ?1", [key], |r| {
-                r.get(0)
-            })
-            .optional()
-            .context("failed to read existing lock")?;
+        let mut stmt = tx
+            .prepare("SELECT acquired_at FROM locks WHERE key = ?1")
+            .await
+            .context("failed to prepare existing-lock query")?;
+        let existing: Option<i64> = optional_row(&mut stmt, turso::params![key])
+            .await
+            .context("failed to read existing lock")?
+            .map(|row| row.get(0))
+            .transpose()
+            .context("failed to read acquired_at")?;
+        drop(stmt);
         let stolen = match existing {
             Some(acquired_at) if now - acquired_at > STALE_LOCK_SECS => {
-                tx.execute("DELETE FROM locks WHERE key = ?1", [key])
+                tx.execute("DELETE FROM locks WHERE key = ?1", turso::params![key])
+                    .await
                     .context("failed to delete stale lock")?;
                 tx.execute(
                     "INSERT INTO locks (key, holder, acquired_at) VALUES (?1, ?2, ?3)",
-                    params![key, holder, now],
+                    turso::params![key, holder, now],
                 )
+                .await
                 .context("failed to insert lock row after stealing")?;
                 true
             }
@@ -644,34 +792,31 @@ impl SyncState {
             _ => false,
         };
         tx.commit()
+            .await
             .context("failed to commit lock-steal transaction")?;
         Ok(stolen)
     }
 
-    fn release(&self, key: &str) {
-        let conn = self.conn.lock().unwrap();
-        if let Err(e) = conn.execute("DELETE FROM locks WHERE key = ?1", [key]) {
+    async fn release(&self, key: &str) {
+        if let Err(e) = self
+            .conn
+            .execute("DELETE FROM locks WHERE key = ?1", turso::params![key])
+            .await
+        {
             tracing::warn!("failed to release lock for {key}: {e:#}");
         }
     }
 
-    /// Acquire the cross-process lock for `key`, blocking (without tying up
-    /// a tokio worker thread -- the actual DB calls run via
-    /// `spawn_blocking`, and the wait between poll attempts is a real async
-    /// sleep) until it's free. Multiple server instances can share one
-    /// content directory; this keeps two of them from verifying/downloading
-    /// the same depot's files at the same time.
+    /// Acquire the cross-process lock for `key`, blocking until it's free.
+    /// Multiple server instances can share one content directory; this
+    /// keeps two of them from verifying/downloading the same depot's files
+    /// at the same time. No more `spawn_blocking` bridging needed here --
+    /// turso's calls are natively async, unlike rusqlite's.
     pub async fn acquire_lock(self: &Arc<Self>, key: String) -> Result<LockGuard> {
         let holder = holder_id();
         let mut waited = false;
         loop {
-            let this = self.clone();
-            let k = key.clone();
-            let h = holder.clone();
-            let acquired = tokio::task::spawn_blocking(move || this.try_acquire(&k, &h))
-                .await
-                .context("lock-acquire task panicked")??;
-            if acquired {
+            if self.try_acquire(&key, &holder).await? {
                 if waited {
                     tracing::info!("[{key}] acquired lock (was waiting on another process)");
                 }
@@ -700,6 +845,220 @@ pub struct LockGuard {
 
 impl Drop for LockGuard {
     fn drop(&mut self) {
-        self.state.release(&self.key);
+        // release() is async (turso has no sync API), but Drop can't be --
+        // spawn it as a detached task instead of blocking. This is a real,
+        // deliberate behavior change from the old rusqlite version (which
+        // released synchronously, inline, on drop): the lock row deletion
+        // now happens shortly *after* the guard is dropped, not atomically
+        // with it. Harmless for correctness (the DB's own locking is what
+        // actually serializes acquirers, and a lock that outlives its
+        // guard by a few milliseconds just delays the next acquirer, same
+        // as the existing STALE_LOCK_SECS fallback already tolerates for a
+        // crashed holder) -- just worth knowing it's no longer synchronous.
+        //
+        // Guarded with try_current() rather than a bare spawn(): dropping
+        // outside a tokio runtime (e.g. during shutdown after the runtime
+        // has already stopped) would otherwise panic. Falls back to
+        // relying on STALE_LOCK_SECS's eventual steal instead.
+        let state = self.state.clone();
+        let key = self.key.clone();
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            handle.spawn(async move {
+                state.release(&key).await;
+            });
+        } else {
+            tracing::warn!(
+                "[{key}] LockGuard dropped outside a tokio runtime -- lock will only clear via the stale-lock timeout"
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    async fn open_test_state() -> (TempDir, Arc<SyncState>) {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let state = SyncState::open(dir.path())
+            .await
+            .expect("failed to open test SyncState");
+        (dir, state)
+    }
+
+    #[tokio::test]
+    async fn open_initializes_schema_idempotently() {
+        let (dir, _state) = open_test_state().await;
+        // Re-opening against the same directory (CREATE TABLE IF NOT EXISTS)
+        // must not error.
+        SyncState::open(dir.path())
+            .await
+            .expect("re-open should be idempotent");
+    }
+
+    #[tokio::test]
+    async fn source_upsert_set_delete_round_trip() {
+        let (_dir, state) = open_test_state().await;
+
+        state
+            .upsert_source("src1", &[1, 2, 3])
+            .await
+            .expect("upsert_source failed");
+        assert_eq!(
+            state
+                .candidate_ids_for_source("src1")
+                .await
+                .expect("candidate_ids_for_source failed"),
+            Some(vec![1, 2, 3])
+        );
+
+        state
+            .set_source_mods("src1", &[10, 20])
+            .await
+            .expect("set_source_mods failed");
+        let mut mod_ids = state
+            .mod_ids_for_source("src1")
+            .await
+            .expect("mod_ids_for_source failed");
+        mod_ids.sort_unstable();
+        assert_eq!(mod_ids, vec![10, 20]);
+
+        let mut desired = state
+            .desired_mod_ids()
+            .await
+            .expect("desired_mod_ids failed");
+        desired.sort_unstable();
+        assert_eq!(desired, vec![10, 20]);
+
+        // Replacing membership drops what's no longer wanted and keeps
+        // what still is.
+        state
+            .set_source_mods("src1", &[20, 30])
+            .await
+            .expect("set_source_mods (replace) failed");
+        let mut mod_ids = state
+            .mod_ids_for_source("src1")
+            .await
+            .expect("mod_ids_for_source (after replace) failed");
+        mod_ids.sort_unstable();
+        assert_eq!(mod_ids, vec![20, 30]);
+
+        state
+            .delete_source("src1")
+            .await
+            .expect("delete_source failed");
+        assert_eq!(
+            state
+                .candidate_ids_for_source("src1")
+                .await
+                .expect("candidate_ids_for_source (after delete) failed"),
+            None
+        );
+        assert!(
+            state
+                .mod_ids_for_source("src1")
+                .await
+                .expect("mod_ids_for_source (after delete) failed")
+                .is_empty()
+        );
+    }
+
+    #[tokio::test]
+    async fn mark_synced_and_is_synced_round_trip() {
+        let (_dir, state) = open_test_state().await;
+
+        assert_eq!(state.last_manifest_id("depot/1").await, None);
+        assert!(!state.is_synced("depot/1", 42, true).await);
+
+        state.mark_synced("depot/1", 42, 1024).await;
+        assert_eq!(state.last_manifest_id("depot/1").await, Some(42));
+        assert!(state.is_synced("depot/1", 42, true).await);
+        // A dir that no longer exists is never "synced", regardless of
+        // the recorded manifest_id.
+        assert!(!state.is_synced("depot/1", 42, false).await);
+        // A manifest_id mismatch (content changed) is a cache miss too.
+        assert!(!state.is_synced("depot/1", 43, true).await);
+
+        state.invalidate("depot/1").await;
+        assert_eq!(state.last_manifest_id("depot/1").await, None);
+    }
+
+    #[tokio::test]
+    async fn acquire_lock_serializes_concurrent_acquirers() {
+        let (_dir, state) = open_test_state().await;
+
+        let guard = state
+            .acquire_lock("key1".to_string())
+            .await
+            .expect("first acquire_lock failed");
+
+        // A second acquirer must not get it while the first still holds
+        // it -- try_acquire directly (not acquire_lock, which would just
+        // block forever polling).
+        assert!(
+            !state
+                .try_acquire("key1", "other-holder")
+                .await
+                .expect("try_acquire failed")
+        );
+
+        drop(guard);
+        // LockGuard's release is spawned, not synchronous -- give it a
+        // moment to actually run before checking it cleared.
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        assert!(
+            state
+                .try_acquire("key1", "other-holder")
+                .await
+                .expect("try_acquire after release failed")
+        );
+    }
+
+    #[tokio::test]
+    async fn stale_lock_gets_stolen() {
+        let (_dir, state) = open_test_state().await;
+
+        // Seed a lock row backdated well past STALE_LOCK_SECS, simulating
+        // a holder that crashed without ever releasing.
+        let stale_at = now_unix() - STALE_LOCK_SECS - 60;
+        state
+            .conn
+            .execute(
+                "INSERT INTO locks (key, holder, acquired_at) VALUES (?1, ?2, ?3)",
+                turso::params!["key1", "dead-holder", stale_at],
+            )
+            .await
+            .expect("failed to seed stale lock");
+
+        assert!(
+            state
+                .try_acquire("key1", "new-holder")
+                .await
+                .expect("try_acquire (steal) failed"),
+            "a sufficiently stale lock should be stolen"
+        );
+    }
+
+    #[tokio::test]
+    async fn fresh_lock_is_not_stolen() {
+        let (_dir, state) = open_test_state().await;
+
+        state
+            .conn
+            .execute(
+                "INSERT INTO locks (key, holder, acquired_at) VALUES (?1, ?2, ?3)",
+                turso::params!["key1", "live-holder", now_unix()],
+            )
+            .await
+            .expect("failed to seed fresh lock");
+
+        assert!(
+            !state
+                .try_acquire("key1", "new-holder")
+                .await
+                .expect("try_acquire (should not steal) failed"),
+            "a fresh lock must not be stolen"
+        );
     }
 }

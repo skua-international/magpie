@@ -116,10 +116,12 @@ impl Shared {
         let outcome = result?;
 
         let mod_ids: Vec<u64> = outcome.mods.iter().map(|m| m.mod_id).collect();
-        self.sync_state.upsert_source(source_id, candidate_ids)?;
-        self.sync_state.set_source_mods(source_id, &mod_ids)?;
+        self.sync_state
+            .upsert_source(source_id, candidate_ids)
+            .await?;
+        self.sync_state.set_source_mods(source_id, &mod_ids).await?;
         for m in &outcome.mods {
-            self.sync_state.record_mod_title(m.mod_id, &m.title);
+            self.sync_state.record_mod_title(m.mod_id, &m.title).await;
         }
 
         let (root_title, root_is_collection) = match candidate_ids {
@@ -152,7 +154,8 @@ impl Shared {
     ) -> anyhow::Result<RegisterSourceOutcome> {
         let candidate_ids = self
             .sync_state
-            .candidate_ids_for_source(source_id)?
+            .candidate_ids_for_source(source_id)
+            .await?
             .ok_or_else(|| anyhow::anyhow!("unknown source: {source_id}"))?;
         self.register_source_impl(&candidate_ids, source_id).await
     }
@@ -193,7 +196,7 @@ impl Shared {
         drop(conn);
         result?;
 
-        let desired = self.sync_state.desired_mod_ids()?;
+        let desired = self.sync_state.desired_mod_ids().await?;
         if !desired.is_empty() {
             let mut conn = self.pool()?.acquire().await;
             let result = workshop::sync_mods(
@@ -284,6 +287,7 @@ impl SyncService for SyncServiceImpl {
         self.shared
             .sync_state
             .delete_source(&request.source_id)
+            .await
             .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
         Response::ok(DeregisterSourceResponse::default())
     }
@@ -313,6 +317,7 @@ impl SyncService for SyncServiceImpl {
             .shared
             .sync_state
             .mod_ids_for_source(request.source_id)
+            .await
             .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
         Response::ok(GetSourceModsResponse {
             mod_ids,
@@ -354,6 +359,7 @@ impl SyncService for SyncServiceImpl {
             .shared
             .sync_state
             .list_synced_mods()
+            .await
             .into_iter()
             .map(|m| SyncedMod {
                 mod_id: m.mod_id,
@@ -379,6 +385,7 @@ impl SyncService for SyncServiceImpl {
             .shared
             .sync_state
             .get_synced_mod(mod_id)
+            .await
             .map(|m| SyncedMod {
                 mod_id: m.mod_id,
                 manifest_id: m.manifest_id,
@@ -386,7 +393,7 @@ impl SyncService for SyncServiceImpl {
                 title: m.title,
                 ..Default::default()
             });
-        let source_ids = self.shared.sync_state.sources_for_mod(mod_id);
+        let source_ids = self.shared.sync_state.sources_for_mod(mod_id).await;
         Response::ok(GetSyncedModResponse {
             r#mod: m.into(),
             source_ids,
@@ -400,8 +407,8 @@ impl SyncService for SyncServiceImpl {
         _request: ServiceRequest<'_, GetSyncStatsRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<GetSyncStatsResponse> + Send + use<'a>> {
         Response::ok(GetSyncStatsResponse {
-            mods_bytes: self.shared.sync_state.total_mods_size(),
-            game_files_bytes: self.shared.sync_state.total_game_files_size(),
+            mods_bytes: self.shared.sync_state.total_mods_size().await,
+            game_files_bytes: self.shared.sync_state.total_game_files_size().await,
             ..Default::default()
         })
     }
@@ -413,7 +420,7 @@ impl SyncService for SyncServiceImpl {
     ) -> ServiceResult<impl connectrpc::Encodable<GetSyncStatusResponse> + Send + use<'a>> {
         Response::ok(GetSyncStatusResponse {
             syncing: self.shared.syncing.load(Ordering::SeqCst) > 0,
-            game_files_ready: self.shared.sync_state.total_game_files_size() > 0,
+            game_files_ready: self.shared.sync_state.total_game_files_size().await > 0,
             ..Default::default()
         })
     }
@@ -426,7 +433,7 @@ impl SyncService for SyncServiceImpl {
         // Matches list_synced_mods'/sync_key's own key format: every Arma 3
         // workshop item shares depot_id (consumer_appid) 107410.
         let key = format!("107410/{}", request.mod_id);
-        self.shared.sync_state.invalidate(&key);
+        self.shared.sync_state.invalidate(&key).await;
         Response::ok(InvalidateModResponse::default())
     }
 

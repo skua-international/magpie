@@ -130,7 +130,7 @@ async fn resolve(obj: &ModSource, ctx: &Ctx) -> anyhow::Result<Action> {
     match ctx.shared.register_source_impl(&candidate_ids, &name).await {
         Ok(outcome) => {
             let resolved_mod_ids: Vec<u64> = outcome.mods.iter().map(|m| m.mod_id).collect();
-            let sizes = ctx.shared.sync_state.list_synced_mods();
+            let sizes = ctx.shared.sync_state.list_synced_mods().await;
             let size_bytes = resolved_mod_ids
                 .iter()
                 .filter_map(|id| sizes.iter().find(|m| m.mod_id == *id).map(|m| m.size_bytes))
@@ -212,7 +212,7 @@ async fn resolve(obj: &ModSource, ctx: &Ctx) -> anyhow::Result<Action> {
 async fn cleanup(obj: &ModSource, ctx: &Ctx) -> anyhow::Result<Action> {
     let name = obj.name_any();
     if !matches!(obj.spec.source, ModSourceInput::Local { .. }) {
-        ctx.shared.sync_state.delete_source(&name)?;
+        ctx.shared.sync_state.delete_source(&name).await?;
     }
     Ok(Action::await_change())
 }

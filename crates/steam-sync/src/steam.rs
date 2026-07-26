@@ -773,7 +773,7 @@ async fn resolve_wanted_depots(
     // One snapshot query instead of one is_synced() call per depot -- see
     // SyncState::snapshot.
     let dir_exists = install_dir.is_dir();
-    let synced_snapshot = sync_state.snapshot();
+    let synced_snapshot = sync_state.snapshot().await;
     let depots: Vec<_> = depots
         .into_iter()
         .filter(|d| {
@@ -1182,7 +1182,7 @@ pub async fn resolve_workshop_items(
     // request code (skipped entirely on a manifest cache hit).
     // One snapshot query instead of one is_synced() call per item -- see
     // SyncState::snapshot.
-    let synced_snapshot = sync_state.snapshot();
+    let synced_snapshot = sync_state.snapshot().await;
     let mut pending = Vec::new();
     let mut cache_hits = Vec::new();
     let mut already_synced = 0usize;
@@ -1525,7 +1525,10 @@ pub(crate) async fn download_one_depot(
     // Re-check after acquiring the lock: if another instance just finished
     // syncing this exact manifest_id while we were waiting, trust its work
     // instead of redundantly re-verifying everything ourselves.
-    if sync_state.is_synced(&sync_key, manifest_id, install_dir.is_dir()) {
+    if sync_state
+        .is_synced(&sync_key, manifest_id, install_dir.is_dir())
+        .await
+    {
         info!(
             "[{tag}] another server instance already synced this manifest_id ({manifest_id}) while we waited, trusting it"
         );
@@ -1536,7 +1539,7 @@ pub(crate) async fn download_one_depot(
     // verification pass -- either it's never been synced, or its
     // manifest_id no longer matches what was last verified on disk (a
     // genuine content update). Log which, purely for visibility.
-    match sync_state.last_manifest_id(&sync_key) {
+    match sync_state.last_manifest_id(&sync_key).await {
         Some(old) => info!(
             "[{tag}] manifest_id changed since last verified sync ({old} -> {manifest_id}), content was updated -- verifying"
         ),
@@ -1628,7 +1631,7 @@ pub(crate) async fn download_one_depot(
         warn!("[{tag}] failed to compute on-disk size, recording 0: {e:#}");
         0
     });
-    sync_state.mark_synced(&sync_key, manifest_id, size_bytes);
+    sync_state.mark_synced(&sync_key, manifest_id, size_bytes).await;
 
     Ok(())
 }

@@ -2,6 +2,7 @@
 name = "steam-sync"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 
 [dependencies]
 steamdepot = { git = "https://github.com/LinkIsGrim/steamdepot", rev = "fec00ce" }
@@ -9,11 +10,23 @@ tokio = { version = "1", features = ["rt", "sync", "time"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 regex = "1"
 anyhow = "1"
-futures = "0.3"
+# The full `futures` meta-crate bundles futures-channel/-executor/-io, none
+# of which this crate uses (only future::try_join_all and
+# stream::{FuturesUnordered, StreamExt}, both in futures-util itself) --
+# depending on futures-util directly under the `futures` name (via
+# `package =`) keeps every `use futures::...` in src/ unchanged while
+# dropping the unused bundled crates.
+futures = { package = "futures-util", version = "0.3", default-features = false, features = ["std", "async-await"] }
 tracing = "0.1"
 serde_json = "1"
 bincode = "1.3.3"
-rusqlite = { version = "0.31", features = ["bundled"] }
+turso = { version = "0.7", default-features = false }
 prost = "0.13"
 walkdir = "2.5.0"
 qrcode = { version = "0.14.1", default-features = false }
+
+[dev-dependencies]
+tempfile = "3"
+# #[tokio::test] itself needs the "macros" feature -- only pulled in for
+# test builds, unified with [dependencies]' tokio at the same version.
+tokio = { version = "1", features = ["macros"] }

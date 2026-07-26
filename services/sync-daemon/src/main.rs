@@ -29,7 +29,7 @@ async fn main() -> Result<()> {
 
     std::fs::create_dir_all(&cfg.content_root)?;
 
-    let sync_state = SyncState::open(&cfg.content_root)?;
+    let sync_state = SyncState::open(&cfg.content_root).await?;
 
     // rustls 0.23 needs a process-level CryptoProvider installed before
     // its first use, or any TLS handshake through it panics -- confirmed
