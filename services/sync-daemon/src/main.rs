@@ -16,8 +16,38 @@ use steam_sync::cache::SyncState;
 use steam_sync::steam::{CmPool, SteamAuth};
 use tracing::{error, info, warn};
 
+// Only set when built with `--features dhat-heap` (a throwaway profiling
+// build, never the production image) -- dhat's Profiler flushes its
+// allocation trace to disk on Drop, which requires main() to actually
+// return normally. Without with_graceful_shutdown below, kubelet's SIGTERM
+// just gets SIGKILLed after the grace period with no unwind at all, so a
+// profiling run would silently produce no output.
+#[cfg(feature = "dhat-heap")]
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
+
+// Production allocator: mimalloc's per-thread heaps/sharded free lists handle
+// this daemon's high-frequency concurrent alloc/free pattern (confirmed via
+// dhat profiling: 46.7M allocations in one resync, much of it hyper's
+// internal per-chunk plumbing across tokio's multi-threaded worker pool)
+// better than glibc's default allocator, and its own background purging
+// returns idle memory to the OS automatically -- no manual malloc_trim
+// needed. Mutually exclusive with dhat-heap above (both are global
+// allocators); profiling builds keep dhat's own so allocation tracking
+// still works.
+#[cfg(not(feature = "dhat-heap"))]
+#[global_allocator]
+static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 #[tokio::main]
 async fn main() -> Result<()> {
+    #[cfg(feature = "dhat-heap")]
+    let _profiler = dhat::Profiler::builder()
+        .file_name(
+            std::env::var("DHAT_OUT_PATH").unwrap_or_else(|_| "/content/dhat-heap.json".into()),
+        )
+        .build();
+
     // Non-blocking + JSON -- same pattern as launcher/src/main.rs,
     // rolled out repo-wide for consistency. `_guard` has to live for the
     // rest of `main` -- dropping it early stops the writer thread and
@@ -197,7 +227,32 @@ async fn main() -> Result<()> {
 
     let listener = tokio::net::TcpListener::bind(&cfg.listen_addr).await?;
     info!("Listening on {}", cfg.listen_addr);
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
 
     Ok(())
+}
+
+/// Resolves on SIGTERM (what kubelet sends on pod deletion/scale-down) or
+/// Ctrl+C -- lets main() return normally instead of being SIGKILLed after
+/// the grace period, which matters for the dhat-heap profiling build (see
+/// its own comment above) but is generally correct behavior regardless.
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install SIGTERM handler")
+            .recv()
+            .await;
+    };
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+    info!("received shutdown signal, shutting down gracefully");
 }

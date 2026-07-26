@@ -5,7 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-steamdepot = { git = "https://github.com/LinkIsGrim/steamdepot", rev = "3c2378c" }
+steamdepot = { git = "https://github.com/LinkIsGrim/steamdepot", rev = "5f6ae1b" }
 tokio = { version = "1", features = ["rt", "sync", "time"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "http2"] }
 regex = "1"

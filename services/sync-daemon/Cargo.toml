@@ -18,7 +18,7 @@ kube = { version = "4.0.0", features = ["runtime", "derive"] }
 metrics-exporter-prometheus = { version = "0.18", default-features = false }
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
 workshop-parse = { path = "../../crates/workshop-parse" }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "time"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "sync", "time"] }
 anyhow = "1"
 serde_json = "1.0.150"
 thiserror = "2.0.18"
@@ -26,3 +26,11 @@ tracing = "0.1"
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 uuid = { version = "1", features = ["v7"] }
+dhat = { version = "0.3", optional = true }
+mimalloc = "0.1"
+
+[features]
+# Throwaway profiling build only -- never the production image. See
+# main.rs's own comments on the global allocator swap and graceful
+# shutdown this requires to actually flush a profile to disk.
+dhat-heap = ["dep:dhat"]

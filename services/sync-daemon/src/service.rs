@@ -51,9 +51,28 @@ pub struct Shared {
     syncing: AtomicUsize,
 }
 
+// THROWAWAY -- not committed. mi_collect isn't exposed by either the
+// `mimalloc` or `libmimalloc-sys` crates (only basic alloc/free are
+// bound), but the C library is already statically linked in via
+// libmimalloc-sys's build script, so the symbol exists in the final
+// binary regardless -- declaring it ourselves is enough to call it.
+// Gated out of the dhat-heap profiling build, which uses a different
+// global allocator entirely (calling into mimalloc's collector when
+// mimalloc was never actually installed as the allocator would be
+// undefined behavior).
+#[cfg(not(feature = "dhat-heap"))]
+unsafe extern "C" {
+    fn mi_collect(force: bool);
+}
+
 /// RAII guard incrementing `Shared::syncing` on creation, decrementing on
 /// drop -- so a `sync_content` call that returns early via `?` still
 /// clears itself, no separate cleanup needed at every return point.
+/// Also the trigger point for an explicit mimalloc purge: once the last
+/// in-flight sync finishes (counter back to 0), force-collect rather than
+/// waiting on mimalloc's own time-decayed background purge, which
+/// benchmarking showed plateaus well above genuinely-live memory for this
+/// workload's large one-shot decompression buffers.
 struct SyncingGuard<'a>(&'a AtomicUsize);
 
 impl<'a> SyncingGuard<'a> {
@@ -65,7 +84,16 @@ impl<'a> SyncingGuard<'a> {
 
 impl Drop for SyncingGuard<'_> {
     fn drop(&mut self) {
-        self.0.fetch_sub(1, Ordering::SeqCst);
+        let previous = self.0.fetch_sub(1, Ordering::SeqCst);
+        #[cfg(not(feature = "dhat-heap"))]
+        if previous == 1 {
+            info!("last in-flight sync finished, forcing mimalloc collect");
+            unsafe {
+                mi_collect(true);
+            }
+        }
+        #[cfg(feature = "dhat-heap")]
+        let _ = previous;
     }
 }
 
