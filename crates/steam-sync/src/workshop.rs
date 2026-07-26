@@ -94,7 +94,7 @@ pub async fn sync_mods(
         .await
         .context("failed to resolve workshop items for download")?;
 
-    let http = reqwest::Client::new();
+    let http = steam::build_http_client();
     for item in resolution.items {
         let item_dir = workshop_root.join(item.published_file_id.to_string());
         let pool = resolution.cdn_pool.clone();
