@@ -54,7 +54,7 @@ func main() {
 	// only fire once per Pod lifecycle, not per write. This narrows the
 	// exposure window; it doesn't eliminate the race outright (a fast
 	// enough burst can still outrun any fixed poll interval) -- see
-	// magpie#41 for the actual fix (sync-daemon reserving capacity
+	// magpie#42 for the actual fix (sync-daemon reserving capacity
 	// upfront, sized to what it's about to download, instead of this
 	// driver polling blind).
 	capacityCheckInterval, err := time.ParseDuration(envOr("CAPACITY_CHECK_INTERVAL", "30s"))
