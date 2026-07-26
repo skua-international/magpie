@@ -33,6 +33,7 @@ use std::time::Duration;
 use crd::{
     ArmaServer, ArmaServerPhase, ArmaServerStatus, DesiredState, HeadlessClient,
     HeadlessClientPhase, HeadlessClientSpec, HeadlessClientStatus, ModSource, ModSourceInput,
+    ModSourcePhase,
 };
 use futures::StreamExt;
 use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec};
@@ -214,6 +215,31 @@ async fn apply(obj: &ArmaServer, ctx: &Ctx) -> anyhow::Result<Action> {
                 Ok(_) => {}
                 Err(e) => {
                     warn!("{name}: failed to check sync-daemon status, retrying: {e:#}");
+                    return Ok(Action::requeue(ERROR_REQUEUE));
+                }
+            }
+
+            // The global check above only covers "is anything syncing
+            // right now" and the base game -- it says nothing about
+            // *this* server's own mod_source_ids. Confirmed live: an
+            // ArmaServer created while sync-daemon happened to be
+            // globally idle (its own mod not yet queued, or resolved but
+            // not yet downloaded) passed the check above, took its CSI
+            // btrfs snapshot of the golden tree at that moment, and got
+            // permanently stuck with a zero-filled placeholder for a
+            // file sync-daemon hadn't written yet -- a snapshot is an
+            // independent CoW copy, so it never picks up the golden
+            // tree's later, completed write. Block on every one of this
+            // server's own mod sources reporting Synced, not just the
+            // cluster-wide flags.
+            match not_yet_synced_mod_source(ctx, obj).await {
+                Ok(Some(pending_name)) => {
+                    info!("{name}: waiting for mod source {pending_name} to finish syncing");
+                    return Ok(Action::requeue(FAST_REQUEUE));
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    warn!("{name}: failed to check mod source sync status, retrying: {e:#}");
                     return Ok(Action::requeue(ERROR_REQUEUE));
                 }
             }
@@ -413,6 +439,31 @@ async fn delete_all_headless_clients(ctx: &Ctx, name: &str) -> anyhow::Result<()
         }
     }
     Ok(())
+}
+
+/// Returns the name of the first of this server's `mod_source_ids` that
+/// hasn't reached `ModSourcePhase::Synced` yet, or `None` if they all
+/// have (including the trivial case of no mod sources at all). A source
+/// that's `Failed` still counts as "not yet synced" here rather than a
+/// hard error -- same as the global sync-status check above, this is a
+/// wait-and-requeue gate, not a place to fail the whole server over one
+/// mod that's struggling; `resolve_mod_paths`/`run_pending` surface a
+/// real error later if it never recovers.
+async fn not_yet_synced_mod_source(ctx: &Ctx, obj: &ArmaServer) -> anyhow::Result<Option<String>> {
+    let mod_sources: Api<ModSource> = Api::namespaced(ctx.client.clone(), &ctx.cfg.namespace);
+    for source_id in &obj.spec.mod_source_ids {
+        let source = mod_sources.get(source_id).await.map_err(|e| match e {
+            kube::Error::Api(e) if e.code == 404 => {
+                anyhow::anyhow!("mod source {source_id} no longer exists")
+            }
+            e => e.into(),
+        })?;
+        let phase = source.status.map(|s| s.phase).unwrap_or_default();
+        if phase != ModSourcePhase::Synced {
+            return Ok(Some(source_id.clone()));
+        }
+    }
+    Ok(None)
 }
 
 /// Unions every mod source this server references into `-mod=`-ready
