@@ -61,7 +61,15 @@ func serversCreateCmd() *cobra.Command {
 		Short: "Create and start a new server",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cc *cobra.Command, args []string) error {
-			name := args[0]
+			// Sanitized/validated up front, not just inside
+			// actions.CreateServer below -- maybePromptServerConfigMap's
+			// own default ("<name>-config") is derived from this name
+			// too, and needs the same clean value CreateServer would
+			// otherwise only enforce after the prompt already ran.
+			name, err := actions.SanitizeServerName(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid server name %q: %w", args[0], err)
+			}
 
 			// Only prompt when --config-map wasn't already given
 			// explicitly -- maybePromptServerConfigMap itself skips the

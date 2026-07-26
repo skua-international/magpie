@@ -149,13 +149,26 @@ func (m Model) handleCreateServerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "enter":
 			if strings.TrimSpace(m.create.name) != "" {
+				// Sanitize (lowercase) before advancing, not just before
+				// the final submit -- createStepConfigMapConfirm derives
+				// its own default from m.create.name directly, so this
+				// has to already be clean by the time that step reads it.
+				sanitized, err := actions.SanitizeServerName(m.create.name)
+				if err != nil {
+					m.create.err = err
+					return m, nil
+				}
+				m.create.name = sanitized
+				m.create.err = nil
 				m.create.step = createStepPort
 			}
 		case "backspace":
 			m.create.name = trimLastRune(m.create.name)
+			m.create.err = nil
 		default:
 			if msg.Text != "" {
 				m.create.name += msg.Text
+				m.create.err = nil
 			}
 		}
 
