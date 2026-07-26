@@ -38,7 +38,14 @@ fn required_scope(path: &str) -> Option<&'static str> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Non-blocking + JSON -- same pattern as launcher/src/main.rs,
+    // rolled out repo-wide for consistency. `_guard` has to live for the
+    // rest of `main` -- dropping it early stops the writer thread and
+    // silently drops whatever's still buffered.
+    let (non_blocking_stdout, _guard) = tracing_appender::non_blocking(std::io::stdout());
     tracing_subscriber::fmt()
+        .json()
+        .with_writer(non_blocking_stdout)
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
