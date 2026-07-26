@@ -164,6 +164,34 @@ pub struct CmPool {
     relogin: Option<(String, String)>,
 }
 
+/// Retries a single connection's login up to [`LOGIN_ATTEMPTS`] times with
+/// the same backoff shape used everywhere in this pool -- shared by
+/// [`CmPool::start`]'s initial per-slot logins and [`CmPool::relogin_slot`]'s
+/// post-startup reconnects, so a transient rejection on *one* slot doesn't
+/// waste the other slots' already-successful logins by failing the whole
+/// batch (the previous behavior, via `try_join_all` with no per-slot retry).
+const LOGIN_ATTEMPTS: usize = 3;
+
+async fn login_with_retry<F, Fut>(slot: usize, mut attempt_login: F) -> Result<CmConnection>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<CmConnection>>,
+{
+    for attempt in 1..=LOGIN_ATTEMPTS {
+        match attempt_login().await {
+            Ok(conn) => return Ok(conn),
+            Err(e) if attempt < LOGIN_ATTEMPTS => {
+                warn!(
+                    "pool slot {slot} login attempt {attempt}/{LOGIN_ATTEMPTS} failed, retrying: {e:#}"
+                );
+                tokio::time::sleep(std::time::Duration::from_secs(2 * attempt as u64)).await;
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    unreachable!("loop above always returns by the final attempt")
+}
+
 impl CmPool {
     /// Log in `n` connections concurrently right away. `install_dir` is
     /// only used to cache/reuse a credentialed login's refresh token across
@@ -175,7 +203,7 @@ impl CmPool {
                 // Anonymous login is already just one lightweight ClientLogon
                 // per connection -- nothing to negotiate once and reuse.
                 let logins = (0..n).map(|slot| async move {
-                    let conn = login_anonymous().await?;
+                    let conn = login_with_retry(slot, login_anonymous).await?;
                     debug!("pool slot {slot} logged in");
                     Ok::<_, anyhow::Error>((slot, conn))
                 });
@@ -199,7 +227,9 @@ impl CmPool {
                 let logins = (0..n).map(|slot| {
                     let refresh_token = refresh_token.clone();
                     async move {
-                        let conn = login_with_refresh_token(user, &refresh_token).await?;
+                        let conn =
+                            login_with_retry(slot, || login_with_refresh_token(user, &refresh_token))
+                                .await?;
                         debug!("pool slot {slot} logged in");
                         Ok::<_, anyhow::Error>((slot, conn))
                     }
@@ -219,7 +249,9 @@ impl CmPool {
                 let logins = (0..n).map(|slot| {
                     let refresh_token = refresh_token.clone();
                     async move {
-                        let conn = login_with_refresh_token(user, &refresh_token).await?;
+                        let conn =
+                            login_with_retry(slot, || login_with_refresh_token(user, &refresh_token))
+                                .await?;
                         debug!("pool slot {slot} logged in");
                         Ok::<_, anyhow::Error>((slot, conn))
                     }
@@ -247,31 +279,19 @@ impl CmPool {
     /// permanently one slot short until the process restarts (a clear,
     /// logged, rare-in-practice degradation rather than a silent one).
     async fn relogin_slot(self: Arc<Self>, slot: usize, permit: tokio::sync::OwnedSemaphorePermit) {
-        const RELOGIN_ATTEMPTS: usize = 3;
-        for attempt in 1..=RELOGIN_ATTEMPTS {
-            let result = match &self.relogin {
-                Some((user, token)) => login_with_refresh_token(user, token).await,
-                None => login_anonymous().await,
-            };
-            match result {
-                Ok(conn) => {
-                    info!(
-                        "pool slot {slot} reconnected after being marked bad (attempt {attempt}/{RELOGIN_ATTEMPTS})"
-                    );
-                    self.idle.lock().unwrap().push((slot, conn));
-                    return;
-                }
-                Err(e) if attempt < RELOGIN_ATTEMPTS => {
-                    warn!(
-                        "pool slot {slot} reconnect attempt {attempt}/{RELOGIN_ATTEMPTS} failed: {e:#}"
-                    );
-                    tokio::time::sleep(std::time::Duration::from_secs(2 * attempt as u64)).await;
-                }
-                Err(e) => {
-                    error!(
-                        "pool slot {slot} failed to reconnect after {RELOGIN_ATTEMPTS} attempts, giving up -- pool is now permanently short by one slot until process restart: {e:#}"
-                    );
-                }
+        let result = match &self.relogin {
+            Some((user, token)) => login_with_retry(slot, || login_with_refresh_token(user, token)).await,
+            None => login_with_retry(slot, login_anonymous).await,
+        };
+        match result {
+            Ok(conn) => {
+                info!("pool slot {slot} reconnected after being marked bad");
+                self.idle.lock().unwrap().push((slot, conn));
+            }
+            Err(e) => {
+                error!(
+                    "pool slot {slot} failed to reconnect after {LOGIN_ATTEMPTS} attempts, giving up -- pool is now permanently short by one slot until process restart: {e:#}"
+                );
             }
         }
         drop(permit);

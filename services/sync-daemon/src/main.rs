@@ -83,50 +83,39 @@ async fn main() -> Result<()> {
         }
         Some(auth) => {
             info!("Logging in to Steam ({} connections)...", cfg.pool_size);
-            // A single failed attempt here used to fall straight through to
-            // degraded mode, even for a transient rejection (e.g. Steam
-            // briefly bouncing a just-restarted pool's relogin burst) --
-            // mirrors relogin_slot's existing retry/backoff for individual
-            // slots, just applied to the initial pool-wide login too.
-            const START_ATTEMPTS: usize = 3;
-            let mut pool = None;
-            for attempt in 1..=START_ATTEMPTS {
-                match CmPool::start(cfg.pool_size, &auth, &cfg.content_root).await {
-                    Ok(p) => {
-                        info!("Logged in to Steam (attempt {attempt}/{START_ATTEMPTS})");
-                        if let Some((user, refresh_token)) = p.session() {
-                            let session = Session {
-                                user: user.to_string(),
-                                refresh_token: refresh_token.to_string(),
-                            };
-                            if let Err(e) = secrets::write_session(
-                                &client,
-                                &cfg.namespace,
-                                &cfg.steam_session_secret_name,
-                                &session,
-                            )
-                            .await
-                            {
-                                warn!("failed to persist Steam session to Secret: {e:#}");
-                            }
+            // Per-slot retry/backoff lives inside CmPool::start itself (see
+            // login_with_retry in steam.rs) -- a transient rejection on one
+            // connection no longer sacrifices the other already-successful
+            // slots by failing the whole batch, so this only needs to
+            // handle the case where every slot exhausted its own retries.
+            match CmPool::start(cfg.pool_size, &auth, &cfg.content_root).await {
+                Ok(pool) => {
+                    info!("Logged in to Steam");
+                    if let Some((user, refresh_token)) = pool.session() {
+                        let session = Session {
+                            user: user.to_string(),
+                            refresh_token: refresh_token.to_string(),
+                        };
+                        if let Err(e) = secrets::write_session(
+                            &client,
+                            &cfg.namespace,
+                            &cfg.steam_session_secret_name,
+                            &session,
+                        )
+                        .await
+                        {
+                            warn!("failed to persist Steam session to Secret: {e:#}");
                         }
-                        pool = Some(p);
-                        break;
                     }
-                    Err(e) if attempt < START_ATTEMPTS => {
-                        warn!(
-                            "Steam login attempt {attempt}/{START_ATTEMPTS} failed, retrying: {e:#}"
-                        );
-                        tokio::time::sleep(std::time::Duration::from_secs(2 * attempt as u64)).await;
-                    }
-                    Err(e) => {
-                        error!(
-                            "failed to start Steam connection pool after {START_ATTEMPTS} attempts, starting in degraded mode with none: {e:#}"
-                        );
-                    }
+                    Some(pool)
+                }
+                Err(e) => {
+                    error!(
+                        "failed to start Steam connection pool, starting in degraded mode with none: {e:#}"
+                    );
+                    None
                 }
             }
-            pool
         }
     };
 
