@@ -1109,6 +1109,10 @@ async fn spawn_plan_downloads(
             pool.clone(),
             sync_state.clone(),
             download_workers,
+            // spawn_plan_downloads is only ever called from
+            // resolve_and_spawn_server -- every depot it dispatches is a
+            // server/CDLC depot, never a workshop mod.
+            true,
         );
         spawn_bounded(tasks, sem.clone(), fut);
     }
@@ -1494,6 +1498,7 @@ pub(crate) async fn download_one_depot(
     pool: Arc<Mutex<CdnPool>>,
     sync_state: Arc<cache::SyncState>,
     download_workers: usize,
+    is_server_depot: bool,
 ) -> Result<()> {
     let manifest = dp.manifest.as_mut().with_context(|| {
         format!(
@@ -1610,37 +1615,27 @@ pub(crate) async fn download_one_depot(
         result.bytes_downloaded
     );
 
-    // Depot manifests come from Steam's Windows-built content and can carry
-    // mixed-case filenames; Arma 3 on Linux refuses to load non-lowercase
-    // PBOs. Fix this up after every real sync (not just first-time
-    // downloads -- an updated manifest can reintroduce mixed-case names)
-    // and before mark_synced, so nothing is ever recorded as synced with
-    // filenames Arma can't actually load.
-    lowercase_synced_tree(&install_dir).await.with_context(|| {
-        format!(
-            "failed to lowercase filenames under {}",
-            install_dir.display()
-        )
-    })?;
-
-    // The dedicated server depot's manifest doesn't set FLAG_EXECUTABLE on
-    // its own server binaries (confirmed live: steamdepot's download.rs
+    // Post-sync fixup, all in one tree walk: depot manifests come from
+    // Steam's Windows-built content and can carry mixed-case filenames
+    // (Arma 3 on Linux refuses to load non-lowercase PBOs); the dedicated
+    // server depot's manifest doesn't set FLAG_EXECUTABLE on its own
+    // server binaries either (confirmed live: steamdepot's download.rs
     // does chmod +x when that flag is set, and it wasn't -- the binary
-    // landed 0o644, "Permission denied" on exec). A Windows-authored
-    // depot's Linux-executable metadata apparently can't be trusted here,
-    // so fix up the known binary names explicitly, same fixup-after-sync
-    // pattern as lowercase_synced_tree above.
-    fix_executable_bits(&install_dir).await.with_context(|| {
-        format!(
-            "failed to set executable bits under {}",
-            install_dir.display()
-        )
-    })?;
-
-    let size_bytes = dir_size(&install_dir).await.unwrap_or_else(|e| {
-        warn!("[{tag}] failed to compute on-disk size, recording 0: {e:#}");
-        0
-    });
+    // landed 0o644, "Permission denied" on exec); and the synced tree's
+    // total on-disk size needs recording alongside its verified-manifest
+    // marker. All three used to be three separate full recursive
+    // `walkdir::WalkDir` passes over the same tree (3x the readdir/stat
+    // syscalls one pass needs) -- combined here into one, run after every
+    // real sync (not just first-time downloads -- an updated manifest can
+    // reintroduce mixed-case names) and before mark_synced, so nothing is
+    // ever recorded as synced with filenames Arma can't load or a stale
+    // size. `is_server_depot` skips the executable-bit check entirely for
+    // a workshop mod's tree, which could never contain
+    // `KNOWN_SERVER_BINARIES` anyway (those are Linux server binaries
+    // shipped only in the server depot) -- no reason to even look.
+    let size_bytes = finalize_synced_tree(&install_dir, is_server_depot)
+        .await
+        .with_context(|| format!("failed to finalize synced tree under {}", install_dir.display()))?;
     sync_state.mark_synced(&sync_key, manifest_id, size_bytes).await;
 
     Ok(())
@@ -1649,14 +1644,48 @@ pub(crate) async fn download_one_depot(
 /// Renames every file/directory under `dir` whose name isn't already
 /// lowercase. Walks deepest-entries-first so renaming a directory never
 /// invalidates a path this same pass still needs to visit.
-async fn lowercase_synced_tree(dir: &std::path::Path) -> Result<()> {
+/// Known Linux server binary names Arma 3's dedicated server depot
+/// ships (lowercased -- checked after this same pass's own lowercase
+/// rename), whose executable bit needs setting explicitly. See
+/// `finalize_synced_tree`'s own doc for why this can't just rely on the
+/// manifest's own executable flag. Only ever relevant for the server
+/// depot itself -- a workshop mod's tree could never contain either name.
+#[cfg_attr(not(unix), allow(dead_code))] // only read inside finalize_synced_tree_blocking's #[cfg(unix)] arm
+const KNOWN_SERVER_BINARIES: &[&str] = &["arma3server", "arma3server_x64"];
+
+/// Post-sync fixup in one combined tree walk, replacing what used to be
+/// three separate full `walkdir::WalkDir` passes over the same tree
+/// (lowercase-rename, executable-bit fix, size sum -- 3x the readdir/stat
+/// syscalls one pass needs, worse for a workshop mod where the
+/// executable-bit walk could never find anything anyway). Returns the
+/// tree's total on-disk size in bytes, same as the old `dir_size` did.
+///
+/// Depot manifests come from Steam's Windows-built content and can carry
+/// mixed-case filenames; Arma 3 on Linux refuses to load non-lowercase
+/// PBOs, so every non-lowercase entry gets renamed. The dedicated server
+/// depot's manifest also doesn't set FLAG_EXECUTABLE on its own server
+/// binaries (confirmed live: steamdepot's download.rs does chmod +x when
+/// that flag is set, and it wasn't -- the binary landed 0o644,
+/// "Permission denied" on exec) -- `check_executables` (true only for the
+/// server depot, see `is_server_depot` at this function's call site) sets
+/// it explicitly on `KNOWN_SERVER_BINARIES`, checked against each entry's
+/// *already-renamed* lowercase name, same ordering the old two-pass
+/// version relied on.
+async fn finalize_synced_tree(dir: &std::path::Path, check_executables: bool) -> Result<u64> {
     let dir = dir.to_path_buf();
-    tokio::task::spawn_blocking(move || lowercase_tree_blocking(&dir))
+    tokio::task::spawn_blocking(move || finalize_synced_tree_blocking(&dir, check_executables))
         .await
-        .context("lowercase-filenames task panicked")?
+        .context("finalize-synced-tree task panicked")?
 }
 
-fn lowercase_tree_blocking(dir: &std::path::Path) -> Result<()> {
+fn finalize_synced_tree_blocking(dir: &std::path::Path, check_executables: bool) -> Result<u64> {
+    let mut total_bytes = 0u64;
+    // contents_first: a directory's own rename must wait until everything
+    // under it has already been visited (renaming a directory before its
+    // children are walked would invalidate the paths WalkDir has queued
+    // for them) -- same requirement the old lowercase-only pass had; size
+    // summing and the executable-bit check don't care about ordering, so
+    // inheriting it here costs nothing.
     for entry in walkdir::WalkDir::new(dir)
         .contents_first(true)
         .into_iter()
@@ -1666,79 +1695,57 @@ fn lowercase_tree_blocking(dir: &std::path::Path) -> Result<()> {
         let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
             continue;
         };
+
         let lower = name.to_lowercase();
-        if lower == name {
+        let final_path = if lower == name {
+            path.to_path_buf()
+        } else {
+            let dest = path.with_file_name(&lower);
+            if dest.exists() {
+                // Two siblings differing only by case (rare, but possible
+                // in a sloppily-packaged mod) would otherwise clobber
+                // each other.
+                warn!(
+                    "[{}] not renaming {name} -> {lower}: a file with that name already exists",
+                    dir.display()
+                );
+                path.to_path_buf()
+            } else {
+                std::fs::rename(path, &dest)
+                    .with_context(|| format!("failed to rename {} to {lower}", path.display()))?;
+                dest
+            }
+        };
+
+        let Ok(metadata) = final_path.metadata() else {
+            // Matches the old dir_size's own tolerance (filter_map(.ok()))
+            // -- a file that vanished between being listed and stat'd just
+            // doesn't count toward the total, not a hard failure.
             continue;
+        };
+
+        if check_executables
+            && metadata.is_file()
+            && final_path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|final_name| KNOWN_SERVER_BINARIES.contains(&final_name))
+        {
+            set_executable(&final_path)?;
         }
 
-        let dest = path.with_file_name(&lower);
-        if dest.exists() {
-            // Two siblings differing only by case (rare, but possible in a
-            // sloppily-packaged mod) would otherwise clobber each other.
-            warn!(
-                "[{}] not renaming {name} -> {lower}: a file with that name already exists",
-                dir.display()
-            );
-            continue;
+        if metadata.is_file() {
+            total_bytes += metadata.len();
         }
-        std::fs::rename(path, &dest)
-            .with_context(|| format!("failed to rename {} to {lower}", path.display()))?;
     }
-    Ok(())
-}
-
-/// Total bytes of every regular file under `dir`, recursively -- used to
-/// record a synced depot/mod's on-disk footprint alongside its
-/// verified-manifest marker, so disk-usage queries are a plain read of
-/// `SyncState` rather than a live directory walk on every call.
-async fn dir_size(dir: &std::path::Path) -> Result<u64> {
-    let dir = dir.to_path_buf();
-    tokio::task::spawn_blocking(move || {
-        Ok(walkdir::WalkDir::new(&dir)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().is_file())
-            .filter_map(|e| e.metadata().ok())
-            .map(|m| m.len())
-            .sum())
-    })
-    .await
-    .context("dir_size task panicked")?
-}
-
-/// Known Linux server binary names Arma 3's dedicated server depot
-/// ships (lowercased -- runs after `lowercase_synced_tree`), whose
-/// executable bit needs setting explicitly. See the caller's comment for
-/// why this can't just rely on the manifest's own executable flag.
-#[cfg_attr(not(unix), allow(dead_code))] // only read inside fix_executable_bits_blocking's #[cfg(unix)] variant
-const KNOWN_SERVER_BINARIES: &[&str] = &["arma3server", "arma3server_x64"];
-
-async fn fix_executable_bits(dir: &std::path::Path) -> Result<()> {
-    let dir = dir.to_path_buf();
-    tokio::task::spawn_blocking(move || fix_executable_bits_blocking(&dir))
-        .await
-        .context("chmod task panicked")?
+    Ok(total_bytes)
 }
 
 #[cfg(unix)]
-fn fix_executable_bits_blocking(dir: &std::path::Path) -> Result<()> {
+fn set_executable(path: &std::path::Path) -> Result<()> {
     use std::os::unix::fs::PermissionsExt;
-
-    for entry in walkdir::WalkDir::new(dir)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
-        let path = entry.path();
-        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
-            continue;
-        };
-        if !KNOWN_SERVER_BINARIES.contains(&name) {
-            continue;
-        }
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755))
-            .with_context(|| format!("failed to chmod +x {}", path.display()))?;
-    }
-    Ok(())
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755))
+        .with_context(|| format!("failed to chmod +x {}", path.display()))
 }
 
 // Windows has no executable-bit concept to fix -- KNOWN_SERVER_BINARIES
@@ -1746,7 +1753,7 @@ fn fix_executable_bits_blocking(dir: &std::path::Path) -> Result<()> {
 // this genuinely never has anything to do there, not just "doesn't
 // bother."
 #[cfg(not(unix))]
-fn fix_executable_bits_blocking(_dir: &std::path::Path) -> Result<()> {
+fn set_executable(_path: &std::path::Path) -> Result<()> {
     Ok(())
 }
 

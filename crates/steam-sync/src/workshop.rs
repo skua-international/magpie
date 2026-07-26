@@ -103,8 +103,19 @@ pub async fn sync_mods(
         let id = item.published_file_id;
 
         let fut = async move {
-            steam::download_one_depot(item.plan, item_dir.clone(), http, pool, sync_state, download_workers)
-                .await?;
+            steam::download_one_depot(
+                item.plan,
+                item_dir.clone(),
+                http,
+                pool,
+                sync_state,
+                download_workers,
+                // Workshop items are never the server depot -- skips the
+                // executable-bit check, which could never match anyway
+                // (KNOWN_SERVER_BINARIES only exist in the server depot).
+                false,
+            )
+            .await?;
             patch_mod_metadata(&item_dir, id, replace_app_id)?;
             tracing::info!("[{id}] Finished");
             Ok(())
