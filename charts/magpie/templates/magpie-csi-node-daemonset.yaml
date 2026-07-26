@@ -96,6 +96,18 @@ spec:
               mountPropagation: Bidirectional
             - name: blob-storage
               mountPath: /var/lib/magpie-csi
+            # Confirmed live: without this, /dev inside the container is
+            # whatever loop-device nodes existed the moment the container
+            # started -- it does NOT pick up new device nodes the host
+            # kernel creates afterward (e.g. after a reboot, `losetup -f`
+            # correctly finds loop0 free at the kernel level, but the node
+            # itself is missing here, so the actual open() fails with
+            # "device node is lost"). Binding the host's real /dev in
+            # keeps this container's view live instead of a stale
+            # snapshot, which is what host block-device access via
+            # privileged: true is supposed to actually get you.
+            - name: dev
+              mountPath: /dev
           livenessProbe:
             httpGet:
               path: /healthz
@@ -137,3 +149,7 @@ spec:
           hostPath:
             path: /var/lib/magpie-csi
             type: DirectoryOrCreate
+        - name: dev
+          hostPath:
+            path: /dev
+            type: Directory
