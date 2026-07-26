@@ -9,7 +9,7 @@ charm.land/lipgloss/v2
 ## explicit; go 1.25.0
 connectrpc.com/connect
 connectrpc.com/connect/internal/gen/connectext/grpc/status/v1
-# github.com/0xAozora/go-steam v0.0.0-20250414150026-b27aac88f1b8 => ./third_party/go-steam
+# github.com/0xAozora/go-steam v0.0.0-20250414150026-b27aac88f1b8 => github.com/LinkIsGrim/go-steam v0.0.0-20260725235643-4e4d92d038ba
 ## explicit; go 1.23
 github.com/0xAozora/go-steam
 github.com/0xAozora/go-steam/cryptoutil
@@ -223,4 +223,4 @@ google.golang.org/protobuf/types/known/wrapperspb
 rsc.io/qr
 rsc.io/qr/coding
 rsc.io/qr/gf256
-# github.com/0xAozora/go-steam => ./third_party/go-steam
+# github.com/0xAozora/go-steam => github.com/LinkIsGrim/go-steam v0.0.0-20260725235643-4e4d92d038ba

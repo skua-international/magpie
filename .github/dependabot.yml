@@ -47,3 +47,24 @@ updates:
     directory: /
     schedule:
       interval: weekly
+
+  # Three separate go.mod files (no shared workspace-level dependabot
+  # scanning across go.work members) -- one directory entry each.
+  - package-ecosystem: gomod
+    directory: /cli/magpie
+    schedule:
+      interval: weekly
+    ignore:
+      # Points at LinkIsGrim/go-steam's fix branch via a replace directive
+      # (see go.mod's own comment) -- pinned to that one commit
+      # deliberately until the upstream PR merges, not something
+      # dependabot should try to bump on its own.
+      - dependency-name: "github.com/0xAozora/go-steam"
+  - package-ecosystem: gomod
+    directory: /services/magpie-csi
+    schedule:
+      interval: weekly
+  - package-ecosystem: gomod
+    directory: /generated/go
+    schedule:
+      interval: weekly

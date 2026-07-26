@@ -9,9 +9,12 @@ go 1.26.5
 replace github.com/skua-international/magpie/generated/go => ../../generated/go
 
 // Confirmed-live nil-pointer panic in (*Client).Write's TOCTOU race on
-// c.Conn during QR login (see third_party/go-steam/client.go for the
-// fix) -- forked locally rather than waiting on upstream.
-replace github.com/0xAozora/go-steam => ../../third_party/go-steam
+// c.Conn during QR login. Fix submitted upstream as a PR (not yet
+// merged) -- pointed at LinkIsGrim/go-steam's fix branch in the
+// meantime instead of vendoring the whole tree locally. Drop this
+// replace (and the require below) once the upstream PR merges and a
+// new upstream version/commit includes it.
+replace github.com/0xAozora/go-steam => github.com/LinkIsGrim/go-steam v0.0.0-20260725235643-4e4d92d038ba
 
 require (
 	charm.land/bubbletea/v2 v2.0.8

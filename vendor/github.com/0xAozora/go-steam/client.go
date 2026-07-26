@@ -279,12 +279,6 @@ func (c *Client) Write(msg protocol.IMsg) error {
 		return fmt.Errorf("error serializing message %v: %v", msg, err)
 	}
 
-	// Write via the locally-snapshotted conn, not c.Conn again -- a
-	// concurrent Disconnect() can nil out c.Conn between the nil-check
-	// above and here (it only takes c.mutex, not the RLock this function
-	// held), so re-reading c.Conn at this point is a TOCTOU race that
-	// panics with a nil pointer dereference. Confirmed live: a QR-login
-	// poll goroutine's WriteLoop hit this exact panic in client.go.
 	err = conn.Write(c.writeBuf.Bytes())
 	c.writeBuf.Reset()
 	if err != nil {
