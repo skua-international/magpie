@@ -73,9 +73,20 @@ spec:
             - name: ANONYMOUS_LOGIN
               value: "true"
             {{- end }}
+            # turso (steam-sync's cache.rs) writes its own internal
+            # spill/overflow temp files via tempfile::tempdir() --
+            # confirmed live: "failed to begin lock-steal transaction: I/O
+            # error (tempdir): read-only filesystem or storage medium"
+            # against readOnlyRootFilesystem's default /tmp. Explicit, not
+            # relying on the emptyDir-at-/tmp mount alone matching
+            # tempfile's own default path assumption.
+            - name: TMPDIR
+              value: /tmp
           volumeMounts:
             - name: golden-content
               mountPath: /content
+            - name: tmp
+              mountPath: /tmp
           readinessProbe:
             httpGet:
               path: /healthz
@@ -96,6 +107,11 @@ spec:
         - name: golden-content
           persistentVolumeClaim:
             claimName: {{ include "magpie.fullname" . }}-golden-content
+        # readOnlyRootFilesystem means /tmp itself isn't writable by
+        # default -- this is the one thing that needs to be, for turso's
+        # own internal temp files (see the TMPDIR env var above).
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
