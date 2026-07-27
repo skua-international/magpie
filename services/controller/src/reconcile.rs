@@ -691,9 +691,26 @@ async fn ensure_deployment(
                     containers: vec![Container {
                         name: "launcher".into(),
                         image: Some(ctx.cfg.launcher_image.clone()),
+                        // ALL dropped except SYS_NICE, added back for a
+                        // separate reason than the capability testing
+                        // documented on the Pod's own securityContext above:
+                        // arma3server_x64 itself (not launcher) uses a
+                        // priority-protected pthread mutex internally, and
+                        // without SYS_NICE glibc's __pthread_tpp_change_priority
+                        // hits a hard, unrecoverable assertion failure and
+                        // aborts the whole process (`Fatal glibc error:
+                        // tpp.c:83 ... assertion failed`, exit status 6) the
+                        // first time that mutex is touched under real
+                        // traffic -- confirmed live in production. This is
+                        // the well-documented container/glibc interaction
+                        // (RLIMIT_RTPRIO / SCHED_FIFO priority range checks
+                        // silently misbehave without CAP_SYS_NICE), distinct
+                        // from the SteamAPI_Init/passwd-entry issue below,
+                        // which SYS_NICE alone was already shown not to fix.
                         security_context: Some(SecurityContext {
                             allow_privilege_escalation: Some(false),
                             capabilities: Some(Capabilities {
+                                add: Some(vec!["SYS_NICE".into()]),
                                 drop: Some(vec!["ALL".into()]),
                                 ..Default::default()
                             }),
@@ -1091,9 +1108,17 @@ async fn ensure_hc_deployment(
                     containers: vec![Container {
                         name: "launcher".into(),
                         image: Some(ctx.cfg.launcher_image.clone()),
+                        // See the equivalent server Deployment's own comment
+                        // on this same securityContext -- SYS_NICE is
+                        // required for arma3server_x64 itself (a
+                        // priority-protected pthread mutex it uses
+                        // internally aborts the process via a glibc
+                        // assertion without it), this client-connect launch
+                        // path execs the identical binary.
                         security_context: Some(SecurityContext {
                             allow_privilege_escalation: Some(false),
                             capabilities: Some(Capabilities {
+                                add: Some(vec!["SYS_NICE".into()]),
                                 drop: Some(vec!["ALL".into()]),
                                 ..Default::default()
                             }),
