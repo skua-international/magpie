@@ -26,9 +26,9 @@ func targetCmd() *cobra.Command {
 		Use:   "target",
 		Short: "Pick and save the cluster this magpiectl targets by default",
 		Long: "Interactively pick a kubeconfig context (informational only -- see below) and enter " +
-			"the cluster's identity/server-api/registry URLs plus namespace/release, then save all of " +
+			"the cluster's public API URL plus namespace/release, then save all of " +
 			"it to magpiectl's config dir. Every subsequent invocation (any subcommand, and the bare " +
-			"TUI) uses the saved values as its default -- no more --identity-url/--namespace/etc on " +
+			"TUI) uses the saved values as its default -- no more --api-url/--namespace/etc on " +
 			"every command. An explicit flag or env var still always wins over the saved target.\n\n" +
 			"The kubeconfig context is saved for display only (`magpiectl target show`) -- magpiectl " +
 			"itself never switches kubeconfig context; the one already active in your shell " +
@@ -58,11 +58,18 @@ func targetShowCmd() *cobra.Command {
 			if t.Context != "" {
 				fmt.Println("kubeconfig context:", t.Context)
 			}
-			fmt.Println("identity-url:  ", t.IdentityURL)
-			fmt.Println("server-api-url:", t.ServerAPIURL)
-			fmt.Println("registry-url:  ", t.RegistryURL)
-			fmt.Println("namespace:     ", t.Namespace)
-			fmt.Println("release:       ", t.Release)
+			fmt.Println("api-url:  ", t.APIURL)
+			fmt.Println("namespace:", t.Namespace)
+			fmt.Println("release:  ", t.Release)
+			if t.LegacyOnly() {
+				fmt.Println()
+				fmt.Println("This target predates magpie's single public entrypoint and still lists")
+				fmt.Println("per-service hostnames that no longer exist:")
+				fmt.Println("  identity-url:  ", t.IdentityURL)
+				fmt.Println("  server-api-url:", t.ServerAPIURL)
+				fmt.Println("  registry-url:  ", t.RegistryURL)
+				fmt.Println("Re-run `magpiectl target` to replace them with a single api-url.")
+			}
 			return nil
 		},
 	}
@@ -100,13 +107,15 @@ func runTargetPicker(_ context.Context) error {
 		}
 	}
 
+	// Note the legacy per-service URLs on `existing` are deliberately not
+	// carried over: if this target predates the single public entrypoint,
+	// those hostnames are exactly what's stale about it, and re-running
+	// this command is how a user is told to fix that.
 	t := &config.Target{
-		Context:      chosenContext,
-		IdentityURL:  promptWithDefault(reader, "identity-url", firstNonEmpty(existing.IdentityURL, identityURL)),
-		ServerAPIURL: promptWithDefault(reader, "server-api-url", firstNonEmpty(existing.ServerAPIURL, serverAPIURL)),
-		RegistryURL:  promptWithDefault(reader, "registry-url", firstNonEmpty(existing.RegistryURL, registryURL)),
-		Namespace:    promptWithDefault(reader, "namespace", firstNonEmpty(existing.Namespace, namespace)),
-		Release:      promptWithDefault(reader, "release (helm)", firstNonEmpty(existing.Release, release)),
+		Context:   chosenContext,
+		APIURL:    promptWithDefault(reader, "api-url", firstNonEmpty(existing.APIURL, apiURL)),
+		Namespace: promptWithDefault(reader, "namespace", firstNonEmpty(existing.Namespace, namespace)),
+		Release:   promptWithDefault(reader, "release (helm)", firstNonEmpty(existing.Release, release)),
 	}
 
 	if err := config.SaveTarget(t); err != nil {

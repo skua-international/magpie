@@ -1,7 +1,13 @@
 // Package client builds authenticated Connect clients against magpie's
-// public API surface (server-api + registry, both reachable through the
-// cluster's Ingress) -- every RPC call this CLI/TUI makes goes through
+// public API surface -- every RPC call this CLI/TUI makes goes through
 // one of these.
+//
+// All of them share a single base URL. The cluster exposes one public
+// host that routes to server-api, registry and identity by path prefix
+// (charts/magpie/templates/ingress.yaml), so the RPC paths these
+// generated clients already produce -- /controller.v1.ServerService/*
+// and /registry.v1.*Service/* -- land on the right backend without this
+// package having to know which service is which.
 package client
 
 import (
@@ -11,21 +17,22 @@ import (
 	registryv1connect "github.com/skua-international/magpie/generated/go/registry/v1/registryv1connect"
 )
 
-// Config is where each service actually lives -- defaults to this
-// project's own Ingress hostnames (see charts/magpie/values.yaml's
-// ingress.baseDomain), overridable for anyone fronting the cluster
+// Config is where the cluster's public API lives -- defaults to this
+// project's own Ingress hostname (see charts/magpie/values.yaml's
+// ingress.host/baseDomain), overridable for anyone fronting the cluster
 // differently.
 type Config struct {
-	ServerAPIURL string
-	RegistryURL  string
+	APIURL string
 }
 
 func DefaultConfig() Config {
-	return Config{
-		ServerAPIURL: "http://server-api.magpie.local",
-		RegistryURL:  "http://registry.magpie.local",
-	}
+	return Config{APIURL: DefaultAPIURL}
 }
+
+// DefaultAPIURL matches the chart's default ingress.host/baseDomain.
+// Shared with the cmd package so the flag default and this one can't
+// drift apart.
+const DefaultAPIURL = "http://api.magpie.local"
 
 // Clients bundles every generated Connect client this tool talks to.
 // sync-daemon's own SyncService is deliberately absent -- it's an
@@ -44,10 +51,10 @@ type Clients struct {
 func New(cfg Config, accessToken string) *Clients {
 	httpClient := &http.Client{Transport: &authTransport{token: accessToken, base: http.DefaultTransport}}
 	return &Clients{
-		Servers:    controllerv1connect.NewServerServiceClient(httpClient, cfg.ServerAPIURL),
-		ModSources: registryv1connect.NewModSourceServiceClient(httpClient, cfg.RegistryURL),
-		Missions:   registryv1connect.NewMissionServiceClient(httpClient, cfg.RegistryURL),
-		Admin:      registryv1connect.NewAdminServiceClient(httpClient, cfg.RegistryURL),
+		Servers:    controllerv1connect.NewServerServiceClient(httpClient, cfg.APIURL),
+		ModSources: registryv1connect.NewModSourceServiceClient(httpClient, cfg.APIURL),
+		Missions:   registryv1connect.NewMissionServiceClient(httpClient, cfg.APIURL),
+		Admin:      registryv1connect.NewAdminServiceClient(httpClient, cfg.APIURL),
 	}
 }
 

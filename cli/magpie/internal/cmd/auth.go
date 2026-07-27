@@ -50,7 +50,7 @@ func authStatusCmd() *cobra.Command {
 		RunE: func(_ *cobra.Command, _ []string) error {
 			creds, err := auth.Load()
 			if errors.Is(err, auth.ErrNotLoggedIn) {
-				fmt.Println("Not logged in to", identityURL)
+				fmt.Println("Not logged in to", apiURL)
 				fmt.Println("Run `magpiectl auth login`.")
 				return nil
 			}
@@ -58,7 +58,7 @@ func authStatusCmd() *cobra.Command {
 				return err
 			}
 
-			fmt.Println("Logged in to", identityURL)
+			fmt.Println("Logged in to", apiURL)
 			if claims, err := decodeJWTPayload(creds.AccessToken); err == nil {
 				if sub, ok := claims["sub"].(string); ok {
 					fmt.Println("  user:", sub)

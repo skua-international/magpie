@@ -18,6 +18,16 @@ import (
 // source in their own precedence chain (env var, then hardcoded
 // default), never treat a zero Target as an error.
 type Target struct {
+	// APIURL is the cluster's single public entrypoint -- one host
+	// routing to server-api, registry and identity by path prefix.
+	APIURL string `json:"api_url,omitempty"`
+	// IdentityURL/ServerAPIURL/RegistryURL are the pre-single-entrypoint
+	// shape, when each service had its own public hostname. Still parsed
+	// so an older target.json doesn't error, but no longer used to reach
+	// anything: those hostnames don't exist after that change. Their
+	// presence without APIURL is what LegacyOnly reports on, so callers
+	// can tell the user to re-run `magpiectl target` instead of failing
+	// with a bare connection error.
 	IdentityURL  string `json:"identity_url,omitempty"`
 	ServerAPIURL string `json:"server_api_url,omitempty"`
 	RegistryURL  string `json:"registry_url,omitempty"`
@@ -29,6 +39,17 @@ type Target struct {
 	// calls kubectl for the per-server ConfigMap flow, and that still
 	// uses whatever kubeconfig/KUBECONFIG is already in effect).
 	Context string `json:"context,omitempty"`
+}
+
+// LegacyOnly reports whether this target was saved before magpie moved
+// to a single public entrypoint: it names the old per-service hostnames
+// but has no APIURL. Those hostnames no longer resolve to anything, and
+// a saved target outranks the built-in default, so without this check
+// the CLI would quietly dial a dead host and surface a connection error
+// that says nothing about why.
+func (t *Target) LegacyOnly() bool {
+	return t.APIURL == "" &&
+		(t.IdentityURL != "" || t.ServerAPIURL != "" || t.RegistryURL != "")
 }
 
 // targetPath returns the same config dir auth's credentials.json uses

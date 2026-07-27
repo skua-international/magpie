@@ -30,7 +30,7 @@ func accountLinkCmd() *cobra.Command {
 				return err
 			}
 			fmt.Println("Opening browser to link", args[0], "...")
-			fresh, err := auth.LinkAccount(c.Context(), identityURL, args[0], creds.AccessToken)
+			fresh, err := auth.LinkAccount(c.Context(), apiURL, args[0], creds.AccessToken)
 			if err != nil {
 				return err
 			}
