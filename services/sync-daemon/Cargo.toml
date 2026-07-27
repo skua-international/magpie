@@ -9,7 +9,8 @@ base64 = "0.23.0"
 steam-sync = { path = "../../crates/steam-sync" }
 protocol = { path = "../../crates/protocol" }
 crd = { path = "../../crates/crd" }
-connectrpc = { version = "0.8", features = ["axum"] }
+connectrpc = { version = "0.8", features = ["axum", "client"] }
+http = "1.4.2"
 buffa = "0.8"
 axum = "0.8"
 futures = "0.3.32"

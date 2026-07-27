@@ -6,5 +6,6 @@
 //! without depending on the launcher (game-launch) binary itself.
 
 pub mod cache;
+pub mod capacity;
 pub mod steam;
 pub mod workshop;

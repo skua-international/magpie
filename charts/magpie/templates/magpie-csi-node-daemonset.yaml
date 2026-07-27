@@ -69,6 +69,21 @@ spec:
               value: /var/lib/magpie-csi/mnt
             - name: MAX_SIZE_GIB
               value: {{ .Values.reflinkStorage.maxSizeGiB | quote }}
+            - name: CAPACITY_LISTEN_ADDR
+              value: "0.0.0.0:{{ .Values.magpieCsi.capacityPort }}"
+          ports:
+            # csi.v1.CapacityService -- sync-daemon calls this before a
+            # batch of downloads to have the blob grown up front, instead
+            # of leaving the capacity watchdog to notice afterwards.
+            #
+            # hostPort, not a Service: the blob is node-local, so the only
+            # correct target is the plugin on the caller's own node. A
+            # ClusterIP Service in front of a DaemonSet would round-robin
+            # and could grow the wrong node's blob entirely.
+            - name: capacity
+              containerPort: {{ .Values.magpieCsi.capacityPort }}
+              hostPort: {{ .Values.magpieCsi.capacityPort }}
+              protocol: TCP
           volumeMounts:
             - name: plugin-dir
               mountPath: /csi

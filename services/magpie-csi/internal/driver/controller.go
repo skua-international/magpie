@@ -75,7 +75,42 @@ func (d *Driver) ControllerGetCapabilities(context.Context, *csi.ControllerGetCa
 	return &csi.ControllerGetCapabilitiesResponse{
 		Capabilities: []*csi.ControllerServiceCapability{
 			capability(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME),
+			capability(csi.ControllerServiceCapability_RPC_EXPAND_VOLUME),
 		},
+	}, nil
+}
+
+// ControllerExpandVolume does no host work, for the same reason
+// CreateVolume doesn't: the Controller Deployment isn't privileged and
+// has no hostPath access to any node's blob, so it cannot resize
+// anything itself. It validates the request and hands the real work to
+// NodeExpandVolume via NodeExpansionRequired, which runs on the
+// DaemonSet that does own the blob.
+//
+// What expanding this volume *means*: the golden-content PVC's requested
+// size is the blob's guaranteed floor -- the size it's grown to and held
+// at regardless of how little content is currently synced. It is not a
+// quota; reflinkStorage.maxSizeGiB is the ceiling, and the capacity
+// watchdog moves the actual size between the two. Raising the PVC is how
+// an operator says "keep at least this much room provisioned".
+//
+// Note Kubernetes volume expansion is one-way -- a PVC can never be
+// shrunk -- so lowering the floor again means editing values and letting
+// the watchdog shrink toward the new target on its own; the PVC's own
+// requested size stays where it was.
+func (d *Driver) ControllerExpandVolume(_ context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
+	if req.GetVolumeId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "volume_id is required")
+	}
+	required := req.GetCapacityRange().GetRequiredBytes()
+	if required <= 0 {
+		return nil, status.Error(codes.InvalidArgument, "capacity_range.required_bytes must be positive")
+	}
+	return &csi.ControllerExpandVolumeResponse{
+		CapacityBytes: required,
+		// The blob is a mounted filesystem, so the node half has to run
+		// to actually grow it -- this is never a pure metadata resize.
+		NodeExpansionRequired: true,
 	}, nil
 }
 

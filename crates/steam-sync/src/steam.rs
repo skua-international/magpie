@@ -20,6 +20,7 @@ use tokio::task::JoinSet;
 use tracing::{debug, error, info, warn};
 
 use crate::cache;
+use crate::capacity;
 
 /// Steam login mode: either an anonymous session (works for workshop
 /// content under depot 107410, which needs no license grant at all, but
@@ -1063,6 +1064,7 @@ pub async fn resolve_and_spawn_server(
     tasks: &Mutex<SyncTasks>,
     sync_state: Arc<cache::SyncState>,
     download_workers: usize,
+    reserver: Option<&dyn capacity::CapacityReserver>,
 ) -> Result<()> {
     let plan = resolve_wanted_depots(
         conn,
@@ -1090,6 +1092,7 @@ pub async fn resolve_and_spawn_server(
         tasks,
         sync_state,
         download_workers,
+        reserver,
     )
     .await
 }
@@ -1107,6 +1110,7 @@ async fn spawn_plan_downloads(
     tasks: &Mutex<SyncTasks>,
     sync_state: Arc<cache::SyncState>,
     download_workers: usize,
+    reserver: Option<&dyn capacity::CapacityReserver>,
 ) -> Result<()> {
     let http = build_http_client();
     let app_id = plan.app_id;
@@ -1239,6 +1243,19 @@ async fn spawn_plan_downloads(
         match result {
             Ok(dp) => resolved_plans.push(dp),
             Err(e) => warn!("skipping a depot after a manifest fetch failure: {e:#}"),
+        }
+    }
+
+    // Every depot below is about to start writing, up to SYNC_CONCURRENCY
+    // of them at once. Announce the total first and wait for the room to
+    // exist -- this is the last point where nothing has been dispatched
+    // yet, and spawn_bounded returns immediately (its permit is acquired
+    // inside the spawned task), so anything after the loop would be racing
+    // the writes it was meant to precede.
+    if let Some(reserver) = reserver {
+        let bytes = capacity::total_disk_bytes(&resolved_plans);
+        if bytes > 0 {
+            reserver.reserve(capacity::KEY_SERVER_DEPOTS, bytes).await;
         }
     }
 

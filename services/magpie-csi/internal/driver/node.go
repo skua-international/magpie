@@ -179,8 +179,39 @@ func (d *Driver) NodeGetCapabilities(context.Context, *csi.NodeGetCapabilitiesRe
 	return &csi.NodeGetCapabilitiesResponse{
 		Capabilities: []*csi.NodeServiceCapability{
 			capability(csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME),
+			capability(csi.NodeServiceCapability_RPC_EXPAND_VOLUME),
 		},
 	}, nil
+}
+
+// NodeExpandVolume is where a golden-content PVC resize actually lands:
+// this runs on the DaemonSet, which is privileged and owns the blob,
+// unlike the Controller half that fielded ControllerExpandVolume.
+//
+// It sets the blob's floor rather than resizing a per-volume filesystem,
+// because there is no per-volume filesystem -- every volume this driver
+// serves is a bind-mount or btrfs snapshot of the one shared blob. So
+// "expand this volume to N" means "never let the shared blob be smaller
+// than N", which SetFloor records and EnsureCapacity then honors on
+// every subsequent reconcile.
+func (d *Driver) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
+	if req.GetVolumeId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "volume_id is required")
+	}
+	required := req.GetCapacityRange().GetRequiredBytes()
+	if required <= 0 {
+		return nil, status.Error(codes.InvalidArgument, "capacity_range.required_bytes must be positive")
+	}
+
+	outcome, err := d.blob.SetFloor(ctx, required)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to expand blob to %d bytes: %v", required, err)
+	}
+	// Reported back as what the blob actually is, not what was asked for
+	// -- reflinkStorage.maxSizeGiB can cap it below the request, and
+	// claiming the larger number would leave the CO believing in space
+	// that doesn't exist.
+	return &csi.NodeExpandVolumeResponse{CapacityBytes: outcome.TotalBytes}, nil
 }
 
 func (d *Driver) NodeGetInfo(context.Context, *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {

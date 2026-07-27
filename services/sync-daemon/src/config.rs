@@ -41,6 +41,16 @@ pub struct Config {
     /// taken by services/magpie-csi when its PVC is created -- not this
     /// process's concern at all.
     pub content_root: PathBuf,
+    /// Base URL of the node-local magpie-csi capacity service, used to
+    /// reserve blob headroom before a batch of downloads starts. None
+    /// disables reservations entirely -- downloads still run, they just
+    /// fall back to magpie-csi's own capacity watchdog noticing after
+    /// the fact, which is what shipped before this existed.
+    ///
+    /// Deliberately per-node rather than a ClusterIP Service: the blob
+    /// belongs to one node's CSI Node plugin, and a Service would
+    /// round-robin to the wrong one on any multi-node cluster.
+    pub csi_capacity_url: Option<String>,
     pub listen_addr: String,
     pub pool_size: usize,
     /// Chunk-level concurrency within each depot/mod's own verify+download
@@ -84,6 +94,7 @@ impl Config {
             content_root: env::var("CONTENT_ROOT")
                 .unwrap_or_else(|_| "/content".into())
                 .into(),
+            csi_capacity_url: env::var("CSI_CAPACITY_URL").ok().filter(|v| !v.is_empty()),
             listen_addr: env::var("LISTEN_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".into()),
             pool_size: env::var("POOL_SIZE")
                 .ok()

@@ -131,14 +131,29 @@ ingress:
 # own doc for why that's still necessary even though this isn't hostPath
 # any more.
 reflinkStorage:
-  # Caps how large magpie-csi's node-local btrfs blob is ever allowed to
-  # grow -- 0 means unlimited (grows to fit whatever content/workshop
-  # actually needs, minus 5GiB always kept free for burst headroom).
-  # There's no separate "initial size" setting anymore: that's now
-  # computed automatically as (current non-workshop game content size +
-  # 5GiB), not configured -- see services/magpie-csi/internal/blob's own
-  # doc for why.
+  # Ceiling: caps how large magpie-csi's node-local btrfs blob is ever
+  # allowed to grow -- 0 means unlimited (grows to fit whatever
+  # content/workshop actually needs, plus 5GiB always kept free for burst
+  # headroom, plus whatever sync-daemon has reserved for an in-flight
+  # batch). There's no separate "initial size" setting: that's computed
+  # automatically as (current non-workshop game content size + 5GiB) --
+  # see services/magpie-csi/internal/blob's own doc for why.
   maxSizeGiB: 0
+  # Floor: the golden-content PVC's requested size, which the blob is
+  # held at regardless of how little content is actually synced. The
+  # capacity watchdog moves the real size between this and maxSizeGiB.
+  #
+  # Raising this on a live cluster works -- the StorageClass sets
+  # allowVolumeExpansion and the driver implements EXPAND_VOLUME, so
+  # `helm upgrade` flows through ControllerExpandVolume ->
+  # NodeExpandVolume -> blob.SetFloor. Lowering it does NOT: Kubernetes
+  # volume expansion is one-way and the API server rejects a smaller
+  # request outright. To reclaim space, lower maxSizeGiB instead and let
+  # the watchdog shrink toward it.
+  #
+  # 40 is what every pre-existing cluster's PVC already has on disk, so
+  # this default is a no-op on upgrade.
+  goldenContentGiB: 40
 
 # Node-local directory holding registry-owned local (zip-uploaded) mods
 # and missions -- hostPath, not a PVC: this chart targets single-node
@@ -415,6 +430,16 @@ magpieCsi:
   # deploying onto a cluster this chart didn't bootstrap itself and its
   # kubelet root-dir isn't the k8s default either.
   kubeletDir: /var/lib/kubelet
+  # Port the Node plugin serves csi.v1.CapacityService on, bound as a
+  # hostPort so sync-daemon can reach the plugin on its *own* node (the
+  # blob is node-local -- see the DaemonSet's own comment). Only the Node
+  # role serves this; the Controller Deployment has no blob to manage.
+  #
+  # Not 9808: the livenessprobe sidecar has that, and sidecars share the
+  # Pod's network namespace. Change this if something else on the host
+  # already binds 9809 -- it's a hostPort, so it's the node's real port
+  # space, not just the Pod's.
+  capacityPort: 9809
   resources: {}
 
 # Cluster-wide baseline Arma server config -- every ArmaServer's own

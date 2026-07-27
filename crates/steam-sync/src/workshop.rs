@@ -7,6 +7,7 @@ use steamdepot::connection::CmConnection;
 use tokio::sync::Semaphore;
 
 use crate::cache;
+use crate::capacity as steam_capacity;
 use crate::steam::{self, SyncTasks};
 
 /// Patch `meta.cpp` (publishedid) and, if `replace_app_id`, `mod.cpp`
@@ -77,6 +78,7 @@ pub async fn sync_mods(
     tasks: &Mutex<SyncTasks>,
     sync_state: Arc<cache::SyncState>,
     download_workers: usize,
+    reserver: Option<&dyn steam_capacity::CapacityReserver>,
 ) -> Result<SyncModsResult> {
     let replace_app_id = !cdlc_force;
     let workshop_root = server_root.join("workshop");
@@ -93,6 +95,17 @@ pub async fn sync_mods(
     let resolution = steam::resolve_workshop_items(conn, &workshop_root, mod_ids, &sync_state)
         .await
         .context("failed to resolve workshop items for download")?;
+
+    // Same seam as the server-depot path: manifests are resolved, nothing
+    // is dispatched yet, and spawn_bounded below won't block. Reserve the
+    // whole batch before any of it starts writing.
+    if let Some(reserver) = reserver {
+        let plans: Vec<_> = resolution.items.iter().map(|i| &i.plan).collect();
+        let bytes = steam_capacity::total_disk_bytes(plans);
+        if bytes > 0 {
+            reserver.reserve(steam_capacity::KEY_WORKSHOP, bytes).await;
+        }
+    }
 
     let http = steam::build_http_client();
     for item in resolution.items {

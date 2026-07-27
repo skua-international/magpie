@@ -15,16 +15,22 @@ spec:
   storageClassName: magpie-golden-content
   resources:
     requests:
-      # DO NOT CHANGE THIS VALUE, ever -- confirmed live: the
-      # magpie-golden-content StorageClass supports no resize at all (no
-      # allowVolumeExpansion, no EXPAND_VOLUME capability), so the API
-      # server rejects `helm upgrade`/`kubectl apply` outright the moment
-      # this differs from whatever's already on the live PVC ("only
-      # dynamically provisioned pvc can be resized and the storageclass
-      # that provisions the pvc must support resize"). This number is
-      # otherwise non-binding -- magpie-csi's CreateVolume echoes it back
-      # but never enforces it (storageCapacity: false in its CSIDriver
-      # spec); real sizing is the capacity watchdog's job at runtime (see
-      # values.yaml's reflinkStorage.maxSizeGiB). 40Gi purely because
-      # that's what every existing cluster's PVC already has on disk.
-      storage: 40Gi
+      # The blob's guaranteed floor: the size magpie-csi holds it at
+      # regardless of how little content is currently synced.
+      # reflinkStorage.maxSizeGiB is the ceiling, and the capacity
+      # watchdog moves the real size between the two.
+      #
+      # This used to be an unchangeable hardcoded 40Gi -- the
+      # StorageClass had no allowVolumeExpansion and the driver no
+      # EXPAND_VOLUME capability, so the API server rejected any
+      # `helm upgrade` that changed it ("only dynamically provisioned pvc
+      # can be resized and the storageclass that provisions the pvc must
+      # support resize"). Both are in place now, so raising this value
+      # and upgrading genuinely grows the blob, via ControllerExpandVolume
+      # -> NodeExpandVolume -> blob.SetFloor.
+      #
+      # Still one-way: Kubernetes never shrinks a PVC. Lowering this
+      # value won't shrink anything (the API server rejects it) -- to
+      # actually reclaim space, lower reflinkStorage.maxSizeGiB and let
+      # the watchdog shrink toward it.
+      storage: {{ .Values.reflinkStorage.goldenContentGiB }}Gi
