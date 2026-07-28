@@ -4989,6 +4989,7 @@ dependencies = [
  "crd",
  "dhat",
  "futures",
+ "http",
  "k8s-openapi",
  "kube",
  "metrics-exporter-prometheus",

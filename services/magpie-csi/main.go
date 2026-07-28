@@ -13,13 +13,19 @@ import (
 	"context"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"strconv"
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 	"google.golang.org/grpc"
 
+	"github.com/skua-international/magpie/generated/go/csi/v1/csiv1connect"
+	"github.com/skua-international/magpie/services/magpie-csi/internal/blob"
+	"github.com/skua-international/magpie/services/magpie-csi/internal/capacity"
 	"github.com/skua-international/magpie/services/magpie-csi/internal/driver"
 )
 
@@ -61,6 +67,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("invalid CAPACITY_CHECK_INTERVAL: %v", err)
 	}
+	// Where csi.v1.CapacityService listens (Node role only). Not 9808 --
+	// the livenessprobe sidecar has that, and sidecars share this Pod's
+	// network namespace.
+	capacityAddr := envOr("CAPACITY_LISTEN_ADDR", "0.0.0.0:9809")
 
 	// A stale socket from a previous run (e.g. an unclean restart) makes
 	// net.Listen fail with "address already in use" -- safe to remove
@@ -81,13 +91,43 @@ func main() {
 	csi.RegisterControllerServer(server, d)
 	csi.RegisterNodeServer(server, d)
 
+	// Both gated on being the Node role, for the same reason: only it has
+	// a blob to manage. The watchdog stays regardless of the reservation
+	// endpoint -- it's the fallback for anything that writes without
+	// announcing itself first, which is every writer other than
+	// sync-daemon's batch downloads.
 	if rawNodeID != "" {
 		go d.Blob().Watch(context.Background(), capacityCheckInterval)
+		go serveCapacity(capacityAddr, d.Blob())
 	}
 
 	log.Printf("magpie-csi listening on %s (node_id=%s)", endpoint, nodeID)
 	if err := server.Serve(listener); err != nil {
 		log.Fatalf("gRPC server failed: %v", err)
+	}
+}
+
+// serveCapacity runs magpie's own csi.v1.CapacityService alongside the
+// CSI socket. Blocking, so main runs it in a goroutine; a failure here
+// is logged rather than fatal -- losing the reservation endpoint costs
+// the upfront-sizing optimization, but the watchdog still keeps the blob
+// from filling, and taking the whole CSI driver down with it would stop
+// every volume mount on this node instead.
+func serveCapacity(addr string, b *blob.Manager) {
+	mux := http.NewServeMux()
+	mux.Handle(csiv1connect.NewCapacityServiceHandler(capacity.New(b)))
+
+	// h2c so the Connect client can use HTTP/2 without TLS -- this is a
+	// node-local endpoint on a private port, reached over the node's own
+	// network.
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           h2c.NewHandler(mux, &http2.Server{}),
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+	log.Printf("magpie-csi capacity service listening on %s", addr)
+	if err := srv.ListenAndServe(); err != nil {
+		log.Printf("capacity service stopped: %v (blob watchdog still running)", err)
 	}
 }
 

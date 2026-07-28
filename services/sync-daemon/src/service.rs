@@ -18,6 +18,8 @@ use steam_sync::workshop;
 use tokio::sync::Semaphore;
 use tracing::{info, warn};
 
+use crate::capacity::CapacityClient;
+use steam_sync::capacity::CapacityReserver;
 use crate::secrets::{self, Session};
 
 /// Shared state, `Arc`-wrapped so it can be cloned cheaply into a spawned
@@ -43,6 +45,12 @@ pub struct Shared {
     pub client: kube::Client,
     pub namespace: String,
     pub steam_session_secret_name: String,
+    /// Announces an upcoming batch's byte total to magpie-csi so the
+    /// blob is grown before the writes start, rather than after its
+    /// watchdog notices. `None` when CSI_CAPACITY_URL isn't set (or the
+    /// client failed to build), in which case that watchdog is the only
+    /// defense -- which is what shipped before this existed.
+    pub capacity: Option<Arc<CapacityClient>>,
     /// Count of `sync_content` calls currently in flight -- a counter, not
     /// a bool, since this can be entered from three independent places
     /// (the `SyncContent` RPC, the reconciler's auto-sync-on-first-resolve,
@@ -106,6 +114,7 @@ impl Shared {
         namespace: String,
         steam_session_secret_name: String,
         download_workers: usize,
+        capacity: Option<Arc<CapacityClient>>,
     ) -> Arc<Self> {
         Arc::new(Self {
             pool,
@@ -115,6 +124,7 @@ impl Shared {
             namespace,
             steam_session_secret_name,
             download_workers,
+            capacity,
             syncing: AtomicUsize::new(0),
         })
     }
@@ -205,6 +215,13 @@ impl Shared {
     /// main.rs's sync-on-startup.
     pub async fn sync_content(&self) -> anyhow::Result<()> {
         let _guard = SyncingGuard::enter(&self.syncing);
+        // Both download paths below share this: each announces its own
+        // batch total under its own key, so the two sum on the far side
+        // rather than overwriting each other.
+        let reserver = self
+            .capacity
+            .as_deref()
+            .map(|c| c as &dyn steam_sync::capacity::CapacityReserver);
         let sem = Arc::new(Semaphore::new(steam::SYNC_CONCURRENCY));
         let tasks: Mutex<SyncTasks> = Mutex::new(SyncTasks::new());
 
@@ -228,6 +245,7 @@ impl Shared {
                 &tasks,
                 self.sync_state.clone(),
                 self.download_workers,
+                reserver,
             )
             .await;
             if let Err(e) = &result {
@@ -257,6 +275,7 @@ impl Shared {
                 &tasks,
                 self.sync_state.clone(),
                 self.download_workers,
+                reserver,
             )
             .await;
             if let Err(e) = &result {
@@ -271,6 +290,15 @@ impl Shared {
         let mut tasks = tasks.into_inner().unwrap();
         while let Some(result) = tasks.join_next().await {
             result??;
+        }
+
+        // Everything above has finished writing, so hand the headroom
+        // back rather than leaving it held until the TTL lapses -- while
+        // a reservation stands, magpie-csi won't shrink the blob even if
+        // the content that justified it was since deleted.
+        if let Some(capacity) = &self.capacity {
+            capacity.release(steam_sync::capacity::KEY_SERVER_DEPOTS).await;
+            capacity.release(steam_sync::capacity::KEY_WORKSHOP).await;
         }
         Ok(())
     }

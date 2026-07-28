@@ -61,6 +61,22 @@ spec:
               value: {{ include "magpie.namespace" . }}
             - name: CONTENT_ROOT
               value: /content
+            # magpie-csi's capacity service, on this Pod's *own* node --
+            # status.hostIP, not a Service name, because the blob being
+            # reserved against is node-local and a ClusterIP Service would
+            # round-robin across DaemonSet pods (see the DaemonSet's own
+            # comment on the hostPort). sync-daemon announces each batch's
+            # byte total here before dispatching it, so the blob is grown
+            # up front rather than by the watchdog noticing afterwards.
+            #
+            # Unset this to disable reservations -- downloads still work,
+            # they just fall back to that watchdog alone.
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: CSI_CAPACITY_URL
+              value: "http://$(HOST_IP):{{ .Values.magpieCsi.capacityPort }}"
             - name: POOL_SIZE
               value: {{ .Values.syncDaemon.poolSize | quote }}
             - name: DOWNLOAD_WORKERS

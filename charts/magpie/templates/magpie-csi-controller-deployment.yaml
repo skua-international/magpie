@@ -46,6 +46,27 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
+        # Watches PVCs whose spec.resources.requests.storage has grown
+        # past their status.capacity and drives the driver's
+        # ControllerExpandVolume for them -- without this sidecar,
+        # allowVolumeExpansion on the StorageClass is inert: the API
+        # server accepts the larger request and nothing ever acts on it.
+        # Only the golden-content PVC ever goes through this path (see
+        # the provisioner comment above), and only when an operator
+        # actually raises reflinkStorage.goldenContentGiB.
+        - name: csi-resizer
+          image: registry.k8s.io/sig-storage/csi-resizer:v1.13.1
+          args:
+            - "--csi-address=/csi/csi.sock"
+            - "--leader-election=false"
+            # The blob grows online (sparse truncate + btrfs resize), and
+            # the golden-content volume is mounted continuously by
+            # sync-daemon, so waiting for it to be unused would mean an
+            # expansion that never completes.
+            - "--handle-volume-inuse-error=false"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
         # Standard CSI sidecar: calls the driver's own Identity.Probe RPC
         # over the shared socket and exposes a real /healthz kubelet can
         # check -- without this, the magpie-csi container's own liveness

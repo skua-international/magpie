@@ -81,6 +81,20 @@ func (d *Driver) GetPluginCapabilities(context.Context, *csi.GetPluginCapabiliti
 					},
 				},
 			},
+			{
+				// ONLINE, not OFFLINE: growing the blob is a sparse-file
+				// truncate plus an online `btrfs filesystem resize`, so
+				// nothing has to be unpublished or unmounted first. That
+				// matters here -- the golden-content volume is mounted by
+				// sync-daemon continuously, so requiring OFFLINE would
+				// mean an expansion could never complete without evicting
+				// the very thing that needs the space.
+				Type: &csi.PluginCapability_VolumeExpansion_{
+					VolumeExpansion: &csi.PluginCapability_VolumeExpansion{
+						Type: csi.PluginCapability_VolumeExpansion_ONLINE,
+					},
+				},
+			},
 		},
 	}, nil
 }

@@ -22,3 +22,14 @@ reclaimPolicy: Retain
 # the PVC is actually scheduled, so the CSI provisioner knows which
 # node's blob to create the volume on instead of guessing.
 volumeBindingMode: WaitForFirstConsumer
+# The PVC's requested size is the blob's guaranteed floor -- the size
+# it's held at regardless of how little content happens to be synced
+# (reflinkStorage.maxSizeGiB is the ceiling; the capacity watchdog moves
+# the real size between the two). Raising reflinkStorage.goldenContentGiB
+# is how an operator provisions more room, and this is what lets that
+# reach the driver instead of the API server rejecting the change.
+#
+# Expansion is one-way -- Kubernetes never shrinks a PVC. Lowering the
+# floor again means lowering the value and letting the watchdog shrink
+# toward the new target; the PVC's own requested size stays put.
+allowVolumeExpansion: true

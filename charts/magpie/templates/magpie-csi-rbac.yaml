@@ -31,6 +31,16 @@ rules:
   - apiGroups: [""]
     resources: ["persistentvolumeclaims"]
     verbs: ["get", "list", "watch", "update", "patch"]
+  # external-resizer shares this ServiceAccount with external-provisioner
+  # rather than getting its own -- both are sidecars in the same Pod, so
+  # a separate SA would only be able to differ in name. Everything it
+  # needs beyond the provisioner's grants above is this one subresource:
+  # it writes the observed capacity back to the PVC once expansion
+  # completes, and without it a resize appears to hang forever with the
+  # PVC stuck on the FileSystemResizePending condition.
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims/status"]
+    verbs: ["get", "patch", "update"]
   - apiGroups: ["storage.k8s.io"]
     resources: ["storageclasses"]
     verbs: ["get", "list", "watch"]

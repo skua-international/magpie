@@ -1,0 +1,77 @@
+syntax = "proto3";
+package csi.v1;
+
+option go_package = "github.com/skua-international/magpie/generated/go/csi/v1;csiv1";
+
+// Node-local capacity control for magpie-csi's golden-content blob.
+//
+// Deliberately separate from the CSI gRPC surface the same binary serves
+// on its unix socket: that socket is kubelet's, and the CSI spec has no
+// call that means "I am about to write N bytes, make room". This is
+// magpie's own side channel, served only by the Node role (the one that
+// actually owns a blob), on a normal TCP port.
+//
+// Why it exists: the driver used to learn about impending writes only by
+// polling free space on a timer (blob.Manager.Watch). That is inherently
+// reactive -- confirmed live on 2026-07-26, a startup sync with a
+// dozen-plus depots downloading in parallel blew through the 5GiB
+// headroom well inside the poll gap, and no fixed interval can win that
+// race outright. sync-daemon already knows exactly how much it is about
+// to download once it has resolved its manifests, so it says so here
+// first. The poll loop stays as the fallback safety net; this is
+// additive.
+service CapacityService {
+  // Ask for `bytes` of headroom to be available before a batch of
+  // downloads starts, and to stay available for `ttl_seconds`.
+  //
+  // Blocks until the blob has actually been resized (growing is a cheap
+  // online btrfs resize, so this is fast), so a caller that awaits this
+  // before dispatching genuinely has the room it asked for.
+  //
+  // Reserving the same `key` again replaces that key's previous
+  // reservation rather than adding to it, so a retried or re-resolved
+  // batch doesn't double-count. Different keys sum.
+  rpc ReserveCapacity(ReserveCapacityRequest) returns (ReserveCapacityResponse);
+
+  // Drop a reservation early, once the batch it covered has finished.
+  // Purely an optimization -- every reservation expires on its own TTL
+  // regardless, which is what keeps a crashed or wedged caller from
+  // pinning the blob at its high-water mark forever. Releasing an
+  // unknown or already-expired key is not an error.
+  rpc ReleaseCapacity(ReleaseCapacityRequest) returns (ReleaseCapacityResponse);
+}
+
+message ReserveCapacityRequest {
+  // Caller-chosen identifier for what this reservation covers (e.g.
+  // "server-depots", "workshop"). Scopes replacement -- see the RPC doc.
+  string key = 1;
+  // Total bytes the upcoming batch is expected to write. An upper bound
+  // is fine and expected: the caller sums whole-depot sizes without
+  // knowing which chunks are already present on disk, so this
+  // over-reserves for a partially-synced depot. Over-reserving is the
+  // safe direction.
+  uint64 bytes = 2;
+  // How long to hold it. Should comfortably exceed how long the batch
+  // can take -- when this expires mid-download the blob becomes
+  // shrinkable again and the original race is back.
+  uint32 ttl_seconds = 3;
+}
+
+message ReserveCapacityResponse {
+  // The blob's size and free space after reconciling, so a caller can
+  // log what it actually got.
+  uint64 total_bytes = 1;
+  uint64 free_bytes = 2;
+  // False when the reservation could not be fully honored -- currently
+  // only when reflinkStorage.maxSizeGiB caps the blob below what was
+  // asked for. The caller is expected to proceed anyway (there may still
+  // be enough room, and failing the sync outright would be worse than
+  // letting it try), but it's worth logging loudly.
+  bool satisfied = 3;
+}
+
+message ReleaseCapacityRequest {
+  string key = 1;
+}
+
+message ReleaseCapacityResponse {}

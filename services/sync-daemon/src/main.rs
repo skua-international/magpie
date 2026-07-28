@@ -1,3 +1,4 @@
+mod capacity;
 mod config;
 mod reconcile;
 mod secrets;
@@ -149,6 +150,29 @@ async fn main() -> Result<()> {
         }
     };
 
+    // A bad URL here is a config error worth surfacing, but not worth
+    // refusing to start over: without a reservation client sync-daemon
+    // still downloads correctly, it just leaves magpie-csi's watchdog to
+    // notice the space being consumed rather than being told first.
+    let capacity = match cfg.csi_capacity_url.as_deref() {
+        Some(url) => match capacity::CapacityClient::new(url) {
+            Ok(client) => {
+                info!("capacity reservations enabled, using {url}");
+                Some(std::sync::Arc::new(client))
+            }
+            Err(e) => {
+                warn!("invalid CSI_CAPACITY_URL {url:?} ({e:#}) -- continuing without capacity reservations");
+                None
+            }
+        },
+        None => {
+            warn!(
+                "CSI_CAPACITY_URL not set -- continuing without capacity reservations; magpie-csi's watchdog is the only defense against the blob filling mid-sync"
+            );
+            None
+        }
+    };
+
     let shared = Shared::new(
         pool,
         sync_state,
@@ -157,6 +181,7 @@ async fn main() -> Result<()> {
         cfg.namespace.clone(),
         cfg.steam_session_secret_name.clone(),
         cfg.download_workers,
+        capacity,
     );
 
     reconcile::spawn(

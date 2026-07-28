@@ -54,6 +54,35 @@ type Manager struct {
 	maxSizeBytes int64 // 0 == unlimited
 
 	mu sync.Mutex
+	// reservations is space callers have declared they're about to use
+	// but haven't written yet, keyed by caller-chosen scope. Guarded by
+	// mu, same as everything else here.
+	reservations map[string]reservation
+	// provisionedFloor is the golden-content PVC's requested size: a
+	// size the blob is held at regardless of how little is stored in it,
+	// set by NodeExpandVolume when an operator expands that PVC. 0 until
+	// one arrives, which is why the content-derived desiredFloor stays
+	// the baseline rather than being replaced by this.
+	//
+	// Not persisted across restarts by design -- the CO replays
+	// NodeExpandVolume when reconciling a PVC whose status hasn't caught
+	// up with its spec, so Kubernetes remains the source of truth for it
+	// rather than a state file here that could disagree with the PVC.
+	provisionedFloor int64
+}
+
+// reservation is a claim on space that isn't occupied yet. It has to
+// persist across ticks rather than being applied once: EnsureCapacity
+// recomputes its target from *observed* usage every call, so a one-shot
+// grow would be handed straight back by the next tick's shrink branch --
+// mid-download, which is the exact failure this is meant to prevent.
+//
+// The expiry is what makes that safe to hold. A caller that crashes,
+// wedges, or simply forgets to release would otherwise pin the blob at
+// its high-water mark forever, and the shrink path would never run again.
+type reservation struct {
+	bytes   int64
+	expires time.Time
 }
 
 type GrowOutcome struct {
@@ -89,6 +118,12 @@ func NewManager(imagePath, mountPath string, maxSizeBytes int64) *Manager {
 // space including zero, so the blob silently filled to 100% and never
 // grew until nothing could be written at all (sync-daemon crash-looping
 // on SIGBUS from an mmap page fault into a completely full filesystem).
+//
+// Reserve below does let a caller name a byte count, but that is not a
+// return to the old shape: it records the claim in m.reservations and
+// then calls straight into here, so this still does the same full
+// reconciliation on every call, and a zero-byte reservation reduces to
+// exactly today's behavior rather than skipping the check.
 func (m *Manager) EnsureCapacity(ctx context.Context) (GrowOutcome, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -126,17 +161,24 @@ func (m *Manager) EnsureCapacity(ctx context.Context) (GrowOutcome, error) {
 		return GrowOutcome{}, err
 	}
 	used := total - free
-	target := m.clamp(max(used+headroomBytes, floor))
+	target := m.clamp(max(used+headroomBytes+m.reservedBytesLocked(), floor, m.provisionedFloor))
 
+	// Decided here rather than re-derived after the resize below: the
+	// second statvfs reassigns total to roughly target, so comparing the
+	// two afterwards reported neither grown nor shrunk on almost every
+	// real resize, and Watch's logging of them never fired.
+	var grew, shrunk bool
 	switch {
 	case target > total:
 		if err := m.growTo(ctx, target); err != nil {
 			return GrowOutcome{}, fmt.Errorf("failed to grow blob filesystem: %w", err)
 		}
+		grew = true
 	case total-target >= shrinkHysteresisBytes:
 		if err := m.shrinkTo(ctx, target); err != nil {
 			return GrowOutcome{}, fmt.Errorf("failed to shrink blob filesystem: %w", err)
 		}
+		shrunk = true
 	default:
 		return GrowOutcome{TotalBytes: total, FreeBytes: free}, nil
 	}
@@ -145,7 +187,88 @@ func (m *Manager) EnsureCapacity(ctx context.Context) (GrowOutcome, error) {
 	if err != nil {
 		return GrowOutcome{}, err
 	}
-	return GrowOutcome{TotalBytes: total, FreeBytes: free, Grew: target > total, Shrunk: target < total}, nil
+	return GrowOutcome{TotalBytes: total, FreeBytes: free, Grew: grew, Shrunk: shrunk}, nil
+}
+
+// Reserve records that `bytes` are about to be written under `key` and
+// reconciles the blob so they'll fit, holding that space for ttl.
+// Reserving an existing key replaces it rather than adding, so a retried
+// or re-resolved batch doesn't double-count; distinct keys sum.
+//
+// Returns the post-reconcile size, and whether the reservation could
+// actually be honored -- a maxSizeBytes cap can leave it short, which is
+// the caller's to log rather than this package's to fail on.
+func (m *Manager) Reserve(ctx context.Context, key string, bytes int64, ttl time.Duration) (GrowOutcome, bool, error) {
+	m.mu.Lock()
+	if m.reservations == nil {
+		m.reservations = make(map[string]reservation)
+	}
+	if bytes <= 0 {
+		delete(m.reservations, key)
+	} else {
+		m.reservations[key] = reservation{bytes: bytes, expires: time.Now().Add(ttl)}
+	}
+	m.mu.Unlock()
+
+	// Unlocked across this call because EnsureCapacity takes mu itself.
+	// Safe: the reservation is already recorded, so whichever caller wins
+	// the lock computes a target that includes it.
+	outcome, err := m.EnsureCapacity(ctx)
+	if err != nil {
+		return GrowOutcome{}, false, err
+	}
+	return outcome, outcome.FreeBytes >= bytes, nil
+}
+
+// SetFloor raises the size the blob is held at regardless of usage --
+// the golden-content PVC's requested size, arriving via
+// NodeExpandVolume. Reconciles immediately so the caller can report back
+// what the blob actually ended up as.
+//
+// Monotonic within a process lifetime: a lower floor than the one
+// already set is ignored rather than shrinking. Kubernetes volume
+// expansion is one-way (a PVC can never be shrunk), so a smaller value
+// here means a stale or replayed request, not an operator asking for
+// less. Lowering it for real means lowering reflinkStorage.maxSizeGiB
+// or letting content shrink, and restarting this DaemonSet.
+func (m *Manager) SetFloor(ctx context.Context, bytes int64) (GrowOutcome, error) {
+	m.mu.Lock()
+	if bytes > m.provisionedFloor {
+		log.Printf("blob: provisioned floor raised to %d bytes", bytes)
+		m.provisionedFloor = bytes
+	}
+	m.mu.Unlock()
+
+	return m.EnsureCapacity(ctx)
+}
+
+// Release drops a reservation early, once whatever it covered is done.
+// Unknown or already-expired keys are not an error -- callers release
+// on a defer/cleanup path where the TTL may well have won the race, and
+// that's a no-op, not a failure.
+//
+// Deliberately does not reconcile: shrinking is the slow, extent-moving
+// direction, and the next watchdog tick will reclaim the space anyway
+// once it's genuinely unused.
+func (m *Manager) Release(key string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.reservations, key)
+}
+
+// reservedBytesLocked sums the reservations still in force, dropping any
+// that have expired on the way past. Caller must hold mu.
+func (m *Manager) reservedBytesLocked() int64 {
+	now := time.Now()
+	var total int64
+	for key, r := range m.reservations {
+		if now.After(r.expires) {
+			delete(m.reservations, key)
+			continue
+		}
+		total += r.bytes
+	}
+	return total
 }
 
 // clamp caps target at maxSizeBytes, if one's configured (0 == no cap).
