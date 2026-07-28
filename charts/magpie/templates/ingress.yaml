@@ -1,39 +1,58 @@
 {{- if .Values.ingress.enabled }}
-{{- range $svc, $port := (dict "identity" .Values.identity.service.port "registry" .Values.registry.service.port "server-api" .Values.serverApi.service.port) }}
----
+{{- /*
+One Ingress, one public host, routed to the three ClusterIP services by
+path prefix. Traefik is already the reverse proxy in front of all of
+them, and their path namespaces are disjoint (identity /auth +
+/.well-known, registry /registry.v1.*, server-api /controller.v1.* and
+the catch-all), so routing here needs no application-level proxying --
+see ingress.routes in values.yaml for the table and the pathType Prefix
+element-matching caveat.
+
+The slug->port dict below exists because values keys are camelCase
+(.Values.serverApi) while Service names, route slugs and component
+labels are kebab-case (server-api).
+*/}}
+{{- $ports := dict "identity" .Values.identity.service.port "registry" .Values.registry.service.port "server-api" .Values.serverApi.service.port }}
+{{- $host := printf "%s.%s" .Values.ingress.host .Values.ingress.baseDomain }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "magpie.fullname" $ }}-{{ $svc }}
-  namespace: {{ include "magpie.namespace" $ }}
+  name: {{ include "magpie.fullname" . }}
+  namespace: {{ include "magpie.namespace" . }}
   labels:
-    {{- include "magpie.labels" $ | nindent 4 }}
-    app.kubernetes.io/component: {{ $svc }}
-    {{- if (index $.Values.ingress.dns.services $svc) }}
-    {{ $.Values.ingress.dns.labelKey }}: {{ $.Values.ingress.dns.labelValue | quote }}
+    {{- include "magpie.labels" . | nindent 4 }}
+    {{- if .Values.ingress.dns.enabled }}
+    {{ .Values.ingress.dns.labelKey }}: {{ .Values.ingress.dns.labelValue | quote }}
     {{- end }}
-  {{- if $.Values.ingress.tls.enabled }}
+  {{- if .Values.ingress.tls.enabled }}
   annotations:
-    cert-manager.io/cluster-issuer: {{ $.Values.ingress.tls.clusterIssuer | quote }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.clusterIssuer | quote }}
   {{- end }}
 spec:
-  ingressClassName: {{ $.Values.ingress.className }}
-  {{- if $.Values.ingress.tls.enabled }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls.enabled }}
   tls:
     - hosts:
-        - {{ printf "%s.%s" $svc $.Values.ingress.baseDomain }}
-      secretName: {{ include "magpie.fullname" $ }}-{{ $svc }}-tls
+        - {{ $host }}
+      secretName: {{ include "magpie.fullname" . }}-tls
   {{- end }}
   rules:
-    - host: {{ printf "%s.%s" $svc $.Values.ingress.baseDomain }}
+    - host: {{ $host }}
       http:
         paths:
-          - path: /
+          {{- range $route := .Values.ingress.routes }}
+          {{- $port := index $ports $route.service }}
+          {{- if not $port }}
+          {{- fail (printf "ingress.routes: unknown service %q (expected one of identity, registry, server-api)" $route.service) }}
+          {{- end }}
+          {{- range $path := $route.paths }}
+          - path: {{ $path }}
             pathType: Prefix
             backend:
               service:
-                name: {{ include "magpie.fullname" $ }}-{{ $svc }}
+                name: {{ include "magpie.fullname" $ }}-{{ $route.service }}
                 port:
                   number: {{ $port }}
-{{- end }}
+          {{- end }}
+          {{- end }}
 {{- end }}

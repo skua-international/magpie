@@ -230,6 +230,29 @@ explicitly set to point at something else.
 {{- end -}}
 
 {{/*
+identity's externally-reachable base URL -- what it builds OAuth2
+redirect_uri values and Steam's OpenID realm from, so it has to match
+what the browser completing a login actually hits, byte for byte with
+what's registered in each provider's app console.
+
+Derived from the single public Ingress host by default rather than
+asked for separately: the chart already knows that host, and two
+independent settings that must agree is a standing footgun. Only
+required when ingress.enabled is false, since there's no host to derive
+from then. identity.baseUrl still wins if set, for a deployment fronted
+by something this chart doesn't create.
+*/}}
+{{- define "magpie.identityBaseUrl" -}}
+{{- if .Values.identity.baseUrl -}}
+{{- .Values.identity.baseUrl -}}
+{{- else if .Values.ingress.enabled -}}
+{{- printf "%s://%s.%s" (.Values.ingress.tls.enabled | ternary "https" "http") .Values.ingress.host .Values.ingress.baseDomain -}}
+{{- else -}}
+{{- required "identity.baseUrl is required when ingress.enabled is false" "" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 JWKS/issuer/audience env entries, shared by services/registry and
 services/server-api (which verify tokens) and services/identity (which
 issues them) -- all three must agree, so they all pull from this one

@@ -36,7 +36,7 @@
 #                       since there's no prior release to carry values over
 #                       from. Pass them after `--`, e.g.:
 #                         scripts/deploy.sh --install -- \
-#                           --set identity.baseUrl=http://identity.magpie.local \
+#                           --set ingress.baseDomain=magpie.local \
 #                           --set postgres.existingSecret=arma-postgres-creds \
 #                           --set imagePullSecrets='{ghcr-pull-secret}'
 #                       (No Steam auth flag needed at install time at all --

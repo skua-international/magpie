@@ -62,7 +62,7 @@ type Model struct {
 	clients     *client.Clients
 	namespace   string
 	release     string
-	identityURL string
+	apiURL      string
 	accessToken string
 
 	// Zero until the first tea.WindowSizeMsg arrives (sent automatically
@@ -97,13 +97,13 @@ type Model struct {
 // the "create server" flow's per-server override (create_server.go) and
 // the Admin screen's baseline edit (admin_actions.go) -- every RPC-backed
 // screen gets its namespace from server-api's own config instead, never
-// from here. identityURL/accessToken are only used by the Account
+// from here. apiURL/accessToken are only used by the Account
 // screen's link flow (see account.go) -- accessToken is a point-in-time
 // snapshot, not refreshed for the life of the TUI session.
-func New(ctx context.Context, clients *client.Clients, namespace, release, identityURL, accessToken string) Model {
+func New(ctx context.Context, clients *client.Clients, namespace, release, apiURL, accessToken string) Model {
 	return Model{
 		ctx: ctx, clients: clients, namespace: namespace, release: release,
-		identityURL: identityURL, accessToken: accessToken,
+		apiURL: apiURL, accessToken: accessToken,
 		screen: screenMenu, create: newCreateServerState(),
 	}
 }

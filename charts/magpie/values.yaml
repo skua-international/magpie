@@ -89,36 +89,59 @@ armaServer:
 ingress:
   enabled: true
   className: traefik
-  # Each service gets its own hostname: <service>.<baseDomain>. No real
-  # DNS needed for a single-node target -- point these at the node's own
-  # IP via /etc/hosts (or real DNS, if you have it) on whatever machine
-  # needs to reach them.
+  # One public hostname, <host>.<baseDomain>, routed to all three
+  # services by path (see routes below). Previously each service got its
+  # own hostname, which meant a DNS record, an ACME cert and a
+  # "does this one need to be public?" judgment call per service --
+  # registry ended up public purely so `magpiectl admin` RPCs worked
+  # remotely. No real DNS needed for a single-node target -- point this
+  # at the node's own IP via /etc/hosts (or real DNS, if you have it) on
+  # whatever machine needs to reach it.
+  host: api
   baseDomain: magpie.local
+  # Path-prefix routing table for the single host above, applied in
+  # order. Every service keeps serving exactly the paths it serves
+  # in-cluster -- nothing is rewritten -- which is what lets identity's
+  # OAuth callback URL work unchanged.
+  #
+  # Note these must be whole path *elements*: pathType Prefix matches
+  # element by element, split on "/", so "/registry.v1." would NOT match
+  # "/registry.v1.ModSourceService/AddModSource". Hence each Connect
+  # service is named in full. A new RPC service needs an entry here.
+  routes:
+    - service: identity
+      paths:
+        - /auth
+        - /.well-known
+    - service: registry
+      paths:
+        - /registry.v1.ModSourceService
+        - /registry.v1.MissionService
+        - /registry.v1.AdminService
+    # Catch-all, so this must sort last: takes /controller.v1.ServerService/*
+    # plus /healthz and /metrics, all three of which server-api serves.
+    - service: server-api
+      paths:
+        - /
   tls:
     # Off by default -- the local magpie.local flow above has no real
     # cert to get anyway. A real public deployment (a cert-manager
     # ClusterIssuer already installed cluster-wide, e.g. by a sibling
-    # infra chart) sets this true and names that issuer; each Ingress
-    # above then gets the cert-manager.io/cluster-issuer annotation and
-    # its own TLS secret.
+    # infra chart) sets this true and names that issuer; the Ingress
+    # then gets the cert-manager.io/cluster-issuer annotation and a TLS
+    # secret. One host now means one cert, not three.
     enabled: false
     clusterIssuer: letsencrypt-prod
-  # Per-service opt-in label for an external-dns install using a
-  # matching --label-filter (e.g. --source=ingress
-  # --label-filter=external-dns.skua.io/expose=true) -- the label
-  # alone does nothing without that; this chart never installs
-  # external-dns itself. A map, not one shared toggle: not every
-  # service necessarily needs public DNS reachability (e.g. one meant
-  # for internal/VPN-only access), so each of the three Ingresses this
-  # chart creates opts in independently. All off by default -- inert
-  # for any deployment that never wires up external-dns at all.
+  # Opt-in label for an external-dns install using a matching
+  # --label-filter (e.g. --source=ingress
+  # --label-filter=external-dns.skua.io/expose=true) -- the label alone
+  # does nothing without that; this chart never installs external-dns
+  # itself. Off by default -- inert for any deployment that never wires
+  # up external-dns at all.
   dns:
+    enabled: false
     labelKey: external-dns.skua.io/expose
     labelValue: "true"
-    services:
-      identity: false
-      registry: false
-      server-api: false
 
 # sync-daemon's golden content tree lives on a PersistentVolumeClaim
 # against the magpie-golden-content StorageClass (see
@@ -191,8 +214,19 @@ identity:
   # This service's externally-reachable base URL, no trailing slash --
   # used to build OAuth2 redirect_uri values and Steam's OpenID realm.
   # Unlike everything else in this chart, whoever's browser completes a
-  # login needs to reach this, so it generally can't just be an in-cluster
-  # DNS name -- required.
+  # login needs to reach this, so it can't just be an in-cluster DNS
+  # name.
+  #
+  # Leave empty to derive it from the public Ingress host
+  # (<ingress.host>.<ingress.baseDomain>, https if ingress.tls.enabled),
+  # which is what you want whenever this chart creates the Ingress --
+  # setting it separately just risks the two disagreeing. Only needed
+  # explicitly when ingress.enabled is false and something else fronts
+  # this service, in which case it's required.
+  #
+  # Whatever this resolves to, each OAuth provider's app console must
+  # have <baseUrl>/auth/<provider>/callback registered as a redirect
+  # URI, or logins fail at the callback.
   baseUrl: ""
   # Name of an existing Secret holding OAuth2 app credentials as
   # <PROVIDER>_CLIENT_ID / <PROVIDER>_CLIENT_SECRET keys (e.g.

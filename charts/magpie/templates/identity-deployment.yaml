@@ -44,7 +44,7 @@ spec:
             - name: LISTEN_ADDR
               value: "0.0.0.0:{{ .Values.identity.service.port }}"
             - name: BASE_URL
-              value: {{ required "identity.baseUrl is required" .Values.identity.baseUrl | quote }}
+              value: {{ include "magpie.identityBaseUrl" . | quote }}
             - name: JWT_ISSUER
               value: {{ required "jwt.issuer is required" .Values.jwt.issuer | quote }}
             - name: JWT_AUDIENCE

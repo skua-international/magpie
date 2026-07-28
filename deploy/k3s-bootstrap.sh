@@ -61,11 +61,13 @@
 #     the printed instructions at the end. Steam login needs no app
 #     credentials at all (OpenID 2.0) and works with none of this set.
 #
-# identity.baseUrl/ingress.baseDomain default to
-# http://identity.magpie.local / magpie.local -- override with
-# --identity-base-url/--ingress-base-domain if this host has a real
-# domain, or if you're not using /etc/hosts on whatever machine needs to
-# reach it.
+# The cluster gets one public host, ingress.host.ingress.baseDomain,
+# defaulting to http://api.magpie.local -- override with
+# --ingress-base-domain if this host has a real domain, or if you're not
+# using /etc/hosts on whatever machine needs to reach it.
+# identity.baseUrl is derived from that same host, so it normally needs
+# no flag of its own (--identity-base-url overrides it if something
+# other than this chart fronts the cluster).
 set -euo pipefail
 
 ARMA_DATA_DIR="${ARMA_DATA_DIR:-/var/lib/magpie}"

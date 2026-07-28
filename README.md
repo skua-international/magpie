@@ -101,7 +101,7 @@ Steam is the only login method that works out of the box — Discord/GitHub/Goog
 
 To enable one or more:
 
-1. Register an OAuth2 app with the provider(s) you want (Discord Developer Portal / GitHub OAuth Apps / Google Cloud Console), with its redirect URI set to `<identity.baseUrl>/auth/<provider>/callback` (e.g. `https://id.example.com/auth/discord/callback`).
+1. Register an OAuth2 app with the provider(s) you want (Discord Developer Portal / GitHub OAuth Apps / Google Cloud Console), with its redirect URI set to `<identity.baseUrl>/auth/<provider>/callback` (e.g. `https://api.example.com/auth/discord/callback`). `identity.baseUrl` defaults to the cluster's single public host — `http[s]://<ingress.host>.<ingress.baseDomain>` — so you normally don't set it yourself; it only needs an explicit value when something other than this chart fronts the cluster. Whatever it resolves to has to match what's registered here byte for byte, and has to be reachable from wherever the browser completing a login is.
 2. Create a Secret holding whichever providers you're enabling, as `<PROVIDER>_CLIENT_ID`/`<PROVIDER>_CLIENT_SECRET` keys:
    ```bash
    kubectl create secret generic magpie-oauth -n <namespace> \
@@ -191,14 +191,15 @@ Windows: same API dance (asset name `magpiectl_windows_amd64.zip`), or just down
 Then point it at your cluster and log in:
 
 ```bash
-magpiectl --identity-url http://identity.magpie.local \
-          --server-api-url http://server-api.magpie.local \
-          --registry-url http://registry.magpie.local \
-          auth login
+magpiectl --api-url http://api.magpie.local auth login
 magpiectl completion install   # optional -- bash/zsh/fish/powershell autocompletion
 ```
 
-(Those base URLs are this chart's own `ingress.baseDomain` default, `magpie.local` — override to match whatever you actually set at install time. `http://` above matches that local default; a real public deployment sets `ingress.tls.enabled: true` plus `ingress.tls.clusterIssuer` to a cert-manager `ClusterIssuer` already installed in the cluster, and every generated Ingress picks up a real cert instead — needed for Steam OAuth login to work for anyone off the local network at all, since `identity`'s callback URL has to actually be reachable from wherever the browser is.)
+The cluster exposes a **single public host**, `<ingress.host>.<ingress.baseDomain>` (default `api.magpie.local`), which routes to `server-api`, `registry` and `identity` by path prefix. Set it once with `magpiectl target` and later invocations pick it up automatically; `MAGPIE_API_URL` and `--api-url` override it in that order.
+
+(That base URL is this chart's own `ingress.host`/`ingress.baseDomain` default — override to match whatever you actually set at install time. `http://` above matches that local default; a real public deployment sets `ingress.tls.enabled: true` plus `ingress.tls.clusterIssuer` to a cert-manager `ClusterIssuer` already installed in the cluster, and the Ingress picks up a real cert instead — needed for Steam OAuth login to work for anyone off the local network at all, since the callback URL has to actually be reachable from wherever the browser is.)
+
+> **Upgrading from a pre-single-entrypoint install?** Each service used to get its own hostname (`identity.`/`registry.`/`server-api.<baseDomain>`) and `magpiectl` took three separate URL flags. Those hostnames are gone. Re-run `magpiectl target` to save the new one — a `target.json` still holding the old three is detected and warned about rather than silently dialing a dead host. Retiring the old DNS records is manual if you use external-dns with `policy: upsert-only`, and **each OAuth provider's registered redirect URI must be updated** to the new host (see below), or logins break at the callback.
 
 Building from source instead (e.g. to run an unreleased commit): `cd cli/magpie && go install ./cmd/magpiectl` -- only works from within a clone of this monorepo, since `cli/magpie`'s `go.mod` points at `generated/go` via a relative `replace` directive rather than a published module.
 

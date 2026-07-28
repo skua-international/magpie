@@ -320,12 +320,12 @@ func Run(ctx context.Context, opts Options) error {
 		if opts.IngressBaseDomain != "" {
 			opts.ExtraHelmArgs = append(opts.ExtraHelmArgs, "--set", "ingress.baseDomain="+opts.IngressBaseDomain)
 		}
-		identityBaseURL := opts.IdentityBaseURL
-		if identityBaseURL == "" && opts.IngressBaseDomain != "" {
-			identityBaseURL = "http://identity." + opts.IngressBaseDomain
-		}
-		if identityBaseURL != "" {
-			opts.ExtraHelmArgs = append(opts.ExtraHelmArgs, "--set", "identity.baseUrl="+identityBaseURL)
+		// Only forwarded when explicitly set: the chart derives
+		// identity.baseUrl from the public Ingress host on its own (see
+		// magpie.identityBaseUrl in _helpers.tpl), so deriving a second
+		// candidate here would just be a way for the two to disagree.
+		if opts.IdentityBaseURL != "" {
+			opts.ExtraHelmArgs = append(opts.ExtraHelmArgs, "--set", "identity.baseUrl="+opts.IdentityBaseURL)
 		}
 		if opts.KubeletDir != "" {
 			opts.ExtraHelmArgs = append(opts.ExtraHelmArgs, "--set", "magpieCsi.kubeletDir="+opts.KubeletDir)

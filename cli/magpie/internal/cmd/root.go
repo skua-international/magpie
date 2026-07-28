@@ -22,9 +22,10 @@ import (
 )
 
 var (
-	identityURL   string
-	serverAPIURL  string
-	registryURL   string
+	// apiURL is the cluster's single public entrypoint -- one host that
+	// routes to server-api, registry and identity by path prefix, so the
+	// Connect clients and the plain-HTTP /auth/* calls all target it.
+	apiURL        string
 	loginProvider string
 	namespace     string
 	release       string
@@ -62,9 +63,7 @@ func Root() *cobra.Command {
 		},
 	}
 
-	root.PersistentFlags().StringVar(&identityURL, "identity-url", defaults.identityURL, "base URL of the identity service (env MAGPIE_IDENTITY_URL, or 'magpiectl target')")
-	root.PersistentFlags().StringVar(&serverAPIURL, "server-api-url", defaults.serverAPIURL, "base URL of server-api (env MAGPIE_SERVER_API_URL, or 'magpiectl target')")
-	root.PersistentFlags().StringVar(&registryURL, "registry-url", defaults.registryURL, "base URL of registry (env MAGPIE_REGISTRY_URL, or 'magpiectl target')")
+	root.PersistentFlags().StringVar(&apiURL, "api-url", defaults.apiURL, "base URL of the cluster's public API (env MAGPIE_API_URL, or 'magpiectl target')")
 	root.PersistentFlags().StringVar(&loginProvider, "provider", "steam", "login provider: steam, discord, github, or google (prompts interactively if omitted on a TTY)")
 	root.PersistentFlags().StringVar(&namespace, "namespace", defaults.namespace, "target namespace (bare TUI invocation only -- subcommands like 'servers create'/'arma-config edit' have their own --namespace; env MAGPIE_NAMESPACE, or 'magpiectl target')")
 	root.PersistentFlags().StringVar(&release, "release", defaults.release, "helm release name (bare TUI invocation only -- same caveat as --namespace; env MAGPIE_RELEASE, or 'magpiectl target')")
@@ -126,7 +125,7 @@ func doLogin(ctx context.Context) error {
 	defer cancel()
 
 	fmt.Println("Opening browser to log in via", loginProvider, "...")
-	creds, err := auth.Login(loginCtx, identityURL, loginProvider)
+	creds, err := auth.Login(loginCtx, apiURL, loginProvider)
 	if err != nil {
 		return err
 	}
@@ -145,7 +144,7 @@ func clients(ctx context.Context) (*client.Clients, error) {
 	if err != nil {
 		return nil, err
 	}
-	return client.New(client.Config{ServerAPIURL: serverAPIURL, RegistryURL: registryURL}, creds.AccessToken), nil
+	return client.New(client.Config{APIURL: apiURL}, creds.AccessToken), nil
 }
 
 // ensureCredentials loads a stored session, refreshing it or triggering
@@ -170,7 +169,7 @@ func ensureCredentials(ctx context.Context) (*auth.Credentials, error) {
 
 	refreshCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	fresh, err := auth.Refresh(refreshCtx, identityURL, creds.RefreshToken)
+	fresh, err := auth.Refresh(refreshCtx, apiURL, creds.RefreshToken)
 	if err != nil {
 		// The stored refresh token is dead -- fall back to a real login
 		// rather than leaving the caller stuck.

@@ -48,8 +48,8 @@ func addInstallFlags(c *cobra.Command, f *installFlags) {
 	c.Flags().StringVar(&f.ghcrUser, "ghcr-user", "", "GHCR username -- creates ghcr-pull-secret if this and --ghcr-token are both set")
 	c.Flags().StringVar(&f.ghcrToken, "ghcr-token", "", "GHCR token (needs read:packages) -- creates ghcr-pull-secret if this and --ghcr-user are both set")
 	c.Flags().StringVar(&f.identityBaseURL, "identity-base-url", "",
-		"identity's externally-reachable base URL (default: http://identity.<ingress-base-domain>)")
-	c.Flags().StringVar(&f.ingressBaseDomain, "ingress-base-domain", "magpie.local", "base domain every service's Ingress hostname is built from")
+		"override identity's externally-reachable base URL (defaults to the public Ingress host, http[s]://api.<ingress-base-domain>) -- only needed when something other than this chart fronts the cluster")
+	c.Flags().StringVar(&f.ingressBaseDomain, "ingress-base-domain", "magpie.local", "base domain the cluster's public Ingress hostname is built from (api.<domain>)")
 }
 
 // extraArgsAfterDash returns whatever was passed after a literal `--` on

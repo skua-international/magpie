@@ -32,7 +32,7 @@ type accountLinkedMsg struct {
 // line while the browser does its thing out-of-band.
 func (m Model) linkAccountCmd(provider string) tea.Cmd {
 	return func() tea.Msg {
-		fresh, err := auth.LinkAccount(m.ctx, m.identityURL, provider, m.accessToken)
+		fresh, err := auth.LinkAccount(m.ctx, m.apiURL, provider, m.accessToken)
 		if err != nil {
 			return accountLinkedMsg{provider: provider, err: err}
 		}

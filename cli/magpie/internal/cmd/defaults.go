@@ -4,22 +4,20 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/skua-international/magpie/cli/internal/client"
 	"github.com/skua-international/magpie/cli/internal/config"
 )
 
-// resolvedDefaults are the flag defaults every --identity-url/
-// --server-api-url/--registry-url/--namespace/--release flag in this
-// package registers with -- computed once, before cobra parses anything,
-// from (in order) an env var, a saved `magpiectl target`, then the
-// original hardcoded fallback. An explicitly passed flag always wins
-// regardless of where the default came from; this only changes what's
-// used when one isn't passed.
+// resolvedDefaults are the flag defaults every --api-url/--namespace/
+// --release flag in this package registers with -- computed once, before
+// cobra parses anything, from (in order) an env var, a saved
+// `magpiectl target`, then the original hardcoded fallback. An
+// explicitly passed flag always wins regardless of where the default
+// came from; this only changes what's used when one isn't passed.
 type resolvedDefaults struct {
-	identityURL  string
-	serverAPIURL string
-	registryURL  string
-	namespace    string
-	release      string
+	apiURL    string
+	namespace string
+	release   string
 }
 
 // defaults is computed once at package-init time (before Root() builds
@@ -38,12 +36,20 @@ func resolveDefaults() resolvedDefaults {
 		fmt.Fprintf(os.Stderr, "warning: failed to load saved target (%v), ignoring it\n", err)
 		target = &config.Target{}
 	}
+	// A target saved before the single-entrypoint change names hostnames
+	// that no longer exist, and it outranks the built-in default, so say
+	// so plainly here rather than letting it fail later as a connection
+	// error against a host the user never typed.
+	if target.LegacyOnly() && os.Getenv("MAGPIE_API_URL") == "" {
+		fmt.Fprintf(os.Stderr,
+			"warning: your saved target predates magpie's single public entrypoint and lists\n"+
+				"  per-service hostnames that no longer exist. Re-run `magpiectl target` to pick it\n"+
+				"  again, or pass --api-url. Falling back to %s.\n", client.DefaultAPIURL)
+	}
 	return resolvedDefaults{
-		identityURL:  firstNonEmpty(os.Getenv("MAGPIE_IDENTITY_URL"), target.IdentityURL, "http://identity.magpie.local"),
-		serverAPIURL: firstNonEmpty(os.Getenv("MAGPIE_SERVER_API_URL"), target.ServerAPIURL, "http://server-api.magpie.local"),
-		registryURL:  firstNonEmpty(os.Getenv("MAGPIE_REGISTRY_URL"), target.RegistryURL, "http://registry.magpie.local"),
-		namespace:    firstNonEmpty(os.Getenv("MAGPIE_NAMESPACE"), target.Namespace, "magpie"),
-		release:      firstNonEmpty(os.Getenv("MAGPIE_RELEASE"), target.Release, "arma"),
+		apiURL:    firstNonEmpty(os.Getenv("MAGPIE_API_URL"), target.APIURL, client.DefaultAPIURL),
+		namespace: firstNonEmpty(os.Getenv("MAGPIE_NAMESPACE"), target.Namespace, "magpie"),
+		release:   firstNonEmpty(os.Getenv("MAGPIE_RELEASE"), target.Release, "arma"),
 	}
 }
 
