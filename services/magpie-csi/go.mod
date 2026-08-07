@@ -4,7 +4,7 @@ go 1.26.5
 
 require (
 	github.com/container-storage-interface/spec v1.12.0
-	google.golang.org/grpc v1.82.1
+	google.golang.org/grpc v1.83.0
 )
 
 require (
