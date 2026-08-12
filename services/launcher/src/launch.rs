@@ -3,7 +3,7 @@ use std::os::unix::process::ExitStatusExt;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
 use tokio::process::{ChildStderr, ChildStdout, Command as TokioCommand};
 use tokio::signal::unix::{SignalKind, signal};
 
@@ -174,6 +174,27 @@ pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Inst
     cmd.args(&args)
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
+    // Rust's `Command` (tokio's included -- it wraps std's) deliberately
+    // resets signal dispositions to SIG_DFL in the child, so arma3server
+    // starts with SIGPIPE fatal. That matters here specifically *because*
+    // stdout/stderr above are pipes owned by this process: anything that
+    // closes a read end (see forward_stream) turns arma's next write into
+    // SIGPIPE and kills the server outright, exit 141. It also bites
+    // without any help from us -- an extension that closes a pipe on a
+    // foreign thread (a JVM, say) does the same thing, which is exactly
+    // how this surfaced on the community image's Rust launcher, where the
+    // Python launcher it replaced had silently run with SIGPIPE ignored
+    // (inherited from CPython through os.system()) for years.
+    //
+    // SAFETY: runs in the child between fork and exec, where only
+    // async-signal-safe calls are permitted. `signal(2)` is on POSIX's
+    // async-signal-safe list, and nothing here allocates or takes a lock.
+    unsafe {
+        cmd.pre_exec(|| {
+            libc::signal(libc::SIGPIPE, libc::SIG_IGN);
+            Ok(())
+        });
+    }
     // Set on arma3server_x64 specifically, not this launcher process --
     // see Config::ld_preload's own doc for why LD_PRELOAD is the only way
     // to affect the Linux binary's allocator at all. The two MIMALLOC_*
@@ -258,20 +279,7 @@ pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Inst
 /// already reaps the process and reports its exit status; this task's
 /// job ends when there's nothing left to read, whichever happens first.
 async fn forward_stdout(stdout: ChildStdout) {
-    let mut lines = BufReader::new(stdout).lines();
-    loop {
-        match lines.next_line().await {
-            Ok(Some(line)) => tracing::info!(stream = "stdout", "{line}"),
-            Ok(None) => return,
-            // A read error here is arma3server's pipe going away
-            // unexpectedly, not launcher's own concern to propagate --
-            // `run`'s own `child.wait()` is what surfaces a real failure.
-            Err(e) => {
-                tracing::warn!("stopped reading arma3server stdout: {e:#}");
-                return;
-            }
-        }
-    }
+    forward_stream(stdout, "stdout").await
 }
 
 /// Same as `forward_stdout`, but for stderr, logged at `warn` -- arma
@@ -279,14 +287,59 @@ async fn forward_stdout(stdout: ChildStdout) {
 /// this stream any more clearly than most CLI tools do, but warn is a
 /// closer default than info for "the child chose to write here".
 async fn forward_stderr(stderr: ChildStderr) {
-    let mut lines = BufReader::new(stderr).lines();
+    forward_stream(stderr, "stderr").await
+}
+
+/// The shared body of both forwarders.
+///
+/// Reading bytes and decoding lossily, rather than `BufReader::lines()`:
+/// `next_line()` fails the *entire* stream with `InvalidData` the first
+/// time arma writes a byte that isn't valid UTF-8, which mod names out of
+/// a Windows-1252 .rpt will happily do. That was previously a `return`,
+/// and returning from here drops the `ChildStdout`/`ChildStderr` and so
+/// closes this process's read end of the pipe -- which, with the SIGPIPE
+/// disposition arma3server used to inherit, killed the server outright on
+/// its next write. One undecodable byte in a mod name could take the
+/// server down. Decoding lossily removes that failure class entirely
+/// instead of relying on `pre_exec` above to make it survivable.
+///
+/// Note that ignoring SIGPIPE does not on its own make an early return
+/// safe -- it converts "arma dies on the next write" into "arma blocks
+/// forever once the 64K pipe buffer fills", which for a live server is
+/// not much of an improvement. The drain has to keep running either way;
+/// the two fixes address the same bug from opposite ends.
+async fn forward_stream<R: AsyncRead + Unpin>(stream: R, name: &'static str) {
+    let mut reader = BufReader::new(stream);
+    let mut buf = Vec::new();
     loop {
-        match lines.next_line().await {
-            Ok(Some(line)) => tracing::warn!(stream = "stderr", "{line}"),
-            Ok(None) => return,
+        buf.clear();
+        match reader.read_until(b'\n', &mut buf).await {
+            // The child exited and dropped its end. The only condition
+            // that should ever end this task.
+            Ok(0) => return,
+            Ok(_) => {
+                let line = String::from_utf8_lossy(&buf);
+                let line = line.trim_end_matches(['\n', '\r']);
+                if name == "stderr" {
+                    tracing::warn!(stream = name, "{line}");
+                } else {
+                    tracing::info!(stream = name, "{line}");
+                }
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            // A genuine I/O error, as opposed to undecodable bytes (which
+            // no longer reach here at all). Near-unreachable on a pipe
+            // whose write end is still open -- a closed write end is EOF
+            // above, not an error -- so this means the fd itself is
+            // broken. Park instead of returning: the read end stays open
+            // for the rest of the process either way, which is all that
+            // protects arma from blocking on a full pipe. This task's
+            // lifetime is the process's, and `run`'s `child.wait()` is
+            // still what decides the exit status.
             Err(e) => {
-                tracing::warn!("stopped reading arma3server stderr: {e:#}");
-                return;
+                tracing::error!("stopped reading arma3server {name}: {e:#} (holding pipe open)");
+                std::future::pending::<()>().await;
+                unreachable!("pending() never resolves");
             }
         }
     }
@@ -349,5 +402,62 @@ mod tests {
         tokio::time::timeout(PORT_WAIT_RETRY_INTERVAL * 2, wait_for_ports_free(port))
             .await
             .expect_err("should still be waiting, not have returned");
+    }
+}
+
+#[cfg(test)]
+mod sigpipe_tests {
+    /// The child must start with SIGPIPE ignored (bit 13 of SigIgn), the
+    /// disposition arma3server needs so that a closed pipe read end -- from
+    /// an extension, or from a forwarder that stopped draining -- returns
+    /// EPIPE instead of killing it with exit 141.
+    #[tokio::test]
+    async fn spawned_child_ignores_sigpipe() {
+        let mut cmd = tokio::process::Command::new("sh");
+        cmd.arg("-c")
+            .arg("grep '^SigIgn' /proc/self/status")
+            .stdout(std::process::Stdio::piped());
+        // SAFETY: async-signal-safe call between fork and exec, as in `run`.
+        unsafe {
+            cmd.pre_exec(|| {
+                libc::signal(libc::SIGPIPE, libc::SIG_IGN);
+                Ok(())
+            });
+        }
+        let out = cmd.output().await.unwrap();
+        let mask = String::from_utf8_lossy(&out.stdout)
+            .split_whitespace()
+            .nth(1)
+            .unwrap()
+            .to_string();
+        let bits = u64::from_str_radix(&mask, 16).unwrap();
+        assert_eq!(
+            bits & (1 << 12),
+            1 << 12,
+            "SIGPIPE not ignored (mask {mask})"
+        );
+    }
+
+    /// Undecodable bytes must not end the drain. Previously `lines()`
+    /// returned `InvalidData` here, the forwarder returned, and the pipe's
+    /// read end closed -- which is what killed the server.
+    #[tokio::test]
+    async fn forward_stream_survives_invalid_utf8() {
+        // 0xff is never valid UTF-8; a real .rpt hits this via Windows-1252
+        // mod names. The line after it must still be read.
+        let input: &[u8] = b"before\n\xffbad\nafter\n";
+        let (mut w, r) = tokio::io::duplex(64);
+        tokio::io::AsyncWriteExt::write_all(&mut w, input)
+            .await
+            .unwrap();
+        drop(w);
+        // Completing at all proves the drain ran to EOF rather than
+        // bailing out on the undecodable line in the middle.
+        tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            super::forward_stream(r, "stdout"),
+        )
+        .await
+        .expect("forward_stream stopped early on invalid UTF-8");
     }
 }
