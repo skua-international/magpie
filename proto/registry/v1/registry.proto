@@ -295,6 +295,26 @@ message ExportedServer {
 message ExportStateRequest {}
 
 message ExportStateResponse {
+  // Version of the exported *shape*, bumped whenever a change would make
+  // an older importer misread this payload -- a renamed/restructured
+  // field, or a new one whose absence can't be treated as a default.
+  // Purely additive changes don't need a bump; proto3 already handles
+  // those (an old importer ignores unknown fields, a new one sees the
+  // zero value).
+  //
+  // Read by `magpiectl admin import-state`, which refuses a file from a
+  // future version outright rather than best-effort parsing it into a
+  // cluster. Unset means a file written before this field existed, which
+  // is exactly the v1 shape -- see the Go side's ReadStateFile, which
+  // treats absent as 1 rather than rejecting those files.
+  //
+  // Deliberately not on ImportStateRequest: this versions the state
+  // document that ExportState emits and import-state consumes, and the
+  // CLI validates it at the point it reads the file. A direct RPC caller
+  // is constructing a request against a proto contract it compiled
+  // against, which is already versioned by the `registry.v1` package.
+  uint32 schema_version = 6;
+
   string exported_at_rfc3339 = 1;
   repeated ExportedModSource mod_sources = 2;
   repeated ExportedConfigMap config_maps = 3;

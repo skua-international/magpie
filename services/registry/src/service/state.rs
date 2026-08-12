@@ -31,6 +31,18 @@ use uuid::Uuid;
 use super::admin::AdminServiceImpl;
 use super::mod_source::to_mod_source_info;
 
+/// Stamped into every `ExportStateResponse` as `schema_version`, and
+/// checked by `magpiectl admin import-state` before it applies anything
+/// (see `StateSchemaVersion` in cli/magpie/internal/actions/state.go,
+/// which has to be bumped in lockstep -- there's no shared constant
+/// across the Rust and Go sides to derive it from).
+///
+/// Bump only for a change that would make an older importer *misread*
+/// this payload: a renamed or restructured field, or a new one whose
+/// absence can't safely be treated as a default. Purely additive fields
+/// don't need it -- see the proto field's own doc.
+const STATE_SCHEMA_VERSION: u32 = 1;
+
 /// The join key used for both `id_to_reference` (export) and
 /// `reference_to_new_id` (import) -- almost always just `reference`
 /// itself, except every PRESET source registered from inline HTML
@@ -184,6 +196,7 @@ impl AdminServiceImpl {
         }
 
         Ok(ExportStateResponse {
+            schema_version: STATE_SCHEMA_VERSION,
             exported_at_rfc3339: time::OffsetDateTime::now_utc()
                 .format(&time::format_description::well_known::Rfc3339)
                 .unwrap_or_default(),
