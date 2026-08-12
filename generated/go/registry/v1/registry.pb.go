@@ -1573,11 +1573,30 @@ func (*ExportStateRequest) Descriptor() ([]byte, []int) {
 }
 
 type ExportStateResponse struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	ExportedAtRfc3339 string                 `protobuf:"bytes,1,opt,name=exported_at_rfc3339,json=exportedAtRfc3339,proto3" json:"exported_at_rfc3339,omitempty"`
-	ModSources        []*ExportedModSource   `protobuf:"bytes,2,rep,name=mod_sources,json=modSources,proto3" json:"mod_sources,omitempty"`
-	ConfigMaps        []*ExportedConfigMap   `protobuf:"bytes,3,rep,name=config_maps,json=configMaps,proto3" json:"config_maps,omitempty"`
-	Servers           []*ExportedServer      `protobuf:"bytes,4,rep,name=servers,proto3" json:"servers,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Version of the exported *shape*, bumped whenever a change would make
+	// an older importer misread this payload -- a renamed/restructured
+	// field, or a new one whose absence can't be treated as a default.
+	// Purely additive changes don't need a bump; proto3 already handles
+	// those (an old importer ignores unknown fields, a new one sees the
+	// zero value).
+	//
+	// Read by `magpiectl admin import-state`, which refuses a file from a
+	// future version outright rather than best-effort parsing it into a
+	// cluster. Unset means a file written before this field existed, which
+	// is exactly the v1 shape -- see the Go side's ReadStateFile, which
+	// treats absent as 1 rather than rejecting those files.
+	//
+	// Deliberately not on ImportStateRequest: this versions the state
+	// document that ExportState emits and import-state consumes, and the
+	// CLI validates it at the point it reads the file. A direct RPC caller
+	// is constructing a request against a proto contract it compiled
+	// against, which is already versioned by the `registry.v1` package.
+	SchemaVersion     uint32               `protobuf:"varint,6,opt,name=schema_version,json=schemaVersion,proto3" json:"schema_version,omitempty"`
+	ExportedAtRfc3339 string               `protobuf:"bytes,1,opt,name=exported_at_rfc3339,json=exportedAtRfc3339,proto3" json:"exported_at_rfc3339,omitempty"`
+	ModSources        []*ExportedModSource `protobuf:"bytes,2,rep,name=mod_sources,json=modSources,proto3" json:"mod_sources,omitempty"`
+	ConfigMaps        []*ExportedConfigMap `protobuf:"bytes,3,rep,name=config_maps,json=configMaps,proto3" json:"config_maps,omitempty"`
+	Servers           []*ExportedServer    `protobuf:"bytes,4,rep,name=servers,proto3" json:"servers,omitempty"`
 	// E.g. a server referencing a mod source ID that no longer resolves
 	// (deleted between the mod source list and server list reads) --
 	// dropped from that server's mod_source_references rather than
@@ -1615,6 +1634,13 @@ func (x *ExportStateResponse) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ExportStateResponse.ProtoReflect.Descriptor instead.
 func (*ExportStateResponse) Descriptor() ([]byte, []int) {
 	return file_registry_v1_registry_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *ExportStateResponse) GetSchemaVersion() uint32 {
+	if x != nil {
+		return x.SchemaVersion
+	}
+	return 0
 }
 
 func (x *ExportStateResponse) GetExportedAtRfc3339() string {
@@ -2131,8 +2157,9 @@ const file_registry_v1_registry_proto_rawDesc = "" +
 	"\v_config_mapB\x0f\n" +
 	"\r_metrics_portB\x0f\n" +
 	"\r_metrics_pathJ\x04\b\a\x10\bR\x06params\"\x14\n" +
-	"\x12ExportStateRequest\"\x9a\x02\n" +
-	"\x13ExportStateResponse\x12.\n" +
+	"\x12ExportStateRequest\"\xc1\x02\n" +
+	"\x13ExportStateResponse\x12%\n" +
+	"\x0eschema_version\x18\x06 \x01(\rR\rschemaVersion\x12.\n" +
 	"\x13exported_at_rfc3339\x18\x01 \x01(\tR\x11exportedAtRfc3339\x12?\n" +
 	"\vmod_sources\x18\x02 \x03(\v2\x1e.registry.v1.ExportedModSourceR\n" +
 	"modSources\x12?\n" +
