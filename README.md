@@ -8,6 +8,8 @@ Kubernetes-native orchestration for Arma 3 dedicated servers: mod/collection syn
 
 Some of what's in here is more than a self-hosted Arma fleet strictly needs -- a purpose-built CSI driver, a placeholder-and-secret-aware config templating layer, its own OAuth2/OpenID identity broker. Running a handful of community game servers doesn't *require* any of that. Some of it got built anyway because the underlying problem was genuinely interesting to solve properly rather than duct-taped around, not because the requirements demanded it. If it looks over-engineered for the stated purpose in places, that's why -- and also, at some point, the acronym.
 
+I recommend you check out https://github.com/ilbinek/ideal, https://github.com/BrettMayson/Arma3Server, or https://github.com/LinkIsGrim/Arma3Server if you don't need/want/use Kubernetes. If you don't know you want it or need it, you generally don't and those other tools will serve you better.
+
 ## Architecture
 
 ```mermaid
@@ -320,3 +322,10 @@ cargo clippy --workspace --all-targets
 ```
 
 All 7 service binaries are compiled once, together, by `Dockerfile.workspace` (`cargo-chef` for dependency-layer caching, built from the repo root — every service needs the full workspace's `Cargo.lock`/manifests to resolve), rather than each service having its own multi-stage Rust build. Each `services/*/Dockerfile` is just a thin packaging step on top of that -- `COPY` the already-built binary plus whatever runtime `apt` packages it needs, nothing else. `.github/workflows/build-images.yml` runs `Dockerfile.workspace` once (`build-workspace`) on push to `main`, hands the resulting binaries to the 7 packaging builds as a job artifact, and pushes every image to `ghcr.io/skua-international/magpie/*`. Release tags are a separate, manually-triggered promotion step (`.github/workflows/release.yml`) that retags/republishes what a passing commit already built, rather than rebuilding anything.
+
+## Acknowledgements
+
+- Brett for the original Arma 3 Docker setup @ https://github.com/BrettMayson/Arma3Server
+- ilbinek for IDEAL and letting me steal the steam auth flow @ https://github.com/ilbinek/ideal
+- jonpas for catching some bugs in https://github.com/LinkIsGrim/Arma3Server which persisted in the launcher service
+- [Skua International](https://skua.international) for annoying me
