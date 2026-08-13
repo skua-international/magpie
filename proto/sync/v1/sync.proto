@@ -89,6 +89,19 @@ service SyncService {
   // first.
   rpc RefreshSteamAuth(RefreshSteamAuthRequest) returns (RefreshSteamAuthResponse);
 
+  // QR-code login negotiated here rather than by the client. Begin
+  // opens a Steam CM connection and returns its challenge URL; Poll
+  // waits for the mobile app to confirm and then installs the session,
+  // exactly as RefreshSteamAuth would have with a client-negotiated
+  // token.
+  //
+  // The session between the two calls holds that live CM connection, so
+  // it is held in-process and both calls must land on the same replica
+  // -- see the deployment's own replica note. Same constraint
+  // services/identity already carries for its exchange-code map.
+  rpc BeginQrLogin(BeginQrLoginRequest) returns (BeginQrLoginResponse);
+  rpc PollQrLogin(PollQrLoginRequest) returns (PollQrLoginResponse);
+
   // Whether the golden content tree is safe to snapshot from right now --
   // the controller polls this before creating an ArmaServer's Deployment
   // so a launcher Pod never gets a CSI snapshot of a base-game/CDLC sync
@@ -219,4 +232,20 @@ message GetSyncStatusResponse {
   // also true and this is still the first sync ever). A server with this
   // false has no arma3server_x64 to run at all yet, regardless of syncing.
   bool game_files_ready = 2;
+}
+
+message BeginQrLoginRequest {}
+
+message BeginQrLoginResponse {
+  string session_id = 1;
+  string challenge_url = 2;
+}
+
+message PollQrLoginRequest {
+  string session_id = 1;
+}
+
+message PollQrLoginResponse {
+  bool confirmed = 1;
+  string username = 2;
 }

@@ -53,6 +53,12 @@ const (
 	// ServerServiceStopServerProcedure is the fully-qualified name of the ServerService's StopServer
 	// RPC.
 	ServerServiceStopServerProcedure = "/controller.v1.ServerService/StopServer"
+	// ServerServiceGetServerLogsProcedure is the fully-qualified name of the ServerService's
+	// GetServerLogs RPC.
+	ServerServiceGetServerLogsProcedure = "/controller.v1.ServerService/GetServerLogs"
+	// ServerServiceGetServerHealthProcedure is the fully-qualified name of the ServerService's
+	// GetServerHealth RPC.
+	ServerServiceGetServerHealthProcedure = "/controller.v1.ServerService/GetServerHealth"
 )
 
 // ServerServiceClient is a client for the controller.v1.ServerService service.
@@ -78,6 +84,24 @@ type ServerServiceClient interface {
 	// normal Kubernetes graceful termination (no pre-shutdown hook support
 	// yet -- planned, not built).
 	StopServer(context.Context, *connect.Request[v1.StopServerRequest]) (*connect.Response[v1.ServerInfo], error)
+	// Recent output from the server's own pod.
+	//
+	// Lines are returned raw, exactly as the container wrote them, rather
+	// than parsed here: launcher emits JSON (tracing_subscriber's json
+	// layer) but arma3server's own pre-tracing output is not JSON at all,
+	// and a client that renders both wants to make that distinction
+	// itself instead of being handed a lossy normalization.
+	GetServerLogs(context.Context, *connect.Request[v1.GetServerLogsRequest]) (*connect.Response[v1.GetServerLogsResponse], error)
+	// Whether the server is actually answering queries, as opposed to
+	// merely running.
+	//
+	// Reports the pod's readiness, which is exactly the A2S_INFO round
+	// trip `launcher healthcheck` performs against arma3server's Steam
+	// query port -- a real "a player's server browser would see this"
+	// check, not process liveness. Deliberately a separate RPC rather
+	// than a field on ServerInfo: it reads pods, so folding it into
+	// ListServers would make every list call pay for it.
+	GetServerHealth(context.Context, *connect.Request[v1.GetServerHealthRequest]) (*connect.Response[v1.GetServerHealthResponse], error)
 }
 
 // NewServerServiceClient constructs a client for the controller.v1.ServerService service. By
@@ -133,18 +157,32 @@ func NewServerServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(serverServiceMethods.ByName("StopServer")),
 			connect.WithClientOptions(opts...),
 		),
+		getServerLogs: connect.NewClient[v1.GetServerLogsRequest, v1.GetServerLogsResponse](
+			httpClient,
+			baseURL+ServerServiceGetServerLogsProcedure,
+			connect.WithSchema(serverServiceMethods.ByName("GetServerLogs")),
+			connect.WithClientOptions(opts...),
+		),
+		getServerHealth: connect.NewClient[v1.GetServerHealthRequest, v1.GetServerHealthResponse](
+			httpClient,
+			baseURL+ServerServiceGetServerHealthProcedure,
+			connect.WithSchema(serverServiceMethods.ByName("GetServerHealth")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // serverServiceClient implements ServerServiceClient.
 type serverServiceClient struct {
-	createServer *connect.Client[v1.CreateServerRequest, v1.ServerInfo]
-	listServers  *connect.Client[v1.ListServersRequest, v1.ListServersResponse]
-	getServer    *connect.Client[v1.GetServerRequest, v1.ServerInfo]
-	deleteServer *connect.Client[v1.DeleteServerRequest, v1.DeleteServerResponse]
-	updateServer *connect.Client[v1.UpdateServerRequest, v1.ServerInfo]
-	startServer  *connect.Client[v1.StartServerRequest, v1.ServerInfo]
-	stopServer   *connect.Client[v1.StopServerRequest, v1.ServerInfo]
+	createServer    *connect.Client[v1.CreateServerRequest, v1.ServerInfo]
+	listServers     *connect.Client[v1.ListServersRequest, v1.ListServersResponse]
+	getServer       *connect.Client[v1.GetServerRequest, v1.ServerInfo]
+	deleteServer    *connect.Client[v1.DeleteServerRequest, v1.DeleteServerResponse]
+	updateServer    *connect.Client[v1.UpdateServerRequest, v1.ServerInfo]
+	startServer     *connect.Client[v1.StartServerRequest, v1.ServerInfo]
+	stopServer      *connect.Client[v1.StopServerRequest, v1.ServerInfo]
+	getServerLogs   *connect.Client[v1.GetServerLogsRequest, v1.GetServerLogsResponse]
+	getServerHealth *connect.Client[v1.GetServerHealthRequest, v1.GetServerHealthResponse]
 }
 
 // CreateServer calls controller.v1.ServerService.CreateServer.
@@ -182,6 +220,16 @@ func (c *serverServiceClient) StopServer(ctx context.Context, req *connect.Reque
 	return c.stopServer.CallUnary(ctx, req)
 }
 
+// GetServerLogs calls controller.v1.ServerService.GetServerLogs.
+func (c *serverServiceClient) GetServerLogs(ctx context.Context, req *connect.Request[v1.GetServerLogsRequest]) (*connect.Response[v1.GetServerLogsResponse], error) {
+	return c.getServerLogs.CallUnary(ctx, req)
+}
+
+// GetServerHealth calls controller.v1.ServerService.GetServerHealth.
+func (c *serverServiceClient) GetServerHealth(ctx context.Context, req *connect.Request[v1.GetServerHealthRequest]) (*connect.Response[v1.GetServerHealthResponse], error) {
+	return c.getServerHealth.CallUnary(ctx, req)
+}
+
 // ServerServiceHandler is an implementation of the controller.v1.ServerService service.
 type ServerServiceHandler interface {
 	// Creates and starts the server (desired_state defaults to RUNNING --
@@ -205,6 +253,24 @@ type ServerServiceHandler interface {
 	// normal Kubernetes graceful termination (no pre-shutdown hook support
 	// yet -- planned, not built).
 	StopServer(context.Context, *connect.Request[v1.StopServerRequest]) (*connect.Response[v1.ServerInfo], error)
+	// Recent output from the server's own pod.
+	//
+	// Lines are returned raw, exactly as the container wrote them, rather
+	// than parsed here: launcher emits JSON (tracing_subscriber's json
+	// layer) but arma3server's own pre-tracing output is not JSON at all,
+	// and a client that renders both wants to make that distinction
+	// itself instead of being handed a lossy normalization.
+	GetServerLogs(context.Context, *connect.Request[v1.GetServerLogsRequest]) (*connect.Response[v1.GetServerLogsResponse], error)
+	// Whether the server is actually answering queries, as opposed to
+	// merely running.
+	//
+	// Reports the pod's readiness, which is exactly the A2S_INFO round
+	// trip `launcher healthcheck` performs against arma3server's Steam
+	// query port -- a real "a player's server browser would see this"
+	// check, not process liveness. Deliberately a separate RPC rather
+	// than a field on ServerInfo: it reads pods, so folding it into
+	// ListServers would make every list call pay for it.
+	GetServerHealth(context.Context, *connect.Request[v1.GetServerHealthRequest]) (*connect.Response[v1.GetServerHealthResponse], error)
 }
 
 // NewServerServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -256,6 +322,18 @@ func NewServerServiceHandler(svc ServerServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(serverServiceMethods.ByName("StopServer")),
 		connect.WithHandlerOptions(opts...),
 	)
+	serverServiceGetServerLogsHandler := connect.NewUnaryHandler(
+		ServerServiceGetServerLogsProcedure,
+		svc.GetServerLogs,
+		connect.WithSchema(serverServiceMethods.ByName("GetServerLogs")),
+		connect.WithHandlerOptions(opts...),
+	)
+	serverServiceGetServerHealthHandler := connect.NewUnaryHandler(
+		ServerServiceGetServerHealthProcedure,
+		svc.GetServerHealth,
+		connect.WithSchema(serverServiceMethods.ByName("GetServerHealth")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/controller.v1.ServerService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ServerServiceCreateServerProcedure:
@@ -272,6 +350,10 @@ func NewServerServiceHandler(svc ServerServiceHandler, opts ...connect.HandlerOp
 			serverServiceStartServerHandler.ServeHTTP(w, r)
 		case ServerServiceStopServerProcedure:
 			serverServiceStopServerHandler.ServeHTTP(w, r)
+		case ServerServiceGetServerLogsProcedure:
+			serverServiceGetServerLogsHandler.ServeHTTP(w, r)
+		case ServerServiceGetServerHealthProcedure:
+			serverServiceGetServerHealthHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -307,4 +389,12 @@ func (UnimplementedServerServiceHandler) StartServer(context.Context, *connect.R
 
 func (UnimplementedServerServiceHandler) StopServer(context.Context, *connect.Request[v1.StopServerRequest]) (*connect.Response[v1.ServerInfo], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("controller.v1.ServerService.StopServer is not implemented"))
+}
+
+func (UnimplementedServerServiceHandler) GetServerLogs(context.Context, *connect.Request[v1.GetServerLogsRequest]) (*connect.Response[v1.GetServerLogsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("controller.v1.ServerService.GetServerLogs is not implemented"))
+}
+
+func (UnimplementedServerServiceHandler) GetServerHealth(context.Context, *connect.Request[v1.GetServerHealthRequest]) (*connect.Response[v1.GetServerHealthResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("controller.v1.ServerService.GetServerHealth is not implemented"))
 }

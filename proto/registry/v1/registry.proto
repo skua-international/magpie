@@ -60,6 +60,11 @@ message AddModSourceRequest {
     string steam_url = 3;
     LocalModUpload local_mod = 4;
   }
+  // Free-form operator labelling, stored as annotations on the ModSource
+  // object -- nothing resolves or syncs against it. Annotations rather
+  // than a spec field so the CRD schema does not grow a map only humans
+  // read.
+  map<string, string> metadata = 5;
 }
 
 message LocalModUpload {
@@ -148,6 +153,8 @@ message ModSourceInfo {
   // GetDiskUsage's cluster-wide total, this is "how much does *this
   // source* need", not a deduplicated figure.
   uint64 size_bytes = 6;
+  // See AddModSourceRequest.metadata.
+  map<string, string> metadata = 7;
 }
 
 message ListModSourcesRequest {}
@@ -259,7 +266,91 @@ service AdminService {
   // call anything else, including granting `*` (see AclSubject.scopes),
   // so holding it is equivalent to holding everything eventually.
   rpc SetAclScopes(SetAclScopesRequest) returns (SetAclScopesResponse);
+
+  // Steam QR login, the same flow `magpiectl admin refresh-steam-auth`
+  // runs -- but negotiated by the cluster rather than by the client.
+  //
+  // Begin returns a challenge URL to render as a QR code; Poll blocks
+  // until the Steam mobile app confirms it, then installs the resulting
+  // session. No password is involved in either direction (that is what
+  // QR login is), and unlike RefreshSteamAuth the refresh token never
+  // travels through the caller at all -- it goes straight from Steam to
+  // sync-daemon. Both carry the same admin:steam-auth scope, since they
+  // are two halves of the one operation.
+  rpc BeginSteamQrLogin(BeginSteamQrLoginRequest) returns (BeginSteamQrLoginResponse);
+  rpc PollSteamQrLogin(PollSteamQrLoginRequest) returns (PollSteamQrLoginResponse);
+
+  // Secrets an operator wants referenceable from Arma config ConfigMaps
+  // via the `secret:` placeholder (see services/controller's
+  // arma_config.rs). Scoped to the dedicated user-secrets namespace
+  // only -- never the chart's own namespace, which holds Postgres
+  // credentials and image pull secrets, and whose isolation from
+  // operator-controlled config is the reason the second namespace
+  // exists at all.
+  //
+  // Values are never returned: List gives names and key names, so a
+  // stolen token cannot exfiltrate secret material by listing. Writing
+  // is by whole secret (PutSecret replaces its data), which keeps the
+  // operation idempotent and free of read-modify-write races.
+  rpc ListSecrets(ListSecretsRequest) returns (ListSecretsResponse);
+  rpc PutSecret(PutSecretRequest) returns (PutSecretResponse);
+  rpc DeleteSecret(DeleteSecretRequest) returns (DeleteSecretResponse);
 }
+
+message BeginSteamQrLoginRequest {}
+
+message BeginSteamQrLoginResponse {
+  // Opaque handle for the in-flight login, passed back to Poll. The
+  // session holds a live Steam CM connection server-side, so this is not
+  // reconstructible from the challenge URL.
+  string session_id = 1;
+  // steam://... challenge URL to render as a QR code (and to offer as a
+  // link, for someone already signed in on the same device).
+  string challenge_url = 2;
+}
+
+message PollSteamQrLoginRequest {
+  string session_id = 1;
+}
+
+message PollSteamQrLoginResponse {
+  // False means "not confirmed yet, poll again" rather than a failure;
+  // an actual failure comes back as an RPC error.
+  bool confirmed = 1;
+  // The Steam account the session was established as, once confirmed.
+  string username = 2;
+}
+
+message SecretInfo {
+  string name = 1;
+  // Key names only -- never values. See ListSecrets' own doc.
+  repeated string keys = 2;
+}
+
+message ListSecretsRequest {}
+
+message ListSecretsResponse {
+  repeated SecretInfo secrets = 1;
+  // The namespace these live in, so a UI can show operators where to
+  // point a `secret:` placeholder.
+  string namespace = 2;
+}
+
+message PutSecretRequest {
+  string name = 1;
+  // Replaces the secret's data wholesale. A key absent here is removed.
+  map<string, string> data = 2;
+}
+
+message PutSecretResponse {
+  SecretInfo secret = 1;
+}
+
+message DeleteSecretRequest {
+  string name = 1;
+}
+
+message DeleteSecretResponse {}
 
 // A provider login attached to a user -- what a human actually recognizes
 // someone by, since `AclSubject.subject` is an opaque user id.

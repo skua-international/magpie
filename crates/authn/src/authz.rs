@@ -144,6 +144,7 @@ pub async fn require_auth(
 pub const KNOWN_SCOPES: &[&str] = &[
     "servers:read",
     "servers:write",
+    "servers:logs",
     "mod-sources:read",
     "mod-sources:write",
     "mod-sources:invalidate",
@@ -155,6 +156,8 @@ pub const KNOWN_SCOPES: &[&str] = &[
     "admin:import",
     // Can change who holds anything above, including granting "*".
     "admin:acl",
+    // Read/write Secrets in the user-secrets namespace only.
+    "admin:secrets",
     // No RPC: read from the grant table by services/controller when
     // rendering main.cfg.
     "arma:admin",

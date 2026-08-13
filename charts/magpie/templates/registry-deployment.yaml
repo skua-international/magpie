@@ -41,6 +41,10 @@ spec:
           env:
             - name: LISTEN_ADDR
               value: "0.0.0.0:{{ .Values.registry.service.port }}"
+            # Namespace whose Secrets AdminService's secret RPCs manage --
+            # see registry-rbac.yaml for why it is a separate one.
+            - name: USER_SECRETS_NAMESPACE
+              value: {{ .Values.userSecretsNamespace | quote }}
             - name: NAMESPACE
               value: {{ include "magpie.namespace" . }}
             # AdminService's ExportState/ImportState read/write ArmaServer

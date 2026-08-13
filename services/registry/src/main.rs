@@ -46,6 +46,16 @@ fn required_scope(path: &str) -> Option<&'static str> {
         // admin scope.
         "/registry.v1.AdminService/ListAcl" => Some("admin:acl"),
         "/registry.v1.AdminService/SetAclScopes" => Some("admin:acl"),
+        // Two halves of one operation, so one scope -- and the same one
+        // RefreshSteamAuth uses, since both end in a Steam session this
+        // cluster can authenticate as.
+        "/registry.v1.AdminService/BeginSteamQrLogin" => Some("admin:steam-auth"),
+        "/registry.v1.AdminService/PollSteamQrLogin" => Some("admin:steam-auth"),
+        // Its own scope: these read and write credential material, even
+        // though List deliberately returns key names only.
+        "/registry.v1.AdminService/ListSecrets" => Some("admin:secrets"),
+        "/registry.v1.AdminService/PutSecret" => Some("admin:secrets"),
+        "/registry.v1.AdminService/DeleteSecret" => Some("admin:secrets"),
         _ => None,
     }
 }
@@ -101,6 +111,7 @@ async fn main() -> Result<()> {
         cfg.namespace.clone(),
         cfg.armaserver_namespace.clone(),
         cfg.arma_config_baseline.clone(),
+        cfg.user_secrets_namespace.clone(),
     );
 
     let verifier = JwtVerifier::fetch(&cfg.jwt).await?;

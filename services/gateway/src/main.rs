@@ -19,9 +19,9 @@ use connectrpc::Router as ConnectRouter;
 use gateway::config::Config;
 use gateway::service::ServerServiceImpl;
 use kube::Client;
-use tower_http::services::{ServeDir, ServeFile};
 use metrics_exporter_prometheus::PrometheusBuilder;
 use sync_client::SyncClient;
+use tower_http::services::{ServeDir, ServeFile};
 use tracing::info;
 
 fn required_scope(path: &str) -> Option<&'static str> {
@@ -33,6 +33,15 @@ fn required_scope(path: &str) -> Option<&'static str> {
         "/controller.v1.ServerService/StopServer" => Some("servers:write"),
         "/controller.v1.ServerService/ListServers" => Some("servers:read"),
         "/controller.v1.ServerService/GetServer" => Some("servers:read"),
+        // Health is pod readiness -- the same "is it answering queries"
+        // signal ListServers' phase approximates, so it reads at the
+        // same level.
+        "/controller.v1.ServerService/GetServerHealth" => Some("servers:read"),
+        // Its own scope, deliberately not servers:read: logs are the one
+        // thing here that can contain arbitrary content a server or its
+        // mods chose to print, so being able to list servers shouldn't
+        // imply being able to read everything they've logged.
+        "/controller.v1.ServerService/GetServerLogs" => Some("servers:logs"),
         _ => None,
     }
 }

@@ -18,10 +18,17 @@ use crd::{
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use kube::api::{Api, DeleteParams, ListParams, Patch, PatchParams};
 use kube::{Client, ResourceExt};
+/// Ceiling on GetServerLogs' tail. High enough to cover a startup
+/// sequence, low enough that a single call can't stream a whole pod's
+/// history into a browser.
+const MAX_LOG_LINES: u32 = 5000;
+
 use protocol::proto::controller::v1::{
     CreateServerRequest, DeleteServerRequest, DeleteServerResponse,
-    DesiredState as ProtoDesiredState, GetServerRequest, ListServersRequest, ListServersResponse,
-    ServerInfo, ServerPhase, StartServerRequest, StopServerRequest, UpdateServerRequest,
+    DesiredState as ProtoDesiredState, GetServerHealthRequest, GetServerHealthResponse,
+    GetServerLogsRequest, GetServerLogsResponse, GetServerRequest, ListServersRequest,
+    ListServersResponse, ServerInfo, ServerPhase, StartServerRequest, StopServerRequest,
+    UpdateServerRequest,
 };
 use sync_client::SyncClient;
 
@@ -79,6 +86,39 @@ impl ServerServiceImpl {
             .patch_status(id, &PatchParams::default(), &Patch::Merge(patch))
             .await
             .map_err(|e| ConnectError::internal(format!("failed to reset status: {e:#}")))
+    }
+
+    fn pods(&self) -> Api<k8s_openapi::api::core::v1::Pod> {
+        Api::namespaced(self.client.clone(), &self.namespace)
+    }
+
+    /// The Pod currently backing a server.
+    ///
+    /// Found by the controller's own Deployment labels rather than by
+    /// name: a server's pod name carries a ReplicaSet hash and changes
+    /// on every restart, so it can't be derived from the server id.
+    /// Newest first, so a pod being replaced doesn't get reported over
+    /// the one that just took over.
+    async fn server_pod(&self, id: &str) -> Result<k8s_openapi::api::core::v1::Pod, ConnectError> {
+        // app=arma-server as well as armaserver=<id>: services/controller
+        // puts the same armaserver label on this server's HeadlessClient
+        // pods too (reconcile.rs's ensure_hc_deployment), so selecting on
+        // it alone would happily return an HC's logs as the server's.
+        let params = ListParams::default().labels(&format!("app=arma-server,armaserver={id}"));
+        let mut pods = self
+            .pods()
+            .list(&params)
+            .await
+            .map_err(|e| ConnectError::internal(format!("failed to list pods for {id}: {e:#}")))?
+            .items;
+        pods.sort_by(|a, b| {
+            b.metadata
+                .creation_timestamp
+                .cmp(&a.metadata.creation_timestamp)
+        });
+        pods.into_iter()
+            .next()
+            .ok_or_else(|| ConnectError::not_found(format!("no running pod for server {id}")))
     }
 
     /// Rejects `port` if its 5-port range (see `crd::port_range`) overlaps
@@ -170,6 +210,56 @@ fn desired_state_to_proto(state: DesiredState) -> ProtoDesiredState {
     }
 }
 
+/// Operator metadata is stored as annotations under this prefix rather
+/// than as an `ArmaServerSpec` field.
+///
+/// Annotations because nothing reconciles against it -- it exists for
+/// humans -- and growing the CRD schema for a free-form map that no
+/// controller reads would mean a schema migration for every deployment
+/// to gain a field only the UI touches. The prefix keeps it from
+/// colliding with the annotations Kubernetes, Helm and kubectl each put
+/// on the same object.
+const METADATA_PREFIX: &str = "metadata.magpie.skua.io/";
+
+/// Collects into the generated field's own map type (buffa re-exports a
+/// HashMap with a different hasher than std's), so this drops straight
+/// into `ServerInfo` without a rebuild of the whole map.
+fn metadata_from_annotations(obj: &ArmaServer) -> buffa::__private::HashMap<String, String> {
+    obj.annotations()
+        .iter()
+        .filter_map(|(k, v)| {
+            k.strip_prefix(METADATA_PREFIX)
+                .map(|k| (k.to_string(), v.clone()))
+        })
+        .collect()
+}
+
+/// Annotation keys must be valid Kubernetes qualified names, so a key
+/// that isn't gets rejected here rather than becoming an opaque apply
+/// failure from the API server.
+fn metadata_to_annotations<'a>(
+    entries: impl Iterator<Item = (&'a str, &'a str)>,
+) -> Result<std::collections::BTreeMap<String, String>, ConnectError> {
+    let mut out = std::collections::BTreeMap::new();
+    for (key, value) in entries {
+        if key.is_empty() {
+            return Err(ConnectError::invalid_argument(
+                "metadata keys cannot be empty",
+            ));
+        }
+        if !key
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+        {
+            return Err(ConnectError::invalid_argument(format!(
+                "invalid metadata key {key:?}: only letters, digits, '-', '_' and '.' are allowed"
+            )));
+        }
+        out.insert(format!("{METADATA_PREFIX}{key}"), value.to_string());
+    }
+    Ok(out)
+}
+
 fn to_info(obj: &ArmaServer) -> ServerInfo {
     let status = obj.status.clone().unwrap_or_default();
     ServerInfo {
@@ -180,6 +270,7 @@ fn to_info(obj: &ArmaServer) -> ServerInfo {
         phase: EnumValue::Known(phase_to_proto(status.phase)),
         message: status.message,
         desired_state: EnumValue::Known(desired_state_to_proto(obj.spec.desired_state)),
+        metadata: metadata_from_annotations(obj),
         ..Default::default()
     }
 }
@@ -233,9 +324,12 @@ impl protocol::proto::controller::v1::ServerService for ServerServiceImpl {
         };
         let name = request.name.to_string();
 
+        let annotations = metadata_to_annotations(request.metadata.iter().map(|(k, v)| (*k, *v)))?;
+
         let obj = ArmaServer {
             metadata: ObjectMeta {
                 name: Some(name.clone()),
+                annotations: (!annotations.is_empty()).then_some(annotations),
                 ..Default::default()
             },
             spec,
@@ -314,8 +408,164 @@ impl protocol::proto::controller::v1::ServerService for ServerServiceImpl {
         _ctx: RequestContext,
         request: ServiceRequest<'_, UpdateServerRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<ServerInfo> + Send + use<'a>> {
+        // Applied before the resync below, not after: resync_and_repending
+        // refreshes whatever sources the object references, so changing
+        // the set first is what makes newly-attached sources actually get
+        // pulled by this same call.
+        if request.mod_sources.as_option().is_some() || request.metadata.as_option().is_some() {
+            let mut patch = serde_json::Map::new();
+
+            if let Some(selection) = request.mod_sources.as_option() {
+                let ids: Vec<String> = selection
+                    .mod_source_ids
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect();
+                // Every referenced source must exist -- an ArmaServer
+                // pointing at a deleted ModSource reconciles into a
+                // failure the caller would only find out about later.
+                for id in &ids {
+                    if self.mod_sources().get(id).await.is_err() {
+                        return Err(ConnectError::invalid_argument(format!(
+                            "no such mod source: {id}"
+                        )));
+                    }
+                }
+                patch.insert("spec".into(), serde_json::json!({ "modSourceIds": ids }));
+            }
+
+            if let Some(selection) = request.metadata.as_option() {
+                let wanted =
+                    metadata_to_annotations(selection.metadata.iter().map(|(k, v)| (*k, *v)))?;
+                // A merge patch removes a key by setting it to null, so
+                // annotations that existed before and aren't in the new
+                // set have to be nulled explicitly -- otherwise this
+                // would only ever add.
+                let existing = self.api().get(request.id).await.map_err(|_| {
+                    ConnectError::not_found(format!("no such server: {}", request.id))
+                })?;
+                let mut annotations = serde_json::Map::new();
+                for key in existing.annotations().keys() {
+                    if key.starts_with(METADATA_PREFIX) && !wanted.contains_key(key) {
+                        annotations.insert(key.clone(), serde_json::Value::Null);
+                    }
+                }
+                for (key, value) in wanted {
+                    annotations.insert(key, serde_json::Value::String(value));
+                }
+                patch.insert(
+                    "metadata".into(),
+                    serde_json::json!({ "annotations": annotations }),
+                );
+            }
+
+            self.api()
+                .patch(
+                    request.id,
+                    &PatchParams::default(),
+                    &Patch::Merge(serde_json::Value::Object(patch)),
+                )
+                .await
+                .map_err(|e| {
+                    ConnectError::internal(format!("failed to update {}: {e:#}", request.id))
+                })?;
+        }
+
         let obj = self.resync_and_repending(request.id).await?;
         Response::ok(to_info(&obj))
+    }
+
+    async fn get_server_logs<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        request: ServiceRequest<'_, GetServerLogsRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<GetServerLogsResponse> + Send + use<'a>> {
+        let pod = self.server_pod(request.id).await?;
+        let name = pod.name_any();
+
+        // Capped rather than trusted: an unbounded tail pulls a whole
+        // pod's history through the API server and into a browser tab.
+        let tail = request.tail_lines.unwrap_or(500).clamp(1, MAX_LOG_LINES);
+
+        let params = kube::api::LogParams {
+            tail_lines: Some(tail as i64),
+            previous: request.previous.unwrap_or(false),
+            // Deliberately not following: this RPC is unary, so a stream
+            // would just block until the request timed out. A live tail
+            // wants a streaming RPC of its own.
+            follow: false,
+            ..Default::default()
+        };
+
+        let raw = self.pods().logs(&name, &params).await.map_err(|e| {
+            ConnectError::internal(format!("failed to read logs for {name}: {e:#}"))
+        })?;
+
+        Response::ok(GetServerLogsResponse {
+            lines: raw.lines().map(str::to_string).collect(),
+            pod_name: name,
+            ..Default::default()
+        })
+    }
+
+    async fn get_server_health<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        request: ServiceRequest<'_, GetServerHealthRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<GetServerHealthResponse> + Send + use<'a>> {
+        // A stopped server legitimately has no pod. That's "not ready"
+        // with an explanation, not an error -- erroring would make the
+        // UI show a failure for a server the operator deliberately
+        // stopped.
+        let Ok(pod) = self.server_pod(request.id).await else {
+            return Response::ok(GetServerHealthResponse {
+                ready: false,
+                message: "no pod is running for this server".to_string(),
+                ..Default::default()
+            });
+        };
+
+        let status = pod.status.clone().unwrap_or_default();
+        let phase = status.phase.clone().unwrap_or_default();
+
+        // The Ready condition is exactly the A2S_INFO query probe (see
+        // services/launcher/src/healthcheck.rs) -- a real "would a
+        // player's server browser see this" answer, not liveness.
+        let ready_condition = status
+            .conditions
+            .unwrap_or_default()
+            .into_iter()
+            .find(|c| c.type_ == "Ready");
+        let ready = ready_condition.as_ref().is_some_and(|c| c.status == "True");
+
+        let container = status
+            .container_statuses
+            .unwrap_or_default()
+            .into_iter()
+            .next();
+        let restart_count = container.as_ref().map(|c| c.restart_count).unwrap_or(0);
+
+        // Prefer the probe's own explanation, then the pod-level reason,
+        // over an empty string that tells an operator nothing.
+        let message = ready_condition
+            .and_then(|c| c.message)
+            .or(status.reason)
+            .unwrap_or_else(|| {
+                if ready {
+                    "answering Steam queries".to_string()
+                } else {
+                    String::new()
+                }
+            });
+
+        Response::ok(GetServerHealthResponse {
+            ready,
+            pod_name: pod.name_any(),
+            phase,
+            restart_count: restart_count.max(0) as u32,
+            message,
+            ..Default::default()
+        })
     }
 
     async fn start_server<'a>(

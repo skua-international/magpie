@@ -87,6 +87,20 @@ const (
 	// AdminServiceSetAclScopesProcedure is the fully-qualified name of the AdminService's SetAclScopes
 	// RPC.
 	AdminServiceSetAclScopesProcedure = "/registry.v1.AdminService/SetAclScopes"
+	// AdminServiceBeginSteamQrLoginProcedure is the fully-qualified name of the AdminService's
+	// BeginSteamQrLogin RPC.
+	AdminServiceBeginSteamQrLoginProcedure = "/registry.v1.AdminService/BeginSteamQrLogin"
+	// AdminServicePollSteamQrLoginProcedure is the fully-qualified name of the AdminService's
+	// PollSteamQrLogin RPC.
+	AdminServicePollSteamQrLoginProcedure = "/registry.v1.AdminService/PollSteamQrLogin"
+	// AdminServiceListSecretsProcedure is the fully-qualified name of the AdminService's ListSecrets
+	// RPC.
+	AdminServiceListSecretsProcedure = "/registry.v1.AdminService/ListSecrets"
+	// AdminServicePutSecretProcedure is the fully-qualified name of the AdminService's PutSecret RPC.
+	AdminServicePutSecretProcedure = "/registry.v1.AdminService/PutSecret"
+	// AdminServiceDeleteSecretProcedure is the fully-qualified name of the AdminService's DeleteSecret
+	// RPC.
+	AdminServiceDeleteSecretProcedure = "/registry.v1.AdminService/DeleteSecret"
 )
 
 // ModSourceServiceClient is a client for the registry.v1.ModSourceService service.
@@ -551,6 +565,33 @@ type AdminServiceClient interface {
 	// call anything else, including granting `*` (see AclSubject.scopes),
 	// so holding it is equivalent to holding everything eventually.
 	SetAclScopes(context.Context, *connect.Request[v1.SetAclScopesRequest]) (*connect.Response[v1.SetAclScopesResponse], error)
+	// Steam QR login, the same flow `magpiectl admin refresh-steam-auth`
+	// runs -- but negotiated by the cluster rather than by the client.
+	//
+	// Begin returns a challenge URL to render as a QR code; Poll blocks
+	// until the Steam mobile app confirms it, then installs the resulting
+	// session. No password is involved in either direction (that is what
+	// QR login is), and unlike RefreshSteamAuth the refresh token never
+	// travels through the caller at all -- it goes straight from Steam to
+	// sync-daemon. Both carry the same admin:steam-auth scope, since they
+	// are two halves of the one operation.
+	BeginSteamQrLogin(context.Context, *connect.Request[v1.BeginSteamQrLoginRequest]) (*connect.Response[v1.BeginSteamQrLoginResponse], error)
+	PollSteamQrLogin(context.Context, *connect.Request[v1.PollSteamQrLoginRequest]) (*connect.Response[v1.PollSteamQrLoginResponse], error)
+	// Secrets an operator wants referenceable from Arma config ConfigMaps
+	// via the `secret:` placeholder (see services/controller's
+	// arma_config.rs). Scoped to the dedicated user-secrets namespace
+	// only -- never the chart's own namespace, which holds Postgres
+	// credentials and image pull secrets, and whose isolation from
+	// operator-controlled config is the reason the second namespace
+	// exists at all.
+	//
+	// Values are never returned: List gives names and key names, so a
+	// stolen token cannot exfiltrate secret material by listing. Writing
+	// is by whole secret (PutSecret replaces its data), which keeps the
+	// operation idempotent and free of read-modify-write races.
+	ListSecrets(context.Context, *connect.Request[v1.ListSecretsRequest]) (*connect.Response[v1.ListSecretsResponse], error)
+	PutSecret(context.Context, *connect.Request[v1.PutSecretRequest]) (*connect.Response[v1.PutSecretResponse], error)
+	DeleteSecret(context.Context, *connect.Request[v1.DeleteSecretRequest]) (*connect.Response[v1.DeleteSecretResponse], error)
 }
 
 // NewAdminServiceClient constructs a client for the registry.v1.AdminService service. By default,
@@ -600,17 +641,52 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("SetAclScopes")),
 			connect.WithClientOptions(opts...),
 		),
+		beginSteamQrLogin: connect.NewClient[v1.BeginSteamQrLoginRequest, v1.BeginSteamQrLoginResponse](
+			httpClient,
+			baseURL+AdminServiceBeginSteamQrLoginProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("BeginSteamQrLogin")),
+			connect.WithClientOptions(opts...),
+		),
+		pollSteamQrLogin: connect.NewClient[v1.PollSteamQrLoginRequest, v1.PollSteamQrLoginResponse](
+			httpClient,
+			baseURL+AdminServicePollSteamQrLoginProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("PollSteamQrLogin")),
+			connect.WithClientOptions(opts...),
+		),
+		listSecrets: connect.NewClient[v1.ListSecretsRequest, v1.ListSecretsResponse](
+			httpClient,
+			baseURL+AdminServiceListSecretsProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListSecrets")),
+			connect.WithClientOptions(opts...),
+		),
+		putSecret: connect.NewClient[v1.PutSecretRequest, v1.PutSecretResponse](
+			httpClient,
+			baseURL+AdminServicePutSecretProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("PutSecret")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteSecret: connect.NewClient[v1.DeleteSecretRequest, v1.DeleteSecretResponse](
+			httpClient,
+			baseURL+AdminServiceDeleteSecretProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("DeleteSecret")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // adminServiceClient implements AdminServiceClient.
 type adminServiceClient struct {
-	getDiskUsage     *connect.Client[v1.GetDiskUsageRequest, v1.GetDiskUsageResponse]
-	refreshSteamAuth *connect.Client[v1.RefreshSteamAuthRequest, v1.RefreshSteamAuthResponse]
-	exportState      *connect.Client[v1.ExportStateRequest, v1.ExportStateResponse]
-	importState      *connect.Client[v1.ImportStateRequest, v1.ImportStateResponse]
-	listAcl          *connect.Client[v1.ListAclRequest, v1.ListAclResponse]
-	setAclScopes     *connect.Client[v1.SetAclScopesRequest, v1.SetAclScopesResponse]
+	getDiskUsage      *connect.Client[v1.GetDiskUsageRequest, v1.GetDiskUsageResponse]
+	refreshSteamAuth  *connect.Client[v1.RefreshSteamAuthRequest, v1.RefreshSteamAuthResponse]
+	exportState       *connect.Client[v1.ExportStateRequest, v1.ExportStateResponse]
+	importState       *connect.Client[v1.ImportStateRequest, v1.ImportStateResponse]
+	listAcl           *connect.Client[v1.ListAclRequest, v1.ListAclResponse]
+	setAclScopes      *connect.Client[v1.SetAclScopesRequest, v1.SetAclScopesResponse]
+	beginSteamQrLogin *connect.Client[v1.BeginSteamQrLoginRequest, v1.BeginSteamQrLoginResponse]
+	pollSteamQrLogin  *connect.Client[v1.PollSteamQrLoginRequest, v1.PollSteamQrLoginResponse]
+	listSecrets       *connect.Client[v1.ListSecretsRequest, v1.ListSecretsResponse]
+	putSecret         *connect.Client[v1.PutSecretRequest, v1.PutSecretResponse]
+	deleteSecret      *connect.Client[v1.DeleteSecretRequest, v1.DeleteSecretResponse]
 }
 
 // GetDiskUsage calls registry.v1.AdminService.GetDiskUsage.
@@ -641,6 +717,31 @@ func (c *adminServiceClient) ListAcl(ctx context.Context, req *connect.Request[v
 // SetAclScopes calls registry.v1.AdminService.SetAclScopes.
 func (c *adminServiceClient) SetAclScopes(ctx context.Context, req *connect.Request[v1.SetAclScopesRequest]) (*connect.Response[v1.SetAclScopesResponse], error) {
 	return c.setAclScopes.CallUnary(ctx, req)
+}
+
+// BeginSteamQrLogin calls registry.v1.AdminService.BeginSteamQrLogin.
+func (c *adminServiceClient) BeginSteamQrLogin(ctx context.Context, req *connect.Request[v1.BeginSteamQrLoginRequest]) (*connect.Response[v1.BeginSteamQrLoginResponse], error) {
+	return c.beginSteamQrLogin.CallUnary(ctx, req)
+}
+
+// PollSteamQrLogin calls registry.v1.AdminService.PollSteamQrLogin.
+func (c *adminServiceClient) PollSteamQrLogin(ctx context.Context, req *connect.Request[v1.PollSteamQrLoginRequest]) (*connect.Response[v1.PollSteamQrLoginResponse], error) {
+	return c.pollSteamQrLogin.CallUnary(ctx, req)
+}
+
+// ListSecrets calls registry.v1.AdminService.ListSecrets.
+func (c *adminServiceClient) ListSecrets(ctx context.Context, req *connect.Request[v1.ListSecretsRequest]) (*connect.Response[v1.ListSecretsResponse], error) {
+	return c.listSecrets.CallUnary(ctx, req)
+}
+
+// PutSecret calls registry.v1.AdminService.PutSecret.
+func (c *adminServiceClient) PutSecret(ctx context.Context, req *connect.Request[v1.PutSecretRequest]) (*connect.Response[v1.PutSecretResponse], error) {
+	return c.putSecret.CallUnary(ctx, req)
+}
+
+// DeleteSecret calls registry.v1.AdminService.DeleteSecret.
+func (c *adminServiceClient) DeleteSecret(ctx context.Context, req *connect.Request[v1.DeleteSecretRequest]) (*connect.Response[v1.DeleteSecretResponse], error) {
+	return c.deleteSecret.CallUnary(ctx, req)
 }
 
 // AdminServiceHandler is an implementation of the registry.v1.AdminService service.
@@ -695,6 +796,33 @@ type AdminServiceHandler interface {
 	// call anything else, including granting `*` (see AclSubject.scopes),
 	// so holding it is equivalent to holding everything eventually.
 	SetAclScopes(context.Context, *connect.Request[v1.SetAclScopesRequest]) (*connect.Response[v1.SetAclScopesResponse], error)
+	// Steam QR login, the same flow `magpiectl admin refresh-steam-auth`
+	// runs -- but negotiated by the cluster rather than by the client.
+	//
+	// Begin returns a challenge URL to render as a QR code; Poll blocks
+	// until the Steam mobile app confirms it, then installs the resulting
+	// session. No password is involved in either direction (that is what
+	// QR login is), and unlike RefreshSteamAuth the refresh token never
+	// travels through the caller at all -- it goes straight from Steam to
+	// sync-daemon. Both carry the same admin:steam-auth scope, since they
+	// are two halves of the one operation.
+	BeginSteamQrLogin(context.Context, *connect.Request[v1.BeginSteamQrLoginRequest]) (*connect.Response[v1.BeginSteamQrLoginResponse], error)
+	PollSteamQrLogin(context.Context, *connect.Request[v1.PollSteamQrLoginRequest]) (*connect.Response[v1.PollSteamQrLoginResponse], error)
+	// Secrets an operator wants referenceable from Arma config ConfigMaps
+	// via the `secret:` placeholder (see services/controller's
+	// arma_config.rs). Scoped to the dedicated user-secrets namespace
+	// only -- never the chart's own namespace, which holds Postgres
+	// credentials and image pull secrets, and whose isolation from
+	// operator-controlled config is the reason the second namespace
+	// exists at all.
+	//
+	// Values are never returned: List gives names and key names, so a
+	// stolen token cannot exfiltrate secret material by listing. Writing
+	// is by whole secret (PutSecret replaces its data), which keeps the
+	// operation idempotent and free of read-modify-write races.
+	ListSecrets(context.Context, *connect.Request[v1.ListSecretsRequest]) (*connect.Response[v1.ListSecretsResponse], error)
+	PutSecret(context.Context, *connect.Request[v1.PutSecretRequest]) (*connect.Response[v1.PutSecretResponse], error)
+	DeleteSecret(context.Context, *connect.Request[v1.DeleteSecretRequest]) (*connect.Response[v1.DeleteSecretResponse], error)
 }
 
 // NewAdminServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -740,6 +868,36 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(adminServiceMethods.ByName("SetAclScopes")),
 		connect.WithHandlerOptions(opts...),
 	)
+	adminServiceBeginSteamQrLoginHandler := connect.NewUnaryHandler(
+		AdminServiceBeginSteamQrLoginProcedure,
+		svc.BeginSteamQrLogin,
+		connect.WithSchema(adminServiceMethods.ByName("BeginSteamQrLogin")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServicePollSteamQrLoginHandler := connect.NewUnaryHandler(
+		AdminServicePollSteamQrLoginProcedure,
+		svc.PollSteamQrLogin,
+		connect.WithSchema(adminServiceMethods.ByName("PollSteamQrLogin")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceListSecretsHandler := connect.NewUnaryHandler(
+		AdminServiceListSecretsProcedure,
+		svc.ListSecrets,
+		connect.WithSchema(adminServiceMethods.ByName("ListSecrets")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServicePutSecretHandler := connect.NewUnaryHandler(
+		AdminServicePutSecretProcedure,
+		svc.PutSecret,
+		connect.WithSchema(adminServiceMethods.ByName("PutSecret")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceDeleteSecretHandler := connect.NewUnaryHandler(
+		AdminServiceDeleteSecretProcedure,
+		svc.DeleteSecret,
+		connect.WithSchema(adminServiceMethods.ByName("DeleteSecret")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/registry.v1.AdminService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AdminServiceGetDiskUsageProcedure:
@@ -754,6 +912,16 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServiceListAclHandler.ServeHTTP(w, r)
 		case AdminServiceSetAclScopesProcedure:
 			adminServiceSetAclScopesHandler.ServeHTTP(w, r)
+		case AdminServiceBeginSteamQrLoginProcedure:
+			adminServiceBeginSteamQrLoginHandler.ServeHTTP(w, r)
+		case AdminServicePollSteamQrLoginProcedure:
+			adminServicePollSteamQrLoginHandler.ServeHTTP(w, r)
+		case AdminServiceListSecretsProcedure:
+			adminServiceListSecretsHandler.ServeHTTP(w, r)
+		case AdminServicePutSecretProcedure:
+			adminServicePutSecretHandler.ServeHTTP(w, r)
+		case AdminServiceDeleteSecretProcedure:
+			adminServiceDeleteSecretHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -785,4 +953,24 @@ func (UnimplementedAdminServiceHandler) ListAcl(context.Context, *connect.Reques
 
 func (UnimplementedAdminServiceHandler) SetAclScopes(context.Context, *connect.Request[v1.SetAclScopesRequest]) (*connect.Response[v1.SetAclScopesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.SetAclScopes is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) BeginSteamQrLogin(context.Context, *connect.Request[v1.BeginSteamQrLoginRequest]) (*connect.Response[v1.BeginSteamQrLoginResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.BeginSteamQrLogin is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) PollSteamQrLogin(context.Context, *connect.Request[v1.PollSteamQrLoginRequest]) (*connect.Response[v1.PollSteamQrLoginResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.PollSteamQrLogin is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListSecrets(context.Context, *connect.Request[v1.ListSecretsRequest]) (*connect.Response[v1.ListSecretsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.ListSecrets is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) PutSecret(context.Context, *connect.Request[v1.PutSecretRequest]) (*connect.Response[v1.PutSecretResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.PutSecret is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) DeleteSecret(context.Context, *connect.Request[v1.DeleteSecretRequest]) (*connect.Response[v1.DeleteSecretResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.DeleteSecret is not implemented"))
 }

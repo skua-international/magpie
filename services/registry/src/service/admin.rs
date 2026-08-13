@@ -4,12 +4,18 @@
 use std::sync::Arc;
 
 use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest, ServiceResult};
+use k8s_openapi::api::core::v1::Secret;
 use kube::Client;
+use kube::api::{Api, DeleteParams, ListParams, Patch, PatchParams};
+
 use protocol::proto::registry::v1::{
-    AclSubject, ExportStateRequest, ExportStateResponse, GetDiskUsageRequest,
+    AclSubject, BeginSteamQrLoginRequest, BeginSteamQrLoginResponse, DeleteSecretRequest,
+    DeleteSecretResponse, ExportStateRequest, ExportStateResponse, GetDiskUsageRequest,
     GetDiskUsageResponse, ImportStateRequest, ImportStateResponse, LinkedAccountInfo,
-    ListAclRequest, ListAclResponse, RefreshSteamAuthRequest, RefreshSteamAuthResponse,
-    SetAclScopesRequest, SetAclScopesResponse,
+    ListAclRequest, ListAclResponse, ListSecretsRequest, ListSecretsResponse,
+    PollSteamQrLoginRequest, PollSteamQrLoginResponse, PutSecretRequest, PutSecretResponse,
+    RefreshSteamAuthRequest, RefreshSteamAuthResponse, SecretInfo, SetAclScopesRequest,
+    SetAclScopesResponse,
 };
 use sqlx::PgPool;
 use sync_client::SyncClient;
@@ -25,6 +31,9 @@ pub struct AdminServiceImpl {
     /// distinct from `namespace` above.
     pub(crate) armaserver_namespace: String,
     pub(crate) arma_config_baseline: String,
+    /// See `Config::user_secrets_namespace` -- the only namespace the
+    /// secret RPCs below ever touch.
+    user_secrets_namespace: String,
 }
 
 impl AdminServiceImpl {
@@ -35,6 +44,7 @@ impl AdminServiceImpl {
         namespace: String,
         armaserver_namespace: String,
         arma_config_baseline: String,
+        user_secrets_namespace: String,
     ) -> Arc<Self> {
         Arc::new(Self {
             pool,
@@ -43,7 +53,18 @@ impl AdminServiceImpl {
             namespace,
             armaserver_namespace,
             arma_config_baseline,
+            user_secrets_namespace,
         })
+    }
+}
+
+impl AdminServiceImpl {
+    /// Namespaced to `user_secrets_namespace` and nowhere else -- the
+    /// RBAC granted for this is a Role in that namespace, so any other
+    /// namespace would be forbidden anyway; constructing it here makes
+    /// that explicit rather than incidental.
+    fn secrets(&self) -> Api<Secret> {
+        Api::namespaced(self.client.clone(), &self.user_secrets_namespace)
     }
 }
 
@@ -156,6 +177,178 @@ impl protocol::proto::registry::v1::AdminService for AdminServiceImpl {
         })
     }
 
+    async fn list_secrets<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        _request: ServiceRequest<'_, ListSecretsRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<ListSecretsResponse> + Send + use<'a>> {
+        let list = self
+            .secrets()
+            .list(&ListParams::default())
+            .await
+            .map_err(|e| ConnectError::internal(format!("failed to list secrets: {e:#}")))?;
+
+        let mut secrets: Vec<SecretInfo> = list
+            .items
+            .into_iter()
+            .filter(|s| {
+                // Service-account token secrets are Kubernetes' own, not
+                // an operator's, and are noise in a UI meant for
+                // `secret:` placeholder targets.
+                s.type_.as_deref() != Some("kubernetes.io/service-account-token")
+            })
+            .map(|secret| {
+                // Key names only, never values -- see the RPC's proto
+                // doc. A list call must not be an exfiltration path.
+                let mut keys: Vec<String> = secret
+                    .data
+                    .unwrap_or_default()
+                    .into_keys()
+                    .chain(secret.string_data.unwrap_or_default().into_keys())
+                    .collect();
+                keys.sort_unstable();
+                keys.dedup();
+                SecretInfo {
+                    name: secret.metadata.name.unwrap_or_default(),
+                    keys,
+                    ..Default::default()
+                }
+            })
+            .collect();
+        secrets.sort_by(|a, b| a.name.cmp(&b.name));
+
+        Response::ok(ListSecretsResponse {
+            secrets,
+            namespace: self.user_secrets_namespace.clone(),
+            ..Default::default()
+        })
+    }
+
+    async fn put_secret<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        request: ServiceRequest<'_, PutSecretRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<PutSecretResponse> + Send + use<'a>> {
+        let name = request.name.trim();
+        validate_secret_name(name)?;
+
+        // string_data rather than data: Kubernetes base64-encodes it
+        // server-side, so plaintext never has to be encoded here and a
+        // caller can't produce an object whose data doesn't decode.
+        let string_data: std::collections::BTreeMap<String, String> = request
+            .data
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        for key in string_data.keys() {
+            if key.is_empty()
+                || !key
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+            {
+                return Err(ConnectError::invalid_argument(format!(
+                    "invalid secret key {key:?}: only letters, digits, '-', '_' and '.' are allowed"
+                )));
+            }
+        }
+
+        let obj = Secret {
+            metadata: kube::core::ObjectMeta {
+                name: Some(name.to_string()),
+                namespace: Some(self.user_secrets_namespace.clone()),
+                ..Default::default()
+            },
+            string_data: Some(string_data),
+            ..Default::default()
+        };
+
+        // Server-side apply, so this replaces the secret's data rather
+        // than merging into it -- a key the caller dropped is genuinely
+        // removed, which is what "Put" has to mean for the UI's editor
+        // to be able to delete a key at all.
+        let applied = self
+            .secrets()
+            .patch(
+                name,
+                &PatchParams::apply("magpie-registry").force(),
+                &Patch::Apply(&obj),
+            )
+            .await
+            .map_err(|e| ConnectError::internal(format!("failed to write secret {name}: {e:#}")))?;
+
+        let mut keys: Vec<String> = applied
+            .data
+            .unwrap_or_default()
+            .into_keys()
+            .chain(applied.string_data.unwrap_or_default().into_keys())
+            .collect();
+        keys.sort_unstable();
+        keys.dedup();
+
+        Response::ok(PutSecretResponse {
+            secret: Some(SecretInfo {
+                name: applied.metadata.name.unwrap_or_default(),
+                keys,
+                ..Default::default()
+            })
+            .into(),
+            ..Default::default()
+        })
+    }
+
+    async fn delete_secret<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        request: ServiceRequest<'_, DeleteSecretRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<DeleteSecretResponse> + Send + use<'a>> {
+        let name = request.name.trim();
+        validate_secret_name(name)?;
+        self.secrets()
+            .delete(name, &DeleteParams::default())
+            .await
+            .map_err(|e| {
+                ConnectError::internal(format!("failed to delete secret {name}: {e:#}"))
+            })?;
+        Response::ok(DeleteSecretResponse::default())
+    }
+
+    async fn begin_steam_qr_login<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        _request: ServiceRequest<'_, BeginSteamQrLoginRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<BeginSteamQrLoginResponse> + Send + use<'a>> {
+        // Straight passthrough: the Steam CM connection this opens lives
+        // in sync-daemon, which is the process that ultimately needs the
+        // session. Nothing about it is held here.
+        let (session_id, challenge_url) = self
+            .sync_client
+            .begin_qr_login()
+            .await
+            .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
+        Response::ok(BeginSteamQrLoginResponse {
+            session_id,
+            challenge_url,
+            ..Default::default()
+        })
+    }
+
+    async fn poll_steam_qr_login<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        request: ServiceRequest<'_, PollSteamQrLoginRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<PollSteamQrLoginResponse> + Send + use<'a>> {
+        let (confirmed, username) = self
+            .sync_client
+            .poll_qr_login(request.session_id)
+            .await
+            .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
+        Response::ok(PollSteamQrLoginResponse {
+            confirmed,
+            username,
+            ..Default::default()
+        })
+    }
+
     async fn export_state<'a>(
         &'a self,
         _ctx: RequestContext,
@@ -188,12 +381,14 @@ fn to_acl_subject(row: registry_db::AclSubjectRow) -> AclSubject {
         .into_iter()
         .zip(row.provider_user_ids)
         .zip(row.display_names)
-        .map(|((provider, provider_user_id), display_name)| LinkedAccountInfo {
-            provider,
-            provider_user_id,
-            display_name,
-            ..Default::default()
-        })
+        .map(
+            |((provider, provider_user_id), display_name)| LinkedAccountInfo {
+                provider,
+                provider_user_id,
+                display_name,
+                ..Default::default()
+            },
+        )
         .collect();
     AclSubject {
         subject: row.subject,
@@ -201,4 +396,27 @@ fn to_acl_subject(row: registry_db::AclSubjectRow) -> AclSubject {
         scopes: row.scopes,
         ..Default::default()
     }
+}
+
+/// Kubernetes object names are DNS-1123 subdomains; rejecting here gives
+/// a caller a straight answer instead of an opaque apply failure, and
+/// keeps a name like "../other" from ever reaching the API server.
+fn validate_secret_name(name: &str) -> Result<(), ConnectError> {
+    if name.is_empty() || name.len() > 253 {
+        return Err(ConnectError::invalid_argument(
+            "secret name must be 1-253 characters",
+        ));
+    }
+    let valid = name
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '-' | '.'))
+        && name.starts_with(|c: char| c.is_ascii_lowercase() || c.is_ascii_digit())
+        && name.ends_with(|c: char| c.is_ascii_lowercase() || c.is_ascii_digit());
+    if !valid {
+        return Err(ConnectError::invalid_argument(format!(
+            "invalid secret name {name:?}: lowercase letters, digits, '-' and '.' only, \
+             starting and ending with a letter or digit"
+        )));
+    }
+    Ok(())
 }
