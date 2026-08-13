@@ -16,7 +16,7 @@ import { servers } from "../api/clients";
 import { Banner, Button, Field, Spinner } from "./ui";
 import { useAsync } from "./useAsync";
 
-interface ParsedLine {
+export interface ParsedLine {
   raw: string;
   timestamp?: string;
   level?: string;
@@ -30,7 +30,7 @@ interface ParsedLine {
 /// tracing's JSON layer nests user fields under "fields" and puts the
 /// message inside it, but flattens some shapes -- both are handled rather
 /// than assuming one.
-function parseLine(raw: string): ParsedLine {
+export function parseLine(raw: string): ParsedLine {
   const trimmed = raw.trim();
   if (!trimmed.startsWith("{")) return { raw };
   try {

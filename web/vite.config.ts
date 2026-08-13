@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
@@ -9,6 +10,13 @@ export default defineConfig({
   // to the Connect catch-all and comes back as an RPC error, not JS.
   base: "/ui/",
   build: { outDir: "dist", emptyOutDir: true },
+  test: {
+    // jsdom rather than the default node environment: the things worth
+    // testing here touch the DOM, URL/location, and sessionStorage.
+    environment: "jsdom",
+    globals: true,
+    restoreMocks: true,
+  },
   server: {
     // `npm run dev` serves the SPA itself but has no backend; point RPC
     // and auth calls at a real cluster with
