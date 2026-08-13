@@ -41,6 +41,11 @@ fn required_scope(path: &str) -> Option<&'static str> {
         "/registry.v1.AdminService/RefreshSteamAuth" => Some("admin:steam-auth"),
         "/registry.v1.AdminService/ExportState" => Some("admin:export"),
         "/registry.v1.AdminService/ImportState" => Some("admin:import"),
+        // Its own scope: this is the one RPC that can change who may
+        // call any of the others, so it is not folded into a broader
+        // admin scope.
+        "/registry.v1.AdminService/ListAcl" => Some("admin:acl"),
+        "/registry.v1.AdminService/SetAclScopes" => Some("admin:acl"),
         _ => None,
     }
 }

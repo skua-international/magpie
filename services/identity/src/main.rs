@@ -95,6 +95,7 @@ async fn main() -> Result<()> {
             get(|| async move { prometheus_handle.render() }),
         )
         .route("/.well-known/jwks.json", get(handlers::jwks))
+        .route("/auth/providers", get(handlers::providers))
         .route("/auth/{provider}/start", get(handlers::start))
         .route("/auth/{provider}/callback", get(handlers::callback))
         .route("/auth/refresh", post(handlers::refresh))

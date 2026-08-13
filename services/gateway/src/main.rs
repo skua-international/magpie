@@ -19,6 +19,7 @@ use connectrpc::Router as ConnectRouter;
 use gateway::config::Config;
 use gateway::service::ServerServiceImpl;
 use kube::Client;
+use tower_http::services::{ServeDir, ServeFile};
 use metrics_exporter_prometheus::PrometheusBuilder;
 use sync_client::SyncClient;
 use tracing::info;
@@ -79,13 +80,39 @@ async fn main() -> Result<()> {
         .layer(middleware::from_fn_with_state(auth_state, require_auth))
         .service(connect.into_axum_service());
 
-    let app = Router::new()
+    let mut app = Router::new()
         .route("/healthz", get(|| async { "ok" }))
         .route(
             "/metrics",
             get(|| async move { prometheus_handle.render() }),
         )
         .fallback_service(connect_service);
+
+    // Mounted at /ui rather than taking "/" because "/" is already the
+    // catch-all that reaches the Connect services -- claiming it for the
+    // UI would mean enumerating every RPC path explicitly, and moving
+    // /healthz and /metrics too. /ui is one prefix that needs no other
+    // routing to change, in this router or in the chart's Ingress (which
+    // routes the whole of "/" here already, so /ui needs no entry there
+    // at all).
+    //
+    // Deliberately NOT behind require_auth: the SPA has to load before
+    // anyone can log in through it, and these are public static assets --
+    // every byte of data behind them still goes through an authenticated
+    // RPC. Authenticating the bundle itself would be a login page that
+    // requires being logged in to fetch.
+    if let Some(ui_dir) = &cfg.ui_dir {
+        // index.html as the fallback, not a 404: the SPA does its own
+        // client-side routing, so a deep link or a refresh on /ui/servers
+        // has to return the app shell for any path that isn't a real
+        // file, and let the router sort it out.
+        let index = ui_dir.join("index.html");
+        let serve = ServeDir::new(ui_dir).fallback(ServeFile::new(index));
+        app = app.nest_service("/ui", serve);
+        info!("serving web UI from {}", ui_dir.display());
+    } else {
+        info!("no UI_DIR configured (or it does not exist) -- not serving a web UI");
+    }
 
     let listener = tokio::net::TcpListener::bind(&cfg.listen_addr).await?;
     info!("listening on {}", cfg.listen_addr);

@@ -1,11 +1,15 @@
 {
-  "name": "magpie-release-tooling",
+  "name": "@skua-international/magpie-workspace",
+  "version": "0.0.0-unreleased",
   "private": true,
-  "description": "Root Node tooling for release automation (semantic-release) -- not an npm package, the rest of this repo is Rust. See release.config.js and .github/workflows/release.yml.",
-  "devDependencies": {
-    "semantic-release": "^25.0.7",
-    "@semantic-release/commit-analyzer": "^13.0.1",
-    "@semantic-release/release-notes-generator": "^14.1.1",
-    "@semantic-release/github": "^12.0.9"
+  "description": "npm workspace root -- exists so generated/ts and web share one hoisted node_modules.",
+  "//": "generated/ts declares its own runtime deps (@bufbuild/protobuf, @connectrpc/connect) but nothing installs them there: .github/workflows/generate-stubs.yml deliberately keeps node_modules out of that directory, and web/ is a sibling rather than an ancestor so module resolution never walks into it. Declaring both as workspaces hoists their deps here instead, which leaves the generated tree exactly as CI produces it while making its imports resolve.",
+  "workspaces": [
+    "generated/ts",
+    "web"
+  ],
+  "scripts": {
+    "build:web": "npm run build --workspace @skua-international/magpie-web",
+    "typecheck:web": "npm run typecheck --workspace @skua-international/magpie-web"
   }
 }

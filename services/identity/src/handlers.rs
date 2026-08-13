@@ -71,6 +71,36 @@ pub async fn healthz() -> &'static str {
     "ok"
 }
 
+/// `GET /auth/providers` -- which login providers this deployment can
+/// actually complete a login with.
+///
+/// A provider is only enabled when both its client id and secret are
+/// present (see Config::from_env), so the set is deployment-specific and
+/// a client has no way to know it otherwise: asking for an unconfigured
+/// one 404s with "provider not configured". Without this, a UI has to
+/// hardcode the full list and offer buttons that are guaranteed to fail.
+///
+/// Steam is always present -- it's OpenID 2.0 and needs no app
+/// registration or credentials at all, so it works on a cluster where
+/// nothing else is set up.
+///
+/// Unauthenticated on purpose: it is consumed by a login screen, so
+/// requiring a token would be circular, and it discloses nothing beyond
+/// which public login buttons to draw.
+pub async fn providers(State(app): State<Arc<AppState>>) -> Json<serde_json::Value> {
+    let mut names = vec!["steam".to_string()];
+    // Sorted so the button order is stable across restarts rather than
+    // following HashMap iteration order.
+    let mut configured: Vec<&'static str> = app
+        .oauth_providers
+        .keys()
+        .map(|kind| kind.as_str())
+        .collect();
+    configured.sort_unstable();
+    names.extend(configured.into_iter().map(str::to_string));
+    Json(serde_json::json!({ "providers": names }))
+}
+
 pub async fn jwks(State(app): State<Arc<AppState>>) -> Json<serde_json::Value> {
     Json(app.signer.jwks_json())
 }

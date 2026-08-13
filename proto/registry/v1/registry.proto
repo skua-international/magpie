@@ -234,6 +234,69 @@ service AdminService {
   // original Steam/preset URL), never by ID -- ModSource IDs are
   // regenerated on every import and never match the export's own.
   rpc ImportState(ImportStateRequest) returns (ImportStateResponse);
+
+  // Who currently holds which scopes, plus the scope vocabulary itself.
+  // Until this existed, `acl_grants` could be written (registry_db's
+  // grant_scopes, called on first-ever login) and read one subject at a
+  // time by the authorization middleware, but never enumerated -- there
+  // was no way to answer "who has access to this cluster" short of
+  // querying Postgres by hand.
+  //
+  // Returns every user, not only those holding a grant, since granting
+  // to someone who has logged in but has no scopes yet is the common
+  // case. `known_scopes` comes from the server rather than being a
+  // constant in each client so a new scope can't silently go missing
+  // from a UI that hasn't been rebuilt.
+  rpc ListAcl(ListAclRequest) returns (ListAclResponse);
+
+  // Replaces `subject`'s scope set outright -- not a delta. The UI edits
+  // a whole checkbox set and submits it, and a set operation makes that
+  // idempotent and free of read-modify-write races between two admins
+  // editing different people at once.
+  //
+  // Guarded by its own `admin:acl` scope, deliberately separate from
+  // every other admin scope: this is the one RPC that can change who can
+  // call anything else, including granting `*` (see AclSubject.scopes),
+  // so holding it is equivalent to holding everything eventually.
+  rpc SetAclScopes(SetAclScopesRequest) returns (SetAclScopesResponse);
+}
+
+// A provider login attached to a user -- what a human actually recognizes
+// someone by, since `AclSubject.subject` is an opaque user id.
+message LinkedAccountInfo {
+  string provider = 1;
+  string provider_user_id = 2;
+  string display_name = 3;
+}
+
+message AclSubject {
+  // The JWT `sub` this grant is keyed by -- a stringified user id.
+  string subject = 1;
+  repeated LinkedAccountInfo accounts = 2;
+  // `"*"` here means every scope, present or future -- there's no role
+  // hierarchy, so it's the one coarse "full admin" grant. The first
+  // person ever to sign in gets it automatically.
+  repeated string scopes = 3;
+}
+
+message ListAclRequest {}
+
+message ListAclResponse {
+  repeated AclSubject subjects = 1;
+  // Every scope this cluster's services actually enforce, for a client to
+  // offer as choices rather than free-typing a string that matches
+  // nothing. Does not include `"*"`, which is meaningful but isn't a
+  // scope any single RPC requires.
+  repeated string known_scopes = 2;
+}
+
+message SetAclScopesRequest {
+  string subject = 1;
+  repeated string scopes = 2;
+}
+
+message SetAclScopesResponse {
+  AclSubject subject = 1;
 }
 
 enum ExportedDesiredState {

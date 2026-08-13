@@ -22,6 +22,7 @@ sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio",
 sync-client = { path = "../../crates/sync-client" }
 tokio = { version = "1.53.0", features = ["rt-multi-thread", "macros", "net"] }
 tower = "0.5.3"
+tower-http = { version = "0.6", features = ["fs"] }
 tracing = "0.1.44"
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }

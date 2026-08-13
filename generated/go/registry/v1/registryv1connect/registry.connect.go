@@ -82,6 +82,11 @@ const (
 	// AdminServiceImportStateProcedure is the fully-qualified name of the AdminService's ImportState
 	// RPC.
 	AdminServiceImportStateProcedure = "/registry.v1.AdminService/ImportState"
+	// AdminServiceListAclProcedure is the fully-qualified name of the AdminService's ListAcl RPC.
+	AdminServiceListAclProcedure = "/registry.v1.AdminService/ListAcl"
+	// AdminServiceSetAclScopesProcedure is the fully-qualified name of the AdminService's SetAclScopes
+	// RPC.
+	AdminServiceSetAclScopesProcedure = "/registry.v1.AdminService/SetAclScopes"
 )
 
 // ModSourceServiceClient is a client for the registry.v1.ModSourceService service.
@@ -523,6 +528,29 @@ type AdminServiceClient interface {
 	// original Steam/preset URL), never by ID -- ModSource IDs are
 	// regenerated on every import and never match the export's own.
 	ImportState(context.Context, *connect.Request[v1.ImportStateRequest]) (*connect.Response[v1.ImportStateResponse], error)
+	// Who currently holds which scopes, plus the scope vocabulary itself.
+	// Until this existed, `acl_grants` could be written (registry_db's
+	// grant_scopes, called on first-ever login) and read one subject at a
+	// time by the authorization middleware, but never enumerated -- there
+	// was no way to answer "who has access to this cluster" short of
+	// querying Postgres by hand.
+	//
+	// Returns every user, not only those holding a grant, since granting
+	// to someone who has logged in but has no scopes yet is the common
+	// case. `known_scopes` comes from the server rather than being a
+	// constant in each client so a new scope can't silently go missing
+	// from a UI that hasn't been rebuilt.
+	ListAcl(context.Context, *connect.Request[v1.ListAclRequest]) (*connect.Response[v1.ListAclResponse], error)
+	// Replaces `subject`'s scope set outright -- not a delta. The UI edits
+	// a whole checkbox set and submits it, and a set operation makes that
+	// idempotent and free of read-modify-write races between two admins
+	// editing different people at once.
+	//
+	// Guarded by its own `admin:acl` scope, deliberately separate from
+	// every other admin scope: this is the one RPC that can change who can
+	// call anything else, including granting `*` (see AclSubject.scopes),
+	// so holding it is equivalent to holding everything eventually.
+	SetAclScopes(context.Context, *connect.Request[v1.SetAclScopesRequest]) (*connect.Response[v1.SetAclScopesResponse], error)
 }
 
 // NewAdminServiceClient constructs a client for the registry.v1.AdminService service. By default,
@@ -560,6 +588,18 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("ImportState")),
 			connect.WithClientOptions(opts...),
 		),
+		listAcl: connect.NewClient[v1.ListAclRequest, v1.ListAclResponse](
+			httpClient,
+			baseURL+AdminServiceListAclProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListAcl")),
+			connect.WithClientOptions(opts...),
+		),
+		setAclScopes: connect.NewClient[v1.SetAclScopesRequest, v1.SetAclScopesResponse](
+			httpClient,
+			baseURL+AdminServiceSetAclScopesProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("SetAclScopes")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -569,6 +609,8 @@ type adminServiceClient struct {
 	refreshSteamAuth *connect.Client[v1.RefreshSteamAuthRequest, v1.RefreshSteamAuthResponse]
 	exportState      *connect.Client[v1.ExportStateRequest, v1.ExportStateResponse]
 	importState      *connect.Client[v1.ImportStateRequest, v1.ImportStateResponse]
+	listAcl          *connect.Client[v1.ListAclRequest, v1.ListAclResponse]
+	setAclScopes     *connect.Client[v1.SetAclScopesRequest, v1.SetAclScopesResponse]
 }
 
 // GetDiskUsage calls registry.v1.AdminService.GetDiskUsage.
@@ -589,6 +631,16 @@ func (c *adminServiceClient) ExportState(ctx context.Context, req *connect.Reque
 // ImportState calls registry.v1.AdminService.ImportState.
 func (c *adminServiceClient) ImportState(ctx context.Context, req *connect.Request[v1.ImportStateRequest]) (*connect.Response[v1.ImportStateResponse], error) {
 	return c.importState.CallUnary(ctx, req)
+}
+
+// ListAcl calls registry.v1.AdminService.ListAcl.
+func (c *adminServiceClient) ListAcl(ctx context.Context, req *connect.Request[v1.ListAclRequest]) (*connect.Response[v1.ListAclResponse], error) {
+	return c.listAcl.CallUnary(ctx, req)
+}
+
+// SetAclScopes calls registry.v1.AdminService.SetAclScopes.
+func (c *adminServiceClient) SetAclScopes(ctx context.Context, req *connect.Request[v1.SetAclScopesRequest]) (*connect.Response[v1.SetAclScopesResponse], error) {
+	return c.setAclScopes.CallUnary(ctx, req)
 }
 
 // AdminServiceHandler is an implementation of the registry.v1.AdminService service.
@@ -620,6 +672,29 @@ type AdminServiceHandler interface {
 	// original Steam/preset URL), never by ID -- ModSource IDs are
 	// regenerated on every import and never match the export's own.
 	ImportState(context.Context, *connect.Request[v1.ImportStateRequest]) (*connect.Response[v1.ImportStateResponse], error)
+	// Who currently holds which scopes, plus the scope vocabulary itself.
+	// Until this existed, `acl_grants` could be written (registry_db's
+	// grant_scopes, called on first-ever login) and read one subject at a
+	// time by the authorization middleware, but never enumerated -- there
+	// was no way to answer "who has access to this cluster" short of
+	// querying Postgres by hand.
+	//
+	// Returns every user, not only those holding a grant, since granting
+	// to someone who has logged in but has no scopes yet is the common
+	// case. `known_scopes` comes from the server rather than being a
+	// constant in each client so a new scope can't silently go missing
+	// from a UI that hasn't been rebuilt.
+	ListAcl(context.Context, *connect.Request[v1.ListAclRequest]) (*connect.Response[v1.ListAclResponse], error)
+	// Replaces `subject`'s scope set outright -- not a delta. The UI edits
+	// a whole checkbox set and submits it, and a set operation makes that
+	// idempotent and free of read-modify-write races between two admins
+	// editing different people at once.
+	//
+	// Guarded by its own `admin:acl` scope, deliberately separate from
+	// every other admin scope: this is the one RPC that can change who can
+	// call anything else, including granting `*` (see AclSubject.scopes),
+	// so holding it is equivalent to holding everything eventually.
+	SetAclScopes(context.Context, *connect.Request[v1.SetAclScopesRequest]) (*connect.Response[v1.SetAclScopesResponse], error)
 }
 
 // NewAdminServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -653,6 +728,18 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(adminServiceMethods.ByName("ImportState")),
 		connect.WithHandlerOptions(opts...),
 	)
+	adminServiceListAclHandler := connect.NewUnaryHandler(
+		AdminServiceListAclProcedure,
+		svc.ListAcl,
+		connect.WithSchema(adminServiceMethods.ByName("ListAcl")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceSetAclScopesHandler := connect.NewUnaryHandler(
+		AdminServiceSetAclScopesProcedure,
+		svc.SetAclScopes,
+		connect.WithSchema(adminServiceMethods.ByName("SetAclScopes")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/registry.v1.AdminService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AdminServiceGetDiskUsageProcedure:
@@ -663,6 +750,10 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServiceExportStateHandler.ServeHTTP(w, r)
 		case AdminServiceImportStateProcedure:
 			adminServiceImportStateHandler.ServeHTTP(w, r)
+		case AdminServiceListAclProcedure:
+			adminServiceListAclHandler.ServeHTTP(w, r)
+		case AdminServiceSetAclScopesProcedure:
+			adminServiceSetAclScopesHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -686,4 +777,12 @@ func (UnimplementedAdminServiceHandler) ExportState(context.Context, *connect.Re
 
 func (UnimplementedAdminServiceHandler) ImportState(context.Context, *connect.Request[v1.ImportStateRequest]) (*connect.Response[v1.ImportStateResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.ImportState is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListAcl(context.Context, *connect.Request[v1.ListAclRequest]) (*connect.Response[v1.ListAclResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.ListAcl is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) SetAclScopes(context.Context, *connect.Request[v1.SetAclScopesRequest]) (*connect.Response[v1.SetAclScopesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.SetAclScopes is not implemented"))
 }

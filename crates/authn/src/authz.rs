@@ -122,3 +122,41 @@ pub async fn require_auth(
     );
     response
 }
+
+/// Every scope this cluster's services actually enforce, in the order a
+/// UI should offer them.
+///
+/// Lives here rather than in either service because the set spans both:
+/// `servers:*` is enforced by gateway, everything else by registry, and
+/// `arma:*` by neither -- those two are read straight out of the grant
+/// table by services/controller to populate a server's `admins[]` and
+/// `filePatchingExceptions[]`, so they're real grants with no RPC behind
+/// them. A list assembled from any one service's `required_scope` table
+/// would silently omit the others.
+///
+/// `"*"` is deliberately absent: it means "every scope", but no single
+/// RPC requires it, so it isn't a choice to offer alongside the rest --
+/// `AdminService.SetAclScopes` accepts it as a special case.
+///
+/// Adding a scope to a `required_scope` table without adding it here
+/// leaves it ungrantable through any UI, so the two have to move
+/// together.
+pub const KNOWN_SCOPES: &[&str] = &[
+    "servers:read",
+    "servers:write",
+    "mod-sources:read",
+    "mod-sources:write",
+    "mod-sources:invalidate",
+    "missions:read",
+    "missions:write",
+    "admin:disk-usage",
+    "admin:steam-auth",
+    "admin:export",
+    "admin:import",
+    // Can change who holds anything above, including granting "*".
+    "admin:acl",
+    // No RPC: read from the grant table by services/controller when
+    // rendering main.cfg.
+    "arma:admin",
+    "arma:filepatch",
+];

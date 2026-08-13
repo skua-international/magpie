@@ -189,6 +189,78 @@ pub async fn steam_ids_with_scope(pool: &PgPool, scope: &str) -> sqlx::Result<Ve
     .await
 }
 
+/// One row per user, with their linked accounts and current scopes --
+/// what `AdminService.ListAcl` serves.
+///
+/// LEFT JOINs from `users`, not from `acl_grants`, on purpose: someone who
+/// has logged in but holds no scopes yet has no `acl_grants` row at all,
+/// and they're exactly who an admin is usually looking for. Starting from
+/// the grant table would list only people who already have access.
+pub async fn list_acl_subjects(pool: &PgPool) -> sqlx::Result<Vec<AclSubjectRow>> {
+    // Accounts are aggregated into arrays here rather than fetched in a
+    // second per-user query -- one round trip regardless of user count,
+    // and the ordering is fixed so the UI doesn't reshuffle between
+    // refreshes. COALESCE keeps a user with no grant row (or no linked
+    // account, which shouldn't happen but isn't enforced) as empty
+    // arrays instead of NULLs.
+    sqlx::query_as(
+        "SELECT
+             u.id::text AS subject,
+             COALESCE(g.scopes, ARRAY[]::text[]) AS scopes,
+             COALESCE(
+                 array_agg(la.provider ORDER BY la.provider)
+                     FILTER (WHERE la.provider IS NOT NULL),
+                 ARRAY[]::text[]
+             ) AS providers,
+             COALESCE(
+                 array_agg(la.provider_user_id ORDER BY la.provider)
+                     FILTER (WHERE la.provider IS NOT NULL),
+                 ARRAY[]::text[]
+             ) AS provider_user_ids,
+             COALESCE(
+                 array_agg(la.display_name ORDER BY la.provider)
+                     FILTER (WHERE la.provider IS NOT NULL),
+                 ARRAY[]::text[]
+             ) AS display_names
+         FROM users u
+         LEFT JOIN acl_grants g ON g.subject = u.id::text
+         LEFT JOIN linked_accounts la ON la.user_id = u.id
+         GROUP BY u.id, g.scopes
+         ORDER BY u.created_at",
+    )
+    .fetch_all(pool)
+    .await
+}
+
+/// Three parallel arrays rather than a composite type: sqlx maps Postgres
+/// arrays of scalars directly, whereas an array of ROW(...) needs a
+/// custom Decode impl for what is only ever zipped back together
+/// immediately. They're aggregated with the same ORDER BY, so index `i`
+/// is one account across all three.
+#[derive(sqlx::FromRow)]
+pub struct AclSubjectRow {
+    pub subject: String,
+    pub scopes: Vec<String>,
+    pub providers: Vec<String>,
+    pub provider_user_ids: Vec<String>,
+    pub display_names: Vec<String>,
+}
+
+/// Replaces `subject`'s scopes, or removes the row entirely when `scopes`
+/// is empty -- "no grant row" and "a grant row holding no scopes" are
+/// indistinguishable to `scopes_for_subject`, and not leaving empty rows
+/// behind keeps the table to actual grant holders.
+pub async fn set_scopes(pool: &PgPool, subject: &str, scopes: &[String]) -> sqlx::Result<()> {
+    if scopes.is_empty() {
+        sqlx::query("DELETE FROM acl_grants WHERE subject = $1")
+            .bind(subject)
+            .execute(pool)
+            .await?;
+        return Ok(());
+    }
+    grant_scopes(pool, subject, scopes).await
+}
+
 pub async fn grant_scopes(pool: &PgPool, subject: &str, scopes: &[String]) -> sqlx::Result<()> {
     sqlx::query(
         "INSERT INTO acl_grants (subject, scopes) VALUES ($1, $2)

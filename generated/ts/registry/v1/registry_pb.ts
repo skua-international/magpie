@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file registry/v1/registry.proto.
  */
 export const file_registry_v1_registry: GenFile = /*@__PURE__*/
-  fileDesc("ChpyZWdpc3RyeS92MS9yZWdpc3RyeS5wcm90bxILcmVnaXN0cnkudjEikgEKE0FkZE1vZFNvdXJjZVJlcXVlc3QSEgoIaHRtbF91cmwYASABKAlIABIWCgxodG1sX2NvbnRlbnQYAiABKAlIABITCglzdGVhbV91cmwYAyABKAlIABIwCglsb2NhbF9tb2QYBCABKAsyGy5yZWdpc3RyeS52MS5Mb2NhbE1vZFVwbG9hZEgAQggKBnNvdXJjZSI4Cg5Mb2NhbE1vZFVwbG9hZBIRCgl1bmlxdWVfaWQYASABKAkSEwoLemlwX2NvbnRlbnQYAiABKAwiIgoUQWRkTW9kU291cmNlUmVzcG9uc2USCgoCaWQYASABKAkiJAoWRGVsZXRlTW9kU291cmNlUmVxdWVzdBIKCgJpZBgBIAEoCSIZChdEZWxldGVNb2RTb3VyY2VSZXNwb25zZSIiChRTeW5jTW9kU291cmNlUmVxdWVzdBIKCgJpZBgBIAEoCSIXChVTeW5jTW9kU291cmNlUmVzcG9uc2UiFwoVTGlzdFN5bmNlZE1vZHNSZXF1ZXN0IlMKCVN5bmNlZE1vZBIOCgZtb2RfaWQYASABKAQSEwoLbWFuaWZlc3RfaWQYAiABKAQSEgoKc2l6ZV9ieXRlcxgDIAEoBBINCgV0aXRsZRgEIAEoCSI+ChZMaXN0U3luY2VkTW9kc1Jlc3BvbnNlEiQKBG1vZHMYASADKAsyFi5yZWdpc3RyeS52MS5TeW5jZWRNb2QiJgoUSW52YWxpZGF0ZU1vZFJlcXVlc3QSDgoGbW9kX2lkGAEgASgEIhcKFUludmFsaWRhdGVNb2RSZXNwb25zZSIlChNHZXRTeW5jZWRNb2RSZXF1ZXN0Eg4KBm1vZF9pZBgBIAEoBCJ5ChRHZXRTeW5jZWRNb2RSZXNwb25zZRIoCgNtb2QYASABKAsyFi5yZWdpc3RyeS52MS5TeW5jZWRNb2RIAIgBARIvCgttb2Rfc291cmNlcxgCIAMoCzIaLnJlZ2lzdHJ5LnYxLk1vZFNvdXJjZUluZm9CBgoEX21vZCKeAQoNTW9kU291cmNlSW5mbxIKCgJpZBgBIAEoCRIoCgRraW5kGAIgASgOMhoucmVnaXN0cnkudjEuTW9kU291cmNlS2luZBIRCglyZWZlcmVuY2UYAyABKAkSFAoMZGlzcGxheV9uYW1lGAQgASgJEhoKEmNyZWF0ZWRfYXRfdW5peF9tcxgFIAEoAxISCgpzaXplX2J5dGVzGAYgASgEIhcKFUxpc3RNb2RTb3VyY2VzUmVxdWVzdCJFChZMaXN0TW9kU291cmNlc1Jlc3BvbnNlEisKB3NvdXJjZXMYASADKAsyGi5yZWdpc3RyeS52MS5Nb2RTb3VyY2VJbmZvIlEKFFVwbG9hZE1pc3Npb25SZXF1ZXN0EgwKBG5hbWUYASABKAkSEwoLcGJvX2NvbnRlbnQYAiABKAwSDwoCaWQYAyABKAlIAIgBAUIFCgNfaWQiaQoLTWlzc2lvbkluZm8SCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIQCghmaWxlc2l6ZRgDIAEoBBIaChJjcmVhdGVkX2F0X3VuaXhfbXMYBCABKAMSEgoKY3JlYXRlZF9ieRgFIAEoCSIfChFHZXRNaXNzaW9uUmVxdWVzdBIKCgJpZBgBIAEoCSIVChNMaXN0TWlzc2lvbnNSZXF1ZXN0IkIKFExpc3RNaXNzaW9uc1Jlc3BvbnNlEioKCG1pc3Npb25zGAEgAygLMhgucmVnaXN0cnkudjEuTWlzc2lvbkluZm8igAEKEUV4cG9ydGVkTW9kU291cmNlEigKBGtpbmQYASABKA4yGi5yZWdpc3RyeS52MS5Nb2RTb3VyY2VLaW5kEhEKCXJlZmVyZW5jZRgCIAEoCRIUCgxkaXNwbGF5X25hbWUYAyABKAkSGAoQcmVzb2x2ZWRfbW9kX2lkcxgEIAMoBCKGAQoRRXhwb3J0ZWRDb25maWdNYXASDAoEbmFtZRgBIAEoCRI2CgRkYXRhGAIgAygLMigucmVnaXN0cnkudjEuRXhwb3J0ZWRDb25maWdNYXAuRGF0YUVudHJ5GisKCURhdGFFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIs4CCg5FeHBvcnRlZFNlcnZlchIMCgRuYW1lGAEgASgJEgwKBHBvcnQYAiABKA0SHQoVbW9kX3NvdXJjZV9yZWZlcmVuY2VzGAMgAygJEhcKCmNvbmZpZ19tYXAYBCABKAlIAIgBARIMCgRjZGxjGAUgAygJEhEKCXByb2ZpbGluZxgGIAEoCBI4Cg1kZXNpcmVkX3N0YXRlGAggASgOMiEucmVnaXN0cnkudjEuRXhwb3J0ZWREZXNpcmVkU3RhdGUSGQoMbWV0cmljc19wb3J0GAkgASgNSAGIAQESGQoMbWV0cmljc19wYXRoGAogASgJSAKIAQESGAoQaGVhZGxlc3NfY2xpZW50cxgLIAEoDUINCgtfY29uZmlnX21hcEIPCg1fbWV0cmljc19wb3J0Qg8KDV9tZXRyaWNzX3BhdGhKBAgHEAhSBnBhcmFtcyIUChJFeHBvcnRTdGF0ZVJlcXVlc3Qi9AEKE0V4cG9ydFN0YXRlUmVzcG9uc2USFgoOc2NoZW1hX3ZlcnNpb24YBiABKA0SGwoTZXhwb3J0ZWRfYXRfcmZjMzMzORgBIAEoCRIzCgttb2Rfc291cmNlcxgCIAMoCzIeLnJlZ2lzdHJ5LnYxLkV4cG9ydGVkTW9kU291cmNlEjMKC2NvbmZpZ19tYXBzGAMgAygLMh4ucmVnaXN0cnkudjEuRXhwb3J0ZWRDb25maWdNYXASLAoHc2VydmVycxgEIAMoCzIbLnJlZ2lzdHJ5LnYxLkV4cG9ydGVkU2VydmVyEhAKCHdhcm5pbmdzGAUgAygJIqwBChJJbXBvcnRTdGF0ZVJlcXVlc3QSMwoLbW9kX3NvdXJjZXMYASADKAsyHi5yZWdpc3RyeS52MS5FeHBvcnRlZE1vZFNvdXJjZRIzCgtjb25maWdfbWFwcxgCIAMoCzIeLnJlZ2lzdHJ5LnYxLkV4cG9ydGVkQ29uZmlnTWFwEiwKB3NlcnZlcnMYAyADKAsyGy5yZWdpc3RyeS52MS5FeHBvcnRlZFNlcnZlciInChNJbXBvcnRTdGF0ZVJlc3BvbnNlEhAKCHdhcm5pbmdzGAEgAygJIhUKE0dldERpc2tVc2FnZVJlcXVlc3QicQoUR2V0RGlza1VzYWdlUmVzcG9uc2USEgoKbW9kc19ieXRlcxgBIAEoBBIWCg5taXNzaW9uc19ieXRlcxgCIAEoBBIYChBnYW1lX2ZpbGVzX2J5dGVzGAMgASgEEhMKC3RvdGFsX2J5dGVzGAQgASgEIkIKF1JlZnJlc2hTdGVhbUF1dGhSZXF1ZXN0EhAKCHVzZXJuYW1lGAEgASgJEhUKDXJlZnJlc2hfdG9rZW4YAiABKAkiGgoYUmVmcmVzaFN0ZWFtQXV0aFJlc3BvbnNlIiIKFERlbGV0ZU1pc3Npb25SZXF1ZXN0EgoKAmlkGAEgASgJIhcKFURlbGV0ZU1pc3Npb25SZXNwb25zZSqgAQoNTW9kU291cmNlS2luZBIfChtNT0RfU09VUkNFX0tJTkRfVU5TUEVDSUZJRUQQABIXChNNT0RfU09VUkNFX0tJTkRfTU9EEAESHgoaTU9EX1NPVVJDRV9LSU5EX0NPTExFQ1RJT04QAhIZChVNT0RfU09VUkNFX0tJTkRfTE9DQUwQAxIaChZNT0RfU09VUkNFX0tJTkRfUFJFU0VUEAQqhgEKFEV4cG9ydGVkRGVzaXJlZFN0YXRlEiYKIkVYUE9SVEVEX0RFU0lSRURfU1RBVEVfVU5TUEVDSUZJRUQQABIiCh5FWFBPUlRFRF9ERVNJUkVEX1NUQVRFX1JVTk5JTkcQARIiCh5FWFBPUlRFRF9ERVNJUkVEX1NUQVRFX1NUT1BQRUQQAjKABQoQTW9kU291cmNlU2VydmljZRJTCgxBZGRNb2RTb3VyY2USIC5yZWdpc3RyeS52MS5BZGRNb2RTb3VyY2VSZXF1ZXN0GiEucmVnaXN0cnkudjEuQWRkTW9kU291cmNlUmVzcG9uc2USXAoPRGVsZXRlTW9kU291cmNlEiMucmVnaXN0cnkudjEuRGVsZXRlTW9kU291cmNlUmVxdWVzdBokLnJlZ2lzdHJ5LnYxLkRlbGV0ZU1vZFNvdXJjZVJlc3BvbnNlElkKDkxpc3RNb2RTb3VyY2VzEiIucmVnaXN0cnkudjEuTGlzdE1vZFNvdXJjZXNSZXF1ZXN0GiMucmVnaXN0cnkudjEuTGlzdE1vZFNvdXJjZXNSZXNwb25zZRJWCg1TeW5jTW9kU291cmNlEiEucmVnaXN0cnkudjEuU3luY01vZFNvdXJjZVJlcXVlc3QaIi5yZWdpc3RyeS52MS5TeW5jTW9kU291cmNlUmVzcG9uc2USWQoOTGlzdFN5bmNlZE1vZHMSIi5yZWdpc3RyeS52MS5MaXN0U3luY2VkTW9kc1JlcXVlc3QaIy5yZWdpc3RyeS52MS5MaXN0U3luY2VkTW9kc1Jlc3BvbnNlElYKDUludmFsaWRhdGVNb2QSIS5yZWdpc3RyeS52MS5JbnZhbGlkYXRlTW9kUmVxdWVzdBoiLnJlZ2lzdHJ5LnYxLkludmFsaWRhdGVNb2RSZXNwb25zZRJTCgxHZXRTeW5jZWRNb2QSIC5yZWdpc3RyeS52MS5HZXRTeW5jZWRNb2RSZXF1ZXN0GiEucmVnaXN0cnkudjEuR2V0U3luY2VkTW9kUmVzcG9uc2Uy0wIKDk1pc3Npb25TZXJ2aWNlEkwKDVVwbG9hZE1pc3Npb24SIS5yZWdpc3RyeS52MS5VcGxvYWRNaXNzaW9uUmVxdWVzdBoYLnJlZ2lzdHJ5LnYxLk1pc3Npb25JbmZvEkYKCkdldE1pc3Npb24SHi5yZWdpc3RyeS52MS5HZXRNaXNzaW9uUmVxdWVzdBoYLnJlZ2lzdHJ5LnYxLk1pc3Npb25JbmZvElMKDExpc3RNaXNzaW9ucxIgLnJlZ2lzdHJ5LnYxLkxpc3RNaXNzaW9uc1JlcXVlc3QaIS5yZWdpc3RyeS52MS5MaXN0TWlzc2lvbnNSZXNwb25zZRJWCg1EZWxldGVNaXNzaW9uEiEucmVnaXN0cnkudjEuRGVsZXRlTWlzc2lvblJlcXVlc3QaIi5yZWdpc3RyeS52MS5EZWxldGVNaXNzaW9uUmVzcG9uc2Uy6AIKDEFkbWluU2VydmljZRJTCgxHZXREaXNrVXNhZ2USIC5yZWdpc3RyeS52MS5HZXREaXNrVXNhZ2VSZXF1ZXN0GiEucmVnaXN0cnkudjEuR2V0RGlza1VzYWdlUmVzcG9uc2USXwoQUmVmcmVzaFN0ZWFtQXV0aBIkLnJlZ2lzdHJ5LnYxLlJlZnJlc2hTdGVhbUF1dGhSZXF1ZXN0GiUucmVnaXN0cnkudjEuUmVmcmVzaFN0ZWFtQXV0aFJlc3BvbnNlElAKC0V4cG9ydFN0YXRlEh8ucmVnaXN0cnkudjEuRXhwb3J0U3RhdGVSZXF1ZXN0GiAucmVnaXN0cnkudjEuRXhwb3J0U3RhdGVSZXNwb25zZRJQCgtJbXBvcnRTdGF0ZRIfLnJlZ2lzdHJ5LnYxLkltcG9ydFN0YXRlUmVxdWVzdBogLnJlZ2lzdHJ5LnYxLkltcG9ydFN0YXRlUmVzcG9uc2VCSlpIZ2l0aHViLmNvbS9za3VhLWludGVybmF0aW9uYWwvbWFncGllL2dlbmVyYXRlZC9nby9yZWdpc3RyeS92MTtyZWdpc3RyeXYxYgZwcm90bzM");
+  fileDesc("ChpyZWdpc3RyeS92MS9yZWdpc3RyeS5wcm90bxILcmVnaXN0cnkudjEikgEKE0FkZE1vZFNvdXJjZVJlcXVlc3QSEgoIaHRtbF91cmwYASABKAlIABIWCgxodG1sX2NvbnRlbnQYAiABKAlIABITCglzdGVhbV91cmwYAyABKAlIABIwCglsb2NhbF9tb2QYBCABKAsyGy5yZWdpc3RyeS52MS5Mb2NhbE1vZFVwbG9hZEgAQggKBnNvdXJjZSI4Cg5Mb2NhbE1vZFVwbG9hZBIRCgl1bmlxdWVfaWQYASABKAkSEwoLemlwX2NvbnRlbnQYAiABKAwiIgoUQWRkTW9kU291cmNlUmVzcG9uc2USCgoCaWQYASABKAkiJAoWRGVsZXRlTW9kU291cmNlUmVxdWVzdBIKCgJpZBgBIAEoCSIZChdEZWxldGVNb2RTb3VyY2VSZXNwb25zZSIiChRTeW5jTW9kU291cmNlUmVxdWVzdBIKCgJpZBgBIAEoCSIXChVTeW5jTW9kU291cmNlUmVzcG9uc2UiFwoVTGlzdFN5bmNlZE1vZHNSZXF1ZXN0IlMKCVN5bmNlZE1vZBIOCgZtb2RfaWQYASABKAQSEwoLbWFuaWZlc3RfaWQYAiABKAQSEgoKc2l6ZV9ieXRlcxgDIAEoBBINCgV0aXRsZRgEIAEoCSI+ChZMaXN0U3luY2VkTW9kc1Jlc3BvbnNlEiQKBG1vZHMYASADKAsyFi5yZWdpc3RyeS52MS5TeW5jZWRNb2QiJgoUSW52YWxpZGF0ZU1vZFJlcXVlc3QSDgoGbW9kX2lkGAEgASgEIhcKFUludmFsaWRhdGVNb2RSZXNwb25zZSIlChNHZXRTeW5jZWRNb2RSZXF1ZXN0Eg4KBm1vZF9pZBgBIAEoBCJ5ChRHZXRTeW5jZWRNb2RSZXNwb25zZRIoCgNtb2QYASABKAsyFi5yZWdpc3RyeS52MS5TeW5jZWRNb2RIAIgBARIvCgttb2Rfc291cmNlcxgCIAMoCzIaLnJlZ2lzdHJ5LnYxLk1vZFNvdXJjZUluZm9CBgoEX21vZCKeAQoNTW9kU291cmNlSW5mbxIKCgJpZBgBIAEoCRIoCgRraW5kGAIgASgOMhoucmVnaXN0cnkudjEuTW9kU291cmNlS2luZBIRCglyZWZlcmVuY2UYAyABKAkSFAoMZGlzcGxheV9uYW1lGAQgASgJEhoKEmNyZWF0ZWRfYXRfdW5peF9tcxgFIAEoAxISCgpzaXplX2J5dGVzGAYgASgEIhcKFUxpc3RNb2RTb3VyY2VzUmVxdWVzdCJFChZMaXN0TW9kU291cmNlc1Jlc3BvbnNlEisKB3NvdXJjZXMYASADKAsyGi5yZWdpc3RyeS52MS5Nb2RTb3VyY2VJbmZvIlEKFFVwbG9hZE1pc3Npb25SZXF1ZXN0EgwKBG5hbWUYASABKAkSEwoLcGJvX2NvbnRlbnQYAiABKAwSDwoCaWQYAyABKAlIAIgBAUIFCgNfaWQiaQoLTWlzc2lvbkluZm8SCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIQCghmaWxlc2l6ZRgDIAEoBBIaChJjcmVhdGVkX2F0X3VuaXhfbXMYBCABKAMSEgoKY3JlYXRlZF9ieRgFIAEoCSIfChFHZXRNaXNzaW9uUmVxdWVzdBIKCgJpZBgBIAEoCSIVChNMaXN0TWlzc2lvbnNSZXF1ZXN0IkIKFExpc3RNaXNzaW9uc1Jlc3BvbnNlEioKCG1pc3Npb25zGAEgAygLMhgucmVnaXN0cnkudjEuTWlzc2lvbkluZm8iVQoRTGlua2VkQWNjb3VudEluZm8SEAoIcHJvdmlkZXIYASABKAkSGAoQcHJvdmlkZXJfdXNlcl9pZBgCIAEoCRIUCgxkaXNwbGF5X25hbWUYAyABKAkiXwoKQWNsU3ViamVjdBIPCgdzdWJqZWN0GAEgASgJEjAKCGFjY291bnRzGAIgAygLMh4ucmVnaXN0cnkudjEuTGlua2VkQWNjb3VudEluZm8SDgoGc2NvcGVzGAMgAygJIhAKDkxpc3RBY2xSZXF1ZXN0IlIKD0xpc3RBY2xSZXNwb25zZRIpCghzdWJqZWN0cxgBIAMoCzIXLnJlZ2lzdHJ5LnYxLkFjbFN1YmplY3QSFAoMa25vd25fc2NvcGVzGAIgAygJIjYKE1NldEFjbFNjb3Blc1JlcXVlc3QSDwoHc3ViamVjdBgBIAEoCRIOCgZzY29wZXMYAiADKAkiQAoUU2V0QWNsU2NvcGVzUmVzcG9uc2USKAoHc3ViamVjdBgBIAEoCzIXLnJlZ2lzdHJ5LnYxLkFjbFN1YmplY3QigAEKEUV4cG9ydGVkTW9kU291cmNlEigKBGtpbmQYASABKA4yGi5yZWdpc3RyeS52MS5Nb2RTb3VyY2VLaW5kEhEKCXJlZmVyZW5jZRgCIAEoCRIUCgxkaXNwbGF5X25hbWUYAyABKAkSGAoQcmVzb2x2ZWRfbW9kX2lkcxgEIAMoBCKGAQoRRXhwb3J0ZWRDb25maWdNYXASDAoEbmFtZRgBIAEoCRI2CgRkYXRhGAIgAygLMigucmVnaXN0cnkudjEuRXhwb3J0ZWRDb25maWdNYXAuRGF0YUVudHJ5GisKCURhdGFFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIs4CCg5FeHBvcnRlZFNlcnZlchIMCgRuYW1lGAEgASgJEgwKBHBvcnQYAiABKA0SHQoVbW9kX3NvdXJjZV9yZWZlcmVuY2VzGAMgAygJEhcKCmNvbmZpZ19tYXAYBCABKAlIAIgBARIMCgRjZGxjGAUgAygJEhEKCXByb2ZpbGluZxgGIAEoCBI4Cg1kZXNpcmVkX3N0YXRlGAggASgOMiEucmVnaXN0cnkudjEuRXhwb3J0ZWREZXNpcmVkU3RhdGUSGQoMbWV0cmljc19wb3J0GAkgASgNSAGIAQESGQoMbWV0cmljc19wYXRoGAogASgJSAKIAQESGAoQaGVhZGxlc3NfY2xpZW50cxgLIAEoDUINCgtfY29uZmlnX21hcEIPCg1fbWV0cmljc19wb3J0Qg8KDV9tZXRyaWNzX3BhdGhKBAgHEAhSBnBhcmFtcyIUChJFeHBvcnRTdGF0ZVJlcXVlc3Qi9AEKE0V4cG9ydFN0YXRlUmVzcG9uc2USFgoOc2NoZW1hX3ZlcnNpb24YBiABKA0SGwoTZXhwb3J0ZWRfYXRfcmZjMzMzORgBIAEoCRIzCgttb2Rfc291cmNlcxgCIAMoCzIeLnJlZ2lzdHJ5LnYxLkV4cG9ydGVkTW9kU291cmNlEjMKC2NvbmZpZ19tYXBzGAMgAygLMh4ucmVnaXN0cnkudjEuRXhwb3J0ZWRDb25maWdNYXASLAoHc2VydmVycxgEIAMoCzIbLnJlZ2lzdHJ5LnYxLkV4cG9ydGVkU2VydmVyEhAKCHdhcm5pbmdzGAUgAygJIqwBChJJbXBvcnRTdGF0ZVJlcXVlc3QSMwoLbW9kX3NvdXJjZXMYASADKAsyHi5yZWdpc3RyeS52MS5FeHBvcnRlZE1vZFNvdXJjZRIzCgtjb25maWdfbWFwcxgCIAMoCzIeLnJlZ2lzdHJ5LnYxLkV4cG9ydGVkQ29uZmlnTWFwEiwKB3NlcnZlcnMYAyADKAsyGy5yZWdpc3RyeS52MS5FeHBvcnRlZFNlcnZlciInChNJbXBvcnRTdGF0ZVJlc3BvbnNlEhAKCHdhcm5pbmdzGAEgAygJIhUKE0dldERpc2tVc2FnZVJlcXVlc3QicQoUR2V0RGlza1VzYWdlUmVzcG9uc2USEgoKbW9kc19ieXRlcxgBIAEoBBIWCg5taXNzaW9uc19ieXRlcxgCIAEoBBIYChBnYW1lX2ZpbGVzX2J5dGVzGAMgASgEEhMKC3RvdGFsX2J5dGVzGAQgASgEIkIKF1JlZnJlc2hTdGVhbUF1dGhSZXF1ZXN0EhAKCHVzZXJuYW1lGAEgASgJEhUKDXJlZnJlc2hfdG9rZW4YAiABKAkiGgoYUmVmcmVzaFN0ZWFtQXV0aFJlc3BvbnNlIiIKFERlbGV0ZU1pc3Npb25SZXF1ZXN0EgoKAmlkGAEgASgJIhcKFURlbGV0ZU1pc3Npb25SZXNwb25zZSqgAQoNTW9kU291cmNlS2luZBIfChtNT0RfU09VUkNFX0tJTkRfVU5TUEVDSUZJRUQQABIXChNNT0RfU09VUkNFX0tJTkRfTU9EEAESHgoaTU9EX1NPVVJDRV9LSU5EX0NPTExFQ1RJT04QAhIZChVNT0RfU09VUkNFX0tJTkRfTE9DQUwQAxIaChZNT0RfU09VUkNFX0tJTkRfUFJFU0VUEAQqhgEKFEV4cG9ydGVkRGVzaXJlZFN0YXRlEiYKIkVYUE9SVEVEX0RFU0lSRURfU1RBVEVfVU5TUEVDSUZJRUQQABIiCh5FWFBPUlRFRF9ERVNJUkVEX1NUQVRFX1JVTk5JTkcQARIiCh5FWFBPUlRFRF9ERVNJUkVEX1NUQVRFX1NUT1BQRUQQAjKABQoQTW9kU291cmNlU2VydmljZRJTCgxBZGRNb2RTb3VyY2USIC5yZWdpc3RyeS52MS5BZGRNb2RTb3VyY2VSZXF1ZXN0GiEucmVnaXN0cnkudjEuQWRkTW9kU291cmNlUmVzcG9uc2USXAoPRGVsZXRlTW9kU291cmNlEiMucmVnaXN0cnkudjEuRGVsZXRlTW9kU291cmNlUmVxdWVzdBokLnJlZ2lzdHJ5LnYxLkRlbGV0ZU1vZFNvdXJjZVJlc3BvbnNlElkKDkxpc3RNb2RTb3VyY2VzEiIucmVnaXN0cnkudjEuTGlzdE1vZFNvdXJjZXNSZXF1ZXN0GiMucmVnaXN0cnkudjEuTGlzdE1vZFNvdXJjZXNSZXNwb25zZRJWCg1TeW5jTW9kU291cmNlEiEucmVnaXN0cnkudjEuU3luY01vZFNvdXJjZVJlcXVlc3QaIi5yZWdpc3RyeS52MS5TeW5jTW9kU291cmNlUmVzcG9uc2USWQoOTGlzdFN5bmNlZE1vZHMSIi5yZWdpc3RyeS52MS5MaXN0U3luY2VkTW9kc1JlcXVlc3QaIy5yZWdpc3RyeS52MS5MaXN0U3luY2VkTW9kc1Jlc3BvbnNlElYKDUludmFsaWRhdGVNb2QSIS5yZWdpc3RyeS52MS5JbnZhbGlkYXRlTW9kUmVxdWVzdBoiLnJlZ2lzdHJ5LnYxLkludmFsaWRhdGVNb2RSZXNwb25zZRJTCgxHZXRTeW5jZWRNb2QSIC5yZWdpc3RyeS52MS5HZXRTeW5jZWRNb2RSZXF1ZXN0GiEucmVnaXN0cnkudjEuR2V0U3luY2VkTW9kUmVzcG9uc2Uy0wIKDk1pc3Npb25TZXJ2aWNlEkwKDVVwbG9hZE1pc3Npb24SIS5yZWdpc3RyeS52MS5VcGxvYWRNaXNzaW9uUmVxdWVzdBoYLnJlZ2lzdHJ5LnYxLk1pc3Npb25JbmZvEkYKCkdldE1pc3Npb24SHi5yZWdpc3RyeS52MS5HZXRNaXNzaW9uUmVxdWVzdBoYLnJlZ2lzdHJ5LnYxLk1pc3Npb25JbmZvElMKDExpc3RNaXNzaW9ucxIgLnJlZ2lzdHJ5LnYxLkxpc3RNaXNzaW9uc1JlcXVlc3QaIS5yZWdpc3RyeS52MS5MaXN0TWlzc2lvbnNSZXNwb25zZRJWCg1EZWxldGVNaXNzaW9uEiEucmVnaXN0cnkudjEuRGVsZXRlTWlzc2lvblJlcXVlc3QaIi5yZWdpc3RyeS52MS5EZWxldGVNaXNzaW9uUmVzcG9uc2UygwQKDEFkbWluU2VydmljZRJTCgxHZXREaXNrVXNhZ2USIC5yZWdpc3RyeS52MS5HZXREaXNrVXNhZ2VSZXF1ZXN0GiEucmVnaXN0cnkudjEuR2V0RGlza1VzYWdlUmVzcG9uc2USXwoQUmVmcmVzaFN0ZWFtQXV0aBIkLnJlZ2lzdHJ5LnYxLlJlZnJlc2hTdGVhbUF1dGhSZXF1ZXN0GiUucmVnaXN0cnkudjEuUmVmcmVzaFN0ZWFtQXV0aFJlc3BvbnNlElAKC0V4cG9ydFN0YXRlEh8ucmVnaXN0cnkudjEuRXhwb3J0U3RhdGVSZXF1ZXN0GiAucmVnaXN0cnkudjEuRXhwb3J0U3RhdGVSZXNwb25zZRJQCgtJbXBvcnRTdGF0ZRIfLnJlZ2lzdHJ5LnYxLkltcG9ydFN0YXRlUmVxdWVzdBogLnJlZ2lzdHJ5LnYxLkltcG9ydFN0YXRlUmVzcG9uc2USRAoHTGlzdEFjbBIbLnJlZ2lzdHJ5LnYxLkxpc3RBY2xSZXF1ZXN0GhwucmVnaXN0cnkudjEuTGlzdEFjbFJlc3BvbnNlElMKDFNldEFjbFNjb3BlcxIgLnJlZ2lzdHJ5LnYxLlNldEFjbFNjb3Blc1JlcXVlc3QaIS5yZWdpc3RyeS52MS5TZXRBY2xTY29wZXNSZXNwb25zZUJKWkhnaXRodWIuY29tL3NrdWEtaW50ZXJuYXRpb25hbC9tYWdwaWUvZ2VuZXJhdGVkL2dvL3JlZ2lzdHJ5L3YxO3JlZ2lzdHJ5djFiBnByb3RvMw");
 
 /**
  * @generated from message registry.v1.AddModSourceRequest
@@ -512,6 +512,148 @@ export const ListMissionsResponseSchema: GenMessage<ListMissionsResponse> = /*@_
   messageDesc(file_registry_v1_registry, 21);
 
 /**
+ * A provider login attached to a user -- what a human actually recognizes
+ * someone by, since `AclSubject.subject` is an opaque user id.
+ *
+ * @generated from message registry.v1.LinkedAccountInfo
+ */
+export type LinkedAccountInfo = Message<"registry.v1.LinkedAccountInfo"> & {
+  /**
+   * @generated from field: string provider = 1;
+   */
+  provider: string;
+
+  /**
+   * @generated from field: string provider_user_id = 2;
+   */
+  providerUserId: string;
+
+  /**
+   * @generated from field: string display_name = 3;
+   */
+  displayName: string;
+};
+
+/**
+ * Describes the message registry.v1.LinkedAccountInfo.
+ * Use `create(LinkedAccountInfoSchema)` to create a new message.
+ */
+export const LinkedAccountInfoSchema: GenMessage<LinkedAccountInfo> = /*@__PURE__*/
+  messageDesc(file_registry_v1_registry, 22);
+
+/**
+ * @generated from message registry.v1.AclSubject
+ */
+export type AclSubject = Message<"registry.v1.AclSubject"> & {
+  /**
+   * The JWT `sub` this grant is keyed by -- a stringified user id.
+   *
+   * @generated from field: string subject = 1;
+   */
+  subject: string;
+
+  /**
+   * @generated from field: repeated registry.v1.LinkedAccountInfo accounts = 2;
+   */
+  accounts: LinkedAccountInfo[];
+
+  /**
+   * `"*"` here means every scope, present or future -- there's no role
+   * hierarchy, so it's the one coarse "full admin" grant. The first
+   * person ever to sign in gets it automatically.
+   *
+   * @generated from field: repeated string scopes = 3;
+   */
+  scopes: string[];
+};
+
+/**
+ * Describes the message registry.v1.AclSubject.
+ * Use `create(AclSubjectSchema)` to create a new message.
+ */
+export const AclSubjectSchema: GenMessage<AclSubject> = /*@__PURE__*/
+  messageDesc(file_registry_v1_registry, 23);
+
+/**
+ * @generated from message registry.v1.ListAclRequest
+ */
+export type ListAclRequest = Message<"registry.v1.ListAclRequest"> & {
+};
+
+/**
+ * Describes the message registry.v1.ListAclRequest.
+ * Use `create(ListAclRequestSchema)` to create a new message.
+ */
+export const ListAclRequestSchema: GenMessage<ListAclRequest> = /*@__PURE__*/
+  messageDesc(file_registry_v1_registry, 24);
+
+/**
+ * @generated from message registry.v1.ListAclResponse
+ */
+export type ListAclResponse = Message<"registry.v1.ListAclResponse"> & {
+  /**
+   * @generated from field: repeated registry.v1.AclSubject subjects = 1;
+   */
+  subjects: AclSubject[];
+
+  /**
+   * Every scope this cluster's services actually enforce, for a client to
+   * offer as choices rather than free-typing a string that matches
+   * nothing. Does not include `"*"`, which is meaningful but isn't a
+   * scope any single RPC requires.
+   *
+   * @generated from field: repeated string known_scopes = 2;
+   */
+  knownScopes: string[];
+};
+
+/**
+ * Describes the message registry.v1.ListAclResponse.
+ * Use `create(ListAclResponseSchema)` to create a new message.
+ */
+export const ListAclResponseSchema: GenMessage<ListAclResponse> = /*@__PURE__*/
+  messageDesc(file_registry_v1_registry, 25);
+
+/**
+ * @generated from message registry.v1.SetAclScopesRequest
+ */
+export type SetAclScopesRequest = Message<"registry.v1.SetAclScopesRequest"> & {
+  /**
+   * @generated from field: string subject = 1;
+   */
+  subject: string;
+
+  /**
+   * @generated from field: repeated string scopes = 2;
+   */
+  scopes: string[];
+};
+
+/**
+ * Describes the message registry.v1.SetAclScopesRequest.
+ * Use `create(SetAclScopesRequestSchema)` to create a new message.
+ */
+export const SetAclScopesRequestSchema: GenMessage<SetAclScopesRequest> = /*@__PURE__*/
+  messageDesc(file_registry_v1_registry, 26);
+
+/**
+ * @generated from message registry.v1.SetAclScopesResponse
+ */
+export type SetAclScopesResponse = Message<"registry.v1.SetAclScopesResponse"> & {
+  /**
+   * @generated from field: registry.v1.AclSubject subject = 1;
+   */
+  subject?: AclSubject | undefined;
+};
+
+/**
+ * Describes the message registry.v1.SetAclScopesResponse.
+ * Use `create(SetAclScopesResponseSchema)` to create a new message.
+ */
+export const SetAclScopesResponseSchema: GenMessage<SetAclScopesResponse> = /*@__PURE__*/
+  messageDesc(file_registry_v1_registry, 27);
+
+/**
  * @generated from message registry.v1.ExportedModSource
  */
 export type ExportedModSource = Message<"registry.v1.ExportedModSource"> & {
@@ -560,7 +702,7 @@ export type ExportedModSource = Message<"registry.v1.ExportedModSource"> & {
  * Use `create(ExportedModSourceSchema)` to create a new message.
  */
 export const ExportedModSourceSchema: GenMessage<ExportedModSource> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 22);
+  messageDesc(file_registry_v1_registry, 28);
 
 /**
  * @generated from message registry.v1.ExportedConfigMap
@@ -582,7 +724,7 @@ export type ExportedConfigMap = Message<"registry.v1.ExportedConfigMap"> & {
  * Use `create(ExportedConfigMapSchema)` to create a new message.
  */
 export const ExportedConfigMapSchema: GenMessage<ExportedConfigMap> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 23);
+  messageDesc(file_registry_v1_registry, 29);
 
 /**
  * @generated from message registry.v1.ExportedServer
@@ -652,7 +794,7 @@ export type ExportedServer = Message<"registry.v1.ExportedServer"> & {
  * Use `create(ExportedServerSchema)` to create a new message.
  */
 export const ExportedServerSchema: GenMessage<ExportedServer> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 24);
+  messageDesc(file_registry_v1_registry, 30);
 
 /**
  * @generated from message registry.v1.ExportStateRequest
@@ -665,7 +807,7 @@ export type ExportStateRequest = Message<"registry.v1.ExportStateRequest"> & {
  * Use `create(ExportStateRequestSchema)` to create a new message.
  */
 export const ExportStateRequestSchema: GenMessage<ExportStateRequest> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 25);
+  messageDesc(file_registry_v1_registry, 31);
 
 /**
  * @generated from message registry.v1.ExportStateResponse
@@ -731,7 +873,7 @@ export type ExportStateResponse = Message<"registry.v1.ExportStateResponse"> & {
  * Use `create(ExportStateResponseSchema)` to create a new message.
  */
 export const ExportStateResponseSchema: GenMessage<ExportStateResponse> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 26);
+  messageDesc(file_registry_v1_registry, 32);
 
 /**
  * @generated from message registry.v1.ImportStateRequest
@@ -758,7 +900,7 @@ export type ImportStateRequest = Message<"registry.v1.ImportStateRequest"> & {
  * Use `create(ImportStateRequestSchema)` to create a new message.
  */
 export const ImportStateRequestSchema: GenMessage<ImportStateRequest> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 27);
+  messageDesc(file_registry_v1_registry, 33);
 
 /**
  * @generated from message registry.v1.ImportStateResponse
@@ -775,7 +917,7 @@ export type ImportStateResponse = Message<"registry.v1.ImportStateResponse"> & {
  * Use `create(ImportStateResponseSchema)` to create a new message.
  */
 export const ImportStateResponseSchema: GenMessage<ImportStateResponse> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 28);
+  messageDesc(file_registry_v1_registry, 34);
 
 /**
  * @generated from message registry.v1.GetDiskUsageRequest
@@ -788,7 +930,7 @@ export type GetDiskUsageRequest = Message<"registry.v1.GetDiskUsageRequest"> & {
  * Use `create(GetDiskUsageRequestSchema)` to create a new message.
  */
 export const GetDiskUsageRequestSchema: GenMessage<GetDiskUsageRequest> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 29);
+  messageDesc(file_registry_v1_registry, 35);
 
 /**
  * @generated from message registry.v1.GetDiskUsageResponse
@@ -827,7 +969,7 @@ export type GetDiskUsageResponse = Message<"registry.v1.GetDiskUsageResponse"> &
  * Use `create(GetDiskUsageResponseSchema)` to create a new message.
  */
 export const GetDiskUsageResponseSchema: GenMessage<GetDiskUsageResponse> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 30);
+  messageDesc(file_registry_v1_registry, 36);
 
 /**
  * @generated from message registry.v1.RefreshSteamAuthRequest
@@ -849,7 +991,7 @@ export type RefreshSteamAuthRequest = Message<"registry.v1.RefreshSteamAuthReque
  * Use `create(RefreshSteamAuthRequestSchema)` to create a new message.
  */
 export const RefreshSteamAuthRequestSchema: GenMessage<RefreshSteamAuthRequest> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 31);
+  messageDesc(file_registry_v1_registry, 37);
 
 /**
  * @generated from message registry.v1.RefreshSteamAuthResponse
@@ -862,7 +1004,7 @@ export type RefreshSteamAuthResponse = Message<"registry.v1.RefreshSteamAuthResp
  * Use `create(RefreshSteamAuthResponseSchema)` to create a new message.
  */
 export const RefreshSteamAuthResponseSchema: GenMessage<RefreshSteamAuthResponse> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 32);
+  messageDesc(file_registry_v1_registry, 38);
 
 /**
  * @generated from message registry.v1.DeleteMissionRequest
@@ -879,7 +1021,7 @@ export type DeleteMissionRequest = Message<"registry.v1.DeleteMissionRequest"> &
  * Use `create(DeleteMissionRequestSchema)` to create a new message.
  */
 export const DeleteMissionRequestSchema: GenMessage<DeleteMissionRequest> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 33);
+  messageDesc(file_registry_v1_registry, 39);
 
 /**
  * @generated from message registry.v1.DeleteMissionResponse
@@ -892,7 +1034,7 @@ export type DeleteMissionResponse = Message<"registry.v1.DeleteMissionResponse">
  * Use `create(DeleteMissionResponseSchema)` to create a new message.
  */
 export const DeleteMissionResponseSchema: GenMessage<DeleteMissionResponse> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 34);
+  messageDesc(file_registry_v1_registry, 40);
 
 /**
  * @generated from enum registry.v1.ModSourceKind
@@ -1163,6 +1305,45 @@ export const AdminService: GenService<{
     methodKind: "unary";
     input: typeof ImportStateRequestSchema;
     output: typeof ImportStateResponseSchema;
+  },
+  /**
+   * Who currently holds which scopes, plus the scope vocabulary itself.
+   * Until this existed, `acl_grants` could be written (registry_db's
+   * grant_scopes, called on first-ever login) and read one subject at a
+   * time by the authorization middleware, but never enumerated -- there
+   * was no way to answer "who has access to this cluster" short of
+   * querying Postgres by hand.
+   *
+   * Returns every user, not only those holding a grant, since granting
+   * to someone who has logged in but has no scopes yet is the common
+   * case. `known_scopes` comes from the server rather than being a
+   * constant in each client so a new scope can't silently go missing
+   * from a UI that hasn't been rebuilt.
+   *
+   * @generated from rpc registry.v1.AdminService.ListAcl
+   */
+  listAcl: {
+    methodKind: "unary";
+    input: typeof ListAclRequestSchema;
+    output: typeof ListAclResponseSchema;
+  },
+  /**
+   * Replaces `subject`'s scope set outright -- not a delta. The UI edits
+   * a whole checkbox set and submits it, and a set operation makes that
+   * idempotent and free of read-modify-write races between two admins
+   * editing different people at once.
+   *
+   * Guarded by its own `admin:acl` scope, deliberately separate from
+   * every other admin scope: this is the one RPC that can change who can
+   * call anything else, including granting `*` (see AclSubject.scopes),
+   * so holding it is equivalent to holding everything eventually.
+   *
+   * @generated from rpc registry.v1.AdminService.SetAclScopes
+   */
+  setAclScopes: {
+    methodKind: "unary";
+    input: typeof SetAclScopesRequestSchema;
+    output: typeof SetAclScopesResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_registry_v1_registry, 2);
