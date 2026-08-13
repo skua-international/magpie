@@ -236,8 +236,7 @@ pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Inst
     // orphaned process does.
     let mut sigterm =
         signal(SignalKind::terminate()).context("failed to install SIGTERM handler")?;
-    let mut sigint =
-        signal(SignalKind::interrupt()).context("failed to install SIGINT handler")?;
+    let mut sigint = signal(SignalKind::interrupt()).context("failed to install SIGINT handler")?;
     let status = tokio::select! {
         status = child.wait() => status.context("failed to wait for arma3server")?,
         _ = sigterm.recv() => {

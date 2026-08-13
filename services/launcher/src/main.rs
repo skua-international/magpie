@@ -28,23 +28,23 @@ async fn main() -> Result<()> {
     // reading the child's pipes. `_guard` has to live for the rest of
     // `main` -- dropping it early stops the writer thread and silently
     // drops whatever's still buffered.
-    let (non_blocking_stdout, _guard) = tracing_appender::non_blocking(std::io::stdout());
-
-    // JSON, not the plain-text formatter every other service here still
-    // uses -- launcher's logs now include arbitrary text a game server
-    // chose to print, not just launcher's own structured lines. JSON
-    // keeps each line a single well-formed record (timestamp/level/
-    // message/fields) no matter what that text contains, instead of raw
-    // text that could itself look like a log line and confuse whatever
-    // parses this.
-    tracing_subscriber::fmt()
-        .json()
-        .with_writer(non_blocking_stdout)
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
-        )
-        .with_target(false)
-        .init();
+    // Traces and structured logs only -- no /metrics endpoint, unlike
+    // every other service here. Arma server Pods are hostNetwork: true,
+    // so any port this bound would land on the node's real public
+    // interface rather than a Pod IP, and there is no host firewall in
+    // front of it. The numbers worth having are already covered: startup
+    // phase timings become spans, and CPU/memory/restarts come from
+    // cAdvisor and kube-state-metrics via the armaserver=<name> Pod label
+    // (which the commit introducing magpie's metrics deliberately chose
+    // not to duplicate in-process). An operator's own in-game exporter
+    // has its own route in anyway -- ArmaServerSpec.metrics{port,path}.
+    //
+    // JSON, as before: launcher's logs carry arbitrary text a game server
+    // chose to print, not just its own structured lines, and JSON keeps
+    // each line one well-formed record no matter what that text contains.
+    // `telemetry` has to live for the rest of `main` -- dropping it stops
+    // the non-blocking writer and discards whatever is still buffered.
+    let _telemetry = observability::init("launcher")?;
 
     let process_start = std::time::Instant::now();
     info!("Starting Arma 3 Server...");
