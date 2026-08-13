@@ -7,5 +7,6 @@
 
 pub mod cache;
 pub mod capacity;
+pub mod metrics;
 pub mod steam;
 pub mod workshop;

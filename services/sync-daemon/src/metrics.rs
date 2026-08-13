@@ -24,13 +24,15 @@ use opentelemetry::metrics::Histogram;
 /// second.
 const POLL_INTERVAL: Duration = Duration::from_secs(30);
 
-// Download throughput and per-chunk timing are deliberately absent for
-// now. Both need the counts that only exist inside steam-sync's own
-// chunk loop and progress callback, which would mean threading a meter
-// through that crate -- worth doing, but as its own change rather than
-// shipping instruments here that would always read zero. Content size
-// below already makes a resync's progress visible, which was the
-// immediate gap.
+// Throughput and chunk outcomes are not here: they live in
+// crates/steam-sync's own metrics module, because the counts only exist
+// inside its download loop. sync-daemon can see that a sync ran and how
+// long it took; only steam-sync can see how many bytes crossed the wire
+// while it was running.
+//
+// Per-chunk decompress/verify/decrypt timing is still absent, and cannot
+// be added from this repo: the chunk pipeline lives in the external
+// steamdepot crate, so instrumenting it means changing that fork first.
 
 /// Wall-clock duration of one depot or mod sync.
 ///

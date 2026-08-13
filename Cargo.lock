@@ -4915,6 +4915,8 @@ dependencies = [
  "anyhow",
  "bincode",
  "futures-util",
+ "observability",
+ "opentelemetry",
  "prost 0.13.5",
  "qrcode",
  "regex",
