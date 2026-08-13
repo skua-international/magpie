@@ -101,6 +101,44 @@ pub async fn providers(State(app): State<Arc<AppState>>) -> Json<serde_json::Val
     Json(serde_json::json!({ "providers": names }))
 }
 
+/// `GET /auth/me` -- the caller's own identity and linked provider
+/// accounts.
+///
+/// Exists so a signed-in UI can show who it is signed in as, and which
+/// providers are already linked, without needing `admin:acl` (the only
+/// other way to see linked accounts is AdminService.ListAcl, which
+/// reports them for *everyone* and is deliberately privileged).
+/// Authenticated by the same bearer token everything else uses, and only
+/// ever reports the token's own subject.
+pub async fn me(State(app): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    let Some(user_id) = app.verify_bearer(&headers) else {
+        return (StatusCode::UNAUTHORIZED, "missing or invalid bearer token").into_response();
+    };
+
+    match registry_db::linked_accounts_for_user(&app.pool, user_id).await {
+        Ok(accounts) => Json(serde_json::json!({
+            "subject": user_id.to_string(),
+            "accounts": accounts
+                .into_iter()
+                .map(|(provider, provider_user_id, display_name)| serde_json::json!({
+                    "provider": provider,
+                    "provider_user_id": provider_user_id,
+                    "display_name": display_name,
+                }))
+                .collect::<Vec<_>>(),
+        }))
+        .into_response(),
+        Err(e) => {
+            tracing::error!("failed to read linked accounts for {user_id}: {e:#}");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to read linked accounts",
+            )
+                .into_response()
+        }
+    }
+}
+
 pub async fn jwks(State(app): State<Arc<AppState>>) -> Json<serde_json::Value> {
     Json(app.signer.jwks_json())
 }

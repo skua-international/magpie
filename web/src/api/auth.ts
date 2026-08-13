@@ -68,6 +68,53 @@ export async function availableProviders(): Promise<string[]> {
   return body.providers ?? [];
 }
 
+export interface LinkedAccount {
+  provider: string;
+  provider_user_id: string;
+  display_name: string;
+}
+
+/// The signed-in user's own subject and linked accounts.
+export async function whoAmI(): Promise<{
+  subject: string;
+  accounts: LinkedAccount[];
+}> {
+  const token = storedAccessToken();
+  const res = await fetch("/auth/me", {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    throw new Error(`could not load account: ${res.status} ${await res.text()}`);
+  }
+  return (await res.json()) as { subject: string; accounts: LinkedAccount[] };
+}
+
+/// Attaches another provider to the *current* user rather than signing in
+/// as a new one.
+///
+/// The only difference from startLogin is the Authorization header:
+/// identity's start handler reads it and records a link flow in the state
+/// token. That is also why this endpoint hands back a URL instead of
+/// redirecting -- a bearer header cannot ride along on a browser
+/// redirect, so the caller has to make the request itself and then
+/// navigate.
+export async function linkProvider(provider: string): Promise<void> {
+  const token = storedAccessToken();
+  if (!token) throw new Error("not signed in");
+
+  const url = new URL(`/auth/${provider}/start`, window.location.origin);
+  url.searchParams.set("redirect_uri", callbackUrl());
+
+  const res = await fetch(url, {
+    headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    throw new Error(`could not start linking: ${res.status} ${await res.text()}`);
+  }
+  const body = (await res.json()) as { url: string };
+  window.location.assign(body.url);
+}
+
 export async function startLogin(provider: string): Promise<void> {
   const url = new URL(`/auth/${provider}/start`, window.location.origin);
   url.searchParams.set("redirect_uri", callbackUrl());

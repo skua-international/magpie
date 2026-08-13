@@ -308,6 +308,25 @@ pub async fn insert_signing_key_if_absent(
 
 /// A linked external identity (Discord/GitHub/Google OAuth2, or Steam
 /// OpenID), if `(provider, provider_user_id)` has been seen before.
+/// Every provider account linked to one user, for identity's `/auth/me`.
+///
+/// Distinct from `find_linked_account`, which goes the other way (a
+/// provider identity to its user) during login.
+pub async fn linked_accounts_for_user(
+    pool: &PgPool,
+    user_id: Uuid,
+) -> sqlx::Result<Vec<(String, String, String)>> {
+    sqlx::query_as(
+        "SELECT provider, provider_user_id, display_name
+         FROM linked_accounts
+         WHERE user_id = $1
+         ORDER BY provider",
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await
+}
+
 pub async fn find_linked_account(
     pool: &PgPool,
     provider: &str,

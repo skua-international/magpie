@@ -10,6 +10,7 @@ import {
 import { errorMessage } from "./api/clients";
 import { Banner, Button } from "./components/ui";
 import { Access } from "./pages/Access";
+import { Account } from "./pages/Account";
 import { Cluster } from "./pages/Cluster";
 import { Missions } from "./pages/Missions";
 import { Secrets } from "./pages/Secrets";
@@ -29,6 +30,7 @@ const TABS = {
   access: { label: "Access", render: () => <Access /> },
   secrets: { label: "Secrets", render: () => <Secrets /> },
   cluster: { label: "Cluster", render: () => <Cluster /> },
+  account: { label: "Account", render: () => <Account /> },
 } as const;
 
 type Tab = keyof typeof TABS;

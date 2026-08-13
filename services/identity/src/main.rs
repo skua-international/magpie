@@ -96,6 +96,7 @@ async fn main() -> Result<()> {
         )
         .route("/.well-known/jwks.json", get(handlers::jwks))
         .route("/auth/providers", get(handlers::providers))
+        .route("/auth/me", get(handlers::me))
         .route("/auth/{provider}/start", get(handlers::start))
         .route("/auth/{provider}/callback", get(handlers::callback))
         .route("/auth/refresh", post(handlers::refresh))
