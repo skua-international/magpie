@@ -2,7 +2,7 @@
 
 **M**anaged **A**rma **G**eneral **P**ile of **I**ntricate **E**ngineering.
 
-Kubernetes-native orchestration for Arma 3 dedicated servers: mod/collection syncing with copy-on-write CSI snapshots, a CRD-driven reconciler, JWT-authenticated provisioning APIs, and its own OAuth2/Steam OpenID identity broker. Built as a Cargo workspace of small, single-purpose services deployed together via one Helm chart.
+Kubernetes-native orchestration for Arma 3 dedicated servers: mod/collection syncing with copy-on-write CSI snapshots, a CRD-driven reconciler, JWT-authenticated provisioning APIs, a web UI, and its own OAuth2/Steam OpenID identity broker. Built as a Cargo workspace of small, single-purpose services deployed together via one Helm chart.
 
 ## Why?
 
@@ -14,10 +14,14 @@ I recommend you check out https://github.com/ilbinek/ideal, https://github.com/B
 
 ```mermaid
 flowchart LR
-    bot["Discord bot, etc."] --> gateway["gateway"]
-    serverapi -->|creates/updates| armaserver[("ArmaServer<br/>(CRD)")]
+    browser["browser<br/>(web UI)"] --> gateway["gateway"]
+    client["magpiectl / TUI"] --> gateway
+    bot["Discord bot, etc."] --> gateway
+    gateway -->|serves /ui| browser
+    gateway -->|creates/updates| armaserver[("ArmaServer<br/>(CRD)")]
 
-    client["magpiectl / any client"] --> registry["registry"]
+    client --> registry["registry"]
+    browser --> registry
     registry --> syncdaemon["sync-daemon"]
 
     controller["controller<br/>(reconciler)"] -->|watches| armaserver
@@ -35,8 +39,10 @@ flowchart LR
     postgres[("Postgres<br/>acl_grants/linked_accounts")] -->|arma:admin / arma:filepatch| controller
     controller -->|renders main.cfg/basic.cfg| launcher
 
-    identity["identity"] -->|issues JWTs| serverapi
+    identity["identity"] -->|issues JWTs| gateway
     identity -->|issues JWTs| registry
+    client --> identity
+    browser --> identity
 
     syncdaemon -->|authenticated CM session| steam(["Steam"])
 ```
@@ -53,7 +59,7 @@ All inter-service and client-facing APIs are [ConnectRPC](https://connectrpc.com
 
 ## Deploying
 
-This repo is private, so every command below that talks to GitHub (not GHCR/OCI, which uses its own pull secret) picks up auth from `gh auth token` automatically if the [GitHub CLI](https://cli.github.com/) is installed and logged in (`gh auth login`) -- no separate token to export.
+Everything below is public: the repo, the release binaries, and the container images and Helm chart on GHCR. Nothing here needs a GitHub token, a login, or an image pull secret -- `imagePullSecrets` stays empty unless you're pulling from somewhere of your own.
 
 First install, on a fresh host with no Kubernetes yet -- either from a checkout:
 
@@ -64,8 +70,7 @@ First install, on a fresh host with no Kubernetes yet -- either from a checkout:
 or with no checkout at all, piped straight from GitHub like most install.sh-style tools do it:
 
 ```bash
-curl -sSf -H "Authorization: token $(gh auth token)" \
-  https://raw.githubusercontent.com/skua-international/magpie/main/deploy/k3s-bootstrap.sh | bash
+curl -sSf https://raw.githubusercontent.com/skua-international/magpie/main/deploy/k3s-bootstrap.sh | bash
 ```
 
 Both are the same script -- piping it in just skips needing a clone first, and it fetches `scripts/deploy.sh` (and, for `--ssh`, itself) fresh from GitHub the same way when it can't find a local copy. It ends by actually running `scripts/deploy.sh --install` for you, with every `--set` it resolved along the way.
@@ -83,8 +88,7 @@ Upgrades (including the very first install, via `--install`) all go through one 
 ./scripts/deploy.sh --dry-run             # render + preflight without applying anything
 
 # or, with no checkout:
-curl -sSf -H "Authorization: token $(gh auth token)" \
-  https://raw.githubusercontent.com/skua-international/magpie/main/scripts/deploy.sh | bash -s -- 1.5.0
+curl -sSf https://raw.githubusercontent.com/skua-international/magpie/main/scripts/deploy.sh | bash -s -- 1.5.0
 ```
 
 It pulls the chart from its OCI publish (`oci://ghcr.io/skua-international/magpie/charts/magpie`) rather than the local checkout, so it always deploys the exact artifact CI published for that version — never a locally-edited template that hasn't gone through CI. With no VERSION and no local checkout to default from, it resolves the latest GitHub release instead. See `scripts/deploy.sh --help` for the rest (namespace/release name overrides, preflighting that the target image tags actually exist in GHCR before touching anything, etc). See the chart's `values.yaml` for every knob — most have sane defaults.
@@ -168,7 +172,7 @@ magpiectl admin armaconfig
 - `{{prefix}}` / `{{suffix}}` — the merged config's own `prefix`/`suffix` keys
 - Sane default: `hostname = "{{prefix}}{{server_name}}{{suffix}}"` (only applied when `hostname` is entirely absent from the merge, not when it's present-but-empty)
 
-**Secret references**: `password`-family fields and any `env.<NAME>` key (see below) may be `{{secret:<name>/<key>}}` instead of a literal value, resolved via a live lookup — but *not* against the chart's own namespace. Secrets referenceable this way live in a dedicated `magpie-user-secrets` namespace (`userSecretsNamespace` in `values.yaml`, chart-created), kept separate on purpose: an operator-controlled ConfigMap value naming a Secret to read would otherwise be able to reach `magpie-postgres-creds`/`ghcr-pull-secret`/etc. alongside it. Create your own Secrets there for anything you want referenceable this way.
+**Secret references**: `password`-family fields and any `env.<NAME>` key (see below) may be `{{secret:<name>/<key>}}` instead of a literal value, resolved via a live lookup — but *not* against the chart's own namespace. Secrets referenceable this way live in a dedicated `magpie-user-secrets` namespace (`userSecretsNamespace` in `values.yaml`, chart-created), kept separate on purpose: an operator-controlled ConfigMap value naming a Secret to read would otherwise be able to reach `magpie-postgres-creds`/`magpie-oauth`/etc. alongside it. Create your own Secrets there for anything you want referenceable this way.
 
 **Extra env vars**: any merged-config key of the form `env.<NAME>` becomes an extra `<NAME>` env var on the launcher container (same placeholder/`{{secret:...}}` support), e.g. `env.SOME_API_KEY = "{{secret:my-secret/key}}"`.
 
@@ -265,25 +269,31 @@ pending long enough to be worth looking at:
 magpie_servers_total{phase=~"failed|pending"} > 0
 ```
 
+## Web UI
+
+`gateway` serves a browser UI at `https://<ingress.host>.<ingress.baseDomain>/ui` — the same single public host everything else uses, so there's no extra hostname, DNS record or certificate to arrange. It ships inside the `gateway` image; nothing to install or enable.
+
+It covers what `magpiectl` does — servers (create, start/stop, resync, edit mod sources, logs, health), mod sources (Steam URL, preset HTML, local zip upload), missions, the Steam session — plus two things the CLI has no equivalent for: **access control**, assigning scopes per person, and **secrets** in the user-secrets namespace.
+
+Sign in with the same providers `magpiectl` uses. Only providers you've actually configured are offered (Steam always is — it needs no app registration), so the buttons match what will really work.
+
+One thing to know if you host the UI anywhere other than gateway itself: `identity` only accepts an OAuth `redirect_uri` that is loopback (that's `magpiectl`'s local callback listener) or an origin you've explicitly allowed. gateway's own origin is allowed automatically, so the bundled UI needs no configuration; a UI served from somewhere else needs its origin added to `identity.allowedRedirectOrigins`. It's an open-redirect guard, so only add origins you control.
+
 ## Installing the CLI
 
 `magpiectl` is both a direct CLI (`magpiectl servers list`, `magpiectl deploy`, ...) and, run with no subcommand, an interactive TUI — everything the TUI can do is also a direct invocation, and vice versa (see `cli/magpie/internal/actions`, the one implementation both surfaces call into). It can also drive the cluster's own lifecycle directly (`magpiectl deploy`/`upgrade`/`install`, shelling out to `helm`/`kubectl` the same way `scripts/deploy.sh` does) and establish the cluster's Steam session (`magpiectl admin refresh-steam-auth`, see "Steam authentication" above) without needing a repo checkout at all.
 
-Download a prebuilt binary from [the latest release](https://github.com/skua-international/magpie/releases/latest). This repo is private, so the plain `.../releases/latest/download/...` URL 404s without auth -- resolve the actual asset via the API instead (needs `gh auth login` once, and `jq`):
+Download a prebuilt binary from [the latest release](https://github.com/skua-international/magpie/releases/latest):
 
 ```bash
 # Linux/macOS -- picks the right archive for your OS/arch automatically
 os="$(uname -s | tr '[:upper:]' '[:lower:]')"
 arch="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')"
-asset="magpiectl_${os}_${arch}.tar.gz"
-token="$(gh auth token)"
-url="$(curl -sSf -H "Authorization: token $token" https://api.github.com/repos/skua-international/magpie/releases/latest \
-  | jq -r --arg name "$asset" '.assets[] | select(.name == $name) | .url')"
-curl -sSf -H "Authorization: token $token" -H 'Accept: application/octet-stream' -L "$url" \
+curl -sSfL "https://github.com/skua-international/magpie/releases/latest/download/magpiectl_${os}_${arch}.tar.gz" \
   | tar xz -C /usr/local/bin magpiectl
 ```
 
-Windows: same API dance (asset name `magpiectl_windows_amd64.zip`), or just download it from the releases page directly if you're already logged in to GitHub in your browser.
+Windows: download `magpiectl_windows_amd64.zip` from the releases page.
 
 Then point it at your cluster and log in:
 
@@ -306,11 +316,13 @@ Building from source instead (e.g. to run an unreleased commit): `cd cli/magpie 
 crates/                shared library crates (steam-sync, registry-db, authn, protocol, crd, ...)
 services/              the service binaries described above (including magpie-csi)
 cli/magpie/            the magpie CLI/TUI (Go)
+web/                   the web UI (React + Vite + TypeScript), served by gateway at /ui
 proto/                 ConnectRPC service definitions
+generated/             ConnectRPC stubs generated from proto/ (Go + TypeScript, committed)
 charts/magpie/         the Helm chart
 deploy/                k3s-bootstrap.sh
 scripts/               deploy.sh
-Dockerfile.workspace   compiles every service binary in one build (see Development below)
+Dockerfile.workspace   compiles the Rust service binaries and the web UI in one build (see Development below)
 ```
 
 ## Development
@@ -321,7 +333,7 @@ cargo test --workspace
 cargo clippy --workspace --all-targets
 ```
 
-All 7 service binaries are compiled once, together, by `Dockerfile.workspace` (`cargo-chef` for dependency-layer caching, built from the repo root — every service needs the full workspace's `Cargo.lock`/manifests to resolve), rather than each service having its own multi-stage Rust build. Each `services/*/Dockerfile` is just a thin packaging step on top of that -- `COPY` the already-built binary plus whatever runtime `apt` packages it needs, nothing else. `.github/workflows/build-images.yml` runs `Dockerfile.workspace` once (`build-workspace`) on push to `main`, hands the resulting binaries to the 7 packaging builds as a job artifact, and pushes every image to `ghcr.io/skua-international/magpie/*`. Release tags are a separate, manually-triggered promotion step (`.github/workflows/release.yml`) that retags/republishes what a passing commit already built, rather than rebuilding anything.
+The 6 Rust service binaries are compiled once, together, by `Dockerfile.workspace` (`cargo-chef` for dependency-layer caching, built from the repo root — every service needs the full workspace's `Cargo.lock`/manifests to resolve), rather than each service having its own multi-stage Rust build. Each `services/*/Dockerfile` is just a thin packaging step on top of that -- `COPY` the already-built binary plus whatever runtime `apt` packages it needs, nothing else. `.github/workflows/build-images.yml` runs `Dockerfile.workspace` once (`build-workspace`) on push to `main`, hands the resulting binaries (plus the built web UI, which the same file builds in a Node stage) to the packaging builds as a job artifact, and pushes all 7 images to `ghcr.io/skua-international/magpie/*`. `magpie-csi` is the odd one out: it's Go, so it isn't part of that shared Rust build and has its own self-contained multi-stage Dockerfile. Release tags are a separate, manually-triggered promotion step (`.github/workflows/release.yml`) that retags/republishes what a passing commit already built, rather than rebuilding anything.
 
 ## Acknowledgements
 
