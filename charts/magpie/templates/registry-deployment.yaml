@@ -39,6 +39,7 @@ spec:
             - name: http
               containerPort: {{ .Values.registry.service.port }}
           env:
+            {{- include "magpie.otelEnv" . | nindent 12 }}
             - name: LISTEN_ADDR
               value: "0.0.0.0:{{ .Values.registry.service.port }}"
             # Namespace whose Secrets AdminService's secret RPCs manage --

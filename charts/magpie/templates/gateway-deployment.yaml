@@ -40,6 +40,7 @@ spec:
             - name: http
               containerPort: {{ .Values.gateway.service.port }}
           env:
+            {{- include "magpie.otelEnv" . | nindent 12 }}
             - name: NAMESPACE
               value: {{ include "magpie.gatewayNamespace" . }}
             - name: LISTEN_ADDR

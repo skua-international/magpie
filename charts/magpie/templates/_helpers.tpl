@@ -210,6 +210,22 @@ for an operator's own per-server exporter (services/controller/src/
 reconcile.rs's ensure_deployment).
 Called as: {{- include "magpie.prometheusAnnotations" (dict "port" 8444) | nindent 8 }}
 */}}
+{{/*
+OTLP exporter environment, included by every service's Deployment.
+
+Emits nothing when observability.otlpEndpoint is empty, which is the
+default and what every deployment runs today: with the variable unset the
+services install no trace pipeline at all and behave exactly as before
+(see crates/observability). Setting it is the whole activation step --
+there is no code change involved.
+*/}}
+{{- define "magpie.otelEnv" -}}
+{{- with .Values.observability.otlpEndpoint }}
+- name: OTEL_EXPORTER_OTLP_ENDPOINT
+  value: {{ . | quote }}
+{{- end }}
+{{- end -}}
+
 {{- define "magpie.prometheusAnnotations" -}}
 prometheus.io/scrape: "true"
 prometheus.io/port: {{ .port | quote }}

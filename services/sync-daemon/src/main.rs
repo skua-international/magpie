@@ -1,5 +1,6 @@
 mod capacity;
 mod config;
+mod metrics;
 mod reconcile;
 mod secrets;
 mod service;
@@ -10,7 +11,6 @@ use axum::routing::get;
 use config::{Config, SteamAuthConfig};
 use connectrpc::Router as ConnectRouter;
 use kube::Client;
-use metrics_exporter_prometheus::PrometheusBuilder;
 use secrets::Session;
 use service::{Shared, SyncServiceImpl};
 use steam_sync::cache::SyncState;
@@ -53,15 +53,13 @@ async fn main() -> Result<()> {
     // rolled out repo-wide for consistency. `_guard` has to live for the
     // rest of `main` -- dropping it early stops the writer thread and
     // silently drops whatever's still buffered.
-    let (non_blocking_stdout, _guard) = tracing_appender::non_blocking(std::io::stdout());
-    tracing_subscriber::fmt()
-        .json()
-        .with_writer(non_blocking_stdout)
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
-        )
-        .with_target(false)
-        .init();
+    // Logs, metrics and (when an OTLP endpoint is configured) trace
+    // export from one place -- see crates/observability. Arc because the
+    // /metrics handler is called repeatedly (axum handlers are Fn, not
+    // FnOnce) while `main` keeps its own reference alive: dropping the
+    // last one shuts the exporters down and stops the non-blocking log
+    // writer, silently discarding whatever is still buffered.
+    let telemetry = std::sync::Arc::new(observability::init("sync-daemon")?);
 
     let cfg = Config::from_env()?;
 
@@ -161,7 +159,9 @@ async fn main() -> Result<()> {
                 Some(std::sync::Arc::new(client))
             }
             Err(e) => {
-                warn!("invalid CSI_CAPACITY_URL {url:?} ({e:#}) -- continuing without capacity reservations");
+                warn!(
+                    "invalid CSI_CAPACITY_URL {url:?} ({e:#}) -- continuing without capacity reservations"
+                );
                 None
             }
         },
@@ -183,6 +183,11 @@ async fn main() -> Result<()> {
         cfg.download_workers,
         capacity,
     );
+
+    // Content size, in-flight syncs and the worker ceiling -- the numbers
+    // that previously needed `kubectl top` plus `du` inside the CSI node
+    // pod to answer. See metrics.rs.
+    metrics::spawn(shared.clone());
 
     reconcile::spawn(
         client,
@@ -241,12 +246,17 @@ async fn main() -> Result<()> {
     // file's own doc), so the RPC counters that middleware records for
     // registry/gateway don't apply -- /metrics exists regardless, for
     // shape consistency and whatever gets added here later.
-    let prometheus_handle = PrometheusBuilder::new().install_recorder()?;
     let app = Router::new()
         .route("/healthz", get(|| async { "ok" }))
         .route(
             "/metrics",
-            get(|| async move { prometheus_handle.render() }),
+            get({
+                let telemetry = telemetry.clone();
+                move || {
+                    let telemetry = telemetry.clone();
+                    async move { telemetry.render() }
+                }
+            }),
         )
         .fallback_service(connect.into_axum_service());
 

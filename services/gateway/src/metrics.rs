@@ -8,6 +8,7 @@ use std::time::Duration;
 use crd::{ArmaServer, ArmaServerPhase};
 use kube::Client;
 use kube::api::{Api, ListParams};
+use opentelemetry::KeyValue;
 use tracing::warn;
 
 const POLL_INTERVAL: Duration = Duration::from_secs(30);
@@ -19,6 +20,13 @@ const PHASES: [ArmaServerPhase; 4] = [
 ];
 
 pub fn spawn(client: Client, namespace: String) {
+    // Built once outside the loop: re-resolving an instrument against the
+    // meter provider on every poll is wasted work, and the `metrics`
+    // macros this replaces cached for the same reason.
+    let servers_total = observability::meter()
+        .u64_gauge("magpie_servers_total")
+        .with_description("ArmaServers by reconciliation phase")
+        .build();
     tokio::spawn(async move {
         let api: Api<ArmaServer> = Api::namespaced(client, &namespace);
         loop {
@@ -36,7 +44,7 @@ pub fn spawn(client: Client, namespace: String) {
                     // server has actually reached it.
                     for (phase, count) in PHASES.iter().zip(counts) {
                         let label = format!("{phase:?}").to_lowercase();
-                        metrics::gauge!("magpie_servers_total", "phase" => label).set(count as f64);
+                        servers_total.record(count, &[KeyValue::new("phase", label)]);
                     }
                 }
                 Err(e) => warn!("metrics poll failed: {e:#}"),

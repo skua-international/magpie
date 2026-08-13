@@ -14,11 +14,60 @@ use std::time::Duration;
 use crd::ModSource;
 use kube::Client;
 use kube::api::{Api, ListParams};
+use opentelemetry::KeyValue;
+use opentelemetry::metrics::Gauge;
 use sqlx::PgPool;
 use sync_client::SyncClient;
 use tracing::warn;
 
 use crate::service::mod_source::to_mod_source_info;
+
+/// Every instrument this module publishes, built once rather than
+/// re-resolved against the meter provider on each 30s poll.
+struct Instruments {
+    disk_usage_bytes: Gauge<u64>,
+    mod_sources_total: Gauge<u64>,
+    synced_mods_total: Gauge<u64>,
+    mod_size_bytes: Gauge<u64>,
+    missions_total: Gauge<u64>,
+    missions_size_bytes_total: Gauge<u64>,
+    mission_size_bytes: Gauge<u64>,
+    local_mods_total: Gauge<u64>,
+    local_mods_size_bytes_total: Gauge<u64>,
+    local_mod_size_bytes: Gauge<u64>,
+}
+
+impl Instruments {
+    fn new() -> Self {
+        let meter = observability::meter();
+        Self {
+            disk_usage_bytes: meter
+                .u64_gauge("magpie_disk_usage_bytes")
+                .with_description("On-disk bytes by content kind, deduplicated across sources")
+                .build(),
+            mod_sources_total: meter
+                .u64_gauge("magpie_mod_sources_total")
+                .with_description("Registered mod sources by kind")
+                .build(),
+            synced_mods_total: meter
+                .u64_gauge("magpie_synced_mods_total")
+                .with_description("Workshop mods currently tracked as verified-synced")
+                .build(),
+            mod_size_bytes: meter
+                .u64_gauge("magpie_mod_size_bytes")
+                .with_description("On-disk size of one synced mod")
+                .build(),
+            missions_total: meter.u64_gauge("magpie_missions_total").build(),
+            missions_size_bytes_total: meter.u64_gauge("magpie_missions_size_bytes_total").build(),
+            mission_size_bytes: meter.u64_gauge("magpie_mission_size_bytes").build(),
+            local_mods_total: meter.u64_gauge("magpie_local_mods_total").build(),
+            local_mods_size_bytes_total: meter
+                .u64_gauge("magpie_local_mods_size_bytes_total")
+                .build(),
+            local_mod_size_bytes: meter.u64_gauge("magpie_local_mod_size_bytes").build(),
+        }
+    }
+}
 
 const POLL_INTERVAL: Duration = Duration::from_secs(30);
 
@@ -27,9 +76,11 @@ const POLL_INTERVAL: Duration = Duration::from_secs(30);
 /// (e.g. a transient Postgres/K8s API hiccup) just logs and retries next
 /// interval rather than crashing the process.
 pub fn spawn(client: Client, namespace: String, pool: PgPool, sync_client: Arc<SyncClient>) {
+    let instruments = Instruments::new();
     tokio::spawn(async move {
         loop {
-            if let Err(e) = poll_once(&client, &namespace, &pool, &sync_client).await {
+            if let Err(e) = poll_once(&client, &namespace, &pool, &sync_client, &instruments).await
+            {
                 warn!("metrics poll failed: {e:#}");
             }
             tokio::time::sleep(POLL_INTERVAL).await;
@@ -42,6 +93,7 @@ async fn poll_once(
     namespace: &str,
     pool: &PgPool,
     sync_client: &SyncClient,
+    instruments: &Instruments,
 ) -> anyhow::Result<()> {
     let api: Api<ModSource> = Api::namespaced(client.clone(), namespace);
     let mod_sources = api.list(&ListParams::default()).await?;
@@ -60,37 +112,59 @@ async fn poll_once(
         if is_local {
             local_count += 1;
             local_bytes += info.size_bytes;
-            metrics::gauge!("magpie_local_mod_size_bytes", "unique_id" => info.reference)
-                .set(info.size_bytes as f64);
+            instruments.local_mod_size_bytes.record(
+                info.size_bytes,
+                &[KeyValue::new("unique_id", info.reference)],
+            );
         }
     }
     for (kind, count) in &by_kind {
-        metrics::gauge!("magpie_mod_sources_total", "kind" => kind.clone()).set(*count as f64);
+        instruments
+            .mod_sources_total
+            .record(*count as u64, &[KeyValue::new("kind", kind.clone())]);
     }
-    metrics::gauge!("magpie_local_mods_total").set(local_count as f64);
-    metrics::gauge!("magpie_local_mods_size_bytes_total").set(local_bytes as f64);
+    instruments.local_mods_total.record(local_count as u64, &[]);
+    instruments
+        .local_mods_size_bytes_total
+        .record(local_bytes, &[]);
 
     let synced = sync_client.list_synced_mods().await?;
-    metrics::gauge!("magpie_synced_mods_total").set(synced.len() as f64);
+    instruments
+        .synced_mods_total
+        .record(synced.len() as u64, &[]);
     for m in &synced {
-        metrics::gauge!("magpie_mod_size_bytes", "mod_id" => m.mod_id.to_string())
-            .set(m.size_bytes as f64);
+        instruments.mod_size_bytes.record(
+            m.size_bytes,
+            &[KeyValue::new("mod_id", m.mod_id.to_string())],
+        );
     }
 
     let missions = registry_db::list_missions(pool).await?;
     let missions_bytes: u64 = missions.iter().map(|m| m.filesize as u64).sum();
-    metrics::gauge!("magpie_missions_total").set(missions.len() as f64);
-    metrics::gauge!("magpie_missions_size_bytes_total").set(missions_bytes as f64);
+    instruments
+        .missions_total
+        .record(missions.len() as u64, &[]);
+    instruments
+        .missions_size_bytes_total
+        .record(missions_bytes as u64, &[]);
     for m in &missions {
-        metrics::gauge!("magpie_mission_size_bytes", "mission_id" => m.id.to_string())
-            .set(m.filesize as f64);
+        instruments.mission_size_bytes.record(
+            m.filesize as u64,
+            &[KeyValue::new("mission_id", m.id.to_string())],
+        );
     }
 
     let stats = sync_client.sync_stats().await?;
-    metrics::gauge!("magpie_disk_usage_bytes", "kind" => "mods").set(stats.mods_bytes as f64);
-    metrics::gauge!("magpie_disk_usage_bytes", "kind" => "game_files")
-        .set(stats.game_files_bytes as f64);
-    metrics::gauge!("magpie_disk_usage_bytes", "kind" => "missions").set(missions_bytes as f64);
+    instruments
+        .disk_usage_bytes
+        .record(stats.mods_bytes, &[KeyValue::new("kind", "mods")]);
+    instruments.disk_usage_bytes.record(
+        stats.game_files_bytes,
+        &[KeyValue::new("kind", "game_files")],
+    );
+    instruments
+        .disk_usage_bytes
+        .record(missions_bytes as u64, &[KeyValue::new("kind", "missions")]);
 
     Ok(())
 }

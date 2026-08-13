@@ -237,7 +237,12 @@ async fn cleanup(obj: &ModSource, ctx: &Ctx) -> anyhow::Result<Action> {
 /// for 47+ minutes on two already-resolved ModSources, since every
 /// "nothing changed" drift recheck still unconditionally re-patched the
 /// identical status).
-async fn set_status(ctx: &Ctx, obj: &ModSource, name: &str, status: ModSourceStatus) -> anyhow::Result<()> {
+async fn set_status(
+    ctx: &Ctx,
+    obj: &ModSource,
+    name: &str,
+    status: ModSourceStatus,
+) -> anyhow::Result<()> {
     if obj.status.as_ref() == Some(&status) {
         return Ok(());
     }

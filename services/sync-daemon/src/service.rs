@@ -81,6 +81,15 @@ pub struct Shared {
     syncing: AtomicUsize,
 }
 
+impl Shared {
+    /// Depot/mod syncs currently running -- the same counter
+    /// `GetSyncStatus` reports, exposed so the metric and the RPC can
+    /// never disagree about it.
+    pub fn in_flight(&self) -> usize {
+        self.syncing.load(Ordering::Relaxed)
+    }
+}
+
 // THROWAWAY -- not committed. mi_collect isn't exposed by either the
 // `mimalloc` or `libmimalloc-sys` crates (only basic alloc/free are
 // bound), but the C library is already statically linked in via
@@ -238,6 +247,11 @@ impl Shared {
     /// main.rs's sync-on-startup.
     pub async fn sync_content(&self) -> anyhow::Result<()> {
         let _guard = SyncingGuard::enter(&self.syncing);
+        // Timed around the whole pass rather than per depot: this is the
+        // number an operator actually asks about ("how long does a full
+        // resync take"), and it is the one a load test was hand-timing
+        // with a shell loop before this existed.
+        let started = std::time::Instant::now();
         // Both download paths below share this: each announces its own
         // batch total under its own key, so the two sum on the far side
         // rather than overwriting each other.
@@ -325,6 +339,11 @@ impl Shared {
                 .await;
             capacity.release(steam_sync::capacity::KEY_WORKSHOP).await;
         }
+
+        // Recorded on the success path only: a sync that failed partway
+        // has a duration, but not one comparable to a completed pass, and
+        // mixing them makes the histogram describe neither.
+        crate::metrics::sync_duration().record(started.elapsed().as_secs_f64(), &[]);
         Ok(())
     }
 }

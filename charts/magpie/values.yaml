@@ -269,6 +269,19 @@ identity:
   oauthSecret: ""
   resources: {}
 
+# OpenTelemetry export. Metrics are always published in Prometheus format
+# on each service's own /metrics (discovered via the prometheus.io/*
+# annotations below) regardless of anything here -- this only controls
+# whether traces are additionally exported over OTLP.
+#
+# Empty means no trace export, which is the default: nothing in this
+# chart runs a collector, and the services treat an unset endpoint as
+# "don't install the pipeline" rather than as an error. Point it at one
+# (e.g. http://otel-collector.observability:4317) to turn tracing on --
+# a values change, not a code change.
+observability:
+  otlpEndpoint: ""
+
 # The cluster's single shared Postgres instance -- mod sources, missions,
 # and the ACL grant table (see crates/registry-db) all live in one
 # database, read/written by services/registry, services/gateway, and
