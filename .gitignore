@@ -4,3 +4,8 @@ node_modules/
 # own dist/ (services/*/dist/, packaged by that service's Dockerfile),
 # not just one at the repo root.
 dist/
+
+# tsc -b's incremental state for web/. Purely a local build cache, and it
+# embeds absolute paths, so committing it makes every machine's checkout
+# differ.
+*.tsbuildinfo
