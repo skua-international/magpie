@@ -158,15 +158,27 @@ export function Servers() {
           // and a fleet page that polls every server would hammer the
           // API server for information that changes slowly.
           { header: "Health", cell: (s) => <ServerHealth serverId={s.id} /> },
-          // Only meaningful when the controller has something to say
-          // (a failure reason, usually) -- an empty cell otherwise.
-          { header: "Message", cell: (s) => <span className="muted">{s.message}</span> },
+          // Only meaningful when the controller has something to say (a
+          // failure reason, usually). Takes the leftover width and
+          // truncates rather than letting a long bind-conflict message
+          // widen the whole table; full text stays in the tooltip.
+          {
+            header: "Message",
+            className: "grow",
+            cell: (s) => (
+              <span className="muted" title={s.message}>
+                {s.message}
+              </span>
+            ),
+          },
           {
             header: "",
+            className: "row-actions",
             cell: (s) => (
               <div className="actions">
                 {s.desiredState === DesiredState.RUNNING ? (
                   <Button
+                    size="compact"
                     disabled={action.busy}
                     onClick={() => action.run(() => servers.stopServer({ id: s.id }))}
                   >
@@ -174,6 +186,7 @@ export function Servers() {
                   </Button>
                 ) : (
                   <Button
+                    size="compact"
                     disabled={action.busy}
                     onClick={() => action.run(() => servers.startServer({ id: s.id }))}
                   >
@@ -185,18 +198,20 @@ export function Servers() {
                     the server references (see its proto doc). Nothing
                     else about a server is editable through it. */}
                 <Button
+                  size="compact"
                   disabled={action.busy}
                   onClick={() => action.run(() => servers.updateServer({ id: s.id }))}
                 >
                   Resync
                 </Button>
-                <Button onClick={() => setLogsFor({ id: s.id, name: s.name })}>
+                <Button size="compact" onClick={() => setLogsFor({ id: s.id, name: s.name })}>
                   Logs
                 </Button>
-                <Button onClick={() => setEditing(editing === s.id ? null : s.id)}>
+                <Button size="compact" onClick={() => setEditing(editing === s.id ? null : s.id)}>
                   {editing === s.id ? "Cancel" : "Edit"}
                 </Button>
                 <Button
+                  size="compact"
                   variant="danger"
                   disabled={action.busy}
                   onClick={() =>

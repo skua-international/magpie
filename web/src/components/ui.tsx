@@ -12,17 +12,21 @@ export function Button({
   disabled,
   variant = "default",
   type = "button",
+  size = "default",
 }: {
   children: ReactNode;
   onClick?: () => void;
   disabled?: boolean;
   variant?: "default" | "primary" | "danger";
   type?: "button" | "submit";
+  /// "compact" is for buttons living inside table rows, where full-size
+  /// padding is what forces a row tall enough to need scrolling past.
+  size?: "default" | "compact";
 }) {
   return (
     <button
       type={type}
-      className={`btn btn-${variant}`}
+      className={`btn btn-${variant}${size === "compact" ? " btn-compact" : ""}`}
       onClick={onClick}
       disabled={disabled}
     >
@@ -56,17 +60,24 @@ export function Table<T>({
   rowKey,
 }: {
   rows: T[];
-  columns: { header: string; cell: (row: T) => ReactNode }[];
+  columns: { header: string; cell: (row: T) => ReactNode; className?: string }[];
   empty: string;
   rowKey: (row: T) => string;
 }) {
   if (rows.length === 0) return <p className="muted">{empty}</p>;
   return (
-    <table>
+    // Scrolling lives on this wrapper, not on the table itself. A table
+    // with `display: block` (which is what makes overflow work directly
+    // on it) stops honouring width:100% and stops distributing column
+    // widths, which is what pushed the actions column off-screen.
+    <div className="table-scroll">
+      <table>
       <thead>
         <tr>
           {columns.map((c) => (
-            <th key={c.header}>{c.header}</th>
+            <th key={c.header} className={c.className}>
+              {c.header}
+            </th>
           ))}
         </tr>
       </thead>
@@ -74,12 +85,15 @@ export function Table<T>({
         {rows.map((row) => (
           <tr key={rowKey(row)}>
             {columns.map((c) => (
-              <td key={c.header}>{c.cell(row)}</td>
+              <td key={c.header} className={c.className}>
+                {c.cell(row)}
+              </td>
             ))}
           </tr>
         ))}
       </tbody>
-    </table>
+      </table>
+    </div>
   );
 }
 

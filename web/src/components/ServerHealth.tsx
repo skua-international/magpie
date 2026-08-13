@@ -22,7 +22,7 @@ export function ServerHealth({ serverId }: { serverId: string }) {
         <span className="muted" title={health.error}>
           unavailable
         </span>
-        <Button onClick={health.reload}>Re-check</Button>
+        <Button size="compact" onClick={health.reload}>↻</Button>
       </span>
     );
   }
@@ -48,7 +48,12 @@ export function ServerHealth({ serverId }: { serverId: string }) {
       {data.restartCount > 0 && (
         <span className="muted"> ×{data.restartCount}</span>
       )}
-      <Button onClick={health.reload}>Re-check</Button>
+      {/* A glyph rather than "Re-check": this sits in every row, and the
+          word is what made the health column wide enough to push the
+          actions off-screen. */}
+      <Button size="compact" onClick={health.reload}>
+        ↻
+      </Button>
     </span>
   );
 }

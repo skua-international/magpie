@@ -53,11 +53,23 @@ nav a.active { background: var(--card); color: var(--fg); font-weight: 600; }
 .page-header h2, .page-header h3 { margin: 0; }
 h3 { margin: 1.5rem 0 0.5rem; }
 
-/* Wide tables scroll inside their own box rather than pushing the page
-   sideways -- mod references and subject ids are long. */
-table { width: 100%; border-collapse: collapse; display: block; overflow-x: auto; }
-th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--line); white-space: nowrap; }
+/* Wide tables scroll inside their own wrapper rather than pushing the
+   page sideways -- mod references and subject ids are long. The wrapper
+   carries the overflow, not the table: `display: block` on a table stops
+   it honouring width:100% and distributing column widths, which pushes
+   the last column out of view. */
+.table-scroll { width: 100%; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 0.35rem 0.6rem; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: middle; }
 th { color: var(--muted); font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.03em; }
+/* Free-form text (a controller message, a metadata blob) is the one
+   thing that legitimately wants the leftover width -- it takes it and
+   truncates, instead of every column stretching to fit the longest
+   value. The full text stays available as a title tooltip. */
+td.grow { white-space: normal; width: 100%; max-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* The actions column is sized to its buttons and pinned right, so it is
+   the thing that stays put when a table does need to scroll. */
+td.row-actions, th.row-actions { text-align: right; width: 1%; }
 
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
 .field { display: flex; flex-direction: column; gap: 0.25rem; }
@@ -69,12 +81,16 @@ input, select, textarea {
 input[type="checkbox"] { width: auto; }
 
 .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+/* Inside a table row, never wrap: wrapping is what turned four buttons
+   into a four-line, ~230px-tall row. */
+td .actions { flex-wrap: nowrap; justify-content: flex-end; gap: 0.3rem; }
 .btn { font: inherit; padding: 0.35rem 0.75rem; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer; }
 .btn:hover:not(:disabled) { background: var(--card); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn-primary:hover:not(:disabled) { filter: brightness(1.08); background: var(--accent); }
 .btn-danger { color: var(--danger); border-color: var(--danger); }
+.btn-compact { padding: 0.15rem 0.45rem; font-size: 0.85rem; }
 
 .banner { padding: 0.6rem 0.85rem; border-radius: 6px; margin-bottom: 1rem; border: 1px solid; }
 .banner-error { color: var(--danger); border-color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
@@ -122,6 +138,6 @@ a { color: var(--accent); }
 .log-fields { margin-left: 0.5rem; }
 .log-field { color: var(--muted); margin-right: 0.5rem; }
 
-.health { display: inline-flex; align-items: center; gap: 0.5rem; }
+.health { display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
 .qr { background: #fff; padding: 0.5rem; border-radius: 6px; align-self: flex-start; }
 .key-chip { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 0.05rem 0.35rem; margin-right: 0.25rem; }

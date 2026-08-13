@@ -77,8 +77,10 @@ export function Missions() {
           { header: "By", cell: (m) => <span className="muted">{m.createdBy || "—"}</span> },
           {
             header: "",
+            className: "row-actions",
             cell: (m) => (
               <Button
+                size="compact"
                 variant="danger"
                 disabled={action.busy}
                 onClick={() =>

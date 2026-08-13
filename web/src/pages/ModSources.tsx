@@ -80,6 +80,7 @@ export function ModSources() {
           { header: "Added", cell: (s) => formatTimestamp(s.createdAtUnixMs) },
           {
             header: "Metadata",
+            className: "grow",
             cell: (s) =>
               Object.keys(s.metadata).length === 0 ? (
                 <span className="muted">—</span>
@@ -93,15 +94,18 @@ export function ModSources() {
           },
           {
             header: "",
+            className: "row-actions",
             cell: (s) => (
               <div className="actions">
                 <Button
+                  size="compact"
                   disabled={action.busy}
                   onClick={() => action.run(() => modSources.syncModSource({ id: s.id }))}
                 >
                   Sync
                 </Button>
                 <Button
+                  size="compact"
                   variant="danger"
                   disabled={action.busy}
                   onClick={() =>

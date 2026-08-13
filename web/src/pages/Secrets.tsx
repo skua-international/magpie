@@ -102,12 +102,14 @@ export function Secrets() {
           },
           {
             header: "",
+            className: "row-actions",
             cell: (s) => (
               <div className="actions">
-                <Button onClick={() => setEditing(editing === s.name ? null : s.name)}>
+                <Button size="compact" onClick={() => setEditing(editing === s.name ? null : s.name)}>
                   {editing === s.name ? "Cancel" : "Replace"}
                 </Button>
                 <Button
+                  size="compact"
                   variant="danger"
                   disabled={action.busy}
                   onClick={() =>
