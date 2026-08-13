@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   goreleaser:
-    runs-on: elephant-runners
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:

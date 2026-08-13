@@ -29,27 +29,18 @@ jobs:
   # locally via buildx rather than run/pushed), and hands them to the
   # build matrix below as a job artifact.
   #
-  # Landed on "build in Docker, export locally" after two other
-  # approaches each hit a real, different problem on elephant's
-  # self-hosted runner:
-  # - `container: image: rust:trixie` (GHA's job-container feature)
-  #   breaks under elephant's Docker-outside-of-Docker setup: checkout
-  #   needs the runner to bind-mount its own /actions-runner/externals
-  #   into the spun-up job container, but that source path only resolves
-  #   inside the runner's own container filesystem, not on the actual
-  #   host -- confirmed live, "/__e/node24/bin/node: no such file or
-  #   directory" even with a guaranteed-fresh runner image.
-  # - Building natively on the bare runner (no Docker at all) traded
-  #   that for a different real problem: elephant's runner is Ubuntu
-  #   20.04, whose default gcc (9.4) aws-lc-sys explicitly refuses to
-  #   build with -- a genuine known miscompilation bug (gcc.gnu.org/
-  #   bugzilla 95189), not just an overly cautious version gate.
-  # `docker build` doesn't have either problem: buildx streams the build
-  # context over the Docker API rather than bind-mounting host paths
-  # (exactly why the packaging steps' own docker/build-push-action calls
-  # already work fine on this runner), and Dockerfile.workspace's
-  # rust:trixie gives a modern gcc + a glibc matching every runtime
-  # image (also trixie now) regardless of which runner actually built it.
+  # "Build in Docker, export locally" rather than building natively on
+  # the runner: Dockerfile.workspace's rust:trixie pins the toolchain and
+  # gives a glibc matching every runtime image (also trixie), so the
+  # binaries this produces are correct regardless of what the runner
+  # itself happens to have installed. That decoupling is why moving off
+  # a self-hosted runner to ubuntu-latest was a one-line change.
+  #
+  # (Historically this also worked around two concrete problems on the
+  # self-hosted runner it used to use -- a Docker-outside-of-Docker
+  # setup that broke GHA's job-container feature, and an Ubuntu 20.04
+  # gcc that aws-lc-sys refuses to build with. Neither applies on a
+  # hosted runner; the toolchain-pinning reason above stands on its own.)
   #
   # This also replaced an earlier cargo-chef multi-stage build duplicated
   # across all 7 Dockerfiles, dropped after two separate real caching
@@ -60,7 +51,7 @@ jobs:
   # different commit. Compiling once removes both failure classes
   # outright -- there's only one job now, nothing to race.
   build-workspace:
-    runs-on: elephant-runners
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
@@ -91,7 +82,7 @@ jobs:
 
   build:
     needs: build-workspace
-    runs-on: elephant-runners
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write

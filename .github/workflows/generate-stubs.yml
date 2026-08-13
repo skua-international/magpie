@@ -20,7 +20,7 @@ on:
 
 jobs:
   generate:
-    runs-on: elephant-runners
+    runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
@@ -29,17 +29,13 @@ jobs:
       - uses: bufbuild/buf-setup-action@v1
         with:
           version: "1.71.0"
-          # Tried migrating to the consolidated bufbuild/buf-action (with
-          # setup_only: true) -- confirmed broken on this repo's
-          # self-hosted runner (elephant, via ARC): its core.addPath()
-          # call runs (logged "Setup buf (1.71.0) at
-          # /opt/hostedtoolcache/buf/..."), but the very next step still
-          # gets "buf: command not found", and buf-action's own post-job
-          # cleanup step then fails the same way trying to find buf
-          # itself. Unclear whether that's a buf-action bug or a quirk of
-          # this runner's PATH-file handling; reverted to buf-setup-action
-          # (proven working, same install pattern) rather than debug it
-          # further this session.
+          # buf-setup-action rather than the consolidated
+          # bufbuild/buf-action. Migrating was tried once and reverted:
+          # buf-action's core.addPath() ran but the next step still got
+          # "buf: command not found". That was diagnosed against a
+          # self-hosted ARC runner and may well have been specific to its
+          # PATH-file handling, so it is worth retrying now that this runs
+          # on ubuntu-latest -- see issue #30, which tracks exactly that.
 
 
       - uses: actions/setup-go@v7

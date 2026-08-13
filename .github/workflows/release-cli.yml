@@ -17,7 +17,7 @@ on:
 
 jobs:
   goreleaser:
-    runs-on: elephant-runners
+    runs-on: ubuntu-latest
     permissions:
       # Only uploading assets to a release semantic-release already
       # created -- the default token's contents:write is enough, no need
