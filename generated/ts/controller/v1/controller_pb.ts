@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file controller/v1/controller.proto.
  */
 export const file_controller_v1_controller: GenFile = /*@__PURE__*/
-  fileDesc("Ch5jb250cm9sbGVyL3YxL2NvbnRyb2xsZXIucHJvdG8SDWNvbnRyb2xsZXIudjEi8gEKE0NyZWF0ZVNlcnZlclJlcXVlc3QSDAoEbmFtZRgBIAEoCRIMCgRwb3J0GAIgASgNEhYKDm1vZF9zb3VyY2VfaWRzGAMgAygJEhcKCmNvbmZpZ19tYXAYBiABKAlIAIgBARIZCgxtZXRyaWNzX3BvcnQYByABKA1IAYgBARIZCgxtZXRyaWNzX3BhdGgYCCABKAlIAogBAUINCgtfY29uZmlnX21hcEIPCg1fbWV0cmljc19wb3J0Qg8KDV9tZXRyaWNzX3BhdGhKBAgEEAVKBAgFEAZSC2FybWFfY29uZmlnUg5uZXR3b3JrX2NvbmZpZyKEAgoKU2VydmVySW5mbxIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEgwKBHBvcnQYAyABKA0SFgoObW9kX3NvdXJjZV9pZHMYBCADKAkSKQoFcGhhc2UYBSABKA4yGi5jb250cm9sbGVyLnYxLlNlcnZlclBoYXNlEg8KB21lc3NhZ2UYByABKAkSMgoNZGVzaXJlZF9zdGF0ZRgIIAEoDjIbLmNvbnRyb2xsZXIudjEuRGVzaXJlZFN0YXRlSgQIBhAHSgQICRAKSgQIChALUgpjbGFpbV9wYXRoUgtjb250ZW50X3B2Y1ILYXJtYV9jb25maWdSDm5ldHdvcmtfY29uZmlnIhQKEkxpc3RTZXJ2ZXJzUmVxdWVzdCJBChNMaXN0U2VydmVyc1Jlc3BvbnNlEioKB3NlcnZlcnMYASADKAsyGS5jb250cm9sbGVyLnYxLlNlcnZlckluZm8iHgoQR2V0U2VydmVyUmVxdWVzdBIKCgJpZBgBIAEoCSIhChNEZWxldGVTZXJ2ZXJSZXF1ZXN0EgoKAmlkGAEgASgJIhYKFERlbGV0ZVNlcnZlclJlc3BvbnNlIiEKE1VwZGF0ZVNlcnZlclJlcXVlc3QSCgoCaWQYASABKAkiIAoSU3RhcnRTZXJ2ZXJSZXF1ZXN0EgoKAmlkGAEgASgJIh8KEVN0b3BTZXJ2ZXJSZXF1ZXN0EgoKAmlkGAEgASgJKq8BCgtTZXJ2ZXJQaGFzZRIcChhTRVJWRVJfUEhBU0VfVU5TUEVDSUZJRUQQABIYChRTRVJWRVJfUEhBU0VfU1RPUFBFRBABEhgKFFNFUlZFUl9QSEFTRV9QRU5ESU5HEAISGAoUU0VSVkVSX1BIQVNFX1JVTk5JTkcQBBIXChNTRVJWRVJfUEhBU0VfRkFJTEVEEAUiBAgDEAMqFVNFUlZFUl9QSEFTRV9DTEFJTUlORypjCgxEZXNpcmVkU3RhdGUSHQoZREVTSVJFRF9TVEFURV9VTlNQRUNJRklFRBAAEhkKFURFU0lSRURfU1RBVEVfUlVOTklORxABEhkKFURFU0lSRURfU1RBVEVfU1RPUFBFRBACMr0ECg1TZXJ2ZXJTZXJ2aWNlEk0KDENyZWF0ZVNlcnZlchIiLmNvbnRyb2xsZXIudjEuQ3JlYXRlU2VydmVyUmVxdWVzdBoZLmNvbnRyb2xsZXIudjEuU2VydmVySW5mbxJUCgtMaXN0U2VydmVycxIhLmNvbnRyb2xsZXIudjEuTGlzdFNlcnZlcnNSZXF1ZXN0GiIuY29udHJvbGxlci52MS5MaXN0U2VydmVyc1Jlc3BvbnNlEkcKCUdldFNlcnZlchIfLmNvbnRyb2xsZXIudjEuR2V0U2VydmVyUmVxdWVzdBoZLmNvbnRyb2xsZXIudjEuU2VydmVySW5mbxJXCgxEZWxldGVTZXJ2ZXISIi5jb250cm9sbGVyLnYxLkRlbGV0ZVNlcnZlclJlcXVlc3QaIy5jb250cm9sbGVyLnYxLkRlbGV0ZVNlcnZlclJlc3BvbnNlEk0KDFVwZGF0ZVNlcnZlchIiLmNvbnRyb2xsZXIudjEuVXBkYXRlU2VydmVyUmVxdWVzdBoZLmNvbnRyb2xsZXIudjEuU2VydmVySW5mbxJLCgtTdGFydFNlcnZlchIhLmNvbnRyb2xsZXIudjEuU3RhcnRTZXJ2ZXJSZXF1ZXN0GhkuY29udHJvbGxlci52MS5TZXJ2ZXJJbmZvEkkKClN0b3BTZXJ2ZXISIC5jb250cm9sbGVyLnYxLlN0b3BTZXJ2ZXJSZXF1ZXN0GhkuY29udHJvbGxlci52MS5TZXJ2ZXJJbmZvQk5aTGdpdGh1Yi5jb20vc2t1YS1pbnRlcm5hdGlvbmFsL21hZ3BpZS9nZW5lcmF0ZWQvZ28vY29udHJvbGxlci92MTtjb250cm9sbGVydjFiBnByb3RvMw");
+  fileDesc("Ch5jb250cm9sbGVyL3YxL2NvbnRyb2xsZXIucHJvdG8SDWNvbnRyb2xsZXIudjEi5wIKE0NyZWF0ZVNlcnZlclJlcXVlc3QSDAoEbmFtZRgBIAEoCRIMCgRwb3J0GAIgASgNEhYKDm1vZF9zb3VyY2VfaWRzGAMgAygJEhcKCmNvbmZpZ19tYXAYBiABKAlIAIgBARIZCgxtZXRyaWNzX3BvcnQYByABKA1IAYgBARIZCgxtZXRyaWNzX3BhdGgYCCABKAlIAogBARJCCghtZXRhZGF0YRgJIAMoCzIwLmNvbnRyb2xsZXIudjEuQ3JlYXRlU2VydmVyUmVxdWVzdC5NZXRhZGF0YUVudHJ5Gi8KDU1ldGFkYXRhRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4AUINCgtfY29uZmlnX21hcEIPCg1fbWV0cmljc19wb3J0Qg8KDV9tZXRyaWNzX3BhdGhKBAgEEAVKBAgFEAZSC2FybWFfY29uZmlnUg5uZXR3b3JrX2NvbmZpZyLwAgoKU2VydmVySW5mbxIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEgwKBHBvcnQYAyABKA0SFgoObW9kX3NvdXJjZV9pZHMYBCADKAkSKQoFcGhhc2UYBSABKA4yGi5jb250cm9sbGVyLnYxLlNlcnZlclBoYXNlEg8KB21lc3NhZ2UYByABKAkSMgoNZGVzaXJlZF9zdGF0ZRgIIAEoDjIbLmNvbnRyb2xsZXIudjEuRGVzaXJlZFN0YXRlEjkKCG1ldGFkYXRhGAsgAygLMicuY29udHJvbGxlci52MS5TZXJ2ZXJJbmZvLk1ldGFkYXRhRW50cnkaLwoNTWV0YWRhdGFFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBSgQIBhAHSgQICRAKSgQIChALUgpjbGFpbV9wYXRoUgtjb250ZW50X3B2Y1ILYXJtYV9jb25maWdSDm5ldHdvcmtfY29uZmlnIhQKEkxpc3RTZXJ2ZXJzUmVxdWVzdCJBChNMaXN0U2VydmVyc1Jlc3BvbnNlEioKB3NlcnZlcnMYASADKAsyGS5jb250cm9sbGVyLnYxLlNlcnZlckluZm8iHgoQR2V0U2VydmVyUmVxdWVzdBIKCgJpZBgBIAEoCSIhChNEZWxldGVTZXJ2ZXJSZXF1ZXN0EgoKAmlkGAEgASgJIhYKFERlbGV0ZVNlcnZlclJlc3BvbnNlIrQBChNVcGRhdGVTZXJ2ZXJSZXF1ZXN0EgoKAmlkGAEgASgJEjsKC21vZF9zb3VyY2VzGAIgASgLMiEuY29udHJvbGxlci52MS5Nb2RTb3VyY2VTZWxlY3Rpb25IAIgBARI3CghtZXRhZGF0YRgDIAEoCzIgLmNvbnRyb2xsZXIudjEuTWV0YWRhdGFTZWxlY3Rpb25IAYgBAUIOCgxfbW9kX3NvdXJjZXNCCwoJX21ldGFkYXRhIiwKEk1vZFNvdXJjZVNlbGVjdGlvbhIWCg5tb2Rfc291cmNlX2lkcxgBIAMoCSKGAQoRTWV0YWRhdGFTZWxlY3Rpb24SQAoIbWV0YWRhdGEYASADKAsyLi5jb250cm9sbGVyLnYxLk1ldGFkYXRhU2VsZWN0aW9uLk1ldGFkYXRhRW50cnkaLwoNTWV0YWRhdGFFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIm4KFEdldFNlcnZlckxvZ3NSZXF1ZXN0EgoKAmlkGAEgASgJEhcKCnRhaWxfbGluZXMYAiABKA1IAIgBARIVCghwcmV2aW91cxgDIAEoCEgBiAEBQg0KC190YWlsX2xpbmVzQgsKCV9wcmV2aW91cyI4ChVHZXRTZXJ2ZXJMb2dzUmVzcG9uc2USDQoFbGluZXMYASADKAkSEAoIcG9kX25hbWUYAiABKAkiJAoWR2V0U2VydmVySGVhbHRoUmVxdWVzdBIKCgJpZBgBIAEoCSJxChdHZXRTZXJ2ZXJIZWFsdGhSZXNwb25zZRINCgVyZWFkeRgBIAEoCBIQCghwb2RfbmFtZRgCIAEoCRINCgVwaGFzZRgDIAEoCRIVCg1yZXN0YXJ0X2NvdW50GAQgASgNEg8KB21lc3NhZ2UYBSABKAkiIAoSU3RhcnRTZXJ2ZXJSZXF1ZXN0EgoKAmlkGAEgASgJIh8KEVN0b3BTZXJ2ZXJSZXF1ZXN0EgoKAmlkGAEgASgJKq8BCgtTZXJ2ZXJQaGFzZRIcChhTRVJWRVJfUEhBU0VfVU5TUEVDSUZJRUQQABIYChRTRVJWRVJfUEhBU0VfU1RPUFBFRBABEhgKFFNFUlZFUl9QSEFTRV9QRU5ESU5HEAISGAoUU0VSVkVSX1BIQVNFX1JVTk5JTkcQBBIXChNTRVJWRVJfUEhBU0VfRkFJTEVEEAUiBAgDEAMqFVNFUlZFUl9QSEFTRV9DTEFJTUlORypjCgxEZXNpcmVkU3RhdGUSHQoZREVTSVJFRF9TVEFURV9VTlNQRUNJRklFRBAAEhkKFURFU0lSRURfU1RBVEVfUlVOTklORxABEhkKFURFU0lSRURfU1RBVEVfU1RPUFBFRBACMvsFCg1TZXJ2ZXJTZXJ2aWNlEk0KDENyZWF0ZVNlcnZlchIiLmNvbnRyb2xsZXIudjEuQ3JlYXRlU2VydmVyUmVxdWVzdBoZLmNvbnRyb2xsZXIudjEuU2VydmVySW5mbxJUCgtMaXN0U2VydmVycxIhLmNvbnRyb2xsZXIudjEuTGlzdFNlcnZlcnNSZXF1ZXN0GiIuY29udHJvbGxlci52MS5MaXN0U2VydmVyc1Jlc3BvbnNlEkcKCUdldFNlcnZlchIfLmNvbnRyb2xsZXIudjEuR2V0U2VydmVyUmVxdWVzdBoZLmNvbnRyb2xsZXIudjEuU2VydmVySW5mbxJXCgxEZWxldGVTZXJ2ZXISIi5jb250cm9sbGVyLnYxLkRlbGV0ZVNlcnZlclJlcXVlc3QaIy5jb250cm9sbGVyLnYxLkRlbGV0ZVNlcnZlclJlc3BvbnNlEk0KDFVwZGF0ZVNlcnZlchIiLmNvbnRyb2xsZXIudjEuVXBkYXRlU2VydmVyUmVxdWVzdBoZLmNvbnRyb2xsZXIudjEuU2VydmVySW5mbxJLCgtTdGFydFNlcnZlchIhLmNvbnRyb2xsZXIudjEuU3RhcnRTZXJ2ZXJSZXF1ZXN0GhkuY29udHJvbGxlci52MS5TZXJ2ZXJJbmZvEkkKClN0b3BTZXJ2ZXISIC5jb250cm9sbGVyLnYxLlN0b3BTZXJ2ZXJSZXF1ZXN0GhkuY29udHJvbGxlci52MS5TZXJ2ZXJJbmZvEloKDUdldFNlcnZlckxvZ3MSIy5jb250cm9sbGVyLnYxLkdldFNlcnZlckxvZ3NSZXF1ZXN0GiQuY29udHJvbGxlci52MS5HZXRTZXJ2ZXJMb2dzUmVzcG9uc2USYAoPR2V0U2VydmVySGVhbHRoEiUuY29udHJvbGxlci52MS5HZXRTZXJ2ZXJIZWFsdGhSZXF1ZXN0GiYuY29udHJvbGxlci52MS5HZXRTZXJ2ZXJIZWFsdGhSZXNwb25zZUJOWkxnaXRodWIuY29tL3NrdWEtaW50ZXJuYXRpb25hbC9tYWdwaWUvZ2VuZXJhdGVkL2dvL2NvbnRyb2xsZXIvdjE7Y29udHJvbGxlcnYxYgZwcm90bzM");
 
 /**
  * @generated from message controller.v1.CreateServerRequest
@@ -48,7 +48,7 @@ export type CreateServerRequest = Message<"controller.v1.CreateServerRequest"> &
    * ArmaServer) providing per-server overrides on top of the cluster's
    * baseline Arma config -- see ArmaServerSpec.config_map and
    * services/controller/src/arma_config.rs. The ConfigMap itself isn't
-   * managed through this API (server-api carries no ConfigMap RBAC at
+   * managed through this API (gateway carries no ConfigMap RBAC at
    * all, deliberately -- see charts/magpie/values.yaml's serverApi
    * comment); callers create/edit it directly against the cluster (e.g.
    * `kubectl edit configmap`) and only pass its name here. Unset means
@@ -74,6 +74,16 @@ export type CreateServerRequest = Message<"controller.v1.CreateServerRequest"> &
    * @generated from field: optional string metrics_path = 8;
    */
   metricsPath?: string | undefined;
+
+  /**
+   * Free-form operator labelling, stored as annotations on the
+   * ArmaServer object -- nothing reconciles against it. Annotations
+   * rather than a spec field so the CRD schema does not have to grow a
+   * map that only humans read.
+   *
+   * @generated from field: map<string, string> metadata = 9;
+   */
+  metadata: { [key: string]: string };
 };
 
 /**
@@ -121,6 +131,13 @@ export type ServerInfo = Message<"controller.v1.ServerInfo"> & {
    * @generated from field: controller.v1.DesiredState desired_state = 8;
    */
   desiredState: DesiredState;
+
+  /**
+   * See CreateServerRequest.metadata.
+   *
+   * @generated from field: map<string, string> metadata = 11;
+   */
+  metadata: { [key: string]: string };
 };
 
 /**
@@ -215,6 +232,28 @@ export type UpdateServerRequest = Message<"controller.v1.UpdateServerRequest"> &
    * @generated from field: string id = 1;
    */
   id: string;
+
+  /**
+   * Replaces the server's mod sources when present, leaves them alone
+   * when absent.
+   *
+   * Wrapped in a message rather than a bare `repeated string` because
+   * proto3 cannot tell an empty repeated field from an unset one, and
+   * both are meaningful here: "detach every mod source" has to be
+   * expressible without it being what every plain resync accidentally
+   * says.
+   *
+   * @generated from field: optional controller.v1.ModSourceSelection mod_sources = 2;
+   */
+  modSources?: ModSourceSelection | undefined;
+
+  /**
+   * Replaces the server's metadata when present, leaves it alone when
+   * absent. Same presence-vs-empty reasoning as mod_sources.
+   *
+   * @generated from field: optional controller.v1.MetadataSelection metadata = 3;
+   */
+  metadata?: MetadataSelection | undefined;
 };
 
 /**
@@ -223,6 +262,164 @@ export type UpdateServerRequest = Message<"controller.v1.UpdateServerRequest"> &
  */
 export const UpdateServerRequestSchema: GenMessage<UpdateServerRequest> = /*@__PURE__*/
   messageDesc(file_controller_v1_controller, 7);
+
+/**
+ * @generated from message controller.v1.ModSourceSelection
+ */
+export type ModSourceSelection = Message<"controller.v1.ModSourceSelection"> & {
+  /**
+   * @generated from field: repeated string mod_source_ids = 1;
+   */
+  modSourceIds: string[];
+};
+
+/**
+ * Describes the message controller.v1.ModSourceSelection.
+ * Use `create(ModSourceSelectionSchema)` to create a new message.
+ */
+export const ModSourceSelectionSchema: GenMessage<ModSourceSelection> = /*@__PURE__*/
+  messageDesc(file_controller_v1_controller, 8);
+
+/**
+ * @generated from message controller.v1.MetadataSelection
+ */
+export type MetadataSelection = Message<"controller.v1.MetadataSelection"> & {
+  /**
+   * @generated from field: map<string, string> metadata = 1;
+   */
+  metadata: { [key: string]: string };
+};
+
+/**
+ * Describes the message controller.v1.MetadataSelection.
+ * Use `create(MetadataSelectionSchema)` to create a new message.
+ */
+export const MetadataSelectionSchema: GenMessage<MetadataSelection> = /*@__PURE__*/
+  messageDesc(file_controller_v1_controller, 9);
+
+/**
+ * @generated from message controller.v1.GetServerLogsRequest
+ */
+export type GetServerLogsRequest = Message<"controller.v1.GetServerLogsRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * Most recent N lines. Capped server-side -- an unbounded request
+   * would pull a whole pod's history through the API server and into a
+   * browser.
+   *
+   * @generated from field: optional uint32 tail_lines = 2;
+   */
+  tailLines?: number | undefined;
+
+  /**
+   * Read the previous container instance instead of the current one,
+   * which is the only way to see why a crashed server died.
+   *
+   * @generated from field: optional bool previous = 3;
+   */
+  previous?: boolean | undefined;
+};
+
+/**
+ * Describes the message controller.v1.GetServerLogsRequest.
+ * Use `create(GetServerLogsRequestSchema)` to create a new message.
+ */
+export const GetServerLogsRequestSchema: GenMessage<GetServerLogsRequest> = /*@__PURE__*/
+  messageDesc(file_controller_v1_controller, 10);
+
+/**
+ * @generated from message controller.v1.GetServerLogsResponse
+ */
+export type GetServerLogsResponse = Message<"controller.v1.GetServerLogsResponse"> & {
+  /**
+   * @generated from field: repeated string lines = 1;
+   */
+  lines: string[];
+
+  /**
+   * Which pod these came from, so a UI can say so -- a server's pod name
+   * changes on every restart.
+   *
+   * @generated from field: string pod_name = 2;
+   */
+  podName: string;
+};
+
+/**
+ * Describes the message controller.v1.GetServerLogsResponse.
+ * Use `create(GetServerLogsResponseSchema)` to create a new message.
+ */
+export const GetServerLogsResponseSchema: GenMessage<GetServerLogsResponse> = /*@__PURE__*/
+  messageDesc(file_controller_v1_controller, 11);
+
+/**
+ * @generated from message controller.v1.GetServerHealthRequest
+ */
+export type GetServerHealthRequest = Message<"controller.v1.GetServerHealthRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+};
+
+/**
+ * Describes the message controller.v1.GetServerHealthRequest.
+ * Use `create(GetServerHealthRequestSchema)` to create a new message.
+ */
+export const GetServerHealthRequestSchema: GenMessage<GetServerHealthRequest> = /*@__PURE__*/
+  messageDesc(file_controller_v1_controller, 12);
+
+/**
+ * @generated from message controller.v1.GetServerHealthResponse
+ */
+export type GetServerHealthResponse = Message<"controller.v1.GetServerHealthResponse"> & {
+  /**
+   * The pod's Ready condition: the A2S query probe is passing.
+   *
+   * @generated from field: bool ready = 1;
+   */
+  ready: boolean;
+
+  /**
+   * @generated from field: string pod_name = 2;
+   */
+  podName: string;
+
+  /**
+   * Pod phase (Running/Pending/Failed/...), for the case where there is
+   * no readiness answer yet because there is no running pod.
+   *
+   * @generated from field: string phase = 3;
+   */
+  phase: string;
+
+  /**
+   * Container restart count -- a server that is ready but has restarted
+   * repeatedly is not actually healthy.
+   *
+   * @generated from field: uint32 restart_count = 4;
+   */
+  restartCount: number;
+
+  /**
+   * Human-readable detail: the probe's own failure message where there
+   * is one, otherwise why no pod is running.
+   *
+   * @generated from field: string message = 5;
+   */
+  message: string;
+};
+
+/**
+ * Describes the message controller.v1.GetServerHealthResponse.
+ * Use `create(GetServerHealthResponseSchema)` to create a new message.
+ */
+export const GetServerHealthResponseSchema: GenMessage<GetServerHealthResponse> = /*@__PURE__*/
+  messageDesc(file_controller_v1_controller, 13);
 
 /**
  * @generated from message controller.v1.StartServerRequest
@@ -239,7 +436,7 @@ export type StartServerRequest = Message<"controller.v1.StartServerRequest"> & {
  * Use `create(StartServerRequestSchema)` to create a new message.
  */
 export const StartServerRequestSchema: GenMessage<StartServerRequest> = /*@__PURE__*/
-  messageDesc(file_controller_v1_controller, 8);
+  messageDesc(file_controller_v1_controller, 14);
 
 /**
  * @generated from message controller.v1.StopServerRequest
@@ -256,7 +453,7 @@ export type StopServerRequest = Message<"controller.v1.StopServerRequest"> & {
  * Use `create(StopServerRequestSchema)` to create a new message.
  */
 export const StopServerRequestSchema: GenMessage<StopServerRequest> = /*@__PURE__*/
-  messageDesc(file_controller_v1_controller, 9);
+  messageDesc(file_controller_v1_controller, 15);
 
 /**
  * @generated from enum controller.v1.ServerPhase
@@ -406,6 +603,40 @@ export const ServerService: GenService<{
     methodKind: "unary";
     input: typeof StopServerRequestSchema;
     output: typeof ServerInfoSchema;
+  },
+  /**
+   * Recent output from the server's own pod.
+   *
+   * Lines are returned raw, exactly as the container wrote them, rather
+   * than parsed here: launcher emits JSON (tracing_subscriber's json
+   * layer) but arma3server's own pre-tracing output is not JSON at all,
+   * and a client that renders both wants to make that distinction
+   * itself instead of being handed a lossy normalization.
+   *
+   * @generated from rpc controller.v1.ServerService.GetServerLogs
+   */
+  getServerLogs: {
+    methodKind: "unary";
+    input: typeof GetServerLogsRequestSchema;
+    output: typeof GetServerLogsResponseSchema;
+  },
+  /**
+   * Whether the server is actually answering queries, as opposed to
+   * merely running.
+   *
+   * Reports the pod's readiness, which is exactly the A2S_INFO round
+   * trip `launcher healthcheck` performs against arma3server's Steam
+   * query port -- a real "a player's server browser would see this"
+   * check, not process liveness. Deliberately a separate RPC rather
+   * than a field on ServerInfo: it reads pods, so folding it into
+   * ListServers would make every list call pay for it.
+   *
+   * @generated from rpc controller.v1.ServerService.GetServerHealth
+   */
+  getServerHealth: {
+    methodKind: "unary";
+    input: typeof GetServerHealthRequestSchema;
+    output: typeof GetServerHealthResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_controller_v1_controller, 0);

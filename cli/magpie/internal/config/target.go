@@ -1,5 +1,5 @@
 // Package config persists the cluster target `magpiectl target` picks --
-// identity/server-api/registry URLs plus namespace/release -- so it
+// identity/gateway/registry URLs plus namespace/release -- so it
 // doesn't have to be re-passed as flags/env vars on every invocation.
 // Kept separate from package auth (which persists login tokens) since
 // the two have independent lifecycles: you can pick a target without
@@ -19,7 +19,7 @@ import (
 // default), never treat a zero Target as an error.
 type Target struct {
 	// APIURL is the cluster's single public entrypoint -- one host
-	// routing to server-api, registry and identity by path prefix.
+	// routing to gateway, registry and identity by path prefix.
 	APIURL string `json:"api_url,omitempty"`
 	// IdentityURL/ServerAPIURL/RegistryURL are the pre-single-entrypoint
 	// shape, when each service had its own public hostname. Still parsed

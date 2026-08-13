@@ -28,6 +28,8 @@ pub struct AppState {
     pub signer: crate::signing::Signer,
     pub http: reqwest::Client,
     pub base_url: String,
+    /// See `config::Config::allowed_redirect_origins`.
+    pub allowed_redirect_origins: Vec<String>,
     pub issuer: String,
     pub audience: String,
     pub oauth_providers: HashMap<ProviderKind, crate::oauth::OAuthProvider>,
@@ -69,6 +71,74 @@ pub async fn healthz() -> &'static str {
     "ok"
 }
 
+/// `GET /auth/providers` -- which login providers this deployment can
+/// actually complete a login with.
+///
+/// A provider is only enabled when both its client id and secret are
+/// present (see Config::from_env), so the set is deployment-specific and
+/// a client has no way to know it otherwise: asking for an unconfigured
+/// one 404s with "provider not configured". Without this, a UI has to
+/// hardcode the full list and offer buttons that are guaranteed to fail.
+///
+/// Steam is always present -- it's OpenID 2.0 and needs no app
+/// registration or credentials at all, so it works on a cluster where
+/// nothing else is set up.
+///
+/// Unauthenticated on purpose: it is consumed by a login screen, so
+/// requiring a token would be circular, and it discloses nothing beyond
+/// which public login buttons to draw.
+pub async fn providers(State(app): State<Arc<AppState>>) -> Json<serde_json::Value> {
+    let mut names = vec!["steam".to_string()];
+    // Sorted so the button order is stable across restarts rather than
+    // following HashMap iteration order.
+    let mut configured: Vec<&'static str> = app
+        .oauth_providers
+        .keys()
+        .map(|kind| kind.as_str())
+        .collect();
+    configured.sort_unstable();
+    names.extend(configured.into_iter().map(str::to_string));
+    Json(serde_json::json!({ "providers": names }))
+}
+
+/// `GET /auth/me` -- the caller's own identity and linked provider
+/// accounts.
+///
+/// Exists so a signed-in UI can show who it is signed in as, and which
+/// providers are already linked, without needing `admin:acl` (the only
+/// other way to see linked accounts is AdminService.ListAcl, which
+/// reports them for *everyone* and is deliberately privileged).
+/// Authenticated by the same bearer token everything else uses, and only
+/// ever reports the token's own subject.
+pub async fn me(State(app): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    let Some(user_id) = app.verify_bearer(&headers) else {
+        return (StatusCode::UNAUTHORIZED, "missing or invalid bearer token").into_response();
+    };
+
+    match registry_db::linked_accounts_for_user(&app.pool, user_id).await {
+        Ok(accounts) => Json(serde_json::json!({
+            "subject": user_id.to_string(),
+            "accounts": accounts
+                .into_iter()
+                .map(|(provider, provider_user_id, display_name)| serde_json::json!({
+                    "provider": provider,
+                    "provider_user_id": provider_user_id,
+                    "display_name": display_name,
+                }))
+                .collect::<Vec<_>>(),
+        }))
+        .into_response(),
+        Err(e) => {
+            tracing::error!("failed to read linked accounts for {user_id}: {e:#}");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to read linked accounts",
+            )
+                .into_response()
+        }
+    }
+}
+
 pub async fn jwks(State(app): State<Arc<AppState>>) -> Json<serde_json::Value> {
     Json(app.signer.jwks_json())
 }
@@ -89,7 +159,13 @@ pub async fn start(
     let link_user_id = app.verify_bearer(&headers);
     let redirect_uri = query.get("redirect_uri").cloned();
 
-    let state_token = match state::issue(&app.signer, &provider, link_user_id, redirect_uri) {
+    let state_token = match state::issue(
+        &app.signer,
+        &provider,
+        link_user_id,
+        redirect_uri,
+        &app.allowed_redirect_origins,
+    ) {
         Ok(t) => t,
         Err(e) => return (StatusCode::BAD_REQUEST, format!("{e:#}")).into_response(),
     };

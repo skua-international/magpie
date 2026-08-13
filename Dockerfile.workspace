@@ -52,15 +52,35 @@ RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .
 RUN cargo build --release --locked
 
-# Nothing but the 6 binaries themselves end up in the exported output --
-# build-workspace's `docker build --target dist --output type=local`
-# only ever wants dist/, not a whole rust:trixie image's worth of layers.
+# The web UI gateway serves under /ui. Built here rather than in a
+# separate CI job so it lands in the same dist/ artifact every image job
+# already downloads -- one artifact, one place that knows how the
+# frontend is built.
+#
+# npm ci at the repo root, not in web/: generated/ts and web/ are npm
+# workspaces (see the root package.json's own comment), and only a root
+# install resolves the generated stubs' own dependencies.
+FROM node:22-slim AS web
+WORKDIR /build
+COPY package.json package-lock.json ./
+COPY generated/ts/package.json generated/ts/package.json
+COPY web/package.json web/package.json
+RUN npm ci
+COPY generated/ts generated/ts
+COPY web web
+RUN npm run build --workspace @skua-international/magpie-web
+
+# Nothing but the 6 binaries and the built UI end up in the exported
+# output -- build-workspace's `docker build --target dist --output
+# type=local` only ever wants dist/, not a whole rust:trixie image's
+# worth of layers.
 FROM scratch AS dist
 COPY --from=builder \
     /build/target/release/launcher \
     /build/target/release/sync-daemon \
     /build/target/release/controller \
     /build/target/release/registry \
-    /build/target/release/server-api \
+    /build/target/release/gateway \
     /build/target/release/identity \
     /
+COPY --from=web /build/web/dist /ui

@@ -58,6 +58,9 @@ const (
 	// ModSourceServiceGetSyncedModProcedure is the fully-qualified name of the ModSourceService's
 	// GetSyncedMod RPC.
 	ModSourceServiceGetSyncedModProcedure = "/registry.v1.ModSourceService/GetSyncedMod"
+	// ModSourceServiceSetModSourceMetadataProcedure is the fully-qualified name of the
+	// ModSourceService's SetModSourceMetadata RPC.
+	ModSourceServiceSetModSourceMetadataProcedure = "/registry.v1.ModSourceService/SetModSourceMetadata"
 	// MissionServiceUploadMissionProcedure is the fully-qualified name of the MissionService's
 	// UploadMission RPC.
 	MissionServiceUploadMissionProcedure = "/registry.v1.MissionService/UploadMission"
@@ -70,6 +73,9 @@ const (
 	// MissionServiceDeleteMissionProcedure is the fully-qualified name of the MissionService's
 	// DeleteMission RPC.
 	MissionServiceDeleteMissionProcedure = "/registry.v1.MissionService/DeleteMission"
+	// MissionServiceSetMissionMetadataProcedure is the fully-qualified name of the MissionService's
+	// SetMissionMetadata RPC.
+	MissionServiceSetMissionMetadataProcedure = "/registry.v1.MissionService/SetMissionMetadata"
 	// AdminServiceGetDiskUsageProcedure is the fully-qualified name of the AdminService's GetDiskUsage
 	// RPC.
 	AdminServiceGetDiskUsageProcedure = "/registry.v1.AdminService/GetDiskUsage"
@@ -82,6 +88,25 @@ const (
 	// AdminServiceImportStateProcedure is the fully-qualified name of the AdminService's ImportState
 	// RPC.
 	AdminServiceImportStateProcedure = "/registry.v1.AdminService/ImportState"
+	// AdminServiceListAclProcedure is the fully-qualified name of the AdminService's ListAcl RPC.
+	AdminServiceListAclProcedure = "/registry.v1.AdminService/ListAcl"
+	// AdminServiceSetAclScopesProcedure is the fully-qualified name of the AdminService's SetAclScopes
+	// RPC.
+	AdminServiceSetAclScopesProcedure = "/registry.v1.AdminService/SetAclScopes"
+	// AdminServiceBeginSteamQrLoginProcedure is the fully-qualified name of the AdminService's
+	// BeginSteamQrLogin RPC.
+	AdminServiceBeginSteamQrLoginProcedure = "/registry.v1.AdminService/BeginSteamQrLogin"
+	// AdminServicePollSteamQrLoginProcedure is the fully-qualified name of the AdminService's
+	// PollSteamQrLogin RPC.
+	AdminServicePollSteamQrLoginProcedure = "/registry.v1.AdminService/PollSteamQrLogin"
+	// AdminServiceListSecretsProcedure is the fully-qualified name of the AdminService's ListSecrets
+	// RPC.
+	AdminServiceListSecretsProcedure = "/registry.v1.AdminService/ListSecrets"
+	// AdminServicePutSecretProcedure is the fully-qualified name of the AdminService's PutSecret RPC.
+	AdminServicePutSecretProcedure = "/registry.v1.AdminService/PutSecret"
+	// AdminServiceDeleteSecretProcedure is the fully-qualified name of the AdminService's DeleteSecret
+	// RPC.
+	AdminServiceDeleteSecretProcedure = "/registry.v1.AdminService/DeleteSecret"
 )
 
 // ModSourceServiceClient is a client for the registry.v1.ModSourceService service.
@@ -111,6 +136,13 @@ type ModSourceServiceClient interface {
 	// A single mod's synced state (title, on-disk size) plus every mod
 	// source currently referencing it.
 	GetSyncedMod(context.Context, *connect.Request[v1.GetSyncedModRequest]) (*connect.Response[v1.GetSyncedModResponse], error)
+	// Replace a source's operator metadata. Metadata-only because nothing
+	// else about a registered source is editable: its `source` is what it
+	// *is* (changing a Steam URL would make it a different source, not an
+	// edited one), and everything else in ModSourceInfo is resolved state,
+	// not input. Same scope as AddModSource -- this writes an annotation
+	// and touches no content.
+	SetModSourceMetadata(context.Context, *connect.Request[v1.SetModSourceMetadataRequest]) (*connect.Response[v1.ModSourceInfo], error)
 }
 
 // NewModSourceServiceClient constructs a client for the registry.v1.ModSourceService service. By
@@ -166,18 +198,25 @@ func NewModSourceServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(modSourceServiceMethods.ByName("GetSyncedMod")),
 			connect.WithClientOptions(opts...),
 		),
+		setModSourceMetadata: connect.NewClient[v1.SetModSourceMetadataRequest, v1.ModSourceInfo](
+			httpClient,
+			baseURL+ModSourceServiceSetModSourceMetadataProcedure,
+			connect.WithSchema(modSourceServiceMethods.ByName("SetModSourceMetadata")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // modSourceServiceClient implements ModSourceServiceClient.
 type modSourceServiceClient struct {
-	addModSource    *connect.Client[v1.AddModSourceRequest, v1.AddModSourceResponse]
-	deleteModSource *connect.Client[v1.DeleteModSourceRequest, v1.DeleteModSourceResponse]
-	listModSources  *connect.Client[v1.ListModSourcesRequest, v1.ListModSourcesResponse]
-	syncModSource   *connect.Client[v1.SyncModSourceRequest, v1.SyncModSourceResponse]
-	listSyncedMods  *connect.Client[v1.ListSyncedModsRequest, v1.ListSyncedModsResponse]
-	invalidateMod   *connect.Client[v1.InvalidateModRequest, v1.InvalidateModResponse]
-	getSyncedMod    *connect.Client[v1.GetSyncedModRequest, v1.GetSyncedModResponse]
+	addModSource         *connect.Client[v1.AddModSourceRequest, v1.AddModSourceResponse]
+	deleteModSource      *connect.Client[v1.DeleteModSourceRequest, v1.DeleteModSourceResponse]
+	listModSources       *connect.Client[v1.ListModSourcesRequest, v1.ListModSourcesResponse]
+	syncModSource        *connect.Client[v1.SyncModSourceRequest, v1.SyncModSourceResponse]
+	listSyncedMods       *connect.Client[v1.ListSyncedModsRequest, v1.ListSyncedModsResponse]
+	invalidateMod        *connect.Client[v1.InvalidateModRequest, v1.InvalidateModResponse]
+	getSyncedMod         *connect.Client[v1.GetSyncedModRequest, v1.GetSyncedModResponse]
+	setModSourceMetadata *connect.Client[v1.SetModSourceMetadataRequest, v1.ModSourceInfo]
 }
 
 // AddModSource calls registry.v1.ModSourceService.AddModSource.
@@ -215,6 +254,11 @@ func (c *modSourceServiceClient) GetSyncedMod(ctx context.Context, req *connect.
 	return c.getSyncedMod.CallUnary(ctx, req)
 }
 
+// SetModSourceMetadata calls registry.v1.ModSourceService.SetModSourceMetadata.
+func (c *modSourceServiceClient) SetModSourceMetadata(ctx context.Context, req *connect.Request[v1.SetModSourceMetadataRequest]) (*connect.Response[v1.ModSourceInfo], error) {
+	return c.setModSourceMetadata.CallUnary(ctx, req)
+}
+
 // ModSourceServiceHandler is an implementation of the registry.v1.ModSourceService service.
 type ModSourceServiceHandler interface {
 	AddModSource(context.Context, *connect.Request[v1.AddModSourceRequest]) (*connect.Response[v1.AddModSourceResponse], error)
@@ -242,6 +286,13 @@ type ModSourceServiceHandler interface {
 	// A single mod's synced state (title, on-disk size) plus every mod
 	// source currently referencing it.
 	GetSyncedMod(context.Context, *connect.Request[v1.GetSyncedModRequest]) (*connect.Response[v1.GetSyncedModResponse], error)
+	// Replace a source's operator metadata. Metadata-only because nothing
+	// else about a registered source is editable: its `source` is what it
+	// *is* (changing a Steam URL would make it a different source, not an
+	// edited one), and everything else in ModSourceInfo is resolved state,
+	// not input. Same scope as AddModSource -- this writes an annotation
+	// and touches no content.
+	SetModSourceMetadata(context.Context, *connect.Request[v1.SetModSourceMetadataRequest]) (*connect.Response[v1.ModSourceInfo], error)
 }
 
 // NewModSourceServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -293,6 +344,12 @@ func NewModSourceServiceHandler(svc ModSourceServiceHandler, opts ...connect.Han
 		connect.WithSchema(modSourceServiceMethods.ByName("GetSyncedMod")),
 		connect.WithHandlerOptions(opts...),
 	)
+	modSourceServiceSetModSourceMetadataHandler := connect.NewUnaryHandler(
+		ModSourceServiceSetModSourceMetadataProcedure,
+		svc.SetModSourceMetadata,
+		connect.WithSchema(modSourceServiceMethods.ByName("SetModSourceMetadata")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/registry.v1.ModSourceService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ModSourceServiceAddModSourceProcedure:
@@ -309,6 +366,8 @@ func NewModSourceServiceHandler(svc ModSourceServiceHandler, opts ...connect.Han
 			modSourceServiceInvalidateModHandler.ServeHTTP(w, r)
 		case ModSourceServiceGetSyncedModProcedure:
 			modSourceServiceGetSyncedModHandler.ServeHTTP(w, r)
+		case ModSourceServiceSetModSourceMetadataProcedure:
+			modSourceServiceSetModSourceMetadataHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -346,12 +405,22 @@ func (UnimplementedModSourceServiceHandler) GetSyncedMod(context.Context, *conne
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.ModSourceService.GetSyncedMod is not implemented"))
 }
 
+func (UnimplementedModSourceServiceHandler) SetModSourceMetadata(context.Context, *connect.Request[v1.SetModSourceMetadataRequest]) (*connect.Response[v1.ModSourceInfo], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.ModSourceService.SetModSourceMetadata is not implemented"))
+}
+
 // MissionServiceClient is a client for the registry.v1.MissionService service.
 type MissionServiceClient interface {
 	UploadMission(context.Context, *connect.Request[v1.UploadMissionRequest]) (*connect.Response[v1.MissionInfo], error)
 	GetMission(context.Context, *connect.Request[v1.GetMissionRequest]) (*connect.Response[v1.MissionInfo], error)
 	ListMissions(context.Context, *connect.Request[v1.ListMissionsRequest]) (*connect.Response[v1.ListMissionsResponse], error)
 	DeleteMission(context.Context, *connect.Request[v1.DeleteMissionRequest]) (*connect.Response[v1.DeleteMissionResponse], error)
+	// Replace a mission's operator metadata, without re-uploading the
+	// .pbo. UploadMission can already overwrite a mission in place, but
+	// only by sending its bytes again, which is a poor way to relabel
+	// something. Same replace-the-whole-set semantics as
+	// SetModSourceMetadata.
+	SetMissionMetadata(context.Context, *connect.Request[v1.SetMissionMetadataRequest]) (*connect.Response[v1.MissionInfo], error)
 }
 
 // NewMissionServiceClient constructs a client for the registry.v1.MissionService service. By
@@ -389,15 +458,22 @@ func NewMissionServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(missionServiceMethods.ByName("DeleteMission")),
 			connect.WithClientOptions(opts...),
 		),
+		setMissionMetadata: connect.NewClient[v1.SetMissionMetadataRequest, v1.MissionInfo](
+			httpClient,
+			baseURL+MissionServiceSetMissionMetadataProcedure,
+			connect.WithSchema(missionServiceMethods.ByName("SetMissionMetadata")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // missionServiceClient implements MissionServiceClient.
 type missionServiceClient struct {
-	uploadMission *connect.Client[v1.UploadMissionRequest, v1.MissionInfo]
-	getMission    *connect.Client[v1.GetMissionRequest, v1.MissionInfo]
-	listMissions  *connect.Client[v1.ListMissionsRequest, v1.ListMissionsResponse]
-	deleteMission *connect.Client[v1.DeleteMissionRequest, v1.DeleteMissionResponse]
+	uploadMission      *connect.Client[v1.UploadMissionRequest, v1.MissionInfo]
+	getMission         *connect.Client[v1.GetMissionRequest, v1.MissionInfo]
+	listMissions       *connect.Client[v1.ListMissionsRequest, v1.ListMissionsResponse]
+	deleteMission      *connect.Client[v1.DeleteMissionRequest, v1.DeleteMissionResponse]
+	setMissionMetadata *connect.Client[v1.SetMissionMetadataRequest, v1.MissionInfo]
 }
 
 // UploadMission calls registry.v1.MissionService.UploadMission.
@@ -420,12 +496,23 @@ func (c *missionServiceClient) DeleteMission(ctx context.Context, req *connect.R
 	return c.deleteMission.CallUnary(ctx, req)
 }
 
+// SetMissionMetadata calls registry.v1.MissionService.SetMissionMetadata.
+func (c *missionServiceClient) SetMissionMetadata(ctx context.Context, req *connect.Request[v1.SetMissionMetadataRequest]) (*connect.Response[v1.MissionInfo], error) {
+	return c.setMissionMetadata.CallUnary(ctx, req)
+}
+
 // MissionServiceHandler is an implementation of the registry.v1.MissionService service.
 type MissionServiceHandler interface {
 	UploadMission(context.Context, *connect.Request[v1.UploadMissionRequest]) (*connect.Response[v1.MissionInfo], error)
 	GetMission(context.Context, *connect.Request[v1.GetMissionRequest]) (*connect.Response[v1.MissionInfo], error)
 	ListMissions(context.Context, *connect.Request[v1.ListMissionsRequest]) (*connect.Response[v1.ListMissionsResponse], error)
 	DeleteMission(context.Context, *connect.Request[v1.DeleteMissionRequest]) (*connect.Response[v1.DeleteMissionResponse], error)
+	// Replace a mission's operator metadata, without re-uploading the
+	// .pbo. UploadMission can already overwrite a mission in place, but
+	// only by sending its bytes again, which is a poor way to relabel
+	// something. Same replace-the-whole-set semantics as
+	// SetModSourceMetadata.
+	SetMissionMetadata(context.Context, *connect.Request[v1.SetMissionMetadataRequest]) (*connect.Response[v1.MissionInfo], error)
 }
 
 // NewMissionServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -459,6 +546,12 @@ func NewMissionServiceHandler(svc MissionServiceHandler, opts ...connect.Handler
 		connect.WithSchema(missionServiceMethods.ByName("DeleteMission")),
 		connect.WithHandlerOptions(opts...),
 	)
+	missionServiceSetMissionMetadataHandler := connect.NewUnaryHandler(
+		MissionServiceSetMissionMetadataProcedure,
+		svc.SetMissionMetadata,
+		connect.WithSchema(missionServiceMethods.ByName("SetMissionMetadata")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/registry.v1.MissionService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case MissionServiceUploadMissionProcedure:
@@ -469,6 +562,8 @@ func NewMissionServiceHandler(svc MissionServiceHandler, opts ...connect.Handler
 			missionServiceListMissionsHandler.ServeHTTP(w, r)
 		case MissionServiceDeleteMissionProcedure:
 			missionServiceDeleteMissionHandler.ServeHTTP(w, r)
+		case MissionServiceSetMissionMetadataProcedure:
+			missionServiceSetMissionMetadataHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -492,6 +587,10 @@ func (UnimplementedMissionServiceHandler) ListMissions(context.Context, *connect
 
 func (UnimplementedMissionServiceHandler) DeleteMission(context.Context, *connect.Request[v1.DeleteMissionRequest]) (*connect.Response[v1.DeleteMissionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.MissionService.DeleteMission is not implemented"))
+}
+
+func (UnimplementedMissionServiceHandler) SetMissionMetadata(context.Context, *connect.Request[v1.SetMissionMetadataRequest]) (*connect.Response[v1.MissionInfo], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.MissionService.SetMissionMetadata is not implemented"))
 }
 
 // AdminServiceClient is a client for the registry.v1.AdminService service.
@@ -523,6 +622,56 @@ type AdminServiceClient interface {
 	// original Steam/preset URL), never by ID -- ModSource IDs are
 	// regenerated on every import and never match the export's own.
 	ImportState(context.Context, *connect.Request[v1.ImportStateRequest]) (*connect.Response[v1.ImportStateResponse], error)
+	// Who currently holds which scopes, plus the scope vocabulary itself.
+	// Until this existed, `acl_grants` could be written (registry_db's
+	// grant_scopes, called on first-ever login) and read one subject at a
+	// time by the authorization middleware, but never enumerated -- there
+	// was no way to answer "who has access to this cluster" short of
+	// querying Postgres by hand.
+	//
+	// Returns every user, not only those holding a grant, since granting
+	// to someone who has logged in but has no scopes yet is the common
+	// case. `known_scopes` comes from the server rather than being a
+	// constant in each client so a new scope can't silently go missing
+	// from a UI that hasn't been rebuilt.
+	ListAcl(context.Context, *connect.Request[v1.ListAclRequest]) (*connect.Response[v1.ListAclResponse], error)
+	// Replaces `subject`'s scope set outright -- not a delta. The UI edits
+	// a whole checkbox set and submits it, and a set operation makes that
+	// idempotent and free of read-modify-write races between two admins
+	// editing different people at once.
+	//
+	// Guarded by its own `admin:acl` scope, deliberately separate from
+	// every other admin scope: this is the one RPC that can change who can
+	// call anything else, including granting `*` (see AclSubject.scopes),
+	// so holding it is equivalent to holding everything eventually.
+	SetAclScopes(context.Context, *connect.Request[v1.SetAclScopesRequest]) (*connect.Response[v1.SetAclScopesResponse], error)
+	// Steam QR login, the same flow `magpiectl admin refresh-steam-auth`
+	// runs -- but negotiated by the cluster rather than by the client.
+	//
+	// Begin returns a challenge URL to render as a QR code; Poll blocks
+	// until the Steam mobile app confirms it, then installs the resulting
+	// session. No password is involved in either direction (that is what
+	// QR login is), and unlike RefreshSteamAuth the refresh token never
+	// travels through the caller at all -- it goes straight from Steam to
+	// sync-daemon. Both carry the same admin:steam-auth scope, since they
+	// are two halves of the one operation.
+	BeginSteamQrLogin(context.Context, *connect.Request[v1.BeginSteamQrLoginRequest]) (*connect.Response[v1.BeginSteamQrLoginResponse], error)
+	PollSteamQrLogin(context.Context, *connect.Request[v1.PollSteamQrLoginRequest]) (*connect.Response[v1.PollSteamQrLoginResponse], error)
+	// Secrets an operator wants referenceable from Arma config ConfigMaps
+	// via the `secret:` placeholder (see services/controller's
+	// arma_config.rs). Scoped to the dedicated user-secrets namespace
+	// only -- never the chart's own namespace, which holds Postgres
+	// credentials and image pull secrets, and whose isolation from
+	// operator-controlled config is the reason the second namespace
+	// exists at all.
+	//
+	// Values are never returned: List gives names and key names, so a
+	// stolen token cannot exfiltrate secret material by listing. Writing
+	// is by whole secret (PutSecret replaces its data), which keeps the
+	// operation idempotent and free of read-modify-write races.
+	ListSecrets(context.Context, *connect.Request[v1.ListSecretsRequest]) (*connect.Response[v1.ListSecretsResponse], error)
+	PutSecret(context.Context, *connect.Request[v1.PutSecretRequest]) (*connect.Response[v1.PutSecretResponse], error)
+	DeleteSecret(context.Context, *connect.Request[v1.DeleteSecretRequest]) (*connect.Response[v1.DeleteSecretResponse], error)
 }
 
 // NewAdminServiceClient constructs a client for the registry.v1.AdminService service. By default,
@@ -560,15 +709,64 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("ImportState")),
 			connect.WithClientOptions(opts...),
 		),
+		listAcl: connect.NewClient[v1.ListAclRequest, v1.ListAclResponse](
+			httpClient,
+			baseURL+AdminServiceListAclProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListAcl")),
+			connect.WithClientOptions(opts...),
+		),
+		setAclScopes: connect.NewClient[v1.SetAclScopesRequest, v1.SetAclScopesResponse](
+			httpClient,
+			baseURL+AdminServiceSetAclScopesProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("SetAclScopes")),
+			connect.WithClientOptions(opts...),
+		),
+		beginSteamQrLogin: connect.NewClient[v1.BeginSteamQrLoginRequest, v1.BeginSteamQrLoginResponse](
+			httpClient,
+			baseURL+AdminServiceBeginSteamQrLoginProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("BeginSteamQrLogin")),
+			connect.WithClientOptions(opts...),
+		),
+		pollSteamQrLogin: connect.NewClient[v1.PollSteamQrLoginRequest, v1.PollSteamQrLoginResponse](
+			httpClient,
+			baseURL+AdminServicePollSteamQrLoginProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("PollSteamQrLogin")),
+			connect.WithClientOptions(opts...),
+		),
+		listSecrets: connect.NewClient[v1.ListSecretsRequest, v1.ListSecretsResponse](
+			httpClient,
+			baseURL+AdminServiceListSecretsProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListSecrets")),
+			connect.WithClientOptions(opts...),
+		),
+		putSecret: connect.NewClient[v1.PutSecretRequest, v1.PutSecretResponse](
+			httpClient,
+			baseURL+AdminServicePutSecretProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("PutSecret")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteSecret: connect.NewClient[v1.DeleteSecretRequest, v1.DeleteSecretResponse](
+			httpClient,
+			baseURL+AdminServiceDeleteSecretProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("DeleteSecret")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // adminServiceClient implements AdminServiceClient.
 type adminServiceClient struct {
-	getDiskUsage     *connect.Client[v1.GetDiskUsageRequest, v1.GetDiskUsageResponse]
-	refreshSteamAuth *connect.Client[v1.RefreshSteamAuthRequest, v1.RefreshSteamAuthResponse]
-	exportState      *connect.Client[v1.ExportStateRequest, v1.ExportStateResponse]
-	importState      *connect.Client[v1.ImportStateRequest, v1.ImportStateResponse]
+	getDiskUsage      *connect.Client[v1.GetDiskUsageRequest, v1.GetDiskUsageResponse]
+	refreshSteamAuth  *connect.Client[v1.RefreshSteamAuthRequest, v1.RefreshSteamAuthResponse]
+	exportState       *connect.Client[v1.ExportStateRequest, v1.ExportStateResponse]
+	importState       *connect.Client[v1.ImportStateRequest, v1.ImportStateResponse]
+	listAcl           *connect.Client[v1.ListAclRequest, v1.ListAclResponse]
+	setAclScopes      *connect.Client[v1.SetAclScopesRequest, v1.SetAclScopesResponse]
+	beginSteamQrLogin *connect.Client[v1.BeginSteamQrLoginRequest, v1.BeginSteamQrLoginResponse]
+	pollSteamQrLogin  *connect.Client[v1.PollSteamQrLoginRequest, v1.PollSteamQrLoginResponse]
+	listSecrets       *connect.Client[v1.ListSecretsRequest, v1.ListSecretsResponse]
+	putSecret         *connect.Client[v1.PutSecretRequest, v1.PutSecretResponse]
+	deleteSecret      *connect.Client[v1.DeleteSecretRequest, v1.DeleteSecretResponse]
 }
 
 // GetDiskUsage calls registry.v1.AdminService.GetDiskUsage.
@@ -589,6 +787,41 @@ func (c *adminServiceClient) ExportState(ctx context.Context, req *connect.Reque
 // ImportState calls registry.v1.AdminService.ImportState.
 func (c *adminServiceClient) ImportState(ctx context.Context, req *connect.Request[v1.ImportStateRequest]) (*connect.Response[v1.ImportStateResponse], error) {
 	return c.importState.CallUnary(ctx, req)
+}
+
+// ListAcl calls registry.v1.AdminService.ListAcl.
+func (c *adminServiceClient) ListAcl(ctx context.Context, req *connect.Request[v1.ListAclRequest]) (*connect.Response[v1.ListAclResponse], error) {
+	return c.listAcl.CallUnary(ctx, req)
+}
+
+// SetAclScopes calls registry.v1.AdminService.SetAclScopes.
+func (c *adminServiceClient) SetAclScopes(ctx context.Context, req *connect.Request[v1.SetAclScopesRequest]) (*connect.Response[v1.SetAclScopesResponse], error) {
+	return c.setAclScopes.CallUnary(ctx, req)
+}
+
+// BeginSteamQrLogin calls registry.v1.AdminService.BeginSteamQrLogin.
+func (c *adminServiceClient) BeginSteamQrLogin(ctx context.Context, req *connect.Request[v1.BeginSteamQrLoginRequest]) (*connect.Response[v1.BeginSteamQrLoginResponse], error) {
+	return c.beginSteamQrLogin.CallUnary(ctx, req)
+}
+
+// PollSteamQrLogin calls registry.v1.AdminService.PollSteamQrLogin.
+func (c *adminServiceClient) PollSteamQrLogin(ctx context.Context, req *connect.Request[v1.PollSteamQrLoginRequest]) (*connect.Response[v1.PollSteamQrLoginResponse], error) {
+	return c.pollSteamQrLogin.CallUnary(ctx, req)
+}
+
+// ListSecrets calls registry.v1.AdminService.ListSecrets.
+func (c *adminServiceClient) ListSecrets(ctx context.Context, req *connect.Request[v1.ListSecretsRequest]) (*connect.Response[v1.ListSecretsResponse], error) {
+	return c.listSecrets.CallUnary(ctx, req)
+}
+
+// PutSecret calls registry.v1.AdminService.PutSecret.
+func (c *adminServiceClient) PutSecret(ctx context.Context, req *connect.Request[v1.PutSecretRequest]) (*connect.Response[v1.PutSecretResponse], error) {
+	return c.putSecret.CallUnary(ctx, req)
+}
+
+// DeleteSecret calls registry.v1.AdminService.DeleteSecret.
+func (c *adminServiceClient) DeleteSecret(ctx context.Context, req *connect.Request[v1.DeleteSecretRequest]) (*connect.Response[v1.DeleteSecretResponse], error) {
+	return c.deleteSecret.CallUnary(ctx, req)
 }
 
 // AdminServiceHandler is an implementation of the registry.v1.AdminService service.
@@ -620,6 +853,56 @@ type AdminServiceHandler interface {
 	// original Steam/preset URL), never by ID -- ModSource IDs are
 	// regenerated on every import and never match the export's own.
 	ImportState(context.Context, *connect.Request[v1.ImportStateRequest]) (*connect.Response[v1.ImportStateResponse], error)
+	// Who currently holds which scopes, plus the scope vocabulary itself.
+	// Until this existed, `acl_grants` could be written (registry_db's
+	// grant_scopes, called on first-ever login) and read one subject at a
+	// time by the authorization middleware, but never enumerated -- there
+	// was no way to answer "who has access to this cluster" short of
+	// querying Postgres by hand.
+	//
+	// Returns every user, not only those holding a grant, since granting
+	// to someone who has logged in but has no scopes yet is the common
+	// case. `known_scopes` comes from the server rather than being a
+	// constant in each client so a new scope can't silently go missing
+	// from a UI that hasn't been rebuilt.
+	ListAcl(context.Context, *connect.Request[v1.ListAclRequest]) (*connect.Response[v1.ListAclResponse], error)
+	// Replaces `subject`'s scope set outright -- not a delta. The UI edits
+	// a whole checkbox set and submits it, and a set operation makes that
+	// idempotent and free of read-modify-write races between two admins
+	// editing different people at once.
+	//
+	// Guarded by its own `admin:acl` scope, deliberately separate from
+	// every other admin scope: this is the one RPC that can change who can
+	// call anything else, including granting `*` (see AclSubject.scopes),
+	// so holding it is equivalent to holding everything eventually.
+	SetAclScopes(context.Context, *connect.Request[v1.SetAclScopesRequest]) (*connect.Response[v1.SetAclScopesResponse], error)
+	// Steam QR login, the same flow `magpiectl admin refresh-steam-auth`
+	// runs -- but negotiated by the cluster rather than by the client.
+	//
+	// Begin returns a challenge URL to render as a QR code; Poll blocks
+	// until the Steam mobile app confirms it, then installs the resulting
+	// session. No password is involved in either direction (that is what
+	// QR login is), and unlike RefreshSteamAuth the refresh token never
+	// travels through the caller at all -- it goes straight from Steam to
+	// sync-daemon. Both carry the same admin:steam-auth scope, since they
+	// are two halves of the one operation.
+	BeginSteamQrLogin(context.Context, *connect.Request[v1.BeginSteamQrLoginRequest]) (*connect.Response[v1.BeginSteamQrLoginResponse], error)
+	PollSteamQrLogin(context.Context, *connect.Request[v1.PollSteamQrLoginRequest]) (*connect.Response[v1.PollSteamQrLoginResponse], error)
+	// Secrets an operator wants referenceable from Arma config ConfigMaps
+	// via the `secret:` placeholder (see services/controller's
+	// arma_config.rs). Scoped to the dedicated user-secrets namespace
+	// only -- never the chart's own namespace, which holds Postgres
+	// credentials and image pull secrets, and whose isolation from
+	// operator-controlled config is the reason the second namespace
+	// exists at all.
+	//
+	// Values are never returned: List gives names and key names, so a
+	// stolen token cannot exfiltrate secret material by listing. Writing
+	// is by whole secret (PutSecret replaces its data), which keeps the
+	// operation idempotent and free of read-modify-write races.
+	ListSecrets(context.Context, *connect.Request[v1.ListSecretsRequest]) (*connect.Response[v1.ListSecretsResponse], error)
+	PutSecret(context.Context, *connect.Request[v1.PutSecretRequest]) (*connect.Response[v1.PutSecretResponse], error)
+	DeleteSecret(context.Context, *connect.Request[v1.DeleteSecretRequest]) (*connect.Response[v1.DeleteSecretResponse], error)
 }
 
 // NewAdminServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -653,6 +936,48 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(adminServiceMethods.ByName("ImportState")),
 		connect.WithHandlerOptions(opts...),
 	)
+	adminServiceListAclHandler := connect.NewUnaryHandler(
+		AdminServiceListAclProcedure,
+		svc.ListAcl,
+		connect.WithSchema(adminServiceMethods.ByName("ListAcl")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceSetAclScopesHandler := connect.NewUnaryHandler(
+		AdminServiceSetAclScopesProcedure,
+		svc.SetAclScopes,
+		connect.WithSchema(adminServiceMethods.ByName("SetAclScopes")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceBeginSteamQrLoginHandler := connect.NewUnaryHandler(
+		AdminServiceBeginSteamQrLoginProcedure,
+		svc.BeginSteamQrLogin,
+		connect.WithSchema(adminServiceMethods.ByName("BeginSteamQrLogin")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServicePollSteamQrLoginHandler := connect.NewUnaryHandler(
+		AdminServicePollSteamQrLoginProcedure,
+		svc.PollSteamQrLogin,
+		connect.WithSchema(adminServiceMethods.ByName("PollSteamQrLogin")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceListSecretsHandler := connect.NewUnaryHandler(
+		AdminServiceListSecretsProcedure,
+		svc.ListSecrets,
+		connect.WithSchema(adminServiceMethods.ByName("ListSecrets")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServicePutSecretHandler := connect.NewUnaryHandler(
+		AdminServicePutSecretProcedure,
+		svc.PutSecret,
+		connect.WithSchema(adminServiceMethods.ByName("PutSecret")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceDeleteSecretHandler := connect.NewUnaryHandler(
+		AdminServiceDeleteSecretProcedure,
+		svc.DeleteSecret,
+		connect.WithSchema(adminServiceMethods.ByName("DeleteSecret")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/registry.v1.AdminService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AdminServiceGetDiskUsageProcedure:
@@ -663,6 +988,20 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServiceExportStateHandler.ServeHTTP(w, r)
 		case AdminServiceImportStateProcedure:
 			adminServiceImportStateHandler.ServeHTTP(w, r)
+		case AdminServiceListAclProcedure:
+			adminServiceListAclHandler.ServeHTTP(w, r)
+		case AdminServiceSetAclScopesProcedure:
+			adminServiceSetAclScopesHandler.ServeHTTP(w, r)
+		case AdminServiceBeginSteamQrLoginProcedure:
+			adminServiceBeginSteamQrLoginHandler.ServeHTTP(w, r)
+		case AdminServicePollSteamQrLoginProcedure:
+			adminServicePollSteamQrLoginHandler.ServeHTTP(w, r)
+		case AdminServiceListSecretsProcedure:
+			adminServiceListSecretsHandler.ServeHTTP(w, r)
+		case AdminServicePutSecretProcedure:
+			adminServicePutSecretHandler.ServeHTTP(w, r)
+		case AdminServiceDeleteSecretProcedure:
+			adminServiceDeleteSecretHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -686,4 +1025,32 @@ func (UnimplementedAdminServiceHandler) ExportState(context.Context, *connect.Re
 
 func (UnimplementedAdminServiceHandler) ImportState(context.Context, *connect.Request[v1.ImportStateRequest]) (*connect.Response[v1.ImportStateResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.ImportState is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListAcl(context.Context, *connect.Request[v1.ListAclRequest]) (*connect.Response[v1.ListAclResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.ListAcl is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) SetAclScopes(context.Context, *connect.Request[v1.SetAclScopesRequest]) (*connect.Response[v1.SetAclScopesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.SetAclScopes is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) BeginSteamQrLogin(context.Context, *connect.Request[v1.BeginSteamQrLoginRequest]) (*connect.Response[v1.BeginSteamQrLoginResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.BeginSteamQrLogin is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) PollSteamQrLogin(context.Context, *connect.Request[v1.PollSteamQrLoginRequest]) (*connect.Response[v1.PollSteamQrLoginResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.PollSteamQrLogin is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListSecrets(context.Context, *connect.Request[v1.ListSecretsRequest]) (*connect.Response[v1.ListSecretsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.ListSecrets is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) PutSecret(context.Context, *connect.Request[v1.PutSecretRequest]) (*connect.Response[v1.PutSecretResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.PutSecret is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) DeleteSecret(context.Context, *connect.Request[v1.DeleteSecretRequest]) (*connect.Response[v1.DeleteSecretResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.DeleteSecret is not implemented"))
 }

@@ -1,7 +1,7 @@
 //! Issues the (access token, refresh token) pair every successful login
 //! and `/auth/refresh` call returns. Access tokens are short-lived signed
 //! JWTs (see `signing.rs`) -- exactly what `authn::jwt::JwtVerifier`
-//! already expects from `registry`/`server-api`. Refresh tokens are opaque
+//! already expects from `registry`/`gateway`. Refresh tokens are opaque
 //! and stored (hashed) in Postgres so they're actually revocable, and are
 //! rotated on every use: presenting one both consumes it and returns a
 //! fresh one, so a stolen-but-unused refresh token has a short window

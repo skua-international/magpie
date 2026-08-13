@@ -1122,6 +1122,190 @@ func (x *GetSyncStatusResponse) GetGameFilesReady() bool {
 	return false
 }
 
+type BeginQrLoginRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BeginQrLoginRequest) Reset() {
+	*x = BeginQrLoginRequest{}
+	mi := &file_sync_v1_sync_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BeginQrLoginRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BeginQrLoginRequest) ProtoMessage() {}
+
+func (x *BeginQrLoginRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BeginQrLoginRequest.ProtoReflect.Descriptor instead.
+func (*BeginQrLoginRequest) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{24}
+}
+
+type BeginQrLoginResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	ChallengeUrl  string                 `protobuf:"bytes,2,opt,name=challenge_url,json=challengeUrl,proto3" json:"challenge_url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BeginQrLoginResponse) Reset() {
+	*x = BeginQrLoginResponse{}
+	mi := &file_sync_v1_sync_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BeginQrLoginResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BeginQrLoginResponse) ProtoMessage() {}
+
+func (x *BeginQrLoginResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BeginQrLoginResponse.ProtoReflect.Descriptor instead.
+func (*BeginQrLoginResponse) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *BeginQrLoginResponse) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *BeginQrLoginResponse) GetChallengeUrl() string {
+	if x != nil {
+		return x.ChallengeUrl
+	}
+	return ""
+}
+
+type PollQrLoginRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PollQrLoginRequest) Reset() {
+	*x = PollQrLoginRequest{}
+	mi := &file_sync_v1_sync_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PollQrLoginRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PollQrLoginRequest) ProtoMessage() {}
+
+func (x *PollQrLoginRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PollQrLoginRequest.ProtoReflect.Descriptor instead.
+func (*PollQrLoginRequest) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *PollQrLoginRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+type PollQrLoginResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Confirmed     bool                   `protobuf:"varint,1,opt,name=confirmed,proto3" json:"confirmed,omitempty"`
+	Username      string                 `protobuf:"bytes,2,opt,name=username,proto3" json:"username,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PollQrLoginResponse) Reset() {
+	*x = PollQrLoginResponse{}
+	mi := &file_sync_v1_sync_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PollQrLoginResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PollQrLoginResponse) ProtoMessage() {}
+
+func (x *PollQrLoginResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PollQrLoginResponse.ProtoReflect.Descriptor instead.
+func (*PollQrLoginResponse) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *PollQrLoginResponse) GetConfirmed() bool {
+	if x != nil {
+		return x.Confirmed
+	}
+	return false
+}
+
+func (x *PollQrLoginResponse) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
 var File_sync_v1_sync_proto protoreflect.FileDescriptor
 
 const file_sync_v1_sync_proto_rawDesc = "" +
@@ -1182,7 +1366,18 @@ const file_sync_v1_sync_proto_rawDesc = "" +
 	"\x14GetSyncStatusRequest\"[\n" +
 	"\x15GetSyncStatusResponse\x12\x18\n" +
 	"\asyncing\x18\x01 \x01(\bR\asyncing\x12(\n" +
-	"\x10game_files_ready\x18\x02 \x01(\bR\x0egameFilesReady2\x89\a\n" +
+	"\x10game_files_ready\x18\x02 \x01(\bR\x0egameFilesReady\"\x15\n" +
+	"\x13BeginQrLoginRequest\"Z\n" +
+	"\x14BeginQrLoginResponse\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12#\n" +
+	"\rchallenge_url\x18\x02 \x01(\tR\fchallengeUrl\"3\n" +
+	"\x12PollQrLoginRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\"O\n" +
+	"\x13PollQrLoginResponse\x12\x1c\n" +
+	"\tconfirmed\x18\x01 \x01(\bR\tconfirmed\x12\x1a\n" +
+	"\busername\x18\x02 \x01(\tR\busername2\xa0\b\n" +
 	"\vSyncService\x12Q\n" +
 	"\x0eRegisterSource\x12\x1e.sync.v1.RegisterSourceRequest\x1a\x1f.sync.v1.RegisterSourceResponse\x12W\n" +
 	"\x10DeregisterSource\x12 .sync.v1.DeregisterSourceRequest\x1a!.sync.v1.DeregisterSourceResponse\x12H\n" +
@@ -1193,7 +1388,9 @@ const file_sync_v1_sync_proto_rawDesc = "" +
 	"\rInvalidateMod\x12\x1d.sync.v1.InvalidateModRequest\x1a\x1e.sync.v1.InvalidateModResponse\x12K\n" +
 	"\fGetSyncedMod\x12\x1c.sync.v1.GetSyncedModRequest\x1a\x1d.sync.v1.GetSyncedModResponse\x12K\n" +
 	"\fGetSyncStats\x12\x1c.sync.v1.GetSyncStatsRequest\x1a\x1d.sync.v1.GetSyncStatsResponse\x12W\n" +
-	"\x10RefreshSteamAuth\x12 .sync.v1.RefreshSteamAuthRequest\x1a!.sync.v1.RefreshSteamAuthResponse\x12N\n" +
+	"\x10RefreshSteamAuth\x12 .sync.v1.RefreshSteamAuthRequest\x1a!.sync.v1.RefreshSteamAuthResponse\x12K\n" +
+	"\fBeginQrLogin\x12\x1c.sync.v1.BeginQrLoginRequest\x1a\x1d.sync.v1.BeginQrLoginResponse\x12H\n" +
+	"\vPollQrLogin\x12\x1b.sync.v1.PollQrLoginRequest\x1a\x1c.sync.v1.PollQrLoginResponse\x12N\n" +
 	"\rGetSyncStatus\x12\x1d.sync.v1.GetSyncStatusRequest\x1a\x1e.sync.v1.GetSyncStatusResponseBBZ@github.com/skua-international/magpie/generated/go/sync/v1;syncv1b\x06proto3"
 
 var (
@@ -1208,7 +1405,7 @@ func file_sync_v1_sync_proto_rawDescGZIP() []byte {
 	return file_sync_v1_sync_proto_rawDescData
 }
 
-var file_sync_v1_sync_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
+var file_sync_v1_sync_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
 var file_sync_v1_sync_proto_goTypes = []any{
 	(*ListSyncedModsRequest)(nil),    // 0: sync.v1.ListSyncedModsRequest
 	(*SyncedMod)(nil),                // 1: sync.v1.SyncedMod
@@ -1234,6 +1431,10 @@ var file_sync_v1_sync_proto_goTypes = []any{
 	(*SyncContentResponse)(nil),      // 21: sync.v1.SyncContentResponse
 	(*GetSyncStatusRequest)(nil),     // 22: sync.v1.GetSyncStatusRequest
 	(*GetSyncStatusResponse)(nil),    // 23: sync.v1.GetSyncStatusResponse
+	(*BeginQrLoginRequest)(nil),      // 24: sync.v1.BeginQrLoginRequest
+	(*BeginQrLoginResponse)(nil),     // 25: sync.v1.BeginQrLoginResponse
+	(*PollQrLoginRequest)(nil),       // 26: sync.v1.PollQrLoginRequest
+	(*PollQrLoginResponse)(nil),      // 27: sync.v1.PollQrLoginResponse
 }
 var file_sync_v1_sync_proto_depIdxs = []int32{
 	1,  // 0: sync.v1.ListSyncedModsResponse.mods:type_name -> sync.v1.SyncedMod
@@ -1250,20 +1451,24 @@ var file_sync_v1_sync_proto_depIdxs = []int32{
 	3,  // 11: sync.v1.SyncService.GetSyncedMod:input_type -> sync.v1.GetSyncedModRequest
 	5,  // 12: sync.v1.SyncService.GetSyncStats:input_type -> sync.v1.GetSyncStatsRequest
 	7,  // 13: sync.v1.SyncService.RefreshSteamAuth:input_type -> sync.v1.RefreshSteamAuthRequest
-	22, // 14: sync.v1.SyncService.GetSyncStatus:input_type -> sync.v1.GetSyncStatusRequest
-	17, // 15: sync.v1.SyncService.RegisterSource:output_type -> sync.v1.RegisterSourceResponse
-	19, // 16: sync.v1.SyncService.DeregisterSource:output_type -> sync.v1.DeregisterSourceResponse
-	21, // 17: sync.v1.SyncService.SyncContent:output_type -> sync.v1.SyncContentResponse
-	14, // 18: sync.v1.SyncService.GetSourceMods:output_type -> sync.v1.GetSourceModsResponse
-	12, // 19: sync.v1.SyncService.RefreshSource:output_type -> sync.v1.RefreshSourceResponse
-	2,  // 20: sync.v1.SyncService.ListSyncedMods:output_type -> sync.v1.ListSyncedModsResponse
-	10, // 21: sync.v1.SyncService.InvalidateMod:output_type -> sync.v1.InvalidateModResponse
-	4,  // 22: sync.v1.SyncService.GetSyncedMod:output_type -> sync.v1.GetSyncedModResponse
-	6,  // 23: sync.v1.SyncService.GetSyncStats:output_type -> sync.v1.GetSyncStatsResponse
-	8,  // 24: sync.v1.SyncService.RefreshSteamAuth:output_type -> sync.v1.RefreshSteamAuthResponse
-	23, // 25: sync.v1.SyncService.GetSyncStatus:output_type -> sync.v1.GetSyncStatusResponse
-	15, // [15:26] is the sub-list for method output_type
-	4,  // [4:15] is the sub-list for method input_type
+	24, // 14: sync.v1.SyncService.BeginQrLogin:input_type -> sync.v1.BeginQrLoginRequest
+	26, // 15: sync.v1.SyncService.PollQrLogin:input_type -> sync.v1.PollQrLoginRequest
+	22, // 16: sync.v1.SyncService.GetSyncStatus:input_type -> sync.v1.GetSyncStatusRequest
+	17, // 17: sync.v1.SyncService.RegisterSource:output_type -> sync.v1.RegisterSourceResponse
+	19, // 18: sync.v1.SyncService.DeregisterSource:output_type -> sync.v1.DeregisterSourceResponse
+	21, // 19: sync.v1.SyncService.SyncContent:output_type -> sync.v1.SyncContentResponse
+	14, // 20: sync.v1.SyncService.GetSourceMods:output_type -> sync.v1.GetSourceModsResponse
+	12, // 21: sync.v1.SyncService.RefreshSource:output_type -> sync.v1.RefreshSourceResponse
+	2,  // 22: sync.v1.SyncService.ListSyncedMods:output_type -> sync.v1.ListSyncedModsResponse
+	10, // 23: sync.v1.SyncService.InvalidateMod:output_type -> sync.v1.InvalidateModResponse
+	4,  // 24: sync.v1.SyncService.GetSyncedMod:output_type -> sync.v1.GetSyncedModResponse
+	6,  // 25: sync.v1.SyncService.GetSyncStats:output_type -> sync.v1.GetSyncStatsResponse
+	8,  // 26: sync.v1.SyncService.RefreshSteamAuth:output_type -> sync.v1.RefreshSteamAuthResponse
+	25, // 27: sync.v1.SyncService.BeginQrLogin:output_type -> sync.v1.BeginQrLoginResponse
+	27, // 28: sync.v1.SyncService.PollQrLogin:output_type -> sync.v1.PollQrLoginResponse
+	23, // 29: sync.v1.SyncService.GetSyncStatus:output_type -> sync.v1.GetSyncStatusResponse
+	17, // [17:30] is the sub-list for method output_type
+	4,  // [4:17] is the sub-list for method input_type
 	4,  // [4:4] is the sub-list for extension type_name
 	4,  // [4:4] is the sub-list for extension extendee
 	0,  // [0:4] is the sub-list for field type_name
@@ -1281,7 +1486,7 @@ func file_sync_v1_sync_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sync_v1_sync_proto_rawDesc), len(file_sync_v1_sync_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   24,
+			NumMessages:   28,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

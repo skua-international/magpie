@@ -20,6 +20,9 @@ fn required_scope(path: &str) -> Option<&'static str> {
         "/registry.v1.ModSourceService/AddModSource" => Some("mod-sources:write"),
         "/registry.v1.ModSourceService/DeleteModSource" => Some("mod-sources:write"),
         "/registry.v1.ModSourceService/ListModSources" => Some("mod-sources:read"),
+        // Writes an annotation, touches no content -- same scope as any
+        // other mod source write.
+        "/registry.v1.ModSourceService/SetModSourceMetadata" => Some("mod-sources:write"),
         // Same scope as AddModSource -- re-resolve + sync whatever's
         // already desired is relatively harmless, nothing destructive.
         "/registry.v1.ModSourceService/SyncModSource" => Some("mod-sources:write"),
@@ -33,6 +36,7 @@ fn required_scope(path: &str) -> Option<&'static str> {
         "/registry.v1.ModSourceService/InvalidateMod" => Some("mod-sources:invalidate"),
         "/registry.v1.MissionService/UploadMission" => Some("missions:write"),
         "/registry.v1.MissionService/DeleteMission" => Some("missions:write"),
+        "/registry.v1.MissionService/SetMissionMetadata" => Some("missions:write"),
         "/registry.v1.MissionService/ListMissions" => Some("missions:read"),
         "/registry.v1.MissionService/GetMission" => Some("missions:read"),
         "/registry.v1.AdminService/GetDiskUsage" => Some("admin:disk-usage"),
@@ -41,6 +45,21 @@ fn required_scope(path: &str) -> Option<&'static str> {
         "/registry.v1.AdminService/RefreshSteamAuth" => Some("admin:steam-auth"),
         "/registry.v1.AdminService/ExportState" => Some("admin:export"),
         "/registry.v1.AdminService/ImportState" => Some("admin:import"),
+        // Its own scope: this is the one RPC that can change who may
+        // call any of the others, so it is not folded into a broader
+        // admin scope.
+        "/registry.v1.AdminService/ListAcl" => Some("admin:acl"),
+        "/registry.v1.AdminService/SetAclScopes" => Some("admin:acl"),
+        // Two halves of one operation, so one scope -- and the same one
+        // RefreshSteamAuth uses, since both end in a Steam session this
+        // cluster can authenticate as.
+        "/registry.v1.AdminService/BeginSteamQrLogin" => Some("admin:steam-auth"),
+        "/registry.v1.AdminService/PollSteamQrLogin" => Some("admin:steam-auth"),
+        // Its own scope: these read and write credential material, even
+        // though List deliberately returns key names only.
+        "/registry.v1.AdminService/ListSecrets" => Some("admin:secrets"),
+        "/registry.v1.AdminService/PutSecret" => Some("admin:secrets"),
+        "/registry.v1.AdminService/DeleteSecret" => Some("admin:secrets"),
         _ => None,
     }
 }
@@ -96,6 +115,7 @@ async fn main() -> Result<()> {
         cfg.namespace.clone(),
         cfg.armaserver_namespace.clone(),
         cfg.arma_config_baseline.clone(),
+        cfg.user_secrets_namespace.clone(),
     );
 
     let verifier = JwtVerifier::fetch(&cfg.jwt).await?;

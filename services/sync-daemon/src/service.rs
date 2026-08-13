@@ -4,10 +4,11 @@ use std::sync::{Arc, Mutex};
 
 use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest, ServiceResult};
 use protocol::proto::sync::v1::{
-    DeregisterSourceRequest, DeregisterSourceResponse, GetSourceModsRequest, GetSourceModsResponse,
-    GetSyncStatsRequest, GetSyncStatsResponse, GetSyncStatusRequest, GetSyncStatusResponse,
-    GetSyncedModRequest, GetSyncedModResponse, InvalidateModRequest, InvalidateModResponse,
-    ListSyncedModsRequest, ListSyncedModsResponse, RefreshSourceRequest, RefreshSourceResponse,
+    BeginQrLoginRequest, BeginQrLoginResponse, DeregisterSourceRequest, DeregisterSourceResponse,
+    GetSourceModsRequest, GetSourceModsResponse, GetSyncStatsRequest, GetSyncStatsResponse,
+    GetSyncStatusRequest, GetSyncStatusResponse, GetSyncedModRequest, GetSyncedModResponse,
+    InvalidateModRequest, InvalidateModResponse, ListSyncedModsRequest, ListSyncedModsResponse,
+    PollQrLoginRequest, PollQrLoginResponse, RefreshSourceRequest, RefreshSourceResponse,
     RefreshSteamAuthRequest, RefreshSteamAuthResponse, RegisterSourceRequest,
     RegisterSourceResponse, ResolvedMod as ProtoResolvedMod, SyncContentRequest,
     SyncContentResponse, SyncService, SyncedMod,
@@ -19,13 +20,31 @@ use tokio::sync::Semaphore;
 use tracing::{info, warn};
 
 use crate::capacity::CapacityClient;
-use steam_sync::capacity::CapacityReserver;
 use crate::secrets::{self, Session};
+use steam_sync::capacity::CapacityReserver;
 
 /// Shared state, `Arc`-wrapped so it can be cloned cheaply into a spawned
 /// background sync task -- kept separate from [`SyncServiceImpl`] (which
 /// only borrows `&self` per the trait's method signatures) specifically
 /// so spawning doesn't need a self-referential `Arc<Self>`.
+/// State of one in-flight QR login, keyed by the session id handed back
+/// to the caller.
+///
+/// Needed because `steam::poll_qr_login` blocks until the Steam mobile
+/// app confirms and consumes the session doing it -- neither of which
+/// suits a unary RPC a browser polls. `BeginQrLogin` therefore spawns a
+/// task that does the blocking wait and records the outcome here, and
+/// `PollQrLogin` just reads this map and returns immediately.
+///
+/// In-process, so both calls must reach the same replica. sync-daemon
+/// already runs as a single replica; this is the same constraint
+/// services/identity carries for its exchange-code map.
+pub enum QrLoginState {
+    Pending,
+    Confirmed { username: String },
+    Failed { error: String },
+}
+
 pub struct Shared {
     /// `None` if no Steam session has ever been established (no stored
     /// session Secret, no STEAM_USER/STEAM_PASSWORD configured) or the
@@ -37,6 +56,9 @@ pub struct Shared {
     /// and exits the process, letting a restart pick it up fresh (see
     /// that handler's own doc for why), rather than hot-swapping this.
     pub pool: Option<Arc<CmPool>>,
+    /// In-flight QR logins -- see `QrLoginState`. A std Mutex, not tokio's:
+    /// every access is a map read/write with no await held across it.
+    pub qr_logins: Arc<std::sync::Mutex<std::collections::HashMap<String, QrLoginState>>>,
     pub sync_state: Arc<SyncState>,
     pub content_root: PathBuf,
     /// See steam::DEFAULT_DOWNLOAD_WORKERS' own doc -- chunk-level
@@ -118,6 +140,7 @@ impl Shared {
     ) -> Arc<Self> {
         Arc::new(Self {
             pool,
+            qr_logins: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
             sync_state,
             content_root,
             client,
@@ -297,7 +320,9 @@ impl Shared {
         // a reservation stands, magpie-csi won't shrink the blob even if
         // the content that justified it was since deleted.
         if let Some(capacity) = &self.capacity {
-            capacity.release(steam_sync::capacity::KEY_SERVER_DEPOTS).await;
+            capacity
+                .release(steam_sync::capacity::KEY_SERVER_DEPOTS)
+                .await;
             capacity.release(steam_sync::capacity::KEY_WORKSHOP).await;
         }
         Ok(())
@@ -521,6 +546,106 @@ impl SyncService for SyncServiceImpl {
     /// code) negotiation happens entirely client-side, in
     /// `magpiectl admin refresh-steam-auth`, which calls this RPC with
     /// only the result. See the proto's own doc for the full rationale.
+    async fn begin_qr_login<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        _request: ServiceRequest<'_, BeginQrLoginRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<BeginQrLoginResponse> + Send + use<'a>> {
+        let (session, challenge_url) = steam::begin_qr_login()
+            .await
+            .map_err(|e| ConnectError::internal(format!("failed to begin QR login: {e:#}")))?;
+
+        let session_id = uuid::Uuid::now_v7().to_string();
+        self.shared
+            .qr_logins
+            .lock()
+            .unwrap()
+            .insert(session_id.clone(), QrLoginState::Pending);
+
+        // The blocking wait happens here, off the RPC path, so PollQrLogin
+        // can answer immediately. On confirmation this persists the
+        // session and exits exactly as RefreshSteamAuth does -- see that
+        // handler's own doc for why a restart beats hot-swapping the
+        // connection pool.
+        let shared = self.shared.clone();
+        let id = session_id.clone();
+        tokio::spawn(async move {
+            let outcome = steam::poll_qr_login(session).await;
+            let (state, confirmed) = match outcome {
+                Ok((username, refresh_token)) => {
+                    let persisted = secrets::write_session(
+                        &shared.client,
+                        &shared.namespace,
+                        &shared.steam_session_secret_name,
+                        &Session {
+                            user: username.clone(),
+                            refresh_token,
+                        },
+                    )
+                    .await;
+                    match persisted {
+                        Ok(()) => (QrLoginState::Confirmed { username }, true),
+                        Err(e) => (
+                            QrLoginState::Failed {
+                                error: format!("failed to persist new Steam session: {e:#}"),
+                            },
+                            false,
+                        ),
+                    }
+                }
+                Err(e) => (
+                    QrLoginState::Failed {
+                        error: format!("{e:#}"),
+                    },
+                    false,
+                ),
+            };
+            shared.qr_logins.lock().unwrap().insert(id, state);
+
+            if confirmed {
+                info!("new Steam session established via QR, restarting to pick it up");
+                // Longer than RefreshSteamAuth's one second: the caller
+                // only learns this succeeded by polling, so the process
+                // has to stay up long enough to answer at least one more
+                // poll before it goes away.
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                std::process::exit(0);
+            }
+        });
+
+        Response::ok(BeginQrLoginResponse {
+            session_id,
+            challenge_url,
+            ..Default::default()
+        })
+    }
+
+    async fn poll_qr_login<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        request: ServiceRequest<'_, PollQrLoginRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<PollQrLoginResponse> + Send + use<'a>> {
+        let state = self.shared.qr_logins.lock().unwrap();
+        match state.get(request.session_id) {
+            Some(QrLoginState::Pending) => Response::ok(PollQrLoginResponse {
+                confirmed: false,
+                ..Default::default()
+            }),
+            Some(QrLoginState::Confirmed { username }) => Response::ok(PollQrLoginResponse {
+                confirmed: true,
+                username: username.clone(),
+                ..Default::default()
+            }),
+            Some(QrLoginState::Failed { error }) => Err(ConnectError::internal(error.clone())),
+            // Also what a caller polling after this process restarted
+            // sees -- which, on the happy path, means the login worked.
+            None => Err(ConnectError::not_found(
+                "unknown QR login session -- it may have completed and restarted this service, \
+                 or expired",
+            )),
+        }
+    }
+
     async fn refresh_steam_auth<'a>(
         &'a self,
         _ctx: RequestContext,

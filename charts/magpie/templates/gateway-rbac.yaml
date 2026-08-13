@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ include "magpie.fullname" . }}-server-api
+  name: {{ include "magpie.fullname" . }}-gateway
   namespace: {{ include "magpie.namespace" . }}
   labels:
     {{- include "magpie.labels" . | nindent 4 }}
@@ -10,8 +10,8 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ include "magpie.fullname" . }}-server-api
-  namespace: {{ include "magpie.serverApiNamespace" . }}
+  name: {{ include "magpie.fullname" . }}-gateway
+  namespace: {{ include "magpie.gatewayNamespace" . }}
   labels:
     {{- include "magpie.labels" . | nindent 4 }}
 rules:
@@ -32,20 +32,32 @@ rules:
   - apiGroups: ["arma.skua.io"]
     resources: ["modsources"]
     verbs: ["get"]
+  # Read-only, and the only non-CRD access this service has. Needed for
+  # GetServerHealth (a pod's Ready condition *is* the A2S query probe in
+  # services/launcher/src/healthcheck.rs) and GetServerLogs.
+  #
+  # This does widen what a stolen bearer token reaches -- gateway is the
+  # most exposed process here, and pod logs can contain whatever a server
+  # or its mods chose to print. Kept to get/list with no write verbs, and
+  # GetServerLogs sits behind its own servers:logs scope rather than
+  # servers:read, so listing servers doesn't imply reading their output.
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "magpie.fullname" . }}-server-api
-  namespace: {{ include "magpie.serverApiNamespace" . }}
+  name: {{ include "magpie.fullname" . }}-gateway
+  namespace: {{ include "magpie.gatewayNamespace" . }}
   labels:
     {{- include "magpie.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: {{ include "magpie.fullname" . }}-server-api
+  name: {{ include "magpie.fullname" . }}-gateway
 subjects:
   - kind: ServiceAccount
-    name: {{ include "magpie.fullname" . }}-server-api
+    name: {{ include "magpie.fullname" . }}-gateway
     namespace: {{ include "magpie.namespace" . }}
 {{- end }}

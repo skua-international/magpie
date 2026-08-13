@@ -21,8 +21,8 @@ use protocol::proto::registry::v1::{
     AddModSourceRequest, AddModSourceResponse, DeleteModSourceRequest, DeleteModSourceResponse,
     GetSyncedModRequest, GetSyncedModResponse, InvalidateModRequest, InvalidateModResponse,
     ListModSourcesRequest, ListModSourcesResponse, ListSyncedModsRequest, ListSyncedModsResponse,
-    ModSourceInfo, ModSourceKind as ProtoKind, SyncModSourceRequest, SyncModSourceResponse,
-    SyncedMod as ProtoSyncedMod,
+    ModSourceInfo, ModSourceKind as ProtoKind, SetModSourceMetadataRequest, SyncModSourceRequest,
+    SyncModSourceResponse, SyncedMod as ProtoSyncedMod,
 };
 use sync_client::SyncClient;
 use uuid::Uuid;
@@ -78,6 +78,40 @@ pub(crate) fn kind_str_to_proto(kind: &str) -> ProtoKind {
     }
 }
 
+/// Operator metadata lives in annotations under this prefix rather than
+/// in `ModSourceSpec`, for the same reason it does on ArmaServer: nothing
+/// resolves or syncs against it, so growing the CRD schema for a map only
+/// humans read would mean a migration to gain a field the controller
+/// never looks at. The prefix keeps it clear of the annotations
+/// Kubernetes, Helm and kubectl put on the same object.
+pub(crate) const METADATA_PREFIX: &str = "metadata.magpie.skua.io/";
+
+/// Annotation keys have to be valid Kubernetes qualified names, so an
+/// invalid one is rejected here rather than surfacing as an opaque
+/// create failure from the API server.
+pub(crate) fn metadata_to_annotations<'a>(
+    entries: impl Iterator<Item = (&'a str, &'a str)>,
+) -> Result<std::collections::BTreeMap<String, String>, ConnectError> {
+    let mut out = std::collections::BTreeMap::new();
+    for (key, value) in entries {
+        if key.is_empty() {
+            return Err(ConnectError::invalid_argument(
+                "metadata keys cannot be empty",
+            ));
+        }
+        if !key
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+        {
+            return Err(ConnectError::invalid_argument(format!(
+                "invalid metadata key {key:?}: only letters, digits, '-', '_' and '.' are allowed"
+            )));
+        }
+        out.insert(format!("{METADATA_PREFIX}{key}"), value.to_string());
+    }
+    Ok(out)
+}
+
 pub(crate) fn to_mod_source_info(obj: &ModSource) -> ModSourceInfo {
     let status = obj.status.clone().unwrap_or_default();
     let created_at_unix_ms = obj
@@ -91,11 +125,60 @@ pub(crate) fn to_mod_source_info(obj: &ModSource) -> ModSourceInfo {
         display_name: status.display_name,
         created_at_unix_ms,
         size_bytes: status.size_bytes,
+        metadata: obj
+            .annotations()
+            .iter()
+            .filter_map(|(k, v)| {
+                k.strip_prefix(METADATA_PREFIX)
+                    .map(|k| (k.to_string(), v.clone()))
+            })
+            .collect(),
         ..Default::default()
     }
 }
 
 impl protocol::proto::registry::v1::ModSourceService for ModSourceServiceImpl {
+    async fn set_mod_source_metadata<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        request: ServiceRequest<'_, SetModSourceMetadataRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<ModSourceInfo> + Send + use<'a>> {
+        let existing =
+            self.api().get(request.id).await.map_err(|_| {
+                ConnectError::not_found(format!("no such mod source: {}", request.id))
+            })?;
+
+        let wanted = metadata_to_annotations(request.metadata.iter().map(|(k, v)| (*k, *v)))?;
+
+        // A merge patch removes a key by setting it null, so annotations
+        // that existed before and aren't in the new set have to be nulled
+        // explicitly -- otherwise this could only ever add, and a removed
+        // row in the UI would silently survive.
+        let mut annotations = serde_json::Map::new();
+        for key in existing.annotations().keys() {
+            if key.starts_with(METADATA_PREFIX) && !wanted.contains_key(key) {
+                annotations.insert(key.clone(), serde_json::Value::Null);
+            }
+        }
+        for (key, value) in wanted {
+            annotations.insert(key, serde_json::Value::String(value));
+        }
+
+        let patched = self
+            .api()
+            .patch(
+                request.id,
+                &PatchParams::default(),
+                &Patch::Merge(serde_json::json!({ "metadata": { "annotations": annotations } })),
+            )
+            .await
+            .map_err(|e| {
+                ConnectError::internal(format!("failed to update {}: {e:#}", request.id))
+            })?;
+
+        Response::ok(to_mod_source_info(&patched))
+    }
+
     async fn add_mod_source<'a>(
         &'a self,
         _ctx: RequestContext,
@@ -135,9 +218,11 @@ impl protocol::proto::registry::v1::ModSourceService for ModSourceServiceImpl {
         };
 
         let is_local = matches!(input, ModSourceInput::Local { .. });
+        let annotations = metadata_to_annotations(request.metadata.iter().map(|(k, v)| (*k, *v)))?;
         let obj = ModSource {
             metadata: ObjectMeta {
                 name: Some(source_id.clone()),
+                annotations: (!annotations.is_empty()).then_some(annotations),
                 ..Default::default()
             },
             spec: crd::ModSourceSpec { source: input },

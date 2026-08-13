@@ -40,6 +40,26 @@ service ServerService {
   // normal Kubernetes graceful termination (no pre-shutdown hook support
   // yet -- planned, not built).
   rpc StopServer(StopServerRequest) returns (ServerInfo);
+
+  // Recent output from the server's own pod.
+  //
+  // Lines are returned raw, exactly as the container wrote them, rather
+  // than parsed here: launcher emits JSON (tracing_subscriber's json
+  // layer) but arma3server's own pre-tracing output is not JSON at all,
+  // and a client that renders both wants to make that distinction
+  // itself instead of being handed a lossy normalization.
+  rpc GetServerLogs(GetServerLogsRequest) returns (GetServerLogsResponse);
+
+  // Whether the server is actually answering queries, as opposed to
+  // merely running.
+  //
+  // Reports the pod's readiness, which is exactly the A2S_INFO round
+  // trip `launcher healthcheck` performs against arma3server's Steam
+  // query port -- a real "a player's server browser would see this"
+  // check, not process liveness. Deliberately a separate RPC rather
+  // than a field on ServerInfo: it reads pods, so folding it into
+  // ListServers would make every list call pay for it.
+  rpc GetServerHealth(GetServerHealthRequest) returns (GetServerHealthResponse);
 }
 
 message CreateServerRequest {
@@ -61,7 +81,7 @@ message CreateServerRequest {
   // ArmaServer) providing per-server overrides on top of the cluster's
   // baseline Arma config -- see ArmaServerSpec.config_map and
   // services/controller/src/arma_config.rs. The ConfigMap itself isn't
-  // managed through this API (server-api carries no ConfigMap RBAC at
+  // managed through this API (gateway carries no ConfigMap RBAC at
   // all, deliberately -- see charts/magpie/values.yaml's serverApi
   // comment); callers create/edit it directly against the cluster (e.g.
   // `kubectl edit configmap`) and only pass its name here. Unset means
@@ -74,6 +94,11 @@ message CreateServerRequest {
   optional uint32 metrics_port = 7;
   // Defaults to "/metrics" when unset. Ignored if metrics_port is unset.
   optional string metrics_path = 8;
+  // Free-form operator labelling, stored as annotations on the
+  // ArmaServer object -- nothing reconciles against it. Annotations
+  // rather than a spec field so the CRD schema does not have to grow a
+  // map that only humans read.
+  map<string, string> metadata = 9;
 }
 
 enum ServerPhase {
@@ -101,6 +126,8 @@ message ServerInfo {
   ServerPhase phase = 5;
   string message = 7;
   DesiredState desired_state = 8;
+  // See CreateServerRequest.metadata.
+  map<string, string> metadata = 11;
   reserved 6, 9, 10;
   reserved "claim_path", "content_pvc", "arma_config", "network_config";
 }
@@ -123,6 +150,65 @@ message DeleteServerResponse {}
 
 message UpdateServerRequest {
   string id = 1;
+
+  // Replaces the server's mod sources when present, leaves them alone
+  // when absent.
+  //
+  // Wrapped in a message rather than a bare `repeated string` because
+  // proto3 cannot tell an empty repeated field from an unset one, and
+  // both are meaningful here: "detach every mod source" has to be
+  // expressible without it being what every plain resync accidentally
+  // says.
+  optional ModSourceSelection mod_sources = 2;
+
+  // Replaces the server's metadata when present, leaves it alone when
+  // absent. Same presence-vs-empty reasoning as mod_sources.
+  optional MetadataSelection metadata = 3;
+}
+
+message ModSourceSelection {
+  repeated string mod_source_ids = 1;
+}
+
+message MetadataSelection {
+  map<string, string> metadata = 1;
+}
+
+message GetServerLogsRequest {
+  string id = 1;
+  // Most recent N lines. Capped server-side -- an unbounded request
+  // would pull a whole pod's history through the API server and into a
+  // browser.
+  optional uint32 tail_lines = 2;
+  // Read the previous container instance instead of the current one,
+  // which is the only way to see why a crashed server died.
+  optional bool previous = 3;
+}
+
+message GetServerLogsResponse {
+  repeated string lines = 1;
+  // Which pod these came from, so a UI can say so -- a server's pod name
+  // changes on every restart.
+  string pod_name = 2;
+}
+
+message GetServerHealthRequest {
+  string id = 1;
+}
+
+message GetServerHealthResponse {
+  // The pod's Ready condition: the A2S query probe is passing.
+  bool ready = 1;
+  string pod_name = 2;
+  // Pod phase (Running/Pending/Failed/...), for the case where there is
+  // no readiness answer yet because there is no running pod.
+  string phase = 3;
+  // Container restart count -- a server that is ready but has restarted
+  // repeatedly is not actually healthy.
+  uint32 restart_count = 4;
+  // Human-readable detail: the probe's own failure message where there
+  // is one, otherwise why no pod is running.
+  string message = 5;
 }
 
 message StartServerRequest {

@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file sync/v1/sync.proto.
  */
 export const file_sync_v1_sync: GenFile = /*@__PURE__*/
-  fileDesc("ChJzeW5jL3YxL3N5bmMucHJvdG8SB3N5bmMudjEiFwoVTGlzdFN5bmNlZE1vZHNSZXF1ZXN0IlMKCVN5bmNlZE1vZBIOCgZtb2RfaWQYASABKAQSEwoLbWFuaWZlc3RfaWQYAiABKAQSEgoKc2l6ZV9ieXRlcxgDIAEoBBINCgV0aXRsZRgEIAEoCSI6ChZMaXN0U3luY2VkTW9kc1Jlc3BvbnNlEiAKBG1vZHMYASADKAsyEi5zeW5jLnYxLlN5bmNlZE1vZCIlChNHZXRTeW5jZWRNb2RSZXF1ZXN0Eg4KBm1vZF9pZBgBIAEoBCJYChRHZXRTeW5jZWRNb2RSZXNwb25zZRIkCgNtb2QYASABKAsyEi5zeW5jLnYxLlN5bmNlZE1vZEgAiAEBEhIKCnNvdXJjZV9pZHMYAiADKAlCBgoEX21vZCIVChNHZXRTeW5jU3RhdHNSZXF1ZXN0IkQKFEdldFN5bmNTdGF0c1Jlc3BvbnNlEhIKCm1vZHNfYnl0ZXMYASABKAQSGAoQZ2FtZV9maWxlc19ieXRlcxgCIAEoBCJCChdSZWZyZXNoU3RlYW1BdXRoUmVxdWVzdBIQCgh1c2VybmFtZRgBIAEoCRIVCg1yZWZyZXNoX3Rva2VuGAIgASgJIhoKGFJlZnJlc2hTdGVhbUF1dGhSZXNwb25zZSImChRJbnZhbGlkYXRlTW9kUmVxdWVzdBIOCgZtb2RfaWQYASABKAQiFwoVSW52YWxpZGF0ZU1vZFJlc3BvbnNlIikKFFJlZnJlc2hTb3VyY2VSZXF1ZXN0EhEKCXNvdXJjZV9pZBgBIAEoCSI7ChVSZWZyZXNoU291cmNlUmVzcG9uc2USIgoEbW9kcxgBIAMoCzIULnN5bmMudjEuUmVzb2x2ZWRNb2QiKQoUR2V0U291cmNlTW9kc1JlcXVlc3QSEQoJc291cmNlX2lkGAEgASgJIigKFUdldFNvdXJjZU1vZHNSZXNwb25zZRIPCgdtb2RfaWRzGAEgAygEIkEKFVJlZ2lzdGVyU291cmNlUmVxdWVzdBIVCg1jYW5kaWRhdGVfaWRzGAEgAygEEhEKCXNvdXJjZV9pZBgCIAEoCSIsCgtSZXNvbHZlZE1vZBIOCgZtb2RfaWQYASABKAQSDQoFdGl0bGUYAiABKAkiUAoWUmVnaXN0ZXJTb3VyY2VSZXNwb25zZRIiCgRtb2RzGAEgAygLMhQuc3luYy52MS5SZXNvbHZlZE1vZBISCgpyb290X3RpdGxlGAIgASgJIiwKF0RlcmVnaXN0ZXJTb3VyY2VSZXF1ZXN0EhEKCXNvdXJjZV9pZBgBIAEoCSIaChhEZXJlZ2lzdGVyU291cmNlUmVzcG9uc2UiFAoSU3luY0NvbnRlbnRSZXF1ZXN0IhUKE1N5bmNDb250ZW50UmVzcG9uc2UiFgoUR2V0U3luY1N0YXR1c1JlcXVlc3QiQgoVR2V0U3luY1N0YXR1c1Jlc3BvbnNlEg8KB3N5bmNpbmcYASABKAgSGAoQZ2FtZV9maWxlc19yZWFkeRgCIAEoCDKJBwoLU3luY1NlcnZpY2USUQoOUmVnaXN0ZXJTb3VyY2USHi5zeW5jLnYxLlJlZ2lzdGVyU291cmNlUmVxdWVzdBofLnN5bmMudjEuUmVnaXN0ZXJTb3VyY2VSZXNwb25zZRJXChBEZXJlZ2lzdGVyU291cmNlEiAuc3luYy52MS5EZXJlZ2lzdGVyU291cmNlUmVxdWVzdBohLnN5bmMudjEuRGVyZWdpc3RlclNvdXJjZVJlc3BvbnNlEkgKC1N5bmNDb250ZW50Ehsuc3luYy52MS5TeW5jQ29udGVudFJlcXVlc3QaHC5zeW5jLnYxLlN5bmNDb250ZW50UmVzcG9uc2USTgoNR2V0U291cmNlTW9kcxIdLnN5bmMudjEuR2V0U291cmNlTW9kc1JlcXVlc3QaHi5zeW5jLnYxLkdldFNvdXJjZU1vZHNSZXNwb25zZRJOCg1SZWZyZXNoU291cmNlEh0uc3luYy52MS5SZWZyZXNoU291cmNlUmVxdWVzdBoeLnN5bmMudjEuUmVmcmVzaFNvdXJjZVJlc3BvbnNlElEKDkxpc3RTeW5jZWRNb2RzEh4uc3luYy52MS5MaXN0U3luY2VkTW9kc1JlcXVlc3QaHy5zeW5jLnYxLkxpc3RTeW5jZWRNb2RzUmVzcG9uc2USTgoNSW52YWxpZGF0ZU1vZBIdLnN5bmMudjEuSW52YWxpZGF0ZU1vZFJlcXVlc3QaHi5zeW5jLnYxLkludmFsaWRhdGVNb2RSZXNwb25zZRJLCgxHZXRTeW5jZWRNb2QSHC5zeW5jLnYxLkdldFN5bmNlZE1vZFJlcXVlc3QaHS5zeW5jLnYxLkdldFN5bmNlZE1vZFJlc3BvbnNlEksKDEdldFN5bmNTdGF0cxIcLnN5bmMudjEuR2V0U3luY1N0YXRzUmVxdWVzdBodLnN5bmMudjEuR2V0U3luY1N0YXRzUmVzcG9uc2USVwoQUmVmcmVzaFN0ZWFtQXV0aBIgLnN5bmMudjEuUmVmcmVzaFN0ZWFtQXV0aFJlcXVlc3QaIS5zeW5jLnYxLlJlZnJlc2hTdGVhbUF1dGhSZXNwb25zZRJOCg1HZXRTeW5jU3RhdHVzEh0uc3luYy52MS5HZXRTeW5jU3RhdHVzUmVxdWVzdBoeLnN5bmMudjEuR2V0U3luY1N0YXR1c1Jlc3BvbnNlQkJaQGdpdGh1Yi5jb20vc2t1YS1pbnRlcm5hdGlvbmFsL21hZ3BpZS9nZW5lcmF0ZWQvZ28vc3luYy92MTtzeW5jdjFiBnByb3RvMw");
+  fileDesc("ChJzeW5jL3YxL3N5bmMucHJvdG8SB3N5bmMudjEiFwoVTGlzdFN5bmNlZE1vZHNSZXF1ZXN0IlMKCVN5bmNlZE1vZBIOCgZtb2RfaWQYASABKAQSEwoLbWFuaWZlc3RfaWQYAiABKAQSEgoKc2l6ZV9ieXRlcxgDIAEoBBINCgV0aXRsZRgEIAEoCSI6ChZMaXN0U3luY2VkTW9kc1Jlc3BvbnNlEiAKBG1vZHMYASADKAsyEi5zeW5jLnYxLlN5bmNlZE1vZCIlChNHZXRTeW5jZWRNb2RSZXF1ZXN0Eg4KBm1vZF9pZBgBIAEoBCJYChRHZXRTeW5jZWRNb2RSZXNwb25zZRIkCgNtb2QYASABKAsyEi5zeW5jLnYxLlN5bmNlZE1vZEgAiAEBEhIKCnNvdXJjZV9pZHMYAiADKAlCBgoEX21vZCIVChNHZXRTeW5jU3RhdHNSZXF1ZXN0IkQKFEdldFN5bmNTdGF0c1Jlc3BvbnNlEhIKCm1vZHNfYnl0ZXMYASABKAQSGAoQZ2FtZV9maWxlc19ieXRlcxgCIAEoBCJCChdSZWZyZXNoU3RlYW1BdXRoUmVxdWVzdBIQCgh1c2VybmFtZRgBIAEoCRIVCg1yZWZyZXNoX3Rva2VuGAIgASgJIhoKGFJlZnJlc2hTdGVhbUF1dGhSZXNwb25zZSImChRJbnZhbGlkYXRlTW9kUmVxdWVzdBIOCgZtb2RfaWQYASABKAQiFwoVSW52YWxpZGF0ZU1vZFJlc3BvbnNlIikKFFJlZnJlc2hTb3VyY2VSZXF1ZXN0EhEKCXNvdXJjZV9pZBgBIAEoCSI7ChVSZWZyZXNoU291cmNlUmVzcG9uc2USIgoEbW9kcxgBIAMoCzIULnN5bmMudjEuUmVzb2x2ZWRNb2QiKQoUR2V0U291cmNlTW9kc1JlcXVlc3QSEQoJc291cmNlX2lkGAEgASgJIigKFUdldFNvdXJjZU1vZHNSZXNwb25zZRIPCgdtb2RfaWRzGAEgAygEIkEKFVJlZ2lzdGVyU291cmNlUmVxdWVzdBIVCg1jYW5kaWRhdGVfaWRzGAEgAygEEhEKCXNvdXJjZV9pZBgCIAEoCSIsCgtSZXNvbHZlZE1vZBIOCgZtb2RfaWQYASABKAQSDQoFdGl0bGUYAiABKAkiUAoWUmVnaXN0ZXJTb3VyY2VSZXNwb25zZRIiCgRtb2RzGAEgAygLMhQuc3luYy52MS5SZXNvbHZlZE1vZBISCgpyb290X3RpdGxlGAIgASgJIiwKF0RlcmVnaXN0ZXJTb3VyY2VSZXF1ZXN0EhEKCXNvdXJjZV9pZBgBIAEoCSIaChhEZXJlZ2lzdGVyU291cmNlUmVzcG9uc2UiFAoSU3luY0NvbnRlbnRSZXF1ZXN0IhUKE1N5bmNDb250ZW50UmVzcG9uc2UiFgoUR2V0U3luY1N0YXR1c1JlcXVlc3QiQgoVR2V0U3luY1N0YXR1c1Jlc3BvbnNlEg8KB3N5bmNpbmcYASABKAgSGAoQZ2FtZV9maWxlc19yZWFkeRgCIAEoCCIVChNCZWdpblFyTG9naW5SZXF1ZXN0IkEKFEJlZ2luUXJMb2dpblJlc3BvbnNlEhIKCnNlc3Npb25faWQYASABKAkSFQoNY2hhbGxlbmdlX3VybBgCIAEoCSIoChJQb2xsUXJMb2dpblJlcXVlc3QSEgoKc2Vzc2lvbl9pZBgBIAEoCSI6ChNQb2xsUXJMb2dpblJlc3BvbnNlEhEKCWNvbmZpcm1lZBgBIAEoCBIQCgh1c2VybmFtZRgCIAEoCTKgCAoLU3luY1NlcnZpY2USUQoOUmVnaXN0ZXJTb3VyY2USHi5zeW5jLnYxLlJlZ2lzdGVyU291cmNlUmVxdWVzdBofLnN5bmMudjEuUmVnaXN0ZXJTb3VyY2VSZXNwb25zZRJXChBEZXJlZ2lzdGVyU291cmNlEiAuc3luYy52MS5EZXJlZ2lzdGVyU291cmNlUmVxdWVzdBohLnN5bmMudjEuRGVyZWdpc3RlclNvdXJjZVJlc3BvbnNlEkgKC1N5bmNDb250ZW50Ehsuc3luYy52MS5TeW5jQ29udGVudFJlcXVlc3QaHC5zeW5jLnYxLlN5bmNDb250ZW50UmVzcG9uc2USTgoNR2V0U291cmNlTW9kcxIdLnN5bmMudjEuR2V0U291cmNlTW9kc1JlcXVlc3QaHi5zeW5jLnYxLkdldFNvdXJjZU1vZHNSZXNwb25zZRJOCg1SZWZyZXNoU291cmNlEh0uc3luYy52MS5SZWZyZXNoU291cmNlUmVxdWVzdBoeLnN5bmMudjEuUmVmcmVzaFNvdXJjZVJlc3BvbnNlElEKDkxpc3RTeW5jZWRNb2RzEh4uc3luYy52MS5MaXN0U3luY2VkTW9kc1JlcXVlc3QaHy5zeW5jLnYxLkxpc3RTeW5jZWRNb2RzUmVzcG9uc2USTgoNSW52YWxpZGF0ZU1vZBIdLnN5bmMudjEuSW52YWxpZGF0ZU1vZFJlcXVlc3QaHi5zeW5jLnYxLkludmFsaWRhdGVNb2RSZXNwb25zZRJLCgxHZXRTeW5jZWRNb2QSHC5zeW5jLnYxLkdldFN5bmNlZE1vZFJlcXVlc3QaHS5zeW5jLnYxLkdldFN5bmNlZE1vZFJlc3BvbnNlEksKDEdldFN5bmNTdGF0cxIcLnN5bmMudjEuR2V0U3luY1N0YXRzUmVxdWVzdBodLnN5bmMudjEuR2V0U3luY1N0YXRzUmVzcG9uc2USVwoQUmVmcmVzaFN0ZWFtQXV0aBIgLnN5bmMudjEuUmVmcmVzaFN0ZWFtQXV0aFJlcXVlc3QaIS5zeW5jLnYxLlJlZnJlc2hTdGVhbUF1dGhSZXNwb25zZRJLCgxCZWdpblFyTG9naW4SHC5zeW5jLnYxLkJlZ2luUXJMb2dpblJlcXVlc3QaHS5zeW5jLnYxLkJlZ2luUXJMb2dpblJlc3BvbnNlEkgKC1BvbGxRckxvZ2luEhsuc3luYy52MS5Qb2xsUXJMb2dpblJlcXVlc3QaHC5zeW5jLnYxLlBvbGxRckxvZ2luUmVzcG9uc2USTgoNR2V0U3luY1N0YXR1cxIdLnN5bmMudjEuR2V0U3luY1N0YXR1c1JlcXVlc3QaHi5zeW5jLnYxLkdldFN5bmNTdGF0dXNSZXNwb25zZUJCWkBnaXRodWIuY29tL3NrdWEtaW50ZXJuYXRpb25hbC9tYWdwaWUvZ2VuZXJhdGVkL2dvL3N5bmMvdjE7c3luY3YxYgZwcm90bzM");
 
 /**
  * @generated from message sync.v1.ListSyncedModsRequest
@@ -478,6 +478,80 @@ export const GetSyncStatusResponseSchema: GenMessage<GetSyncStatusResponse> = /*
   messageDesc(file_sync_v1_sync, 23);
 
 /**
+ * @generated from message sync.v1.BeginQrLoginRequest
+ */
+export type BeginQrLoginRequest = Message<"sync.v1.BeginQrLoginRequest"> & {
+};
+
+/**
+ * Describes the message sync.v1.BeginQrLoginRequest.
+ * Use `create(BeginQrLoginRequestSchema)` to create a new message.
+ */
+export const BeginQrLoginRequestSchema: GenMessage<BeginQrLoginRequest> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 24);
+
+/**
+ * @generated from message sync.v1.BeginQrLoginResponse
+ */
+export type BeginQrLoginResponse = Message<"sync.v1.BeginQrLoginResponse"> & {
+  /**
+   * @generated from field: string session_id = 1;
+   */
+  sessionId: string;
+
+  /**
+   * @generated from field: string challenge_url = 2;
+   */
+  challengeUrl: string;
+};
+
+/**
+ * Describes the message sync.v1.BeginQrLoginResponse.
+ * Use `create(BeginQrLoginResponseSchema)` to create a new message.
+ */
+export const BeginQrLoginResponseSchema: GenMessage<BeginQrLoginResponse> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 25);
+
+/**
+ * @generated from message sync.v1.PollQrLoginRequest
+ */
+export type PollQrLoginRequest = Message<"sync.v1.PollQrLoginRequest"> & {
+  /**
+   * @generated from field: string session_id = 1;
+   */
+  sessionId: string;
+};
+
+/**
+ * Describes the message sync.v1.PollQrLoginRequest.
+ * Use `create(PollQrLoginRequestSchema)` to create a new message.
+ */
+export const PollQrLoginRequestSchema: GenMessage<PollQrLoginRequest> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 26);
+
+/**
+ * @generated from message sync.v1.PollQrLoginResponse
+ */
+export type PollQrLoginResponse = Message<"sync.v1.PollQrLoginResponse"> & {
+  /**
+   * @generated from field: bool confirmed = 1;
+   */
+  confirmed: boolean;
+
+  /**
+   * @generated from field: string username = 2;
+   */
+  username: string;
+};
+
+/**
+ * Describes the message sync.v1.PollQrLoginResponse.
+ * Use `create(PollQrLoginResponseSchema)` to create a new message.
+ */
+export const PollQrLoginResponseSchema: GenMessage<PollQrLoginResponse> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 27);
+
+/**
  * Mod/collection sync registry and content-claim service. Owns all Steam
  * depot/workshop mechanics -- callers (the controller) never talk to Steam
  * directly, only in terms of candidate IDs and resolved mod IDs.
@@ -636,6 +710,33 @@ export const SyncService: GenService<{
     methodKind: "unary";
     input: typeof RefreshSteamAuthRequestSchema;
     output: typeof RefreshSteamAuthResponseSchema;
+  },
+  /**
+   * QR-code login negotiated here rather than by the client. Begin
+   * opens a Steam CM connection and returns its challenge URL; Poll
+   * waits for the mobile app to confirm and then installs the session,
+   * exactly as RefreshSteamAuth would have with a client-negotiated
+   * token.
+   *
+   * The session between the two calls holds that live CM connection, so
+   * it is held in-process and both calls must land on the same replica
+   * -- see the deployment's own replica note. Same constraint
+   * services/identity already carries for its exchange-code map.
+   *
+   * @generated from rpc sync.v1.SyncService.BeginQrLogin
+   */
+  beginQrLogin: {
+    methodKind: "unary";
+    input: typeof BeginQrLoginRequestSchema;
+    output: typeof BeginQrLoginResponseSchema;
+  },
+  /**
+   * @generated from rpc sync.v1.SyncService.PollQrLogin
+   */
+  pollQrLogin: {
+    methodKind: "unary";
+    input: typeof PollQrLoginRequestSchema;
+    output: typeof PollQrLoginResponseSchema;
   },
   /**
    * Whether the golden content tree is safe to snapshot from right now --

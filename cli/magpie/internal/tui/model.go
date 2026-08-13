@@ -93,10 +93,10 @@ type Model struct {
 }
 
 // New builds the TUI's top-level model. namespace/release are only used
-// for kubectl-based ConfigMap calls that bypass server-api entirely --
+// for kubectl-based ConfigMap calls that bypass gateway entirely --
 // the "create server" flow's per-server override (create_server.go) and
 // the Admin screen's baseline edit (admin_actions.go) -- every RPC-backed
-// screen gets its namespace from server-api's own config instead, never
+// screen gets its namespace from gateway's own config instead, never
 // from here. apiURL/accessToken are only used by the Account
 // screen's link flow (see account.go) -- accessToken is a point-in-time
 // snapshot, not refreshed for the life of the TUI session.

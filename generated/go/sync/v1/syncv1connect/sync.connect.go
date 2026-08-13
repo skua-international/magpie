@@ -62,6 +62,11 @@ const (
 	// SyncServiceRefreshSteamAuthProcedure is the fully-qualified name of the SyncService's
 	// RefreshSteamAuth RPC.
 	SyncServiceRefreshSteamAuthProcedure = "/sync.v1.SyncService/RefreshSteamAuth"
+	// SyncServiceBeginQrLoginProcedure is the fully-qualified name of the SyncService's BeginQrLogin
+	// RPC.
+	SyncServiceBeginQrLoginProcedure = "/sync.v1.SyncService/BeginQrLogin"
+	// SyncServicePollQrLoginProcedure is the fully-qualified name of the SyncService's PollQrLogin RPC.
+	SyncServicePollQrLoginProcedure = "/sync.v1.SyncService/PollQrLogin"
 	// SyncServiceGetSyncStatusProcedure is the fully-qualified name of the SyncService's GetSyncStatus
 	// RPC.
 	SyncServiceGetSyncStatusProcedure = "/sync.v1.SyncService/GetSyncStatus"
@@ -141,6 +146,18 @@ type SyncServiceClient interface {
 	// handler's own doc for why) -- the response still reaches the caller
 	// first.
 	RefreshSteamAuth(context.Context, *connect.Request[v1.RefreshSteamAuthRequest]) (*connect.Response[v1.RefreshSteamAuthResponse], error)
+	// QR-code login negotiated here rather than by the client. Begin
+	// opens a Steam CM connection and returns its challenge URL; Poll
+	// waits for the mobile app to confirm and then installs the session,
+	// exactly as RefreshSteamAuth would have with a client-negotiated
+	// token.
+	//
+	// The session between the two calls holds that live CM connection, so
+	// it is held in-process and both calls must land on the same replica
+	// -- see the deployment's own replica note. Same constraint
+	// services/identity already carries for its exchange-code map.
+	BeginQrLogin(context.Context, *connect.Request[v1.BeginQrLoginRequest]) (*connect.Response[v1.BeginQrLoginResponse], error)
+	PollQrLogin(context.Context, *connect.Request[v1.PollQrLoginRequest]) (*connect.Response[v1.PollQrLoginResponse], error)
 	// Whether the golden content tree is safe to snapshot from right now --
 	// the controller polls this before creating an ArmaServer's Deployment
 	// so a launcher Pod never gets a CSI snapshot of a base-game/CDLC sync
@@ -225,6 +242,18 @@ func NewSyncServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(syncServiceMethods.ByName("RefreshSteamAuth")),
 			connect.WithClientOptions(opts...),
 		),
+		beginQrLogin: connect.NewClient[v1.BeginQrLoginRequest, v1.BeginQrLoginResponse](
+			httpClient,
+			baseURL+SyncServiceBeginQrLoginProcedure,
+			connect.WithSchema(syncServiceMethods.ByName("BeginQrLogin")),
+			connect.WithClientOptions(opts...),
+		),
+		pollQrLogin: connect.NewClient[v1.PollQrLoginRequest, v1.PollQrLoginResponse](
+			httpClient,
+			baseURL+SyncServicePollQrLoginProcedure,
+			connect.WithSchema(syncServiceMethods.ByName("PollQrLogin")),
+			connect.WithClientOptions(opts...),
+		),
 		getSyncStatus: connect.NewClient[v1.GetSyncStatusRequest, v1.GetSyncStatusResponse](
 			httpClient,
 			baseURL+SyncServiceGetSyncStatusProcedure,
@@ -246,6 +275,8 @@ type syncServiceClient struct {
 	getSyncedMod     *connect.Client[v1.GetSyncedModRequest, v1.GetSyncedModResponse]
 	getSyncStats     *connect.Client[v1.GetSyncStatsRequest, v1.GetSyncStatsResponse]
 	refreshSteamAuth *connect.Client[v1.RefreshSteamAuthRequest, v1.RefreshSteamAuthResponse]
+	beginQrLogin     *connect.Client[v1.BeginQrLoginRequest, v1.BeginQrLoginResponse]
+	pollQrLogin      *connect.Client[v1.PollQrLoginRequest, v1.PollQrLoginResponse]
 	getSyncStatus    *connect.Client[v1.GetSyncStatusRequest, v1.GetSyncStatusResponse]
 }
 
@@ -297,6 +328,16 @@ func (c *syncServiceClient) GetSyncStats(ctx context.Context, req *connect.Reque
 // RefreshSteamAuth calls sync.v1.SyncService.RefreshSteamAuth.
 func (c *syncServiceClient) RefreshSteamAuth(ctx context.Context, req *connect.Request[v1.RefreshSteamAuthRequest]) (*connect.Response[v1.RefreshSteamAuthResponse], error) {
 	return c.refreshSteamAuth.CallUnary(ctx, req)
+}
+
+// BeginQrLogin calls sync.v1.SyncService.BeginQrLogin.
+func (c *syncServiceClient) BeginQrLogin(ctx context.Context, req *connect.Request[v1.BeginQrLoginRequest]) (*connect.Response[v1.BeginQrLoginResponse], error) {
+	return c.beginQrLogin.CallUnary(ctx, req)
+}
+
+// PollQrLogin calls sync.v1.SyncService.PollQrLogin.
+func (c *syncServiceClient) PollQrLogin(ctx context.Context, req *connect.Request[v1.PollQrLoginRequest]) (*connect.Response[v1.PollQrLoginResponse], error) {
+	return c.pollQrLogin.CallUnary(ctx, req)
 }
 
 // GetSyncStatus calls sync.v1.SyncService.GetSyncStatus.
@@ -378,6 +419,18 @@ type SyncServiceHandler interface {
 	// handler's own doc for why) -- the response still reaches the caller
 	// first.
 	RefreshSteamAuth(context.Context, *connect.Request[v1.RefreshSteamAuthRequest]) (*connect.Response[v1.RefreshSteamAuthResponse], error)
+	// QR-code login negotiated here rather than by the client. Begin
+	// opens a Steam CM connection and returns its challenge URL; Poll
+	// waits for the mobile app to confirm and then installs the session,
+	// exactly as RefreshSteamAuth would have with a client-negotiated
+	// token.
+	//
+	// The session between the two calls holds that live CM connection, so
+	// it is held in-process and both calls must land on the same replica
+	// -- see the deployment's own replica note. Same constraint
+	// services/identity already carries for its exchange-code map.
+	BeginQrLogin(context.Context, *connect.Request[v1.BeginQrLoginRequest]) (*connect.Response[v1.BeginQrLoginResponse], error)
+	PollQrLogin(context.Context, *connect.Request[v1.PollQrLoginRequest]) (*connect.Response[v1.PollQrLoginResponse], error)
 	// Whether the golden content tree is safe to snapshot from right now --
 	// the controller polls this before creating an ArmaServer's Deployment
 	// so a launcher Pod never gets a CSI snapshot of a base-game/CDLC sync
@@ -458,6 +511,18 @@ func NewSyncServiceHandler(svc SyncServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(syncServiceMethods.ByName("RefreshSteamAuth")),
 		connect.WithHandlerOptions(opts...),
 	)
+	syncServiceBeginQrLoginHandler := connect.NewUnaryHandler(
+		SyncServiceBeginQrLoginProcedure,
+		svc.BeginQrLogin,
+		connect.WithSchema(syncServiceMethods.ByName("BeginQrLogin")),
+		connect.WithHandlerOptions(opts...),
+	)
+	syncServicePollQrLoginHandler := connect.NewUnaryHandler(
+		SyncServicePollQrLoginProcedure,
+		svc.PollQrLogin,
+		connect.WithSchema(syncServiceMethods.ByName("PollQrLogin")),
+		connect.WithHandlerOptions(opts...),
+	)
 	syncServiceGetSyncStatusHandler := connect.NewUnaryHandler(
 		SyncServiceGetSyncStatusProcedure,
 		svc.GetSyncStatus,
@@ -486,6 +551,10 @@ func NewSyncServiceHandler(svc SyncServiceHandler, opts ...connect.HandlerOption
 			syncServiceGetSyncStatsHandler.ServeHTTP(w, r)
 		case SyncServiceRefreshSteamAuthProcedure:
 			syncServiceRefreshSteamAuthHandler.ServeHTTP(w, r)
+		case SyncServiceBeginQrLoginProcedure:
+			syncServiceBeginQrLoginHandler.ServeHTTP(w, r)
+		case SyncServicePollQrLoginProcedure:
+			syncServicePollQrLoginHandler.ServeHTTP(w, r)
 		case SyncServiceGetSyncStatusProcedure:
 			syncServiceGetSyncStatusHandler.ServeHTTP(w, r)
 		default:
@@ -535,6 +604,14 @@ func (UnimplementedSyncServiceHandler) GetSyncStats(context.Context, *connect.Re
 
 func (UnimplementedSyncServiceHandler) RefreshSteamAuth(context.Context, *connect.Request[v1.RefreshSteamAuthRequest]) (*connect.Response[v1.RefreshSteamAuthResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sync.v1.SyncService.RefreshSteamAuth is not implemented"))
+}
+
+func (UnimplementedSyncServiceHandler) BeginQrLogin(context.Context, *connect.Request[v1.BeginQrLoginRequest]) (*connect.Response[v1.BeginQrLoginResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sync.v1.SyncService.BeginQrLogin is not implemented"))
+}
+
+func (UnimplementedSyncServiceHandler) PollQrLogin(context.Context, *connect.Request[v1.PollQrLoginRequest]) (*connect.Response[v1.PollQrLoginResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sync.v1.SyncService.PollQrLogin is not implemented"))
 }
 
 func (UnimplementedSyncServiceHandler) GetSyncStatus(context.Context, *connect.Request[v1.GetSyncStatusRequest]) (*connect.Response[v1.GetSyncStatusResponse], error) {

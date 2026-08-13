@@ -48,8 +48,13 @@ pub async fn connect(database_url: &str) -> anyhow::Result<PgPool> {
             name TEXT NOT NULL,
             filesize BIGINT NOT NULL,
             created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-            created_by TEXT NOT NULL
+            created_by TEXT NOT NULL,
+            metadata JSONB NOT NULL DEFAULT '{}'::jsonb
         );
+        -- Additive, and separate from the CREATE above: an existing
+        -- deployment already has this table, so a new column in the
+        -- CREATE alone would never be applied to it.
+        ALTER TABLE missions ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb;
         CREATE TABLE IF NOT EXISTS acl_grants (
             subject TEXT PRIMARY KEY,
             scopes TEXT[] NOT NULL
@@ -100,6 +105,32 @@ pub struct MissionRow {
     pub filesize: i64,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub created_by: String,
+    /// Free-form operator labelling. sqlx maps a jsonb column to
+    /// serde_json::Value; callers flatten it to a string map (see
+    /// `metadata_map`), tolerating a non-object or non-string value
+    /// rather than failing a whole list over one hand-edited row.
+    pub metadata: serde_json::Value,
+}
+
+/// Flattens a mission's jsonb metadata to the string map the proto uses.
+/// Anything that isn't a string value is rendered with its JSON form
+/// rather than dropped, so a hand-edited row is visible instead of
+/// silently empty.
+pub fn metadata_map(value: &serde_json::Value) -> std::collections::HashMap<String, String> {
+    value
+        .as_object()
+        .map(|map| {
+            map.iter()
+                .map(|(k, v)| {
+                    let v = match v {
+                        serde_json::Value::String(s) => s.clone(),
+                        other => other.to_string(),
+                    };
+                    (k.clone(), v)
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 pub async fn upsert_mission(
@@ -108,30 +139,54 @@ pub async fn upsert_mission(
     name: &str,
     filesize: i64,
     created_by: &str,
+    metadata: &serde_json::Value,
 ) -> sqlx::Result<()> {
     sqlx::query(
-        "INSERT INTO missions (id, name, filesize, created_by) VALUES ($1, $2, $3, $4)
-         ON CONFLICT (id) DO UPDATE SET name = excluded.name, filesize = excluded.filesize",
+        "INSERT INTO missions (id, name, filesize, created_by, metadata)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (id) DO UPDATE SET
+             name = excluded.name,
+             filesize = excluded.filesize,
+             metadata = excluded.metadata",
     )
     .bind(id)
     .bind(name)
     .bind(filesize)
     .bind(created_by)
+    .bind(metadata)
     .execute(pool)
     .await?;
     Ok(())
 }
 
-pub async fn get_mission(pool: &PgPool, id: Uuid) -> sqlx::Result<Option<MissionRow>> {
-    sqlx::query_as("SELECT id, name, filesize, created_at, created_by FROM missions WHERE id = $1")
+/// Replaces one mission's metadata without touching its file or its
+/// upload provenance. Returns false when no such mission exists, so the
+/// caller can answer NOT_FOUND rather than silently succeeding.
+pub async fn set_mission_metadata(
+    pool: &PgPool,
+    id: Uuid,
+    metadata: &serde_json::Value,
+) -> sqlx::Result<bool> {
+    let result = sqlx::query("UPDATE missions SET metadata = $2 WHERE id = $1")
         .bind(id)
-        .fetch_optional(pool)
-        .await
+        .bind(metadata)
+        .execute(pool)
+        .await?;
+    Ok(result.rows_affected() > 0)
+}
+
+pub async fn get_mission(pool: &PgPool, id: Uuid) -> sqlx::Result<Option<MissionRow>> {
+    sqlx::query_as(
+        "SELECT id, name, filesize, created_at, created_by, metadata FROM missions WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await
 }
 
 pub async fn list_missions(pool: &PgPool) -> sqlx::Result<Vec<MissionRow>> {
     sqlx::query_as(
-        "SELECT id, name, filesize, created_at, created_by FROM missions ORDER BY created_at",
+        "SELECT id, name, filesize, created_at, created_by, metadata FROM missions ORDER BY created_at",
     )
     .fetch_all(pool)
     .await
@@ -189,6 +244,78 @@ pub async fn steam_ids_with_scope(pool: &PgPool, scope: &str) -> sqlx::Result<Ve
     .await
 }
 
+/// One row per user, with their linked accounts and current scopes --
+/// what `AdminService.ListAcl` serves.
+///
+/// LEFT JOINs from `users`, not from `acl_grants`, on purpose: someone who
+/// has logged in but holds no scopes yet has no `acl_grants` row at all,
+/// and they're exactly who an admin is usually looking for. Starting from
+/// the grant table would list only people who already have access.
+pub async fn list_acl_subjects(pool: &PgPool) -> sqlx::Result<Vec<AclSubjectRow>> {
+    // Accounts are aggregated into arrays here rather than fetched in a
+    // second per-user query -- one round trip regardless of user count,
+    // and the ordering is fixed so the UI doesn't reshuffle between
+    // refreshes. COALESCE keeps a user with no grant row (or no linked
+    // account, which shouldn't happen but isn't enforced) as empty
+    // arrays instead of NULLs.
+    sqlx::query_as(
+        "SELECT
+             u.id::text AS subject,
+             COALESCE(g.scopes, ARRAY[]::text[]) AS scopes,
+             COALESCE(
+                 array_agg(la.provider ORDER BY la.provider)
+                     FILTER (WHERE la.provider IS NOT NULL),
+                 ARRAY[]::text[]
+             ) AS providers,
+             COALESCE(
+                 array_agg(la.provider_user_id ORDER BY la.provider)
+                     FILTER (WHERE la.provider IS NOT NULL),
+                 ARRAY[]::text[]
+             ) AS provider_user_ids,
+             COALESCE(
+                 array_agg(la.display_name ORDER BY la.provider)
+                     FILTER (WHERE la.provider IS NOT NULL),
+                 ARRAY[]::text[]
+             ) AS display_names
+         FROM users u
+         LEFT JOIN acl_grants g ON g.subject = u.id::text
+         LEFT JOIN linked_accounts la ON la.user_id = u.id
+         GROUP BY u.id, g.scopes
+         ORDER BY u.created_at",
+    )
+    .fetch_all(pool)
+    .await
+}
+
+/// Three parallel arrays rather than a composite type: sqlx maps Postgres
+/// arrays of scalars directly, whereas an array of ROW(...) needs a
+/// custom Decode impl for what is only ever zipped back together
+/// immediately. They're aggregated with the same ORDER BY, so index `i`
+/// is one account across all three.
+#[derive(sqlx::FromRow)]
+pub struct AclSubjectRow {
+    pub subject: String,
+    pub scopes: Vec<String>,
+    pub providers: Vec<String>,
+    pub provider_user_ids: Vec<String>,
+    pub display_names: Vec<String>,
+}
+
+/// Replaces `subject`'s scopes, or removes the row entirely when `scopes`
+/// is empty -- "no grant row" and "a grant row holding no scopes" are
+/// indistinguishable to `scopes_for_subject`, and not leaving empty rows
+/// behind keeps the table to actual grant holders.
+pub async fn set_scopes(pool: &PgPool, subject: &str, scopes: &[String]) -> sqlx::Result<()> {
+    if scopes.is_empty() {
+        sqlx::query("DELETE FROM acl_grants WHERE subject = $1")
+            .bind(subject)
+            .execute(pool)
+            .await?;
+        return Ok(());
+    }
+    grant_scopes(pool, subject, scopes).await
+}
+
 pub async fn grant_scopes(pool: &PgPool, subject: &str, scopes: &[String]) -> sqlx::Result<()> {
     sqlx::query(
         "INSERT INTO acl_grants (subject, scopes) VALUES ($1, $2)
@@ -236,6 +363,25 @@ pub async fn insert_signing_key_if_absent(
 
 /// A linked external identity (Discord/GitHub/Google OAuth2, or Steam
 /// OpenID), if `(provider, provider_user_id)` has been seen before.
+/// Every provider account linked to one user, for identity's `/auth/me`.
+///
+/// Distinct from `find_linked_account`, which goes the other way (a
+/// provider identity to its user) during login.
+pub async fn linked_accounts_for_user(
+    pool: &PgPool,
+    user_id: Uuid,
+) -> sqlx::Result<Vec<(String, String, String)>> {
+    sqlx::query_as(
+        "SELECT provider, provider_user_id, display_name
+         FROM linked_accounts
+         WHERE user_id = $1
+         ORDER BY provider",
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await
+}
+
 pub async fn find_linked_account(
     pool: &PgPool,
     provider: &str,

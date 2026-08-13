@@ -107,8 +107,8 @@ jobs:
             dockerfile: services/controller/Dockerfile
           - name: registry
             dockerfile: services/registry/Dockerfile
-          - name: server-api
-            dockerfile: services/server-api/Dockerfile
+          - name: gateway
+            dockerfile: services/gateway/Dockerfile
           - name: identity
             dockerfile: services/identity/Dockerfile
           - name: magpie-csi

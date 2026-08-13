@@ -27,9 +27,24 @@
 !dist
 !dist/**
 
+# The web UI's own build inputs (Dockerfile.workspace's `web` stage).
+# generated/ was previously excluded wholesale -- only its TypeScript
+# stubs are needed, and only because the SPA imports them directly.
+!package.json
+!package-lock.json
+
+!web
+!web/**
+
+!generated/ts
+!generated/ts/**
+
 # Re-excluded even though the directories above are allowed -- local
 # build artifacts nobody wants uploaded as build context, matching what
 # the old deny-list .dockerignore already excluded explicitly.
 target
 crates/*/target
 services/*/target
+web/node_modules
+web/dist
+node_modules

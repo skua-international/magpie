@@ -18,7 +18,7 @@ rules:
   # The reconciler needs full ArmaServer access (read the spec, patch
   # status) and full Deployment access (create/update/delete the launcher
   # workload) -- this is the one process in the chart that actually
-  # mutates cluster workloads, which is exactly why serverApi's RBAC below
+  # mutates cluster workloads, which is exactly why gateway's RBAC below
   # is scoped to *not* include Deployments at all.
   - apiGroups: ["arma.skua.io"]
     resources: ["armaservers"]

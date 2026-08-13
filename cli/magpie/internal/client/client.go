@@ -3,7 +3,7 @@
 // one of these.
 //
 // All of them share a single base URL. The cluster exposes one public
-// host that routes to server-api, registry and identity by path prefix
+// host that routes to gateway, registry and identity by path prefix
 // (charts/magpie/templates/ingress.yaml), so the RPC paths these
 // generated clients already produce -- /controller.v1.ServerService/*
 // and /registry.v1.*Service/* -- land on the right backend without this

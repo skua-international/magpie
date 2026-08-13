@@ -16,7 +16,7 @@ metadata:
     {{- include "magpie.labels" . | nindent 4 }}
 rules:
   # ModSourceService is a thin, JWT-authenticated CRUD front end for the
-  # ModSource CRD -- the same shape services/server-api already is for
+  # ModSource CRD -- the same shape services/gateway already is for
   # ArmaServer. Local (zip) sources are also fully resolved here (no Steam
   # session needed), so this is the one process besides
   # services/sync-daemon's own reconciler that ever writes ModSource
@@ -90,3 +90,38 @@ subjects:
     name: {{ include "magpie.fullname" . }}-registry
     namespace: {{ include "magpie.namespace" . }}
 {{- end }}
+---
+# Secrets in the user-secrets namespace only, for AdminService's secret
+# RPCs. A separate Role bound in that namespace rather than a rule added
+# to registry's own namespace Role: the chart's namespace holds the
+# Postgres credentials and the image pull secret, and keeping those out
+# of reach of an operator-facing API is the entire reason
+# user-secrets-namespace.yaml exists. Kubernetes RBAC has no "every
+# secret except these" rule, so namespace separation is the mechanism.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "magpie.fullname" . }}-registry-user-secrets
+  namespace: {{ .Values.userSecretsNamespace }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "magpie.fullname" . }}-registry-user-secrets
+  namespace: {{ .Values.userSecretsNamespace }}
+  labels:
+    {{- include "magpie.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "magpie.fullname" . }}-registry-user-secrets
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "magpie.fullname" . }}-registry
+    namespace: {{ include "magpie.namespace" . }}

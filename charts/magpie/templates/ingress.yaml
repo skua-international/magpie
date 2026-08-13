@@ -3,16 +3,16 @@
 One Ingress, one public host, routed to the three ClusterIP services by
 path prefix. Traefik is already the reverse proxy in front of all of
 them, and their path namespaces are disjoint (identity /auth +
-/.well-known, registry /registry.v1.*, server-api /controller.v1.* and
+/.well-known, registry /registry.v1.*, gateway /controller.v1.* and
 the catch-all), so routing here needs no application-level proxying --
 see ingress.routes in values.yaml for the table and the pathType Prefix
 element-matching caveat.
 
 The slug->port dict below exists because values keys are camelCase
-(.Values.serverApi) while Service names, route slugs and component
-labels are kebab-case (server-api).
+(.Values.gateway) while Service names, route slugs and component
+labels are kebab-case (gateway).
 */}}
-{{- $ports := dict "identity" .Values.identity.service.port "registry" .Values.registry.service.port "server-api" .Values.serverApi.service.port }}
+{{- $ports := dict "identity" .Values.identity.service.port "registry" .Values.registry.service.port "gateway" .Values.gateway.service.port }}
 {{- $host := printf "%s.%s" .Values.ingress.host .Values.ingress.baseDomain }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -43,7 +43,7 @@ spec:
           {{- range $route := .Values.ingress.routes }}
           {{- $port := index $ports $route.service }}
           {{- if not $port }}
-          {{- fail (printf "ingress.routes: unknown service %q (expected one of identity, registry, server-api)" $route.service) }}
+          {{- fail (printf "ingress.routes: unknown service %q (expected one of identity, registry, gateway)" $route.service) }}
           {{- end }}
           {{- range $path := $route.paths }}
           - path: {{ $path }}

@@ -144,7 +144,7 @@ type CreateServerRequest struct {
 	// ArmaServer) providing per-server overrides on top of the cluster's
 	// baseline Arma config -- see ArmaServerSpec.config_map and
 	// services/controller/src/arma_config.rs. The ConfigMap itself isn't
-	// managed through this API (server-api carries no ConfigMap RBAC at
+	// managed through this API (gateway carries no ConfigMap RBAC at
 	// all, deliberately -- see charts/magpie/values.yaml's serverApi
 	// comment); callers create/edit it directly against the cluster (e.g.
 	// `kubectl edit configmap`) and only pass its name here. Unset means
@@ -156,7 +156,12 @@ type CreateServerRequest struct {
 	// this repo runs anything on this port. Unset means no such endpoint.
 	MetricsPort *uint32 `protobuf:"varint,7,opt,name=metrics_port,json=metricsPort,proto3,oneof" json:"metrics_port,omitempty"`
 	// Defaults to "/metrics" when unset. Ignored if metrics_port is unset.
-	MetricsPath   *string `protobuf:"bytes,8,opt,name=metrics_path,json=metricsPath,proto3,oneof" json:"metrics_path,omitempty"`
+	MetricsPath *string `protobuf:"bytes,8,opt,name=metrics_path,json=metricsPath,proto3,oneof" json:"metrics_path,omitempty"`
+	// Free-form operator labelling, stored as annotations on the
+	// ArmaServer object -- nothing reconciles against it. Annotations
+	// rather than a spec field so the CRD schema does not have to grow a
+	// map that only humans read.
+	Metadata      map[string]string `protobuf:"bytes,9,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -233,15 +238,24 @@ func (x *CreateServerRequest) GetMetricsPath() string {
 	return ""
 }
 
+func (x *CreateServerRequest) GetMetadata() map[string]string {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
 type ServerInfo struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Port          uint32                 `protobuf:"varint,3,opt,name=port,proto3" json:"port,omitempty"`
-	ModSourceIds  []string               `protobuf:"bytes,4,rep,name=mod_source_ids,json=modSourceIds,proto3" json:"mod_source_ids,omitempty"`
-	Phase         ServerPhase            `protobuf:"varint,5,opt,name=phase,proto3,enum=controller.v1.ServerPhase" json:"phase,omitempty"`
-	Message       string                 `protobuf:"bytes,7,opt,name=message,proto3" json:"message,omitempty"`
-	DesiredState  DesiredState           `protobuf:"varint,8,opt,name=desired_state,json=desiredState,proto3,enum=controller.v1.DesiredState" json:"desired_state,omitempty"`
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	Id           string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name         string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Port         uint32                 `protobuf:"varint,3,opt,name=port,proto3" json:"port,omitempty"`
+	ModSourceIds []string               `protobuf:"bytes,4,rep,name=mod_source_ids,json=modSourceIds,proto3" json:"mod_source_ids,omitempty"`
+	Phase        ServerPhase            `protobuf:"varint,5,opt,name=phase,proto3,enum=controller.v1.ServerPhase" json:"phase,omitempty"`
+	Message      string                 `protobuf:"bytes,7,opt,name=message,proto3" json:"message,omitempty"`
+	DesiredState DesiredState           `protobuf:"varint,8,opt,name=desired_state,json=desiredState,proto3,enum=controller.v1.DesiredState" json:"desired_state,omitempty"`
+	// See CreateServerRequest.metadata.
+	Metadata      map[string]string `protobuf:"bytes,11,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -323,6 +337,13 @@ func (x *ServerInfo) GetDesiredState() DesiredState {
 		return x.DesiredState
 	}
 	return DesiredState_DESIRED_STATE_UNSPECIFIED
+}
+
+func (x *ServerInfo) GetMetadata() map[string]string {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
 }
 
 type ListServersRequest struct {
@@ -530,8 +551,20 @@ func (*DeleteServerResponse) Descriptor() ([]byte, []int) {
 }
 
 type UpdateServerRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Replaces the server's mod sources when present, leaves them alone
+	// when absent.
+	//
+	// Wrapped in a message rather than a bare `repeated string` because
+	// proto3 cannot tell an empty repeated field from an unset one, and
+	// both are meaningful here: "detach every mod source" has to be
+	// expressible without it being what every plain resync accidentally
+	// says.
+	ModSources *ModSourceSelection `protobuf:"bytes,2,opt,name=mod_sources,json=modSources,proto3,oneof" json:"mod_sources,omitempty"`
+	// Replaces the server's metadata when present, leaves it alone when
+	// absent. Same presence-vs-empty reasoning as mod_sources.
+	Metadata      *MetadataSelection `protobuf:"bytes,3,opt,name=metadata,proto3,oneof" json:"metadata,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -573,6 +606,354 @@ func (x *UpdateServerRequest) GetId() string {
 	return ""
 }
 
+func (x *UpdateServerRequest) GetModSources() *ModSourceSelection {
+	if x != nil {
+		return x.ModSources
+	}
+	return nil
+}
+
+func (x *UpdateServerRequest) GetMetadata() *MetadataSelection {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type ModSourceSelection struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ModSourceIds  []string               `protobuf:"bytes,1,rep,name=mod_source_ids,json=modSourceIds,proto3" json:"mod_source_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ModSourceSelection) Reset() {
+	*x = ModSourceSelection{}
+	mi := &file_controller_v1_controller_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ModSourceSelection) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ModSourceSelection) ProtoMessage() {}
+
+func (x *ModSourceSelection) ProtoReflect() protoreflect.Message {
+	mi := &file_controller_v1_controller_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ModSourceSelection.ProtoReflect.Descriptor instead.
+func (*ModSourceSelection) Descriptor() ([]byte, []int) {
+	return file_controller_v1_controller_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ModSourceSelection) GetModSourceIds() []string {
+	if x != nil {
+		return x.ModSourceIds
+	}
+	return nil
+}
+
+type MetadataSelection struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      map[string]string      `protobuf:"bytes,1,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MetadataSelection) Reset() {
+	*x = MetadataSelection{}
+	mi := &file_controller_v1_controller_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MetadataSelection) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MetadataSelection) ProtoMessage() {}
+
+func (x *MetadataSelection) ProtoReflect() protoreflect.Message {
+	mi := &file_controller_v1_controller_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MetadataSelection.ProtoReflect.Descriptor instead.
+func (*MetadataSelection) Descriptor() ([]byte, []int) {
+	return file_controller_v1_controller_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *MetadataSelection) GetMetadata() map[string]string {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type GetServerLogsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Most recent N lines. Capped server-side -- an unbounded request
+	// would pull a whole pod's history through the API server and into a
+	// browser.
+	TailLines *uint32 `protobuf:"varint,2,opt,name=tail_lines,json=tailLines,proto3,oneof" json:"tail_lines,omitempty"`
+	// Read the previous container instance instead of the current one,
+	// which is the only way to see why a crashed server died.
+	Previous      *bool `protobuf:"varint,3,opt,name=previous,proto3,oneof" json:"previous,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetServerLogsRequest) Reset() {
+	*x = GetServerLogsRequest{}
+	mi := &file_controller_v1_controller_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetServerLogsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetServerLogsRequest) ProtoMessage() {}
+
+func (x *GetServerLogsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_controller_v1_controller_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetServerLogsRequest.ProtoReflect.Descriptor instead.
+func (*GetServerLogsRequest) Descriptor() ([]byte, []int) {
+	return file_controller_v1_controller_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GetServerLogsRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *GetServerLogsRequest) GetTailLines() uint32 {
+	if x != nil && x.TailLines != nil {
+		return *x.TailLines
+	}
+	return 0
+}
+
+func (x *GetServerLogsRequest) GetPrevious() bool {
+	if x != nil && x.Previous != nil {
+		return *x.Previous
+	}
+	return false
+}
+
+type GetServerLogsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Lines []string               `protobuf:"bytes,1,rep,name=lines,proto3" json:"lines,omitempty"`
+	// Which pod these came from, so a UI can say so -- a server's pod name
+	// changes on every restart.
+	PodName       string `protobuf:"bytes,2,opt,name=pod_name,json=podName,proto3" json:"pod_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetServerLogsResponse) Reset() {
+	*x = GetServerLogsResponse{}
+	mi := &file_controller_v1_controller_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetServerLogsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetServerLogsResponse) ProtoMessage() {}
+
+func (x *GetServerLogsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_controller_v1_controller_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetServerLogsResponse.ProtoReflect.Descriptor instead.
+func (*GetServerLogsResponse) Descriptor() ([]byte, []int) {
+	return file_controller_v1_controller_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *GetServerLogsResponse) GetLines() []string {
+	if x != nil {
+		return x.Lines
+	}
+	return nil
+}
+
+func (x *GetServerLogsResponse) GetPodName() string {
+	if x != nil {
+		return x.PodName
+	}
+	return ""
+}
+
+type GetServerHealthRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetServerHealthRequest) Reset() {
+	*x = GetServerHealthRequest{}
+	mi := &file_controller_v1_controller_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetServerHealthRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetServerHealthRequest) ProtoMessage() {}
+
+func (x *GetServerHealthRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_controller_v1_controller_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetServerHealthRequest.ProtoReflect.Descriptor instead.
+func (*GetServerHealthRequest) Descriptor() ([]byte, []int) {
+	return file_controller_v1_controller_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *GetServerHealthRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type GetServerHealthResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The pod's Ready condition: the A2S query probe is passing.
+	Ready   bool   `protobuf:"varint,1,opt,name=ready,proto3" json:"ready,omitempty"`
+	PodName string `protobuf:"bytes,2,opt,name=pod_name,json=podName,proto3" json:"pod_name,omitempty"`
+	// Pod phase (Running/Pending/Failed/...), for the case where there is
+	// no readiness answer yet because there is no running pod.
+	Phase string `protobuf:"bytes,3,opt,name=phase,proto3" json:"phase,omitempty"`
+	// Container restart count -- a server that is ready but has restarted
+	// repeatedly is not actually healthy.
+	RestartCount uint32 `protobuf:"varint,4,opt,name=restart_count,json=restartCount,proto3" json:"restart_count,omitempty"`
+	// Human-readable detail: the probe's own failure message where there
+	// is one, otherwise why no pod is running.
+	Message       string `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetServerHealthResponse) Reset() {
+	*x = GetServerHealthResponse{}
+	mi := &file_controller_v1_controller_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetServerHealthResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetServerHealthResponse) ProtoMessage() {}
+
+func (x *GetServerHealthResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_controller_v1_controller_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetServerHealthResponse.ProtoReflect.Descriptor instead.
+func (*GetServerHealthResponse) Descriptor() ([]byte, []int) {
+	return file_controller_v1_controller_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *GetServerHealthResponse) GetReady() bool {
+	if x != nil {
+		return x.Ready
+	}
+	return false
+}
+
+func (x *GetServerHealthResponse) GetPodName() string {
+	if x != nil {
+		return x.PodName
+	}
+	return ""
+}
+
+func (x *GetServerHealthResponse) GetPhase() string {
+	if x != nil {
+		return x.Phase
+	}
+	return ""
+}
+
+func (x *GetServerHealthResponse) GetRestartCount() uint32 {
+	if x != nil {
+		return x.RestartCount
+	}
+	return 0
+}
+
+func (x *GetServerHealthResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 type StartServerRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -582,7 +963,7 @@ type StartServerRequest struct {
 
 func (x *StartServerRequest) Reset() {
 	*x = StartServerRequest{}
-	mi := &file_controller_v1_controller_proto_msgTypes[8]
+	mi := &file_controller_v1_controller_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -594,7 +975,7 @@ func (x *StartServerRequest) String() string {
 func (*StartServerRequest) ProtoMessage() {}
 
 func (x *StartServerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_controller_v1_controller_proto_msgTypes[8]
+	mi := &file_controller_v1_controller_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -607,7 +988,7 @@ func (x *StartServerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartServerRequest.ProtoReflect.Descriptor instead.
 func (*StartServerRequest) Descriptor() ([]byte, []int) {
-	return file_controller_v1_controller_proto_rawDescGZIP(), []int{8}
+	return file_controller_v1_controller_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *StartServerRequest) GetId() string {
@@ -626,7 +1007,7 @@ type StopServerRequest struct {
 
 func (x *StopServerRequest) Reset() {
 	*x = StopServerRequest{}
-	mi := &file_controller_v1_controller_proto_msgTypes[9]
+	mi := &file_controller_v1_controller_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -638,7 +1019,7 @@ func (x *StopServerRequest) String() string {
 func (*StopServerRequest) ProtoMessage() {}
 
 func (x *StopServerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_controller_v1_controller_proto_msgTypes[9]
+	mi := &file_controller_v1_controller_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -651,7 +1032,7 @@ func (x *StopServerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopServerRequest.ProtoReflect.Descriptor instead.
 func (*StopServerRequest) Descriptor() ([]byte, []int) {
-	return file_controller_v1_controller_proto_rawDescGZIP(), []int{9}
+	return file_controller_v1_controller_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *StopServerRequest) GetId() string {
@@ -665,7 +1046,7 @@ var File_controller_v1_controller_proto protoreflect.FileDescriptor
 
 const file_controller_v1_controller_proto_rawDesc = "" +
 	"\n" +
-	"\x1econtroller/v1/controller.proto\x12\rcontroller.v1\"\xb1\x02\n" +
+	"\x1econtroller/v1/controller.proto\x12\rcontroller.v1\"\xbc\x03\n" +
 	"\x13CreateServerRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\rR\x04port\x12$\n" +
@@ -673,10 +1054,14 @@ const file_controller_v1_controller_proto_rawDesc = "" +
 	"\n" +
 	"config_map\x18\x06 \x01(\tH\x00R\tconfigMap\x88\x01\x01\x12&\n" +
 	"\fmetrics_port\x18\a \x01(\rH\x01R\vmetricsPort\x88\x01\x01\x12&\n" +
-	"\fmetrics_path\x18\b \x01(\tH\x02R\vmetricsPath\x88\x01\x01B\r\n" +
+	"\fmetrics_path\x18\b \x01(\tH\x02R\vmetricsPath\x88\x01\x01\x12L\n" +
+	"\bmetadata\x18\t \x03(\v20.controller.v1.CreateServerRequest.MetadataEntryR\bmetadata\x1a;\n" +
+	"\rMetadataEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\r\n" +
 	"\v_config_mapB\x0f\n" +
 	"\r_metrics_portB\x0f\n" +
-	"\r_metrics_pathJ\x04\b\x04\x10\x05J\x04\b\x05\x10\x06R\varma_configR\x0enetwork_config\"\xc0\x02\n" +
+	"\r_metrics_pathJ\x04\b\x04\x10\x05J\x04\b\x05\x10\x06R\varma_configR\x0enetwork_config\"\xc2\x03\n" +
 	"\n" +
 	"ServerInfo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
@@ -685,7 +1070,11 @@ const file_controller_v1_controller_proto_rawDesc = "" +
 	"\x0emod_source_ids\x18\x04 \x03(\tR\fmodSourceIds\x120\n" +
 	"\x05phase\x18\x05 \x01(\x0e2\x1a.controller.v1.ServerPhaseR\x05phase\x12\x18\n" +
 	"\amessage\x18\a \x01(\tR\amessage\x12@\n" +
-	"\rdesired_state\x18\b \x01(\x0e2\x1b.controller.v1.DesiredStateR\fdesiredStateJ\x04\b\x06\x10\aJ\x04\b\t\x10\n" +
+	"\rdesired_state\x18\b \x01(\x0e2\x1b.controller.v1.DesiredStateR\fdesiredState\x12C\n" +
+	"\bmetadata\x18\v \x03(\v2'.controller.v1.ServerInfo.MetadataEntryR\bmetadata\x1a;\n" +
+	"\rMetadataEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01J\x04\b\x06\x10\aJ\x04\b\t\x10\n" +
 	"J\x04\b\n" +
 	"\x10\vR\n" +
 	"claim_pathR\vcontent_pvcR\varma_configR\x0enetwork_config\"\x14\n" +
@@ -696,9 +1085,39 @@ const file_controller_v1_controller_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"%\n" +
 	"\x13DeleteServerRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x16\n" +
-	"\x14DeleteServerResponse\"%\n" +
+	"\x14DeleteServerResponse\"\xce\x01\n" +
 	"\x13UpdateServerRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"$\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12G\n" +
+	"\vmod_sources\x18\x02 \x01(\v2!.controller.v1.ModSourceSelectionH\x00R\n" +
+	"modSources\x88\x01\x01\x12A\n" +
+	"\bmetadata\x18\x03 \x01(\v2 .controller.v1.MetadataSelectionH\x01R\bmetadata\x88\x01\x01B\x0e\n" +
+	"\f_mod_sourcesB\v\n" +
+	"\t_metadata\":\n" +
+	"\x12ModSourceSelection\x12$\n" +
+	"\x0emod_source_ids\x18\x01 \x03(\tR\fmodSourceIds\"\x9c\x01\n" +
+	"\x11MetadataSelection\x12J\n" +
+	"\bmetadata\x18\x01 \x03(\v2..controller.v1.MetadataSelection.MetadataEntryR\bmetadata\x1a;\n" +
+	"\rMetadataEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x87\x01\n" +
+	"\x14GetServerLogsRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\"\n" +
+	"\n" +
+	"tail_lines\x18\x02 \x01(\rH\x00R\ttailLines\x88\x01\x01\x12\x1f\n" +
+	"\bprevious\x18\x03 \x01(\bH\x01R\bprevious\x88\x01\x01B\r\n" +
+	"\v_tail_linesB\v\n" +
+	"\t_previous\"H\n" +
+	"\x15GetServerLogsResponse\x12\x14\n" +
+	"\x05lines\x18\x01 \x03(\tR\x05lines\x12\x19\n" +
+	"\bpod_name\x18\x02 \x01(\tR\apodName\"(\n" +
+	"\x16GetServerHealthRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\x9f\x01\n" +
+	"\x17GetServerHealthResponse\x12\x14\n" +
+	"\x05ready\x18\x01 \x01(\bR\x05ready\x12\x19\n" +
+	"\bpod_name\x18\x02 \x01(\tR\apodName\x12\x14\n" +
+	"\x05phase\x18\x03 \x01(\tR\x05phase\x12#\n" +
+	"\rrestart_count\x18\x04 \x01(\rR\frestartCount\x12\x18\n" +
+	"\amessage\x18\x05 \x01(\tR\amessage\"$\n" +
 	"\x12StartServerRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"#\n" +
 	"\x11StopServerRequest\x12\x0e\n" +
@@ -712,7 +1131,7 @@ const file_controller_v1_controller_proto_rawDesc = "" +
 	"\fDesiredState\x12\x1d\n" +
 	"\x19DESIRED_STATE_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15DESIRED_STATE_RUNNING\x10\x01\x12\x19\n" +
-	"\x15DESIRED_STATE_STOPPED\x10\x022\xbd\x04\n" +
+	"\x15DESIRED_STATE_STOPPED\x10\x022\xfb\x05\n" +
 	"\rServerService\x12M\n" +
 	"\fCreateServer\x12\".controller.v1.CreateServerRequest\x1a\x19.controller.v1.ServerInfo\x12T\n" +
 	"\vListServers\x12!.controller.v1.ListServersRequest\x1a\".controller.v1.ListServersResponse\x12G\n" +
@@ -721,7 +1140,9 @@ const file_controller_v1_controller_proto_rawDesc = "" +
 	"\fUpdateServer\x12\".controller.v1.UpdateServerRequest\x1a\x19.controller.v1.ServerInfo\x12K\n" +
 	"\vStartServer\x12!.controller.v1.StartServerRequest\x1a\x19.controller.v1.ServerInfo\x12I\n" +
 	"\n" +
-	"StopServer\x12 .controller.v1.StopServerRequest\x1a\x19.controller.v1.ServerInfoBNZLgithub.com/skua-international/magpie/generated/go/controller/v1;controllerv1b\x06proto3"
+	"StopServer\x12 .controller.v1.StopServerRequest\x1a\x19.controller.v1.ServerInfo\x12Z\n" +
+	"\rGetServerLogs\x12#.controller.v1.GetServerLogsRequest\x1a$.controller.v1.GetServerLogsResponse\x12`\n" +
+	"\x0fGetServerHealth\x12%.controller.v1.GetServerHealthRequest\x1a&.controller.v1.GetServerHealthResponseBNZLgithub.com/skua-international/magpie/generated/go/controller/v1;controllerv1b\x06proto3"
 
 var (
 	file_controller_v1_controller_proto_rawDescOnce sync.Once
@@ -736,44 +1157,62 @@ func file_controller_v1_controller_proto_rawDescGZIP() []byte {
 }
 
 var file_controller_v1_controller_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_controller_v1_controller_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_controller_v1_controller_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_controller_v1_controller_proto_goTypes = []any{
-	(ServerPhase)(0),             // 0: controller.v1.ServerPhase
-	(DesiredState)(0),            // 1: controller.v1.DesiredState
-	(*CreateServerRequest)(nil),  // 2: controller.v1.CreateServerRequest
-	(*ServerInfo)(nil),           // 3: controller.v1.ServerInfo
-	(*ListServersRequest)(nil),   // 4: controller.v1.ListServersRequest
-	(*ListServersResponse)(nil),  // 5: controller.v1.ListServersResponse
-	(*GetServerRequest)(nil),     // 6: controller.v1.GetServerRequest
-	(*DeleteServerRequest)(nil),  // 7: controller.v1.DeleteServerRequest
-	(*DeleteServerResponse)(nil), // 8: controller.v1.DeleteServerResponse
-	(*UpdateServerRequest)(nil),  // 9: controller.v1.UpdateServerRequest
-	(*StartServerRequest)(nil),   // 10: controller.v1.StartServerRequest
-	(*StopServerRequest)(nil),    // 11: controller.v1.StopServerRequest
+	(ServerPhase)(0),                // 0: controller.v1.ServerPhase
+	(DesiredState)(0),               // 1: controller.v1.DesiredState
+	(*CreateServerRequest)(nil),     // 2: controller.v1.CreateServerRequest
+	(*ServerInfo)(nil),              // 3: controller.v1.ServerInfo
+	(*ListServersRequest)(nil),      // 4: controller.v1.ListServersRequest
+	(*ListServersResponse)(nil),     // 5: controller.v1.ListServersResponse
+	(*GetServerRequest)(nil),        // 6: controller.v1.GetServerRequest
+	(*DeleteServerRequest)(nil),     // 7: controller.v1.DeleteServerRequest
+	(*DeleteServerResponse)(nil),    // 8: controller.v1.DeleteServerResponse
+	(*UpdateServerRequest)(nil),     // 9: controller.v1.UpdateServerRequest
+	(*ModSourceSelection)(nil),      // 10: controller.v1.ModSourceSelection
+	(*MetadataSelection)(nil),       // 11: controller.v1.MetadataSelection
+	(*GetServerLogsRequest)(nil),    // 12: controller.v1.GetServerLogsRequest
+	(*GetServerLogsResponse)(nil),   // 13: controller.v1.GetServerLogsResponse
+	(*GetServerHealthRequest)(nil),  // 14: controller.v1.GetServerHealthRequest
+	(*GetServerHealthResponse)(nil), // 15: controller.v1.GetServerHealthResponse
+	(*StartServerRequest)(nil),      // 16: controller.v1.StartServerRequest
+	(*StopServerRequest)(nil),       // 17: controller.v1.StopServerRequest
+	nil,                             // 18: controller.v1.CreateServerRequest.MetadataEntry
+	nil,                             // 19: controller.v1.ServerInfo.MetadataEntry
+	nil,                             // 20: controller.v1.MetadataSelection.MetadataEntry
 }
 var file_controller_v1_controller_proto_depIdxs = []int32{
-	0,  // 0: controller.v1.ServerInfo.phase:type_name -> controller.v1.ServerPhase
-	1,  // 1: controller.v1.ServerInfo.desired_state:type_name -> controller.v1.DesiredState
-	3,  // 2: controller.v1.ListServersResponse.servers:type_name -> controller.v1.ServerInfo
-	2,  // 3: controller.v1.ServerService.CreateServer:input_type -> controller.v1.CreateServerRequest
-	4,  // 4: controller.v1.ServerService.ListServers:input_type -> controller.v1.ListServersRequest
-	6,  // 5: controller.v1.ServerService.GetServer:input_type -> controller.v1.GetServerRequest
-	7,  // 6: controller.v1.ServerService.DeleteServer:input_type -> controller.v1.DeleteServerRequest
-	9,  // 7: controller.v1.ServerService.UpdateServer:input_type -> controller.v1.UpdateServerRequest
-	10, // 8: controller.v1.ServerService.StartServer:input_type -> controller.v1.StartServerRequest
-	11, // 9: controller.v1.ServerService.StopServer:input_type -> controller.v1.StopServerRequest
-	3,  // 10: controller.v1.ServerService.CreateServer:output_type -> controller.v1.ServerInfo
-	5,  // 11: controller.v1.ServerService.ListServers:output_type -> controller.v1.ListServersResponse
-	3,  // 12: controller.v1.ServerService.GetServer:output_type -> controller.v1.ServerInfo
-	8,  // 13: controller.v1.ServerService.DeleteServer:output_type -> controller.v1.DeleteServerResponse
-	3,  // 14: controller.v1.ServerService.UpdateServer:output_type -> controller.v1.ServerInfo
-	3,  // 15: controller.v1.ServerService.StartServer:output_type -> controller.v1.ServerInfo
-	3,  // 16: controller.v1.ServerService.StopServer:output_type -> controller.v1.ServerInfo
-	10, // [10:17] is the sub-list for method output_type
-	3,  // [3:10] is the sub-list for method input_type
-	3,  // [3:3] is the sub-list for extension type_name
-	3,  // [3:3] is the sub-list for extension extendee
-	0,  // [0:3] is the sub-list for field type_name
+	18, // 0: controller.v1.CreateServerRequest.metadata:type_name -> controller.v1.CreateServerRequest.MetadataEntry
+	0,  // 1: controller.v1.ServerInfo.phase:type_name -> controller.v1.ServerPhase
+	1,  // 2: controller.v1.ServerInfo.desired_state:type_name -> controller.v1.DesiredState
+	19, // 3: controller.v1.ServerInfo.metadata:type_name -> controller.v1.ServerInfo.MetadataEntry
+	3,  // 4: controller.v1.ListServersResponse.servers:type_name -> controller.v1.ServerInfo
+	10, // 5: controller.v1.UpdateServerRequest.mod_sources:type_name -> controller.v1.ModSourceSelection
+	11, // 6: controller.v1.UpdateServerRequest.metadata:type_name -> controller.v1.MetadataSelection
+	20, // 7: controller.v1.MetadataSelection.metadata:type_name -> controller.v1.MetadataSelection.MetadataEntry
+	2,  // 8: controller.v1.ServerService.CreateServer:input_type -> controller.v1.CreateServerRequest
+	4,  // 9: controller.v1.ServerService.ListServers:input_type -> controller.v1.ListServersRequest
+	6,  // 10: controller.v1.ServerService.GetServer:input_type -> controller.v1.GetServerRequest
+	7,  // 11: controller.v1.ServerService.DeleteServer:input_type -> controller.v1.DeleteServerRequest
+	9,  // 12: controller.v1.ServerService.UpdateServer:input_type -> controller.v1.UpdateServerRequest
+	16, // 13: controller.v1.ServerService.StartServer:input_type -> controller.v1.StartServerRequest
+	17, // 14: controller.v1.ServerService.StopServer:input_type -> controller.v1.StopServerRequest
+	12, // 15: controller.v1.ServerService.GetServerLogs:input_type -> controller.v1.GetServerLogsRequest
+	14, // 16: controller.v1.ServerService.GetServerHealth:input_type -> controller.v1.GetServerHealthRequest
+	3,  // 17: controller.v1.ServerService.CreateServer:output_type -> controller.v1.ServerInfo
+	5,  // 18: controller.v1.ServerService.ListServers:output_type -> controller.v1.ListServersResponse
+	3,  // 19: controller.v1.ServerService.GetServer:output_type -> controller.v1.ServerInfo
+	8,  // 20: controller.v1.ServerService.DeleteServer:output_type -> controller.v1.DeleteServerResponse
+	3,  // 21: controller.v1.ServerService.UpdateServer:output_type -> controller.v1.ServerInfo
+	3,  // 22: controller.v1.ServerService.StartServer:output_type -> controller.v1.ServerInfo
+	3,  // 23: controller.v1.ServerService.StopServer:output_type -> controller.v1.ServerInfo
+	13, // 24: controller.v1.ServerService.GetServerLogs:output_type -> controller.v1.GetServerLogsResponse
+	15, // 25: controller.v1.ServerService.GetServerHealth:output_type -> controller.v1.GetServerHealthResponse
+	17, // [17:26] is the sub-list for method output_type
+	8,  // [8:17] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_controller_v1_controller_proto_init() }
@@ -782,13 +1221,15 @@ func file_controller_v1_controller_proto_init() {
 		return
 	}
 	file_controller_v1_controller_proto_msgTypes[0].OneofWrappers = []any{}
+	file_controller_v1_controller_proto_msgTypes[7].OneofWrappers = []any{}
+	file_controller_v1_controller_proto_msgTypes[10].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_controller_v1_controller_proto_rawDesc), len(file_controller_v1_controller_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   10,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

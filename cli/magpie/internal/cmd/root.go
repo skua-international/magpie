@@ -23,7 +23,7 @@ import (
 
 var (
 	// apiURL is the cluster's single public entrypoint -- one host that
-	// routes to server-api, registry and identity by path prefix, so the
+	// routes to gateway, registry and identity by path prefix, so the
 	// Connect clients and the plain-HTTP /auth/* calls all target it.
 	apiURL        string
 	loginProvider string

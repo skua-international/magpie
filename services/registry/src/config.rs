@@ -3,6 +3,14 @@ use std::env;
 use authn::jwt::JwtConfig;
 
 pub struct Config {
+    /// Namespace whose Secrets `AdminService`'s secret RPCs manage.
+    ///
+    /// Deliberately a distinct namespace from `namespace`: that one holds
+    /// Postgres credentials and image pull secrets, and keeping
+    /// operator-managed secrets out of it is the whole reason
+    /// charts/magpie/templates/user-secrets-namespace.yaml exists. The
+    /// RBAC granted for these RPCs is scoped to this namespace alone.
+    pub user_secrets_namespace: String,
     /// Root of the shared volume holding local (zip-uploaded) mods and
     /// missions -- read-write here (this service is the sole writer),
     /// read-only in every launcher Pod the controller's reconciler creates
@@ -39,6 +47,8 @@ impl Config {
         let armaserver_namespace =
             env::var("ARMASERVER_NAMESPACE").unwrap_or_else(|_| namespace.clone());
         Ok(Self {
+            user_secrets_namespace: env::var("USER_SECRETS_NAMESPACE")
+                .unwrap_or_else(|_| "magpie-user-secrets".into()),
             local_content_root: env::var("LOCAL_CONTENT_ROOT")
                 .unwrap_or_else(|_| "/local-content".into()),
             listen_addr: env::var("LISTEN_ADDR").unwrap_or_else(|_| "0.0.0.0:8444".into()),

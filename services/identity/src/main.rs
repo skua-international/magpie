@@ -81,6 +81,7 @@ async fn main() -> Result<()> {
         signer,
         http,
         base_url: cfg.base_url,
+        allowed_redirect_origins: cfg.allowed_redirect_origins,
         issuer: cfg.issuer,
         audience: cfg.audience,
         oauth_providers,
@@ -94,6 +95,8 @@ async fn main() -> Result<()> {
             get(|| async move { prometheus_handle.render() }),
         )
         .route("/.well-known/jwks.json", get(handlers::jwks))
+        .route("/auth/providers", get(handlers::providers))
+        .route("/auth/me", get(handlers::me))
         .route("/auth/{provider}/start", get(handlers::start))
         .route("/auth/{provider}/callback", get(handlers::callback))
         .route("/auth/refresh", post(handlers::refresh))

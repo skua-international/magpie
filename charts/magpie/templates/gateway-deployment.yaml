@@ -1,35 +1,35 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "magpie.fullname" . }}-server-api
+  name: {{ include "magpie.fullname" . }}-gateway
   namespace: {{ include "magpie.namespace" . }}
   labels:
     {{- include "magpie.labels" . | nindent 4 }}
-    app.kubernetes.io/component: server-api
+    app.kubernetes.io/component: gateway
 spec:
   replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ include "magpie.name" . }}
       app.kubernetes.io/instance: {{ .Release.Name }}
-      app.kubernetes.io/component: server-api
+      app.kubernetes.io/component: gateway
   template:
     metadata:
       labels:
         {{- include "magpie.labels" . | nindent 8 }}
-        app.kubernetes.io/component: server-api
+        app.kubernetes.io/component: gateway
       annotations:
-        {{- include "magpie.prometheusAnnotations" (dict "port" .Values.serverApi.service.port) | nindent 8 }}
+        {{- include "magpie.prometheusAnnotations" (dict "port" .Values.gateway.service.port) | nindent 8 }}
     spec:
       {{- include "magpie.imagePullSecrets" . | nindent 6 }}
-      serviceAccountName: {{ include "magpie.fullname" . }}-server-api
+      serviceAccountName: {{ include "magpie.fullname" . }}-gateway
       securityContext:
         runAsNonRoot: true
       initContainers:
         {{- include "magpie.waitForPostgresInit" . | nindent 8 }}
       containers:
-        - name: server-api
-          image: {{ include "magpie.image" (dict "root" $ "override" .Values.serverApi.image) }}
+        - name: gateway
+          image: {{ include "magpie.image" (dict "root" $ "override" .Values.gateway.image) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
             allowPrivilegeEscalation: false
@@ -38,12 +38,12 @@ spec:
               drop: ["ALL"]
           ports:
             - name: http
-              containerPort: {{ .Values.serverApi.service.port }}
+              containerPort: {{ .Values.gateway.service.port }}
           env:
             - name: NAMESPACE
-              value: {{ include "magpie.serverApiNamespace" . }}
+              value: {{ include "magpie.gatewayNamespace" . }}
             - name: LISTEN_ADDR
-              value: "0.0.0.0:{{ .Values.serverApi.service.port }}"
+              value: "0.0.0.0:{{ .Values.gateway.service.port }}"
             - name: SYNC_DAEMON_URL
               value: "http://{{ include "magpie.fullname" . }}-sync-daemon:8080"
             {{- include "magpie.postgresEnv" . | nindent 12 }}
@@ -53,7 +53,7 @@ spec:
               path: /healthz
               port: http
             initialDelaySeconds: 5
-          {{- with .Values.serverApi.resources }}
+          {{- with .Values.gateway.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -61,18 +61,18 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "magpie.fullname" . }}-server-api
+  name: {{ include "magpie.fullname" . }}-gateway
   namespace: {{ include "magpie.namespace" . }}
   labels:
     {{- include "magpie.labels" . | nindent 4 }}
-    app.kubernetes.io/component: server-api
+    app.kubernetes.io/component: gateway
 spec:
-  type: {{ .Values.serverApi.service.type }}
+  type: {{ .Values.gateway.service.type }}
   selector:
     app.kubernetes.io/name: {{ include "magpie.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/component: server-api
+    app.kubernetes.io/component: gateway
   ports:
     - name: http
-      port: {{ .Values.serverApi.service.port }}
+      port: {{ .Values.gateway.service.port }}
       targetPort: http

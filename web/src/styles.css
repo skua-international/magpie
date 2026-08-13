@@ -1,0 +1,143 @@
+/* One stylesheet, no framework -- see components/ui.tsx for why.
+   Light and dark both defined: this is an operations dashboard people
+   leave open, and a hardcoded light theme at 3am is its own hazard. */
+:root {
+  --bg: #ffffff;
+  --fg: #16191d;
+  --muted: #5c6570;
+  --line: #d8dde3;
+  --card: #f6f8fa;
+  --accent: #1f6feb;
+  --danger: #b3261e;
+  --ok: #1a7f37;
+  --warn: #9a6700;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117;
+    --fg: #e6edf3;
+    --muted: #9198a1;
+    --line: #2a313a;
+    --card: #161b22;
+    --accent: #4493f8;
+    --danger: #f85149;
+    --ok: #3fb950;
+    --warn: #d29922;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.mono, code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
+.muted { color: var(--muted); }
+
+.shell { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+.shell.login { max-width: 26rem; margin-top: 12vh; text-align: center; }
+
+nav { display: flex; align-items: center; gap: 1rem; border-bottom: 1px solid var(--line); padding-bottom: 0.75rem; flex-wrap: wrap; }
+nav h1 { font-size: 1.1rem; margin: 0 1rem 0 0; }
+nav ul { display: flex; gap: 0.25rem; list-style: none; margin: 0; padding: 0; flex: 1; flex-wrap: wrap; }
+nav a { color: var(--muted); text-decoration: none; padding: 0.35rem 0.7rem; border-radius: 6px; }
+nav a:hover { background: var(--card); color: var(--fg); }
+nav a.active { background: var(--card); color: var(--fg); font-weight: 600; }
+
+.content { padding-top: 1.25rem; }
+.page-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.page-header h2, .page-header h3 { margin: 0; }
+h3 { margin: 1.5rem 0 0.5rem; }
+
+/* Wide tables scroll inside their own wrapper rather than pushing the
+   page sideways -- mod references and subject ids are long. The wrapper
+   carries the overflow, not the table: `display: block` on a table stops
+   it honouring width:100% and distributing column widths, which pushes
+   the last column out of view. */
+.table-scroll { width: 100%; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 0.35rem 0.6rem; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: middle; }
+th { color: var(--muted); font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.03em; }
+/* Free-form text (a controller message, a metadata blob) is the one
+   thing that legitimately wants the leftover width -- it takes it and
+   truncates, instead of every column stretching to fit the longest
+   value. The full text stays available as a title tooltip. */
+td.grow { white-space: normal; width: 100%; max-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* The actions column is sized to its buttons and pinned right, so it is
+   the thing that stays put when a table does need to scroll. */
+td.row-actions, th.row-actions { text-align: right; width: 1%; }
+
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
+.field { display: flex; flex-direction: column; gap: 0.25rem; }
+.field > span { font-size: 0.85rem; color: var(--muted); }
+input, select, textarea {
+  font: inherit; padding: 0.4rem 0.5rem; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--bg); color: var(--fg); width: 100%;
+}
+input[type="checkbox"] { width: auto; }
+
+.actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+/* Inside a table row, never wrap: wrapping is what turned four buttons
+   into a four-line, ~230px-tall row. */
+td .actions { flex-wrap: nowrap; justify-content: flex-end; gap: 0.3rem; }
+.btn { font: inherit; padding: 0.35rem 0.75rem; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer; }
+.btn:hover:not(:disabled) { background: var(--card); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover:not(:disabled) { filter: brightness(1.08); background: var(--accent); }
+.btn-danger { color: var(--danger); border-color: var(--danger); }
+.btn-compact { padding: 0.15rem 0.45rem; font-size: 0.85rem; }
+
+.banner { padding: 0.6rem 0.85rem; border-radius: 6px; margin-bottom: 1rem; border: 1px solid; }
+.banner-error { color: var(--danger); border-color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.banner-info { color: var(--ok); border-color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, transparent); }
+
+.phase { font-weight: 600; }
+.phase-running { color: var(--ok); }
+.phase-failed { color: var(--danger); }
+.phase-pending { color: var(--warn); }
+.phase-stopped, .phase-unknown { color: var(--muted); }
+
+.scopes { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0.4rem; }
+.scopes label, .wildcard { display: flex; align-items: center; gap: 0.5rem; }
+
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 1rem; margin: 0; }
+.stats div { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 0.75rem; }
+.stats dt { color: var(--muted); font-size: 0.85rem; }
+.stats dd { margin: 0.25rem 0 0; font-size: 1.25rem; font-weight: 600; }
+
+/* Checkbox mod-source picker (replaces a multi-select) and the
+   key/value metadata editor. */
+.picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); gap: 0.35rem; max-height: 16rem; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; padding: 0.5rem; }
+.picker label { display: flex; align-items: center; gap: 0.5rem; }
+.picker .kind { font-size: 0.8rem; margin-left: auto; }
+
+.metadata { display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-start; }
+.metadata-row { display: flex; gap: 0.4rem; width: 100%; }
+
+a { color: var(--accent); }
+
+/* Log viewer modal, health cell, QR, and key chips. */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; padding: 2rem; z-index: 10; }
+.modal { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 1.25rem; width: min(1000px, 100%); max-height: 85vh; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; }
+.log-controls { display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; }
+.log-controls .field { min-width: 12rem; }
+.log-body { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 0.5rem; overflow-x: auto; max-height: 55vh; overflow-y: auto; }
+.log-line { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; white-space: pre-wrap; word-break: break-word; padding: 0.1rem 0; border-bottom: 1px solid transparent; }
+.log-raw { color: var(--muted); }
+.log-ts { color: var(--muted); margin-right: 0.5rem; }
+.log-level { font-weight: 700; margin-right: 0.5rem; }
+.log-error .log-level, .log-warn .log-level { color: var(--danger); }
+.log-warn .log-level { color: var(--warn); }
+.log-info .log-level { color: var(--ok); }
+.log-stream { color: var(--muted); margin-right: 0.5rem; }
+.log-fields { margin-left: 0.5rem; }
+.log-field { color: var(--muted); margin-right: 0.5rem; }
+
+.health { display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+.qr { background: #fff; padding: 0.5rem; border-radius: 6px; align-self: flex-start; }
+.key-chip { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 0.05rem 0.35rem; margin-right: 0.25rem; }

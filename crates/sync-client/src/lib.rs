@@ -4,9 +4,10 @@
 
 use connectrpc::client::{ClientConfig, HttpClient};
 use protocol::proto::sync::v1::{
-    DeregisterSourceRequest, GetSourceModsRequest, GetSyncStatsRequest, GetSyncStatusRequest,
-    GetSyncedModRequest, InvalidateModRequest, ListSyncedModsRequest, RefreshSourceRequest,
-    RefreshSteamAuthRequest, RegisterSourceRequest, SyncContentRequest, SyncServiceClient,
+    BeginQrLoginRequest, DeregisterSourceRequest, GetSourceModsRequest, GetSyncStatsRequest,
+    GetSyncStatusRequest, GetSyncedModRequest, InvalidateModRequest, ListSyncedModsRequest,
+    PollQrLoginRequest, RefreshSourceRequest, RefreshSteamAuthRequest, RegisterSourceRequest,
+    SyncContentRequest, SyncServiceClient,
 };
 
 pub struct SyncClient {
@@ -219,6 +220,34 @@ impl SyncClient {
             syncing: view.syncing,
             game_files_ready: view.game_files_ready,
         })
+    }
+
+    /// Begin a QR login on sync-daemon and return `(session_id,
+    /// challenge_url)`. The Steam CM connection this opens lives there,
+    /// not here -- see the RPC's own proto doc.
+    pub async fn begin_qr_login(&self) -> anyhow::Result<(String, String)> {
+        let resp = self
+            .inner
+            .begin_qr_login(BeginQrLoginRequest::default())
+            .await
+            .map_err(|e| anyhow::anyhow!("BeginQrLogin failed: {e}"))?;
+        let view = resp.view();
+        Ok((view.session_id.to_string(), view.challenge_url.to_string()))
+    }
+
+    /// Current state of a QR login: `(confirmed, username)`. Returns
+    /// immediately -- the blocking wait happens in sync-daemon.
+    pub async fn poll_qr_login(&self, session_id: &str) -> anyhow::Result<(bool, String)> {
+        let resp = self
+            .inner
+            .poll_qr_login(PollQrLoginRequest {
+                session_id: session_id.to_string(),
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| anyhow::anyhow!("PollQrLogin failed: {e}"))?;
+        let view = resp.view();
+        Ok((view.confirmed, view.username.to_string()))
     }
 
     /// Establish (or replace) the Steam session interactively -- proxies

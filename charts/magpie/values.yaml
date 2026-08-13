@@ -73,7 +73,7 @@ armaServer:
   # default -- not validated against a real server yet.
   ldPreload: ""
 
-# services/server-api, services/identity, and services/registry are
+# services/gateway, services/identity, and services/registry are
 # ClusterIP-only -- reached from outside the cluster via the Ingress
 # resources this chart also creates (see ingress.* below), fronted by
 # k3s's own bundled Traefik. Deliberately not hostPort: a Deployment that
@@ -119,8 +119,8 @@ ingress:
         - /registry.v1.MissionService
         - /registry.v1.AdminService
     # Catch-all, so this must sort last: takes /controller.v1.ServerService/*
-    # plus /healthz and /metrics, all three of which server-api serves.
-    - service: server-api
+    # plus /healthz and /metrics, all three of which gateway serves.
+    - service: gateway
       paths:
         - /
   tls:
@@ -199,7 +199,7 @@ hostPaths:
   localContentPath: /var/lib/magpie/local-content
 
 # JWT verification config, shared by services/registry and
-# services/server-api (which verify tokens) and services/identity (which
+# services/gateway (which verify tokens) and services/identity (which
 # issues them) -- all three need to agree on issuer/audience for anything
 # to work. jwksUrl defaults to this chart's own services/identity if left
 # empty; only set it if you're pointing at a different issuer than the one
@@ -243,6 +243,22 @@ identity:
   # have <baseUrl>/auth/<provider>/callback registered as a redirect
   # URI, or logins fail at the callback.
   baseUrl: ""
+  # Extra origins an OAuth redirect_uri may point at, on top of the two
+  # identity always accepts on its own: loopback (magpiectl's local
+  # callback listener, whose ephemeral port can't be known in advance)
+  # and baseUrl's own origin.
+  #
+  # That second one is why this is usually empty. A browser UI served by
+  # gateway lives on the same public host identity does, so it's already
+  # same-origin with baseUrl and needs nothing here. This is for a UI
+  # hosted somewhere else -- a separate dashboard domain, or a Vite dev
+  # server on a non-loopback address.
+  #
+  # Entries are full URLs (`https://ui.example.com`); only their origin
+  # is compared, so a path or an explicit :443 makes no difference.
+  # Every entry widens what a login can be redirected to, so add only
+  # origins you control -- this is the open-redirect guard.
+  allowedRedirectOrigins: []
   # Name of an existing Secret holding OAuth2 app credentials as
   # <PROVIDER>_CLIENT_ID / <PROVIDER>_CLIENT_SECRET keys (e.g.
   # DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, GITHUB_CLIENT_ID, ...). A
@@ -255,7 +271,7 @@ identity:
 
 # The cluster's single shared Postgres instance -- mod sources, missions,
 # and the ACL grant table (see crates/registry-db) all live in one
-# database, read/written by services/registry, services/server-api, and
+# database, read/written by services/registry, services/gateway, and
 # services/controller (read-only, for resolving mod source kind/reference).
 postgres:
   # Chart-managed: a single-replica StatefulSet + PVC, bundled here like
@@ -386,7 +402,7 @@ syncDaemon:
 
 # Reconciler only -- watches ArmaServer, creates/deletes launcher
 # Deployments. No external listener, no auth surface; the only thing that
-# talks to it is the Kubernetes API itself (services/server-api writes
+# talks to it is the Kubernetes API itself (services/gateway writes
 # ArmaServer objects, this reads them).
 controller:
   image:
@@ -394,7 +410,7 @@ controller:
     tag: ""
   # Namespace ArmaServer resources and their Deployments are managed in.
   # Defaults to the release namespace when empty. Must match
-  # serverApi.namespace.
+  # gateway.namespace.
   namespace: ""
   # Host directory (hostPath-mounted per-ArmaServer as
   # <serverRootBase>/<name>) holding each server's own operator-provided
@@ -411,9 +427,9 @@ controller:
 # Deliberately carries the least Kubernetes RBAC of anything in this chart
 # (ArmaServer read/write only, no Deployment access) -- this is the one
 # process a compromised bearer token gets to talk to directly.
-serverApi:
+gateway:
   image:
-    repository: "ghcr.io/skua-international/magpie/server-api"
+    repository: "ghcr.io/skua-international/magpie/gateway"
     tag: ""
   namespace: ""
   service:

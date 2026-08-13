@@ -164,7 +164,7 @@ check_required_images() {
   ghcr_manifest_exists "skua-international/magpie/controller" "$tag"
   ghcr_manifest_exists "skua-international/magpie/identity" "$tag"
   ghcr_manifest_exists "skua-international/magpie/registry" "$tag"
-  ghcr_manifest_exists "skua-international/magpie/server-api" "$tag"
+  ghcr_manifest_exists "skua-international/magpie/gateway" "$tag"
   ghcr_manifest_exists "skua-international/magpie/sync-daemon" "$tag"
 }
 
