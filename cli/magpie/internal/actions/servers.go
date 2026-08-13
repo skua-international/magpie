@@ -46,8 +46,8 @@ func GetServer(ctx context.Context, c *client.Clients, id string) (*controllerv1
 
 // SanitizeServerName lowercases name (the common, harmless case -- "Ops"
 // becomes "ops" with zero surprise) and then validates what's left
-// against the exact same Kubernetes DNS-1123 label rule server-api's own
-// validate_k8s_name enforces (services/server-api/src/service.rs) --
+// against the exact same Kubernetes DNS-1123 label rule gateway's own
+// validate_k8s_name enforces (services/gateway/src/service.rs) --
 // `name` becomes the ArmaServer's own `metadata.name` verbatim, and this
 // is the one place both the TUI wizard and the plain `servers create`
 // command funnel through, so catching a bad name here means neither

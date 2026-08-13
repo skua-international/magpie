@@ -45,6 +45,13 @@ spec:
               value: "0.0.0.0:{{ .Values.identity.service.port }}"
             - name: BASE_URL
               value: {{ include "magpie.identityBaseUrl" . | quote }}
+            {{- with .Values.identity.allowedRedirectOrigins }}
+            # BASE_URL's own origin is always allowed by the service
+            # itself, so this only carries genuinely extra origins --
+            # see identity.allowedRedirectOrigins in values.yaml.
+            - name: ALLOWED_REDIRECT_ORIGINS
+              value: {{ join "," . | quote }}
+            {{- end }}
             - name: JWT_ISSUER
               value: {{ required "jwt.issuer is required" .Values.jwt.issuer | quote }}
             - name: JWT_AUDIENCE

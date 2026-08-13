@@ -16,7 +16,7 @@ metadata:
     {{- include "magpie.labels" . | nindent 4 }}
 rules:
   # ModSourceService is a thin, JWT-authenticated CRUD front end for the
-  # ModSource CRD -- the same shape services/server-api already is for
+  # ModSource CRD -- the same shape services/gateway already is for
   # ArmaServer. Local (zip) sources are also fully resolved here (no Steam
   # session needed), so this is the one process besides
   # services/sync-daemon's own reconciler that ever writes ModSource

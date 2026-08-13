@@ -213,7 +213,7 @@ impl protocol::proto::controller::v1::ServerService for ServerServiceImpl {
             profiling: false,
             desired_state: DesiredState::Running,
             // The ConfigMap named here isn't created/validated by this
-            // call at all (server-api has no ConfigMap RBAC) -- it's the
+            // call at all (gateway has no ConfigMap RBAC) -- it's the
             // caller's responsibility to have it in place first (e.g. via
             // `kubectl edit`, following the same flow `admin arma-config`
             // already uses for the baseline). Unlike leaving this unset,

@@ -1698,6 +1698,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "gateway"
+version = "0.0.0-unreleased"
+dependencies = [
+ "anyhow",
+ "authn",
+ "axum",
+ "buffa",
+ "connectrpc",
+ "crd",
+ "k8s-openapi",
+ "kube",
+ "metrics",
+ "metrics-exporter-prometheus",
+ "protocol",
+ "registry-db",
+ "serde_json",
+ "sqlx",
+ "sync-client",
+ "tokio",
+ "tower",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "genawaiter"
 version = "0.99.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4394,33 +4421,6 @@ dependencies = [
  "ryu",
  "serde",
  "unsafe-libyaml",
-]
-
-[[package]]
-name = "server-api"
-version = "0.0.0-unreleased"
-dependencies = [
- "anyhow",
- "authn",
- "axum",
- "buffa",
- "connectrpc",
- "crd",
- "k8s-openapi",
- "kube",
- "metrics",
- "metrics-exporter-prometheus",
- "protocol",
- "registry-db",
- "serde_json",
- "sqlx",
- "sync-client",
- "tokio",
- "tower",
- "tracing",
- "tracing-appender",
- "tracing-subscriber",
- "uuid",
 ]
 
 [[package]]

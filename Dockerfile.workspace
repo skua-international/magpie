@@ -61,6 +61,6 @@ COPY --from=builder \
     /build/target/release/sync-daemon \
     /build/target/release/controller \
     /build/target/release/registry \
-    /build/target/release/server-api \
+    /build/target/release/gateway \
     /build/target/release/identity \
     /

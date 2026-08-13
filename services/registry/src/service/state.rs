@@ -4,7 +4,7 @@
 //! any live credential).
 //!
 //! Creates `ArmaServer` objects directly against the Kubernetes API
-//! (`Api<ArmaServer>::create`) rather than calling services/server-api's
+//! (`Api<ArmaServer>::create`) rather than calling services/gateway's
 //! own `CreateServer` RPC -- that RPC can't set `cdlc`/`profiling`/
 //! `params` at all (see proto/controller/v1/controller.proto's own
 //! comment on why), which would silently drop them on every import. This

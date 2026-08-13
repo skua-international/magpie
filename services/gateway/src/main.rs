@@ -16,10 +16,10 @@ use authn::jwt::JwtVerifier;
 use axum::routing::get;
 use axum::{Router, middleware};
 use connectrpc::Router as ConnectRouter;
+use gateway::config::Config;
+use gateway::service::ServerServiceImpl;
 use kube::Client;
 use metrics_exporter_prometheus::PrometheusBuilder;
-use server_api::config::Config;
-use server_api::service::ServerServiceImpl;
 use sync_client::SyncClient;
 use tracing::info;
 
@@ -61,7 +61,7 @@ async fn main() -> Result<()> {
     info!("connected to Kubernetes API");
 
     let prometheus_handle = PrometheusBuilder::new().install_recorder()?;
-    server_api::metrics::spawn(client.clone(), cfg.namespace.clone());
+    gateway::metrics::spawn(client.clone(), cfg.namespace.clone());
 
     let sync_client = SyncClient::new(&cfg.sync_daemon_url)?;
     let server_service = ServerServiceImpl::new(client, cfg.namespace.clone(), sync_client);

@@ -239,7 +239,7 @@ async fn main() -> Result<()> {
 
     // No require_auth layer here at all (internal-only service, see this
     // file's own doc), so the RPC counters that middleware records for
-    // registry/server-api don't apply -- /metrics exists regardless, for
+    // registry/gateway don't apply -- /metrics exists regardless, for
     // shape consistency and whatever gets added here later.
     let prometheus_handle = PrometheusBuilder::new().install_recorder()?;
     let app = Router::new()

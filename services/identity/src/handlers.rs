@@ -28,6 +28,8 @@ pub struct AppState {
     pub signer: crate::signing::Signer,
     pub http: reqwest::Client,
     pub base_url: String,
+    /// See `config::Config::allowed_redirect_origins`.
+    pub allowed_redirect_origins: Vec<String>,
     pub issuer: String,
     pub audience: String,
     pub oauth_providers: HashMap<ProviderKind, crate::oauth::OAuthProvider>,
@@ -89,7 +91,13 @@ pub async fn start(
     let link_user_id = app.verify_bearer(&headers);
     let redirect_uri = query.get("redirect_uri").cloned();
 
-    let state_token = match state::issue(&app.signer, &provider, link_user_id, redirect_uri) {
+    let state_token = match state::issue(
+        &app.signer,
+        &provider,
+        link_user_id,
+        redirect_uri,
+        &app.allowed_redirect_origins,
+    ) {
         Ok(t) => t,
         Err(e) => return (StatusCode::BAD_REQUEST, format!("{e:#}")).into_response(),
     };

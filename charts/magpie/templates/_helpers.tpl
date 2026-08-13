@@ -74,8 +74,8 @@ happens to be pointed). See templates/namespace.yaml, which creates it.
 {{- .Values.controller.namespace | default (include "magpie.namespace" .) -}}
 {{- end -}}
 
-{{- define "magpie.serverApiNamespace" -}}
-{{- .Values.serverApi.namespace | default (include "magpie.namespace" .) -}}
+{{- define "magpie.gatewayNamespace" -}}
+{{- .Values.gateway.namespace | default (include "magpie.namespace" .) -}}
 {{- end -}}
 
 {{/*
@@ -254,7 +254,7 @@ by something this chart doesn't create.
 
 {{/*
 JWKS/issuer/audience env entries, shared by services/registry and
-services/server-api (which verify tokens) and services/identity (which
+services/gateway (which verify tokens) and services/identity (which
 issues them) -- all three must agree, so they all pull from this one
 helper.
 */}}

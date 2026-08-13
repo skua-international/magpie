@@ -81,6 +81,7 @@ async fn main() -> Result<()> {
         signer,
         http,
         base_url: cfg.base_url,
+        allowed_redirect_origins: cfg.allowed_redirect_origins,
         issuer: cfg.issuer,
         audience: cfg.audience,
         oauth_providers,

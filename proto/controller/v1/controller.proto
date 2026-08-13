@@ -61,7 +61,7 @@ message CreateServerRequest {
   // ArmaServer) providing per-server overrides on top of the cluster's
   // baseline Arma config -- see ArmaServerSpec.config_map and
   // services/controller/src/arma_config.rs. The ConfigMap itself isn't
-  // managed through this API (server-api carries no ConfigMap RBAC at
+  // managed through this API (gateway carries no ConfigMap RBAC at
   // all, deliberately -- see charts/magpie/values.yaml's serverApi
   // comment); callers create/edit it directly against the cluster (e.g.
   // `kubectl edit configmap`) and only pass its name here. Unset means

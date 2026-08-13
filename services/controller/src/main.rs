@@ -1,8 +1,8 @@
 //! `ArmaServer` reconciler -- no auth surface, no RPC API.
-//! `services/server-api` is the only thing that talks to this process
+//! `services/gateway` is the only thing that talks to this process
 //! for anything Arma-related, and it does so purely by writing/reading
 //! `ArmaServer` objects through the Kubernetes API, not by calling into
-//! this binary directly. Kept separate from server-api specifically so
+//! this binary directly. Kept separate from gateway specifically so
 //! this process's ServiceAccount needs (create/delete Deployments)
 //! never has to be granted to the JWT-authenticated API surface --
 //! least privilege, given this is the one process in the stack that

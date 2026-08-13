@@ -17,6 +17,6 @@ ENV SYNC_DAEMON_URL=http://sync-daemon:8080
 
 EXPOSE 8443
 
-COPY --chmod=755 dist/server-api /server-api
+COPY --chmod=755 dist/gateway /gateway
 
-ENTRYPOINT ["/server-api"]
+ENTRYPOINT ["/gateway"]
