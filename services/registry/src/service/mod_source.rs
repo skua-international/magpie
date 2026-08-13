@@ -21,8 +21,8 @@ use protocol::proto::registry::v1::{
     AddModSourceRequest, AddModSourceResponse, DeleteModSourceRequest, DeleteModSourceResponse,
     GetSyncedModRequest, GetSyncedModResponse, InvalidateModRequest, InvalidateModResponse,
     ListModSourcesRequest, ListModSourcesResponse, ListSyncedModsRequest, ListSyncedModsResponse,
-    ModSourceInfo, ModSourceKind as ProtoKind, SyncModSourceRequest, SyncModSourceResponse,
-    SyncedMod as ProtoSyncedMod,
+    ModSourceInfo, ModSourceKind as ProtoKind, SetModSourceMetadataRequest, SyncModSourceRequest,
+    SyncModSourceResponse, SyncedMod as ProtoSyncedMod,
 };
 use sync_client::SyncClient;
 use uuid::Uuid;
@@ -138,6 +138,47 @@ pub(crate) fn to_mod_source_info(obj: &ModSource) -> ModSourceInfo {
 }
 
 impl protocol::proto::registry::v1::ModSourceService for ModSourceServiceImpl {
+    async fn set_mod_source_metadata<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        request: ServiceRequest<'_, SetModSourceMetadataRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<ModSourceInfo> + Send + use<'a>> {
+        let existing =
+            self.api().get(request.id).await.map_err(|_| {
+                ConnectError::not_found(format!("no such mod source: {}", request.id))
+            })?;
+
+        let wanted = metadata_to_annotations(request.metadata.iter().map(|(k, v)| (*k, *v)))?;
+
+        // A merge patch removes a key by setting it null, so annotations
+        // that existed before and aren't in the new set have to be nulled
+        // explicitly -- otherwise this could only ever add, and a removed
+        // row in the UI would silently survive.
+        let mut annotations = serde_json::Map::new();
+        for key in existing.annotations().keys() {
+            if key.starts_with(METADATA_PREFIX) && !wanted.contains_key(key) {
+                annotations.insert(key.clone(), serde_json::Value::Null);
+            }
+        }
+        for (key, value) in wanted {
+            annotations.insert(key, serde_json::Value::String(value));
+        }
+
+        let patched = self
+            .api()
+            .patch(
+                request.id,
+                &PatchParams::default(),
+                &Patch::Merge(serde_json::json!({ "metadata": { "annotations": annotations } })),
+            )
+            .await
+            .map_err(|e| {
+                ConnectError::internal(format!("failed to update {}: {e:#}", request.id))
+            })?;
+
+        Response::ok(to_mod_source_info(&patched))
+    }
+
     async fn add_mod_source<'a>(
         &'a self,
         _ctx: RequestContext,

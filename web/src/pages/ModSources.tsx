@@ -10,7 +10,9 @@ import {
   Banner,
   Button,
   Field,
+  MetadataChips,
   MetadataEditor,
+  MetadataForm,
   Reference,
   Spinner,
   Table,
@@ -41,6 +43,7 @@ export function ModSources() {
   const list = useAsync(() => modSources.listModSources({}), []);
   const action = useAction(list.reload);
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
 
   if (list.loading) return <Spinner label="Loading mod sources…" />;
   if (list.error) return <Banner kind="error">{list.error}</Banner>;
@@ -68,6 +71,23 @@ export function ModSources() {
         />
       )}
 
+      {editing && (
+        <MetadataForm
+          title={`Metadata — ${
+            list.data?.sources.find((s) => s.id === editing)?.displayName || editing
+          }`}
+          initial={list.data?.sources.find((s) => s.id === editing)?.metadata ?? {}}
+          busy={action.busy}
+          onCancel={() => setEditing(null)}
+          onSubmit={(metadata) =>
+            action.run(async () => {
+              await modSources.setModSourceMetadata({ id: editing, metadata });
+              setEditing(null);
+            })
+          }
+        />
+      )}
+
       <Table
         rows={list.data?.sources ?? []}
         rowKey={(s) => s.id}
@@ -75,23 +95,17 @@ export function ModSources() {
         columns={[
           { header: "Name", cell: (s) => s.displayName || "—" },
           { header: "Kind", cell: (s) => kindLabel(s.kind) },
-          { header: "Reference", cell: (s) => <Reference reference={s.reference} /> },
+          // Steam URLs are long enough on their own to force the table
+          // wider than the viewport, so this column takes the leftover
+          // width and truncates rather than every column stretching.
+          {
+            header: "Reference",
+            className: "grow",
+            cell: (s) => <Reference reference={s.reference} />,
+          },
           { header: "Size", cell: (s) => formatBytes(s.sizeBytes) },
           { header: "Added", cell: (s) => formatTimestamp(s.createdAtUnixMs) },
-          {
-            header: "Metadata",
-            className: "grow",
-            cell: (s) =>
-              Object.keys(s.metadata).length === 0 ? (
-                <span className="muted">—</span>
-              ) : (
-                Object.entries(s.metadata).map(([k, v]) => (
-                  <code key={k} className="key-chip">
-                    {k}={v}
-                  </code>
-                ))
-              ),
-          },
+          { header: "Metadata", cell: (s) => <MetadataChips metadata={s.metadata} /> },
           {
             header: "",
             className: "row-actions",
@@ -103,6 +117,12 @@ export function ModSources() {
                   onClick={() => action.run(() => modSources.syncModSource({ id: s.id }))}
                 >
                   Sync
+                </Button>
+                <Button
+                  size="compact"
+                  onClick={() => setEditing(editing === s.id ? null : s.id)}
+                >
+                  {editing === s.id ? "Cancel" : "Metadata"}
                 </Button>
                 <Button
                   size="compact"

@@ -3919,6 +3919,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "rustls",
+ "serde_json",
  "sqlx",
  "uuid",
 ]

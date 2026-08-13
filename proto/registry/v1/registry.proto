@@ -44,6 +44,23 @@ service ModSourceService {
   // A single mod's synced state (title, on-disk size) plus every mod
   // source currently referencing it.
   rpc GetSyncedMod(GetSyncedModRequest) returns (GetSyncedModResponse);
+
+  // Replace a source's operator metadata. Metadata-only because nothing
+  // else about a registered source is editable: its `source` is what it
+  // *is* (changing a Steam URL would make it a different source, not an
+  // edited one), and everything else in ModSourceInfo is resolved state,
+  // not input. Same scope as AddModSource -- this writes an annotation
+  // and touches no content.
+  rpc SetModSourceMetadata(SetModSourceMetadataRequest) returns (ModSourceInfo);
+}
+
+message SetModSourceMetadataRequest {
+  string id = 1;
+  // Replaces the whole set: a key absent here is removed. Not optional
+  // like UpdateServer's, because this RPC has nothing else to do -- an
+  // absent map means "remove all metadata", which is the only sensible
+  // reading of a request that carries nothing else.
+  map<string, string> metadata = 2;
 }
 
 message AddModSourceRequest {
@@ -171,6 +188,18 @@ service MissionService {
   rpc GetMission(GetMissionRequest) returns (MissionInfo);
   rpc ListMissions(ListMissionsRequest) returns (ListMissionsResponse);
   rpc DeleteMission(DeleteMissionRequest) returns (DeleteMissionResponse);
+
+  // Replace a mission's operator metadata, without re-uploading the
+  // .pbo. UploadMission can already overwrite a mission in place, but
+  // only by sending its bytes again, which is a poor way to relabel
+  // something. Same replace-the-whole-set semantics as
+  // SetModSourceMetadata.
+  rpc SetMissionMetadata(SetMissionMetadataRequest) returns (MissionInfo);
+}
+
+message SetMissionMetadataRequest {
+  string id = 1;
+  map<string, string> metadata = 2;
 }
 
 message UploadMissionRequest {
@@ -181,6 +210,9 @@ message UploadMissionRequest {
   // of creating a new one -- `name`/`pbo_content` replace the stored
   // values, `id`/`created_at`/`created_by` are unchanged.
   optional string id = 3;
+  // See MissionInfo.metadata. On an overwrite (id set) this replaces the
+  // stored set, same as everywhere else.
+  map<string, string> metadata = 4;
 }
 
 message MissionInfo {
@@ -191,6 +223,11 @@ message MissionInfo {
   // Subject (JWT `sub` claim) of whoever uploaded (or last overwrote) this
   // mission.
   string created_by = 5;
+  // Free-form operator labelling. Unlike servers and mod sources, whose
+  // metadata rides along as annotations on their Kubernetes objects,
+  // missions live only in Postgres -- so this is a jsonb column on the
+  // missions table.
+  map<string, string> metadata = 6;
 }
 
 message GetMissionRequest {

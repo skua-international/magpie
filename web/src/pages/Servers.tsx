@@ -15,6 +15,8 @@ import {
   Field,
   MetadataEditor,
   ModSourcePicker,
+  toEntries,
+  toRecord,
   Spinner,
   Table,
   confirmed,
@@ -23,22 +25,7 @@ import { LogViewer } from "../components/LogViewer";
 import { ServerHealth } from "../components/ServerHealth";
 import { useAction, useAsync } from "../components/useAsync";
 
-/// The proto carries metadata as a plain object; the editor works in
-/// ordered rows so that typing a key doesn't reshuffle or drop entries
-/// mid-edit. These convert between the two.
-function toEntries(metadata: Record<string, string>) {
-  return Object.entries(metadata).map(([key, value]) => ({ key, value }));
-}
 
-function toRecord(entries: { key: string; value: string }[]) {
-  const out: Record<string, string> = {};
-  for (const { key, value } of entries) {
-    // Blank rows are how a half-typed entry looks; dropping them keeps
-    // "Add metadata" from failing the whole save on an empty key.
-    if (key.trim()) out[key.trim()] = value;
-  }
-  return out;
-}
 
 function kindLabel(kind: ModSourceKind): string {
   switch (kind) {

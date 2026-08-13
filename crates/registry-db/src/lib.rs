@@ -48,8 +48,13 @@ pub async fn connect(database_url: &str) -> anyhow::Result<PgPool> {
             name TEXT NOT NULL,
             filesize BIGINT NOT NULL,
             created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-            created_by TEXT NOT NULL
+            created_by TEXT NOT NULL,
+            metadata JSONB NOT NULL DEFAULT '{}'::jsonb
         );
+        -- Additive, and separate from the CREATE above: an existing
+        -- deployment already has this table, so a new column in the
+        -- CREATE alone would never be applied to it.
+        ALTER TABLE missions ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb;
         CREATE TABLE IF NOT EXISTS acl_grants (
             subject TEXT PRIMARY KEY,
             scopes TEXT[] NOT NULL
@@ -100,6 +105,32 @@ pub struct MissionRow {
     pub filesize: i64,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub created_by: String,
+    /// Free-form operator labelling. sqlx maps a jsonb column to
+    /// serde_json::Value; callers flatten it to a string map (see
+    /// `metadata_map`), tolerating a non-object or non-string value
+    /// rather than failing a whole list over one hand-edited row.
+    pub metadata: serde_json::Value,
+}
+
+/// Flattens a mission's jsonb metadata to the string map the proto uses.
+/// Anything that isn't a string value is rendered with its JSON form
+/// rather than dropped, so a hand-edited row is visible instead of
+/// silently empty.
+pub fn metadata_map(value: &serde_json::Value) -> std::collections::HashMap<String, String> {
+    value
+        .as_object()
+        .map(|map| {
+            map.iter()
+                .map(|(k, v)| {
+                    let v = match v {
+                        serde_json::Value::String(s) => s.clone(),
+                        other => other.to_string(),
+                    };
+                    (k.clone(), v)
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 pub async fn upsert_mission(
@@ -108,30 +139,54 @@ pub async fn upsert_mission(
     name: &str,
     filesize: i64,
     created_by: &str,
+    metadata: &serde_json::Value,
 ) -> sqlx::Result<()> {
     sqlx::query(
-        "INSERT INTO missions (id, name, filesize, created_by) VALUES ($1, $2, $3, $4)
-         ON CONFLICT (id) DO UPDATE SET name = excluded.name, filesize = excluded.filesize",
+        "INSERT INTO missions (id, name, filesize, created_by, metadata)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (id) DO UPDATE SET
+             name = excluded.name,
+             filesize = excluded.filesize,
+             metadata = excluded.metadata",
     )
     .bind(id)
     .bind(name)
     .bind(filesize)
     .bind(created_by)
+    .bind(metadata)
     .execute(pool)
     .await?;
     Ok(())
 }
 
-pub async fn get_mission(pool: &PgPool, id: Uuid) -> sqlx::Result<Option<MissionRow>> {
-    sqlx::query_as("SELECT id, name, filesize, created_at, created_by FROM missions WHERE id = $1")
+/// Replaces one mission's metadata without touching its file or its
+/// upload provenance. Returns false when no such mission exists, so the
+/// caller can answer NOT_FOUND rather than silently succeeding.
+pub async fn set_mission_metadata(
+    pool: &PgPool,
+    id: Uuid,
+    metadata: &serde_json::Value,
+) -> sqlx::Result<bool> {
+    let result = sqlx::query("UPDATE missions SET metadata = $2 WHERE id = $1")
         .bind(id)
-        .fetch_optional(pool)
-        .await
+        .bind(metadata)
+        .execute(pool)
+        .await?;
+    Ok(result.rows_affected() > 0)
+}
+
+pub async fn get_mission(pool: &PgPool, id: Uuid) -> sqlx::Result<Option<MissionRow>> {
+    sqlx::query_as(
+        "SELECT id, name, filesize, created_at, created_by, metadata FROM missions WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await
 }
 
 pub async fn list_missions(pool: &PgPool) -> sqlx::Result<Vec<MissionRow>> {
     sqlx::query_as(
-        "SELECT id, name, filesize, created_at, created_by FROM missions ORDER BY created_at",
+        "SELECT id, name, filesize, created_at, created_by, metadata FROM missions ORDER BY created_at",
     )
     .fetch_all(pool)
     .await

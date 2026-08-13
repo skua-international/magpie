@@ -7,6 +7,10 @@ import {
   Banner,
   Button,
   Field,
+  MetadataChips,
+  MetadataEditor,
+  MetadataForm,
+  toRecord,
   Spinner,
   Table,
   confirmed,
@@ -20,6 +24,8 @@ export function Missions() {
   const action = useAction(list.reload);
   const [file, setFile] = useState<File | null>(null);
   const [name, setName] = useState("");
+  const [metadata, setMetadata] = useState<{ key: string; value: string }[]>([]);
+  const [editing, setEditing] = useState<string | null>(null);
 
   if (list.loading) return <Spinner label="Loading missions…" />;
   if (list.error) return <Banner kind="error">{list.error}</Banner>;
@@ -44,9 +50,11 @@ export function Missions() {
               // what's wanted (the .pbo is named after the mission).
               name: name.trim() || file.name,
               pboContent: bytes,
+              metadata: toRecord(metadata),
             });
             setFile(null);
             setName("");
+            setMetadata([]);
           });
         }}
       >
@@ -61,10 +69,30 @@ export function Missions() {
         <Field label="Name (defaults to the filename)">
           <input value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
+        <Field label="Metadata">
+          <MetadataEditor entries={metadata} onChange={setMetadata} />
+        </Field>
         <Button type="submit" variant="primary" disabled={action.busy || !file}>
           {action.busy ? "Uploading…" : "Upload"}
         </Button>
       </form>
+
+      {editing && (
+        <MetadataForm
+          title={`Metadata — ${
+            list.data?.missions.find((m) => m.id === editing)?.name || editing
+          }`}
+          initial={list.data?.missions.find((m) => m.id === editing)?.metadata ?? {}}
+          busy={action.busy}
+          onCancel={() => setEditing(null)}
+          onSubmit={(metadata) =>
+            action.run(async () => {
+              await missions.setMissionMetadata({ id: editing, metadata });
+              setEditing(null);
+            })
+          }
+        />
+      )}
 
       <Table
         rows={list.data?.missions ?? []}
@@ -74,11 +102,23 @@ export function Missions() {
           { header: "Name", cell: (m) => m.name },
           { header: "Size", cell: (m) => formatBytes(m.filesize) },
           { header: "Uploaded", cell: (m) => formatTimestamp(m.createdAtUnixMs) },
-          { header: "By", cell: (m) => <span className="muted">{m.createdBy || "—"}</span> },
+          {
+            header: "By",
+            className: "grow",
+            cell: (m) => <span className="muted">{m.createdBy || "—"}</span>,
+          },
+          { header: "Metadata", cell: (m) => <MetadataChips metadata={m.metadata} /> },
           {
             header: "",
             className: "row-actions",
             cell: (m) => (
+              <div className="actions">
+              <Button
+                size="compact"
+                onClick={() => setEditing(editing === m.id ? null : m.id)}
+              >
+                {editing === m.id ? "Cancel" : "Metadata"}
+              </Button>
               <Button
                 size="compact"
                 variant="danger"
@@ -91,6 +131,7 @@ export function Missions() {
               >
                 Delete
               </Button>
+              </div>
             ),
           },
         ]}

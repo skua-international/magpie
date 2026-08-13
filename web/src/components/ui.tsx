@@ -4,6 +4,7 @@
 // long-term maintenance cost for contributors to learn on top of React
 // itself.
 
+import { useState } from "react";
 import type { ReactNode } from "react";
 
 export function Button({
@@ -215,5 +216,79 @@ export function MetadataEditor({
         Add metadata
       </Button>
     </div>
+  );
+}
+
+/// The protos carry metadata as a plain object; the editor works in
+/// ordered rows so typing a key doesn't reshuffle or drop entries
+/// mid-edit. These convert between the two, and are shared by every page
+/// that edits metadata rather than each keeping its own copy.
+export function toEntries(metadata: Record<string, string>) {
+  return Object.entries(metadata).map(([key, value]) => ({ key, value }));
+}
+
+export function toRecord(entries: { key: string; value: string }[]) {
+  const out: Record<string, string> = {};
+  for (const { key, value } of entries) {
+    // Blank rows are what a half-typed entry looks like; dropping them
+    // keeps "Add metadata" from failing the whole save on an empty key.
+    if (key.trim()) out[key.trim()] = value;
+  }
+  return out;
+}
+
+/// Metadata rendered for a table cell -- chips, or an em dash when empty.
+export function MetadataChips({ metadata }: { metadata: Record<string, string> }) {
+  const entries = Object.entries(metadata);
+  if (entries.length === 0) return <span className="muted">—</span>;
+  return (
+    <>
+      {entries.map(([k, v]) => (
+        <code key={k} className="key-chip">
+          {k}={v}
+        </code>
+      ))}
+    </>
+  );
+}
+
+/// The inline "edit just the metadata" form shared by mod sources and
+/// missions, whose RPCs both replace the whole set.
+export function MetadataForm({
+  title,
+  initial,
+  busy,
+  onSubmit,
+  onCancel,
+}: {
+  title: string;
+  initial: Record<string, string>;
+  busy: boolean;
+  onSubmit: (metadata: Record<string, string>) => void;
+  onCancel: () => void;
+}) {
+  const [entries, setEntries] = useState(toEntries(initial));
+  return (
+    <form
+      className="card"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit(toRecord(entries));
+      }}
+    >
+      <h3>{title}</h3>
+      <p className="muted">
+        Replaces the whole set — a row removed here is removed on the server.
+      </p>
+      <MetadataEditor entries={entries} onChange={setEntries} />
+      <div className="actions">
+        <Button type="submit" variant="primary" disabled={busy}>
+          {busy ? "Saving…" : "Save metadata"}
+        </Button>
+        <Button onClick={onCancel} disabled={busy}>
+          Cancel
+        </Button>
+      </div>
+    </form>
   );
 }

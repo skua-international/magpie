@@ -20,6 +20,9 @@ fn required_scope(path: &str) -> Option<&'static str> {
         "/registry.v1.ModSourceService/AddModSource" => Some("mod-sources:write"),
         "/registry.v1.ModSourceService/DeleteModSource" => Some("mod-sources:write"),
         "/registry.v1.ModSourceService/ListModSources" => Some("mod-sources:read"),
+        // Writes an annotation, touches no content -- same scope as any
+        // other mod source write.
+        "/registry.v1.ModSourceService/SetModSourceMetadata" => Some("mod-sources:write"),
         // Same scope as AddModSource -- re-resolve + sync whatever's
         // already desired is relatively harmless, nothing destructive.
         "/registry.v1.ModSourceService/SyncModSource" => Some("mod-sources:write"),
@@ -33,6 +36,7 @@ fn required_scope(path: &str) -> Option<&'static str> {
         "/registry.v1.ModSourceService/InvalidateMod" => Some("mod-sources:invalidate"),
         "/registry.v1.MissionService/UploadMission" => Some("missions:write"),
         "/registry.v1.MissionService/DeleteMission" => Some("missions:write"),
+        "/registry.v1.MissionService/SetMissionMetadata" => Some("missions:write"),
         "/registry.v1.MissionService/ListMissions" => Some("missions:read"),
         "/registry.v1.MissionService/GetMission" => Some("missions:read"),
         "/registry.v1.AdminService/GetDiskUsage" => Some("admin:disk-usage"),
