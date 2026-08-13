@@ -14,25 +14,20 @@ use axum::Router;
 use axum::routing::{get, post};
 use config::Config;
 use handlers::AppState;
-use metrics_exporter_prometheus::PrometheusBuilder;
 use oauth::OAuthProvider;
 use tracing::{info, warn};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Non-blocking + JSON -- same pattern as launcher/src/main.rs,
-    // rolled out repo-wide for consistency. `_guard` has to live for the
-    // rest of `main` -- dropping it early stops the writer thread and
-    // silently drops whatever's still buffered.
-    let (non_blocking_stdout, _guard) = tracing_appender::non_blocking(std::io::stdout());
-    tracing_subscriber::fmt()
-        .json()
-        .with_writer(non_blocking_stdout)
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
-        )
-        .with_target(false)
-        .init();
+    // Logs, metrics and (when an OTLP endpoint is configured) trace
+    // export, all from one place -- see crates/observability. `telemetry`
+    // has to live for the rest of `main`: dropping it shuts the exporters
+    // down and stops the non-blocking log writer's thread, silently
+    // discarding whatever is still buffered.
+    // Arc because the /metrics handler needs to be callable repeatedly
+    // (axum handlers are Fn, not FnOnce) while `main` keeps its own
+    // reference alive for the process's lifetime.
+    let telemetry = std::sync::Arc::new(observability::init("identity")?);
 
     let cfg = Config::from_env()?;
 
@@ -42,12 +37,20 @@ async fn main() -> Result<()> {
     let signer = signing::Signer::load_or_create(&pool).await?;
     info!("signing key ready");
 
-    let prometheus_handle = PrometheusBuilder::new().install_recorder()?;
+    // Poll-and-set on a timer, unchanged from what this replaces -- only
+    // the recording API moved to OpenTelemetry. A synchronous gauge, not
+    // an observable one: an observable's callback runs on the collection
+    // path, and this value comes from Postgres, so a scrape would then
+    // block on a database round trip.
+    let identities = observability::meter()
+        .u64_gauge("magpie_identities_total")
+        .with_description("Distinct identities -- one per person, not per linked provider account")
+        .build();
     let metrics_pool = pool.clone();
     tokio::spawn(async move {
         loop {
             match registry_db::count_users(&metrics_pool).await {
-                Ok(count) => metrics::gauge!("magpie_identities_total").set(count as f64),
+                Ok(count) => identities.record(count.max(0) as u64, &[]),
                 Err(e) => warn!("metrics poll failed: {e:#}"),
             }
             tokio::time::sleep(std::time::Duration::from_secs(30)).await;
@@ -92,7 +95,13 @@ async fn main() -> Result<()> {
         .route("/healthz", get(handlers::healthz))
         .route(
             "/metrics",
-            get(|| async move { prometheus_handle.render() }),
+            get({
+                let telemetry = telemetry.clone();
+                move || {
+                    let telemetry = telemetry.clone();
+                    async move { telemetry.render() }
+                }
+            }),
         )
         .route("/.well-known/jwks.json", get(handlers::jwks))
         .route("/auth/providers", get(handlers::providers))

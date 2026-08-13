@@ -7,6 +7,10 @@
 //! logic itself is identical everywhere, hence living here instead of
 //! being copy-pasted per service.
 
+use std::sync::LazyLock;
+
+use opentelemetry::KeyValue;
+use opentelemetry::metrics::{Counter, UpDownCounter};
 use std::sync::Arc;
 
 use axum::extract::{Request, State};
@@ -48,9 +52,39 @@ pub struct AuthState {
 /// necessarily the HTTP status, but every early-return path here still
 /// maps to a distinct real HTTP status worth breaking out on its own).
 fn record_outcome(path: &str, status: &'static str) {
-    metrics::counter!("magpie_rpc_requests_total", "path" => path.to_string(), "status" => status)
-        .increment(1);
+    RPC_REQUESTS.add(
+        1,
+        &[
+            KeyValue::new("path", path.to_string()),
+            KeyValue::new("status", status),
+        ],
+    );
 }
+
+/// Instruments are built once and reused. Creating one per request would
+/// re-resolve it against the meter provider on every call, on the request
+/// path -- the `metrics` macros this replaces cached for the same reason.
+///
+/// Constructed lazily rather than in `observability::init` so this crate
+/// stays usable by a caller that hasn't set a meter provider up: the SDK
+/// falls back to a no-op provider, and the middleware still works.
+static RPC_REQUESTS: LazyLock<Counter<u64>> = LazyLock::new(|| {
+    observability::meter()
+        .u64_counter("magpie_rpc_requests_total")
+        .with_description("RPCs handled, by path and coarse outcome class")
+        .build()
+});
+
+/// In-flight is an UpDownCounter, not a gauge: it is incremented and
+/// decremented around each request from many tasks at once, which is
+/// exactly what that instrument is for. A plain gauge would need one
+/// writer holding the true count.
+static RPC_IN_FLIGHT: LazyLock<UpDownCounter<i64>> = LazyLock::new(|| {
+    observability::meter()
+        .i64_up_down_counter("magpie_rpc_requests_in_flight")
+        .with_description("RPCs currently being handled, by path")
+        .build()
+});
 
 pub async fn require_auth(
     State(state): State<Arc<AuthState>>,
@@ -107,10 +141,14 @@ pub async fn require_auth(
 
     request.extensions_mut().insert(identity);
 
-    let in_flight = metrics::gauge!("magpie_rpc_requests_in_flight", "path" => path.clone());
-    in_flight.increment(1.0);
+    let in_flight_labels = [KeyValue::new("path", path.clone())];
+    RPC_IN_FLIGHT.add(1, &in_flight_labels);
     let response = next.run(request).await;
-    in_flight.decrement(1.0);
+    // Decremented on every path out of here, including a panic-free
+    // early return from the handler -- `next.run` either returns a
+    // response or unwinds, and an unwind takes the whole task down
+    // anyway.
+    RPC_IN_FLIGHT.add(-1, &in_flight_labels);
 
     record_outcome(
         &path,

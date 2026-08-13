@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/authn", "crates/crd", "crates/protocol", "crates/registry-db", "crates/steam-sync", "crates/sync-client", "crates/workshop-parse", "services/controller", "services/gateway", "services/identity", "services/launcher", "services/registry", "services/sync-daemon"]
+members = ["crates/authn", "crates/observability", "crates/crd", "crates/protocol", "crates/registry-db", "crates/steam-sync", "crates/sync-client", "crates/workshop-parse", "services/controller", "services/gateway", "services/identity", "services/launcher", "services/registry", "services/sync-daemon"]
 
 [workspace.package]
 edition = "2024"

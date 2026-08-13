@@ -41,6 +41,7 @@ spec:
             - name: http
               containerPort: {{ .Values.identity.service.port }}
           env:
+            {{- include "magpie.otelEnv" . | nindent 12 }}
             - name: LISTEN_ADDR
               value: "0.0.0.0:{{ .Values.identity.service.port }}"
             - name: BASE_URL

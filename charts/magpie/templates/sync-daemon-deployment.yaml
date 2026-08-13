@@ -55,6 +55,7 @@ spec:
             - name: http
               containerPort: 8080
           env:
+            {{- include "magpie.otelEnv" . | nindent 12 }}
             - name: LISTEN_ADDR
               value: "0.0.0.0:8080"
             - name: NAMESPACE

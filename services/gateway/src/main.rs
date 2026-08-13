@@ -19,7 +19,6 @@ use connectrpc::Router as ConnectRouter;
 use gateway::config::Config;
 use gateway::service::ServerServiceImpl;
 use kube::Client;
-use metrics_exporter_prometheus::PrometheusBuilder;
 use sync_client::SyncClient;
 use tower_http::services::{ServeDir, ServeFile};
 use tracing::info;
@@ -52,15 +51,13 @@ async fn main() -> Result<()> {
     // rolled out repo-wide for consistency. `_guard` has to live for the
     // rest of `main` -- dropping it early stops the writer thread and
     // silently drops whatever's still buffered.
-    let (non_blocking_stdout, _guard) = tracing_appender::non_blocking(std::io::stdout());
-    tracing_subscriber::fmt()
-        .json()
-        .with_writer(non_blocking_stdout)
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
-        )
-        .with_target(false)
-        .init();
+    // Logs, metrics and (when an OTLP endpoint is configured) trace
+    // export from one place -- see crates/observability. Arc because the
+    // /metrics handler is called repeatedly (axum handlers are Fn, not
+    // FnOnce) while `main` keeps its own reference alive: dropping the
+    // last one shuts the exporters down and stops the non-blocking log
+    // writer, silently discarding whatever is still buffered.
+    let telemetry = std::sync::Arc::new(observability::init("gateway")?);
 
     let cfg = Config::from_env()?;
 
@@ -70,7 +67,6 @@ async fn main() -> Result<()> {
     let client = Client::try_default().await?;
     info!("connected to Kubernetes API");
 
-    let prometheus_handle = PrometheusBuilder::new().install_recorder()?;
     gateway::metrics::spawn(client.clone(), cfg.namespace.clone());
 
     let sync_client = SyncClient::new(&cfg.sync_daemon_url)?;
@@ -93,7 +89,13 @@ async fn main() -> Result<()> {
         .route("/healthz", get(|| async { "ok" }))
         .route(
             "/metrics",
-            get(|| async move { prometheus_handle.render() }),
+            get({
+                let telemetry = telemetry.clone();
+                move || {
+                    let telemetry = telemetry.clone();
+                    async move { telemetry.render() }
+                }
+            }),
         )
         .fallback_service(connect_service);
 

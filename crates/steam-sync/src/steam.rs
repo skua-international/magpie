@@ -1,6 +1,10 @@
 use std::future::Future;
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+
+use opentelemetry::KeyValue;
+
+use crate::metrics;
 use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result, bail};
@@ -1730,6 +1734,13 @@ pub(crate) async fn download_one_depot(
     );
 
     let last_pct = AtomicU32::new(u32::MAX);
+    // Bytes are reported cumulatively per depot, so the counter is fed
+    // deltas between callbacks rather than the running total -- adding
+    // `p.bytes_downloaded` directly would count every byte again on every
+    // progress tick. Updating live rather than once at completion is the
+    // point: throughput during a multi-hour resync is exactly the number
+    // that previously needed shell-polling to see.
+    let last_bytes = AtomicU64::new(0);
     let tag_progress = tag.clone();
     // sync_depot always prepares the directory tree and verifies existing
     // chunks against the manifest before downloading anything -- there's no
@@ -1743,6 +1754,15 @@ pub(crate) async fn download_one_depot(
         &install_dir,
         download_workers,
         move |p| {
+            // Monotonic in practice, but saturating anyway: a progress
+            // report that somehow went backwards would otherwise wrap
+            // into an enormous bogus delta on an unsigned counter.
+            let previous = last_bytes.swap(p.bytes_downloaded, Ordering::Relaxed);
+            metrics::downloaded_bytes().add(
+                p.bytes_downloaded.saturating_sub(previous),
+                &[KeyValue::new("depot_id", depot_id.to_string())],
+            );
+
             // Log on whole-percent thresholds only -- per-chunk would be
             // way too noisy for a real log stream.
             let pct = if p.chunks_total > 0 {
@@ -1766,6 +1786,19 @@ pub(crate) async fn download_one_depot(
     )
     .await
     .with_context(|| format!("failed to sync depot {}", depot_id))?;
+
+    // Split by outcome, which is the useful distinction: a resync that is
+    // mostly `verified` is disk-bound revalidation, one that is mostly
+    // `downloaded` is network-bound, and that is the first thing asked
+    // whenever a sync looks slow.
+    metrics::chunks().add(
+        result.chunks_verified,
+        &[KeyValue::new("outcome", "verified")],
+    );
+    metrics::chunks().add(
+        result.chunks_done.saturating_sub(result.chunks_verified),
+        &[KeyValue::new("outcome", "downloaded")],
+    );
 
     info!(
         "[{tag}] done: {} chunks ({} already valid, {} downloaded), {} bytes",
@@ -1795,8 +1828,15 @@ pub(crate) async fn download_one_depot(
     // shipped only in the server depot) -- no reason to even look.
     let size_bytes = finalize_synced_tree(&install_dir, is_server_depot)
         .await
-        .with_context(|| format!("failed to finalize synced tree under {}", install_dir.display()))?;
-    sync_state.mark_synced(&sync_key, manifest_id, size_bytes).await;
+        .with_context(|| {
+            format!(
+                "failed to finalize synced tree under {}",
+                install_dir.display()
+            )
+        })?;
+    sync_state
+        .mark_synced(&sync_key, manifest_id, size_bytes)
+        .await;
 
     Ok(())
 }

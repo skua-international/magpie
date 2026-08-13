@@ -170,6 +170,99 @@ magpiectl admin armaconfig
 
 **Extra env vars**: any merged-config key of the form `env.<NAME>` becomes an extra `<NAME>` env var on the launcher container (same placeholder/`{{secret:...}}` support), e.g. `env.SOME_API_KEY = "{{secret:my-secret/key}}"`.
 
+## Observability
+
+Every service emits structured JSON logs on stdout, publishes metrics in
+Prometheus format on its own `/metrics`, and can export traces over OTLP.
+
+**Metrics need no configuration.** Each Deployment already carries
+`prometheus.io/scrape`, `prometheus.io/port` and `prometheus.io/path`
+annotations, so any Prometheus doing annotation-based discovery picks
+them up — deliberately plain annotations rather than PodMonitor CRDs, so
+nothing has to install prometheus-operator to scrape magpie. Note that
+this repo ships no Prometheus of its own; the addon stack is its own
+piece of work.
+
+**Traces are opt-in.** Set `observability.otlpEndpoint` (e.g.
+`http://otel-collector.observability:4317`) and every service exports its
+existing `tracing` spans over OTLP. Left empty — the default — no trace
+pipeline is installed at all and the services behave exactly as they do
+without it. Turning tracing on is a values change, not a code change.
+
+`launcher` is the exception: traces and logs only, no `/metrics`. Arma
+server Pods are `hostNetwork: true`, so a port it bound would land on the
+node's real public interface. Its per-Pod CPU/memory/restarts come from
+cAdvisor and kube-state-metrics via the `armaserver=<name>` label, and an
+operator's own in-game exporter has a separate route in
+(`ArmaServerSpec.metrics`).
+
+### What's published
+
+| Metric | Labels | Meaning |
+| --- | --- | --- |
+| `magpie_rpc_requests_total` | `path`, `status` | RPCs handled, by coarse outcome class (`2xx`/`401`/`403`/`404`/`5xx`) |
+| `magpie_rpc_requests_in_flight` | `path` | RPCs currently being handled |
+| `magpie_servers_total` | `phase` | ArmaServers by reconciliation phase; every phase always present, including zero |
+| `magpie_identities_total` | — | Distinct people, not linked provider accounts |
+| `magpie_mod_sources_total` | `kind` | Registered mod sources |
+| `magpie_synced_mods_total` | — | Workshop mods tracked as verified-synced |
+| `magpie_mod_size_bytes` | `mod_id` | On-disk size of one synced mod |
+| `magpie_missions_total`, `magpie_missions_size_bytes_total` | — | Stored missions and their total size |
+| `magpie_mission_size_bytes` | `mission_id` | One mission's size |
+| `magpie_local_mods_total`, `magpie_local_mods_size_bytes_total` | — | Locally-uploaded zip mods |
+| `magpie_local_mod_size_bytes` | `unique_id` | One local mod's size |
+| `magpie_disk_usage_bytes` | `kind` | Cluster-wide usage (`mods`/`game_files`/`missions`), deduplicated across sources |
+| `magpie_sync_content_bytes` | `kind` | sync-daemon's on-disk golden content |
+| `magpie_sync_in_flight`, `magpie_sync_download_workers` | — | Running syncs, and the configured concurrency ceiling |
+| `magpie_sync_duration_seconds` | — | Histogram of full-resync wall-clock duration |
+| `magpie_sync_downloaded_bytes_total` | `depot_id` | Bytes pulled from Steam's CDN |
+| `magpie_sync_chunks_total` | `outcome` | Chunks `verified` on disk vs `downloaded` |
+
+### Queries worth having
+
+Download throughput, the number that previously needed a shell loop
+diffing blob sizes. It is a counter, so rate it — never graph it raw:
+
+```promql
+sum(rate(magpie_sync_downloaded_bytes_total[5m]))
+```
+
+Whether a slow resync is network-bound or disk-bound. Mostly `verified`
+means revalidating what is already there; mostly `downloaded` means
+actually fetching:
+
+```promql
+sum by (outcome) (rate(magpie_sync_chunks_total[5m]))
+```
+
+Whether sync-daemon is saturated — in-flight against its own ceiling,
+which is published precisely so you don't have to know what
+`DOWNLOAD_WORKERS` was set to:
+
+```promql
+magpie_sync_in_flight / magpie_sync_download_workers
+```
+
+RPC error rate by path, using the coarse status class:
+
+```promql
+sum by (path) (rate(magpie_rpc_requests_total{status!="2xx"}[5m]))
+  / sum by (path) (rate(magpie_rpc_requests_total[5m]))
+```
+
+Content growth, for capacity planning against the CSI blob's ceiling:
+
+```promql
+sum by (kind) (magpie_sync_content_bytes)
+```
+
+Servers not in the phase they should be — anything failed, or stuck
+pending long enough to be worth looking at:
+
+```promql
+magpie_servers_total{phase=~"failed|pending"} > 0
+```
+
 ## Installing the CLI
 
 `magpiectl` is both a direct CLI (`magpiectl servers list`, `magpiectl deploy`, ...) and, run with no subcommand, an interactive TUI — everything the TUI can do is also a direct invocation, and vice versa (see `cli/magpie/internal/actions`, the one implementation both surfaces call into). It can also drive the cluster's own lifecycle directly (`magpiectl deploy`/`upgrade`/`install`, shelling out to `helm`/`kubectl` the same way `scripts/deploy.sh` does) and establish the cluster's Steam session (`magpiectl admin refresh-steam-auth`, see "Steam authentication" above) without needing a repo checkout at all.
