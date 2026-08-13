@@ -13,12 +13,32 @@ import {
   Banner,
   Button,
   Field,
+  MetadataEditor,
   ModSourcePicker,
   Spinner,
   Table,
   confirmed,
 } from "../components/ui";
+import { LogViewer } from "../components/LogViewer";
+import { ServerHealth } from "../components/ServerHealth";
 import { useAction, useAsync } from "../components/useAsync";
+
+/// The proto carries metadata as a plain object; the editor works in
+/// ordered rows so that typing a key doesn't reshuffle or drop entries
+/// mid-edit. These convert between the two.
+function toEntries(metadata: Record<string, string>) {
+  return Object.entries(metadata).map(([key, value]) => ({ key, value }));
+}
+
+function toRecord(entries: { key: string; value: string }[]) {
+  const out: Record<string, string> = {};
+  for (const { key, value } of entries) {
+    // Blank rows are how a half-typed entry looks; dropping them keeps
+    // "Add metadata" from failing the whole save on an empty key.
+    if (key.trim()) out[key.trim()] = value;
+  }
+  return out;
+}
 
 function kindLabel(kind: ModSourceKind): string {
   switch (kind) {
@@ -55,6 +75,8 @@ export function Servers() {
   const sources = useAsync(() => modSources.listModSources({}), []);
   const action = useAction(list.reload);
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [logsFor, setLogsFor] = useState<{ id: string; name: string } | null>(null);
 
   if (list.loading) return <Spinner label="Loading servers…" />;
   if (list.error) return <Banner kind="error">{list.error}</Banner>;
@@ -89,6 +111,32 @@ export function Servers() {
         />
       )}
 
+      {editing && (
+        <EditServer
+          server={rows.find((s) => s.id === editing)!}
+          modSources={(sources.data?.sources ?? []).map((s) => ({
+            id: s.id,
+            label: s.displayName || s.reference || s.id,
+            kind: kindLabel(s.kind),
+          }))}
+          busy={action.busy}
+          onSubmit={(req) =>
+            action.run(async () => {
+              await servers.updateServer(req);
+              setEditing(null);
+            })
+          }
+        />
+      )}
+
+      {logsFor && (
+        <LogViewer
+          serverId={logsFor.id}
+          serverName={logsFor.name}
+          onClose={() => setLogsFor(null)}
+        />
+      )}
+
       <Table
         rows={rows}
         rowKey={(s) => s.id}
@@ -105,6 +153,11 @@ export function Servers() {
             ),
           },
           { header: "Mods", cell: (s) => s.modSourceIds.length },
+          // Fetched per row on mount with its own re-check button, as
+          // asked -- deliberately not polled: it reads a pod per call,
+          // and a fleet page that polls every server would hammer the
+          // API server for information that changes slowly.
+          { header: "Health", cell: (s) => <ServerHealth serverId={s.id} /> },
           // Only meaningful when the controller has something to say
           // (a failure reason, usually) -- an empty cell otherwise.
           { header: "Message", cell: (s) => <span className="muted">{s.message}</span> },
@@ -136,6 +189,12 @@ export function Servers() {
                   onClick={() => action.run(() => servers.updateServer({ id: s.id }))}
                 >
                   Resync
+                </Button>
+                <Button onClick={() => setLogsFor({ id: s.id, name: s.name })}>
+                  Logs
+                </Button>
+                <Button onClick={() => setEditing(editing === s.id ? null : s.id)}>
+                  {editing === s.id ? "Cancel" : "Edit"}
                 </Button>
                 <Button
                   variant="danger"
@@ -169,12 +228,14 @@ function CreateServer({
     port: number;
     modSourceIds: string[];
     configMap?: string;
+    metadata: Record<string, string>;
   }) => void;
 }) {
   const [name, setName] = useState("");
   const [port, setPort] = useState(2302);
   const [selected, setSelected] = useState<string[]>([]);
   const [configMap, setConfigMap] = useState("");
+  const [metadata, setMetadata] = useState<{ key: string; value: string }[]>([]);
 
   return (
     <form
@@ -188,6 +249,7 @@ function CreateServer({
           // Empty means "use the baseline" -- sending "" would be a
           // ConfigMap named the empty string.
           configMap: configMap.trim() || undefined,
+          metadata: toRecord(metadata),
         });
       }}
     >
@@ -219,8 +281,67 @@ function CreateServer({
       <Field label="Mod sources">
         <ModSourcePicker sources={sources} selected={selected} onChange={setSelected} />
       </Field>
+      <Field label="Metadata">
+        <MetadataEditor entries={metadata} onChange={setMetadata} />
+      </Field>
       <Button type="submit" variant="primary" disabled={busy || !name.trim()}>
         {busy ? "Creating…" : "Create"}
+      </Button>
+    </form>
+  );
+}
+
+/// Editing an existing server: mod sources and metadata only.
+///
+/// Name and port aren't editable because UpdateServer cannot change them
+/// -- a port move is a delete-and-recreate (the port range is checked for
+/// conflicts at creation), and the name is the object's own identity.
+function EditServer({
+  server,
+  modSources: sources,
+  busy,
+  onSubmit,
+}: {
+  server: { id: string; name: string; modSourceIds: string[]; metadata: Record<string, string> };
+  modSources: { id: string; label: string; kind: string }[];
+  busy: boolean;
+  onSubmit: (req: {
+    id: string;
+    modSources: { modSourceIds: string[] };
+    metadata: { metadata: Record<string, string> };
+  }) => void;
+}) {
+  const [selected, setSelected] = useState<string[]>(server.modSourceIds);
+  const [metadata, setMetadata] = useState(toEntries(server.metadata));
+
+  return (
+    <form
+      className="card"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit({
+          id: server.id,
+          // Both always sent: this form owns both fields, so submitting
+          // means "these are the values now". Presence is what tells the
+          // server to replace rather than leave alone.
+          modSources: { modSourceIds: selected },
+          metadata: { metadata: toRecord(metadata) },
+        });
+      }}
+    >
+      <h3>Editing {server.name}</h3>
+      <p className="muted">
+        Saving also forces a resync of every Steam-backed source this server
+        references, including any just attached.
+      </p>
+      <Field label="Mod sources">
+        <ModSourcePicker sources={sources} selected={selected} onChange={setSelected} />
+      </Field>
+      <Field label="Metadata">
+        <MetadataEditor entries={metadata} onChange={setMetadata} />
+      </Field>
+      <Button type="submit" variant="primary" disabled={busy}>
+        {busy ? "Saving…" : "Save and resync"}
       </Button>
     </form>
   );

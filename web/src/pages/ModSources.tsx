@@ -10,6 +10,7 @@ import {
   Banner,
   Button,
   Field,
+  MetadataEditor,
   Reference,
   Spinner,
   Table,
@@ -78,6 +79,19 @@ export function ModSources() {
           { header: "Size", cell: (s) => formatBytes(s.sizeBytes) },
           { header: "Added", cell: (s) => formatTimestamp(s.createdAtUnixMs) },
           {
+            header: "Metadata",
+            cell: (s) =>
+              Object.keys(s.metadata).length === 0 ? (
+                <span className="muted">—</span>
+              ) : (
+                Object.entries(s.metadata).map(([k, v]) => (
+                  <code key={k} className="key-chip">
+                    {k}={v}
+                  </code>
+                ))
+              ),
+          },
+          {
             header: "",
             cell: (s) => (
               <div className="actions">
@@ -122,14 +136,20 @@ function AddSource({
   const [uniqueId, setUniqueId] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [presetFile, setPresetFile] = useState<File | null>(null);
+  const [metadata, setMetadata] = useState<{ key: string; value: string }[]>([]);
+
+  // Applies to whichever source shape is submitted, so it is built once
+  // here rather than in each branch below.
+  const meta: Record<string, string> = {};
+  for (const { key, value } of metadata) if (key.trim()) meta[key.trim()] = value;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     switch (shape) {
       case "steam":
-        return onSubmit({ source: { case: "steamUrl", value: text.trim() } });
+        return onSubmit({ source: { case: "steamUrl", value: text.trim() }, metadata: meta });
       case "presetUrl":
-        return onSubmit({ source: { case: "htmlUrl", value: text.trim() } });
+        return onSubmit({ source: { case: "htmlUrl", value: text.trim() }, metadata: meta });
       case "presetContent": {
         // File-picked and read as text, same shape as the zip upload --
         // a preset export is a file people already have on disk, so
@@ -139,6 +159,7 @@ function AddSource({
         if (!presetFile) return;
         return onSubmit({
           source: { case: "htmlContent", value: await presetFile.text() },
+          metadata: meta,
         });
       }
       case "local": {
@@ -152,6 +173,7 @@ function AddSource({
             case: "localMod",
             value: { uniqueId: uniqueId.trim(), zipContent: bytes },
           },
+          metadata: meta,
         });
       }
     }
@@ -214,6 +236,10 @@ function AddSource({
           </Field>
         </>
       )}
+
+      <Field label="Metadata">
+        <MetadataEditor entries={metadata} onChange={setMetadata} />
+      </Field>
 
       <Button type="submit" variant="primary" disabled={busy}>
         {busy ? "Adding…" : "Add"}

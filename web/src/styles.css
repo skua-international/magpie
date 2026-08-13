@@ -104,3 +104,24 @@ input[type="checkbox"] { width: auto; }
 .metadata-row { display: flex; gap: 0.4rem; width: 100%; }
 
 a { color: var(--accent); }
+
+/* Log viewer modal, health cell, QR, and key chips. */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; padding: 2rem; z-index: 10; }
+.modal { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 1.25rem; width: min(1000px, 100%); max-height: 85vh; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; }
+.log-controls { display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; }
+.log-controls .field { min-width: 12rem; }
+.log-body { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 0.5rem; overflow-x: auto; max-height: 55vh; overflow-y: auto; }
+.log-line { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; white-space: pre-wrap; word-break: break-word; padding: 0.1rem 0; border-bottom: 1px solid transparent; }
+.log-raw { color: var(--muted); }
+.log-ts { color: var(--muted); margin-right: 0.5rem; }
+.log-level { font-weight: 700; margin-right: 0.5rem; }
+.log-error .log-level, .log-warn .log-level { color: var(--danger); }
+.log-warn .log-level { color: var(--warn); }
+.log-info .log-level { color: var(--ok); }
+.log-stream { color: var(--muted); margin-right: 0.5rem; }
+.log-fields { margin-left: 0.5rem; }
+.log-field { color: var(--muted); margin-right: 0.5rem; }
+
+.health { display: inline-flex; align-items: center; gap: 0.5rem; }
+.qr { background: #fff; padding: 0.5rem; border-radius: 6px; align-self: flex-start; }
+.key-chip { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 0.05rem 0.35rem; margin-right: 0.25rem; }
