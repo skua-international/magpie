@@ -36,6 +36,13 @@
 !web
 !web/**
 
+# generated/go as well as /ts: services/magpie-csi path-replaces it
+# (`replace ... => ../../generated/go` in its go.mod, added with the
+# capacity-reservation RPC), so its Docker build genuinely needs it in
+# the context. Excluded wholesale before that dependency existed.
+!generated/go
+!generated/go/**
+
 !generated/ts
 !generated/ts/**
 

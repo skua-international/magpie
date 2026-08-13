@@ -8,7 +8,13 @@
 # participate in Dockerfile.workspace's shared Rust build for that same
 # reason -- its own self-contained multi-stage build instead.
 FROM golang:1.26-trixie AS build
-WORKDIR /build
+# Mirrors the repo's own layout rather than flattening this service to
+# /build: its go.mod path-replaces generated/go as `../../generated/go`,
+# which only resolves if the two sit at the same relative depth here as
+# they do in the checkout. Flattened, that path pointed at /generated/go
+# and `go mod download` failed outright.
+WORKDIR /build/services/magpie-csi
+COPY generated/go/ /build/generated/go/
 COPY services/magpie-csi/go.mod services/magpie-csi/go.sum ./
 RUN go mod download
 COPY services/magpie-csi/ ./
