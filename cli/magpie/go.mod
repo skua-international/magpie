@@ -17,7 +17,7 @@ replace github.com/skua-international/magpie/generated/go => ../../generated/go
 replace github.com/0xAozora/go-steam => github.com/LinkIsGrim/go-steam v0.0.0-20260725235643-4e4d92d038ba
 
 require (
-	charm.land/bubbletea/v2 v2.0.8
+	charm.land/bubbletea/v2 v2.0.9
 	charm.land/lipgloss/v2 v2.0.5
 	connectrpc.com/connect v1.20.0
 	github.com/0xAozora/go-steam v0.0.0-20250414150026-b27aac88f1b8
