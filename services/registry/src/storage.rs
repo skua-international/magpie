@@ -165,7 +165,8 @@ mod tests {
     fn write_mission_leaf_filename_has_no_uuid_prefix() {
         let root = tempfile::tempdir().unwrap();
         let id = Uuid::now_v7();
-        let path = write_mission(root.path(), id, "skua_training.Malden.pbo", b"pbo bytes").unwrap();
+        let path =
+            write_mission(root.path(), id, "skua_training.Malden.pbo", b"pbo bytes").unwrap();
 
         assert_eq!(
             path.file_name().unwrap().to_str().unwrap(),
@@ -203,7 +204,11 @@ mod tests {
 
         let path = write_mission(root.path(), id, "new_name.Altis.pbo", b"v2").unwrap();
 
-        assert!(!mission_dir(root.path(), id).join("old_name.Altis.pbo").exists());
+        assert!(
+            !mission_dir(root.path(), id)
+                .join("old_name.Altis.pbo")
+                .exists()
+        );
         assert_eq!(std::fs::read(&path).unwrap(), b"v2");
     }
 }

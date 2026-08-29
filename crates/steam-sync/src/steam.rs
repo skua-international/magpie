@@ -25,6 +25,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::cache;
 use crate::capacity;
+use crate::lowercase;
 
 /// Steam login mode: either an anonymous session (works for workshop
 /// content under depot 107410, which needs no license grant at all, but
@@ -1711,7 +1712,22 @@ pub(crate) async fn download_one_depot(
         info!(
             "[{tag}] another server instance already synced this manifest_id ({manifest_id}) while we waited, trusting it"
         );
+        // The repair still runs here, and this is the only place it can:
+        // a tree corrupted by the old rename-after-download pass is
+        // marked synced, so it never re-downloads and the manifest-side
+        // fix below never reaches it. Costs one directory walk and
+        // changes nothing once a tree is healthy.
+        if !is_server_depot {
+            repair_folded_tree(&install_dir, &tag);
+        }
         return Ok(());
+    }
+
+    // Also before a real sync: prepare_directory_tree is about to create
+    // the folded paths, and a stranded mixed-case copy sitting beside one
+    // of them would survive untouched. See crate::lowercase's own doc.
+    if !is_server_depot {
+        repair_folded_tree(&install_dir, &tag);
     }
 
     // Reaching this point means this depot/mod genuinely needs a real
@@ -1753,6 +1769,16 @@ pub(crate) async fn download_one_depot(
         &dp.key,
         &install_dir,
         download_workers,
+        // Workshop content is folded as the path comes off the manifest,
+        // so Arma can load it on a case-sensitive filesystem (see
+        // crate::lowercase). The server depot keeps its real casing --
+        // KNOWN_SERVER_BINARIES below are matched against it, and nothing
+        // in Arma's own install cares.
+        if is_server_depot {
+            download::PathOptions::preserve_case()
+        } else {
+            download::PathOptions::lowercase()
+        },
         move |p| {
             // Monotonic in practice, but saturating anyway: a progress
             // report that somehow went backwards would otherwise wrap
@@ -1871,6 +1897,28 @@ const KNOWN_SERVER_BINARIES: &[&str] = &["arma3server", "arma3server_x64"];
 /// it explicitly on `KNOWN_SERVER_BINARIES`, checked against each entry's
 /// *already-renamed* lowercase name, same ordering the old two-pass
 /// version relied on.
+/// Bring a workshop tree synced by an older version of this code into the
+/// state the folding download path now produces: drop mixed-case copies
+/// stranded beside their lowercase twin, then fold whatever is left.
+///
+/// Never fatal. A tree that fails to repair is no worse off than before
+/// the attempt, and failing a whole mod's sync over it would be.
+fn repair_folded_tree(install_dir: &std::path::Path, tag: &str) {
+    match lowercase::prune_mixed_case_duplicates(install_dir) {
+        Ok(0) => {}
+        Ok(n) => info!("[{tag}] removed {n} stranded mixed-case duplicate(s) from an older sync"),
+        Err(e) => warn!("[{tag}] could not prune mixed-case duplicates, continuing: {e:#}"),
+    }
+    match lowercase::lowercase_tree(install_dir) {
+        Ok(stats) if stats == lowercase::FoldStats::default() => {}
+        Ok(stats) => info!(
+            "[{tag}] folded {} path(s) to lowercase ({} collision(s))",
+            stats.renamed, stats.collisions
+        ),
+        Err(e) => warn!("[{tag}] could not fold content to lowercase, continuing: {e:#}"),
+    }
+}
+
 async fn finalize_synced_tree(dir: &std::path::Path, check_executables: bool) -> Result<u64> {
     let dir = dir.to_path_buf();
     tokio::task::spawn_blocking(move || finalize_synced_tree_blocking(&dir, check_executables))

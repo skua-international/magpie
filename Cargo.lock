@@ -4932,7 +4932,7 @@ dependencies = [
 [[package]]
 name = "steamdepot"
 version = "0.3.11"
-source = "git+https://github.com/LinkIsGrim/steamdepot?rev=5f6ae1b#5f6ae1b3d0f345c43e0385fe499567e26f29eefe"
+source = "git+https://github.com/LinkIsGrim/steamdepot?rev=ea237fc#ea237fc0728aaa1d6fe393dc23f82de9217abd51"
 dependencies = [
  "aes 0.8.4",
  "base64 0.22.1",
