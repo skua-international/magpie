@@ -360,8 +360,8 @@ async fn forward_stream<R: AsyncRead + Unpin>(stream: R, name: &'static str) {
     }
 }
 
-/// Copy `src` into `dst` so Arma can find missions at its own default
-/// `<arma dir>/mpmissions`.
+/// Copy missions into `dst` so Arma can find them at its own default
+/// `<arma dir>/mpmissions`, flattening registry's per-id nesting away.
 ///
 /// Needed because `-mpmissions` cannot point outside the Arma directory at
 /// all: an absolute path is refused ("Path must be relative to Arma3
@@ -369,25 +369,88 @@ async fn forward_stream<R: AsyncRead + Unpin>(stream: R, name: &'static str) {
 /// (confirmed live). Missions live on their own mount, so they have to be
 /// brought in rather than pointed at.
 ///
-/// The tree is mirrored verbatim, nesting included -- registry stores each
-/// mission under its own id (`mpmissions/<uuid>/<name>.<island>.pbo`), and
-/// Arma does recurse into subdirectories, so there is nothing to flatten
-/// and no filename to rewrite. A mission's name is its identity to Arma
-/// (`<name>.<island>.pbo`), so renaming anything here would break it.
+/// Registry stores each mission under its own id
+/// (`mpmissions/<uuid>/<name>.<island>.pbo`), and that one level of
+/// nesting is stripped here. The server *does* list a nested mission --
+/// Arma recurses when scanning -- but a client joining one crashes during
+/// mission init (confirmed live: an access violation at a fixed address,
+/// reproducible on every direct join, gone once the mission sits flat).
+/// Scanning and serving are evidently not the same code path.
+///
+/// Filenames are never rewritten. `<name>.<island>.pbo` is the *only*
+/// thing that tells Arma which terrain a mission wants -- it is not in
+/// mission.sqm -- so a renamed mission silently loads the wrong map.
+///
+/// Two ids holding the same filename would collide once flattened; the
+/// first wins and the clash is logged, since picking arbitrarily between
+/// two different missions of the same name is worse than saying so.
 ///
 /// `dst` is the claim, a per-Pod copy-on-write snapshot: this writes only
 /// to that Pod's own view, never the shared golden tree, and is redone on
-/// every launch because the snapshot is fresh each time. Arma ships its
-/// own `mpmissions` (a readme), so this merges into it rather than
-/// replacing it.
+/// every launch because the snapshot is fresh. Arma ships its own
+/// `mpmissions` (a readme), so this merges into it rather than replacing
+/// it.
 fn mirror_missions(src: std::path::PathBuf, dst: std::path::PathBuf) -> Result<()> {
     if !src.is_dir() {
         // No missions uploaded yet -- Arma's own empty mpmissions is fine.
         tracing::info!("no missions at {}, nothing to mirror", src.display());
         return Ok(());
     }
-    let copied = copy_dir_all(&src, &dst)
-        .with_context(|| format!("failed to mirror {} to {}", src.display(), dst.display()))?;
+    std::fs::create_dir_all(&dst).with_context(|| format!("failed to create {}", dst.display()))?;
+
+    let mut copied = 0;
+    let mut seen: std::collections::HashMap<std::ffi::OsString, std::path::PathBuf> =
+        std::collections::HashMap::new();
+    for entry in
+        std::fs::read_dir(&src).with_context(|| format!("failed to read {}", src.display()))?
+    {
+        let entry = entry?;
+        // One level of id directories, whose *contents* are the missions.
+        // Anything already at the top level is a mission in its own right.
+        let missions: Vec<std::path::PathBuf> = if entry.file_type()?.is_dir() {
+            std::fs::read_dir(entry.path())
+                .with_context(|| format!("failed to read {}", entry.path().display()))?
+                .map(|e| e.map(|e| e.path()))
+                .collect::<std::io::Result<Vec<_>>>()?
+        } else {
+            vec![entry.path()]
+        };
+
+        for mission in missions {
+            let Some(name) = mission.file_name().map(std::ffi::OsStr::to_os_string) else {
+                continue;
+            };
+            if let Some(previous) = seen.get(&name) {
+                tracing::warn!(
+                    "skipping {}: {:?} already mirrored from {}",
+                    mission.display(),
+                    name,
+                    previous.display()
+                );
+                continue;
+            }
+            let target = dst.join(&name);
+            if mission.is_dir() {
+                copied += copy_dir_all(&mission, &target).with_context(|| {
+                    format!(
+                        "failed to copy {} to {}",
+                        mission.display(),
+                        target.display()
+                    )
+                })?;
+            } else {
+                std::fs::copy(&mission, &target).with_context(|| {
+                    format!(
+                        "failed to copy {} to {}",
+                        mission.display(),
+                        target.display()
+                    )
+                })?;
+                copied += 1;
+            }
+            seen.insert(name, mission);
+        }
+    }
     tracing::info!("mirrored {copied} mission file(s) into {}", dst.display());
     Ok(())
 }
@@ -541,44 +604,81 @@ mod mission_tests {
         std::fs::write(path, body).unwrap();
     }
 
-    /// Registry stores each mission under its own id, and Arma recurses into
-    /// subdirectories, so the nesting is kept exactly as-is.
-    #[test]
-    fn mirrors_the_registry_layout_verbatim() {
-        let src = tempfile::TempDir::new().unwrap();
-        let dst = tempfile::TempDir::new().unwrap();
-        write(src.path(), "019fa04a/skua_training.Malden.pbo", "a");
-        write(src.path(), "01a04f66/skua_altis_baseline.Altis.pbo", "b");
-
-        mirror_missions(src.path().to_path_buf(), dst.path().to_path_buf()).unwrap();
-
-        assert!(
-            dst.path()
-                .join("019fa04a/skua_training.Malden.pbo")
-                .is_file()
-        );
-        assert!(
-            dst.path()
-                .join("01a04f66/skua_altis_baseline.Altis.pbo")
-                .is_file()
-        );
-    }
-
-    /// Arma identifies a mission by its filename (`<name>.<island>.pbo`),
-    /// so nothing here may rewrite one.
-    #[test]
-    fn leaves_filenames_untouched() {
-        let src = tempfile::TempDir::new().unwrap();
-        let dst = tempfile::TempDir::new().unwrap();
-        write(src.path(), "id/skua_training.Malden.pbo", "a");
-
-        mirror_missions(src.path().to_path_buf(), dst.path().to_path_buf()).unwrap();
-
-        let names: Vec<String> = std::fs::read_dir(dst.path().join("id"))
+    fn names(dir: &std::path::Path) -> Vec<String> {
+        let mut v: Vec<String> = std::fs::read_dir(dir)
             .unwrap()
             .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
             .collect();
-        assert_eq!(names, vec!["skua_training.Malden.pbo"]);
+        v.sort();
+        v
+    }
+
+    /// The reason this exists: registry nests each mission under its own
+    /// id, and a client joining a nested mission crashes during mission
+    /// init even though the server lists it happily.
+    #[test]
+    fn strips_the_per_id_nesting() {
+        let src = tempfile::TempDir::new().unwrap();
+        let dst = tempfile::TempDir::new().unwrap();
+        write(src.path(), "019fa04a/skua_training.Malden.pbo", "a");
+        write(src.path(), "01a04fb5/skua_baseline_altis.Altis.pbo", "b");
+
+        mirror_missions(src.path().to_path_buf(), dst.path().to_path_buf()).unwrap();
+
+        assert_eq!(
+            names(dst.path()),
+            vec!["skua_baseline_altis.Altis.pbo", "skua_training.Malden.pbo"]
+        );
+        // And no id directory survives the flattening.
+        assert!(!dst.path().join("019fa04a").exists());
+        assert!(!dst.path().join("01a04fb5").exists());
+    }
+
+    /// `<name>.<island>.pbo` is the only thing that tells Arma which
+    /// terrain a mission wants -- it is not in mission.sqm -- so renaming
+    /// one silently loads the wrong map for everyone who joins.
+    #[test]
+    fn never_rewrites_a_filename() {
+        let src = tempfile::TempDir::new().unwrap();
+        let dst = tempfile::TempDir::new().unwrap();
+        write(src.path(), "id/skua_baseline_altis.Altis.pbo", "a");
+
+        mirror_missions(src.path().to_path_buf(), dst.path().to_path_buf()).unwrap();
+
+        assert_eq!(names(dst.path()), vec!["skua_baseline_altis.Altis.pbo"]);
+    }
+
+    /// An unpacked mission is a directory named `<name>.<island>`, and it
+    /// has to survive flattening as a directory rather than being walked
+    /// into and scattered.
+    #[test]
+    fn keeps_an_unpacked_mission_directory_intact() {
+        let src = tempfile::TempDir::new().unwrap();
+        let dst = tempfile::TempDir::new().unwrap();
+        write(src.path(), "id/skua_baseline.Altis/mission.sqm", "a");
+
+        mirror_missions(src.path().to_path_buf(), dst.path().to_path_buf()).unwrap();
+
+        assert!(dst.path().join("skua_baseline.Altis/mission.sqm").is_file());
+    }
+
+    /// Two ids holding the same filename cannot both win. Picking
+    /// arbitrarily between two different missions of one name is exactly
+    /// how someone ends up on a map they did not expect, so the clash is
+    /// reported instead.
+    #[test]
+    fn a_duplicate_filename_does_not_silently_win() {
+        let src = tempfile::TempDir::new().unwrap();
+        let dst = tempfile::TempDir::new().unwrap();
+        write(src.path(), "id-a/same.Altis.pbo", "first");
+        write(src.path(), "id-b/same.Altis.pbo", "second");
+
+        mirror_missions(src.path().to_path_buf(), dst.path().to_path_buf()).unwrap();
+
+        assert_eq!(names(dst.path()), vec!["same.Altis.pbo"]);
+        // Exactly one of them, not a merge or a partial file.
+        let body = std::fs::read_to_string(dst.path().join("same.Altis.pbo")).unwrap();
+        assert!(body == "first" || body == "second", "got {body:?}");
     }
 
     /// Arma ships its own mpmissions (a readme), and the claim is a fresh
@@ -593,7 +693,7 @@ mod mission_tests {
         mirror_missions(src.path().to_path_buf(), dst.path().to_path_buf()).unwrap();
 
         assert!(dst.path().join("readme.txt").is_file());
-        assert!(dst.path().join("id/mission.Altis.pbo").is_file());
+        assert!(dst.path().join("mission.Altis.pbo").is_file());
     }
 
     /// A mission replaced upstream has to win, or a stale copy would
@@ -603,12 +703,25 @@ mod mission_tests {
         let src = tempfile::TempDir::new().unwrap();
         let dst = tempfile::TempDir::new().unwrap();
         write(src.path(), "id/mission.Altis.pbo", "new");
-        write(dst.path(), "id/mission.Altis.pbo", "old");
+        write(dst.path(), "mission.Altis.pbo", "old");
 
         mirror_missions(src.path().to_path_buf(), dst.path().to_path_buf()).unwrap();
 
-        let body = std::fs::read_to_string(dst.path().join("id/mission.Altis.pbo")).unwrap();
+        let body = std::fs::read_to_string(dst.path().join("mission.Altis.pbo")).unwrap();
         assert_eq!(body, "new");
+    }
+
+    /// A mission sitting at the top level already (no id directory) is a
+    /// mission, not a container to descend into.
+    #[test]
+    fn accepts_a_mission_already_at_the_top_level() {
+        let src = tempfile::TempDir::new().unwrap();
+        let dst = tempfile::TempDir::new().unwrap();
+        write(src.path(), "loose.Altis.pbo", "a");
+
+        mirror_missions(src.path().to_path_buf(), dst.path().to_path_buf()).unwrap();
+
+        assert_eq!(names(dst.path()), vec!["loose.Altis.pbo"]);
     }
 
     #[test]
