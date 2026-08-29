@@ -431,7 +431,7 @@ impl protocol::proto::controller::v1::ServerService for ServerServiceImpl {
                         )));
                     }
                 }
-                patch.insert("spec".into(), serde_json::json!({ "modSourceIds": ids }));
+                patch.insert("spec".into(), mod_source_ids_patch(ids));
             }
 
             if let Some(selection) = request.metadata.as_option() {
@@ -611,5 +611,79 @@ impl protocol::proto::controller::v1::ServerService for ServerServiceImpl {
             .await
             .map_err(|e| ConnectError::internal(format!("failed to set desired_state: {e:#}")))?;
         Response::ok(to_info(&obj))
+    }
+}
+
+/// The `spec` half of the merge patch that replaces a server's mod source
+/// selection.
+///
+/// Its own function purely so the key can be asserted against
+/// [`crd::ArmaServerSpec`]'s own serialization in a test. This was
+/// `"modSourceIds"` for a while, which no reader and no compiler could
+/// catch: `ArmaServerSpec` carries no `rename_all`, so the CRD schema
+/// declares `mod_source_ids`, and a structural CRD schema *prunes* unknown
+/// fields rather than rejecting them. The patch was therefore accepted with
+/// a 200, wrote nothing, left `mod_source_ids` at its old value, and the
+/// UpdateServer call went on to resync and re-Pending the server exactly as
+/// though it had worked -- so the only visible symptom was a mod source
+/// selection that silently reverted on reload.
+fn mod_source_ids_patch(ids: Vec<String>) -> serde_json::Value {
+    serde_json::json!({ MOD_SOURCE_IDS_FIELD: ids })
+}
+
+/// Must match `ArmaServerSpec::mod_source_ids`'s serialized name -- see
+/// `mod_source_ids_patch`, and the test that holds the two together.
+const MOD_SOURCE_IDS_FIELD: &str = "mod_source_ids";
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The patch key has to be whatever serde actually emits for that
+    /// field, not whatever looked right when it was typed. Deriving the
+    /// expectation from a serialized `ArmaServerSpec` rather than
+    /// hardcoding the string a second time means adding
+    /// `#[serde(rename_all = "camelCase")]` to the spec later fails this
+    /// test instead of silently reintroducing the same no-op patch.
+    #[test]
+    fn patch_key_matches_the_crd_field_name() {
+        // Written out rather than `..Default::default()`: ArmaServerSpec
+        // has no Default, and giving it one just for a test would let a
+        // future field default into a real API call by accident.
+        let spec = crd::ArmaServerSpec {
+            mod_source_ids: vec!["a".to_string()],
+            port: 2302,
+            cdlc: Vec::new(),
+            profiling: false,
+            desired_state: crd::DesiredState::default(),
+            config_map: None,
+            metrics: None,
+            headless_clients: 0,
+        };
+        let serialized = serde_json::to_value(&spec).expect("spec serializes");
+        let object = serialized.as_object().expect("spec is a JSON object");
+
+        assert!(
+            object.contains_key(MOD_SOURCE_IDS_FIELD),
+            "ArmaServerSpec serializes mod_source_ids as one of {:?}, not {MOD_SOURCE_IDS_FIELD:?}",
+            object.keys().collect::<Vec<_>>()
+        );
+    }
+
+    /// A merge patch only replaces the keys it names, so the patch must
+    /// carry the full desired list (and an empty selection has to be an
+    /// empty array, not an omitted key -- otherwise "detach every mod
+    /// source" would be indistinguishable from "change nothing").
+    #[test]
+    fn patch_carries_the_whole_selection() {
+        let ids = vec!["one".to_string(), "two".to_string()];
+        assert_eq!(
+            mod_source_ids_patch(ids),
+            serde_json::json!({ "mod_source_ids": ["one", "two"] })
+        );
+        assert_eq!(
+            mod_source_ids_patch(Vec::new()),
+            serde_json::json!({ "mod_source_ids": [] })
+        );
     }
 }
