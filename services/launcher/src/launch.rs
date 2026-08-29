@@ -29,6 +29,10 @@ const PORT_WAIT_TIMEOUT: Duration = Duration::from_secs(120);
 /// probe (an actual UDP query against a port nothing is listening on)
 /// reporting not-ready for the whole wait, with no separate "I'm waiting"
 /// signal needed -- see healthcheck.rs.
+///
+/// Server mode only. A headless client is given the *server's* port to
+/// connect to and binds nothing, so waiting for that port to be free
+/// waits on the one process it exists to join -- see the call site.
 async fn wait_for_ports_free(port: u16) -> Result<()> {
     let deadline = tokio::time::Instant::now() + PORT_WAIT_TIMEOUT;
     loop {
@@ -124,15 +128,21 @@ pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Inst
         .unwrap_or(2302);
     let arma_profile = std::env::var("ARMA_PROFILE").unwrap_or_else(|_| "main".into());
 
-    // Only the server reads missions; a headless client just connects.
+    // Both of these are server-only. A headless client reads no missions
+    // (it is handed everything by the server it joins), and -- more
+    // importantly -- it never *binds* `port`: for a client that flag is
+    // the port to connect *to*. Waiting for it to be free meant waiting
+    // for the very server it exists to join to release its game port, so
+    // a headless client could never start while its server was up, and
+    // sat logging "port 2302 still in use" until the 120s timeout killed
+    // it.
     if cfg.client_connect.is_none() {
         mirror_missions(
             std::path::Path::new(SERVER_ROOT).join("mpmissions"),
             cfg.claim_path.join("mpmissions"),
         )?;
+        wait_for_ports_free(port).await?;
     }
-
-    wait_for_ports_free(port).await?;
 
     if let Some(connect) = &cfg.client_connect {
         args.push("-client".to_string());
