@@ -124,6 +124,14 @@ pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Inst
         .unwrap_or(2302);
     let arma_profile = std::env::var("ARMA_PROFILE").unwrap_or_else(|_| "main".into());
 
+    // Only the server reads missions; a headless client just connects.
+    if cfg.client_connect.is_none() {
+        mirror_missions(
+            std::path::Path::new(SERVER_ROOT).join("mpmissions"),
+            cfg.claim_path.join("mpmissions"),
+        )?;
+    }
+
     wait_for_ports_free(port).await?;
 
     if let Some(connect) = &cfg.client_connect {
@@ -141,13 +149,13 @@ pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Inst
         args.push(format!("-name={arma_profile}"));
         args.push(format!("-profiles={SERVER_ROOT}/configs/profiles"));
         args.push(format!("-cfg={SERVER_ROOT}/configs/basic.cfg"));
-        // The one flag here that an absolute path doesn't work for: Arma
-        // rejects it with "[-mpmissions=] Path must be relative to Arma3
-        // directory!" and falls back to the built-in mpmissions, so custom
-        // missions silently go missing. Relative to the process's cwd,
-        // which is `cfg.claim_path` (set above) -- SERVER_ROOT is a
-        // sibling of it, hence the `..`.
-        args.push("-mpmissions=../server/mpmissions".to_string());
+        // No -mpmissions: Arma rejects an absolute path outright
+        // ("[-mpmissions=] Path must be relative to Arma3 directory!"),
+        // and a relative one cannot escape the Arma directory either --
+        // `../server/mpmissions` is rejected by the same check, confirmed
+        // live. Since missions have to sit under the Arma directory
+        // regardless, they are mirrored into its default `mpmissions`
+        // (see mirror_missions) and the flag becomes unnecessary.
         args.push(format!("-keysFolder={SERVER_ROOT}/keys"));
     }
 
@@ -352,6 +360,60 @@ async fn forward_stream<R: AsyncRead + Unpin>(stream: R, name: &'static str) {
     }
 }
 
+/// Copy `src` into `dst` so Arma can find missions at its own default
+/// `<arma dir>/mpmissions`.
+///
+/// Needed because `-mpmissions` cannot point outside the Arma directory at
+/// all: an absolute path is refused ("Path must be relative to Arma3
+/// directory!") and so is a relative one that climbs out with `..`
+/// (confirmed live). Missions live on their own mount, so they have to be
+/// brought in rather than pointed at.
+///
+/// The tree is mirrored verbatim, nesting included -- registry stores each
+/// mission under its own id (`mpmissions/<uuid>/<name>.<island>.pbo`), and
+/// Arma does recurse into subdirectories, so there is nothing to flatten
+/// and no filename to rewrite. A mission's name is its identity to Arma
+/// (`<name>.<island>.pbo`), so renaming anything here would break it.
+///
+/// `dst` is the claim, a per-Pod copy-on-write snapshot: this writes only
+/// to that Pod's own view, never the shared golden tree, and is redone on
+/// every launch because the snapshot is fresh each time. Arma ships its
+/// own `mpmissions` (a readme), so this merges into it rather than
+/// replacing it.
+fn mirror_missions(src: std::path::PathBuf, dst: std::path::PathBuf) -> Result<()> {
+    if !src.is_dir() {
+        // No missions uploaded yet -- Arma's own empty mpmissions is fine.
+        tracing::info!("no missions at {}, nothing to mirror", src.display());
+        return Ok(());
+    }
+    let copied = copy_dir_all(&src, &dst)
+        .with_context(|| format!("failed to mirror {} to {}", src.display(), dst.display()))?;
+    tracing::info!("mirrored {copied} mission file(s) into {}", dst.display());
+    Ok(())
+}
+
+/// Recursive directory copy, returning how many files were written.
+/// Overwrites rather than skipping, so a mission replaced upstream is
+/// picked up on the next launch.
+fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<usize> {
+    std::fs::create_dir_all(dst)?;
+    let mut copied = 0;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let target = dst.join(entry.file_name());
+        // Not following symlinks into a recursive copy: file_type here is
+        // the entry's own, so a link is copied as the file it names
+        // rather than walked into.
+        if entry.file_type()?.is_dir() {
+            copied += copy_dir_all(&entry.path(), &target)?;
+        } else {
+            std::fs::copy(entry.path(), &target)?;
+            copied += 1;
+        }
+    }
+    Ok(copied)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -466,5 +528,93 @@ mod sigpipe_tests {
         )
         .await
         .expect("forward_stream stopped early on invalid UTF-8");
+    }
+}
+
+#[cfg(test)]
+mod mission_tests {
+    use super::*;
+
+    fn write(root: &std::path::Path, relative: &str, body: &str) {
+        let path = root.join(relative);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, body).unwrap();
+    }
+
+    /// Registry stores each mission under its own id, and Arma recurses into
+    /// subdirectories, so the nesting is kept exactly as-is.
+    #[test]
+    fn mirrors_the_registry_layout_verbatim() {
+        let src = tempfile::TempDir::new().unwrap();
+        let dst = tempfile::TempDir::new().unwrap();
+        write(src.path(), "019fa04a/skua_training.Malden.pbo", "a");
+        write(src.path(), "01a04f66/skua_altis_baseline.Altis.pbo", "b");
+
+        mirror_missions(src.path().to_path_buf(), dst.path().to_path_buf()).unwrap();
+
+        assert!(
+            dst.path()
+                .join("019fa04a/skua_training.Malden.pbo")
+                .is_file()
+        );
+        assert!(
+            dst.path()
+                .join("01a04f66/skua_altis_baseline.Altis.pbo")
+                .is_file()
+        );
+    }
+
+    /// Arma identifies a mission by its filename (`<name>.<island>.pbo`),
+    /// so nothing here may rewrite one.
+    #[test]
+    fn leaves_filenames_untouched() {
+        let src = tempfile::TempDir::new().unwrap();
+        let dst = tempfile::TempDir::new().unwrap();
+        write(src.path(), "id/skua_training.Malden.pbo", "a");
+
+        mirror_missions(src.path().to_path_buf(), dst.path().to_path_buf()).unwrap();
+
+        let names: Vec<String> = std::fs::read_dir(dst.path().join("id"))
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(names, vec!["skua_training.Malden.pbo"]);
+    }
+
+    /// Arma ships its own mpmissions (a readme), and the claim is a fresh
+    /// snapshot each launch -- merging into it must not clear it.
+    #[test]
+    fn merges_into_an_existing_directory() {
+        let src = tempfile::TempDir::new().unwrap();
+        let dst = tempfile::TempDir::new().unwrap();
+        write(dst.path(), "readme.txt", "shipped");
+        write(src.path(), "id/mission.Altis.pbo", "a");
+
+        mirror_missions(src.path().to_path_buf(), dst.path().to_path_buf()).unwrap();
+
+        assert!(dst.path().join("readme.txt").is_file());
+        assert!(dst.path().join("id/mission.Altis.pbo").is_file());
+    }
+
+    /// A mission replaced upstream has to win, or a stale copy would
+    /// outlive it for the life of the snapshot.
+    #[test]
+    fn overwrites_a_stale_copy() {
+        let src = tempfile::TempDir::new().unwrap();
+        let dst = tempfile::TempDir::new().unwrap();
+        write(src.path(), "id/mission.Altis.pbo", "new");
+        write(dst.path(), "id/mission.Altis.pbo", "old");
+
+        mirror_missions(src.path().to_path_buf(), dst.path().to_path_buf()).unwrap();
+
+        let body = std::fs::read_to_string(dst.path().join("id/mission.Altis.pbo")).unwrap();
+        assert_eq!(body, "new");
+    }
+
+    #[test]
+    fn no_missions_uploaded_is_not_an_error() {
+        let dst = tempfile::TempDir::new().unwrap();
+        let missing = dst.path().join("does-not-exist");
+        mirror_missions(missing, dst.path().to_path_buf()).unwrap();
     }
 }
