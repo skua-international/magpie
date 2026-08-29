@@ -1374,6 +1374,15 @@ pub async fn resolve_workshop_items(
                 "[{}] manifest unchanged since last verified sync (manifest_id {}), trusting cache (skipping dispatch)",
                 item.published_file_id, item.manifest_id
             );
+            // The repair has to happen *here*, not inside
+            // download_one_depot: this `continue` is the reason a mod
+            // corrupted by the old rename-after-download pass never gets
+            // fixed. Such a mod is marked synced at its current
+            // manifest_id, so it is skipped before any download machinery
+            // runs at all, and nothing downstream ever sees it again
+            // until Steam publishes an update. Costs one directory walk
+            // per already-synced mod and changes nothing once healthy.
+            repair_folded_tree(&item_dir, &item.published_file_id.to_string());
             already_synced += 1;
             continue;
         }
