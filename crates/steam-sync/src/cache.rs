@@ -322,7 +322,11 @@ impl SyncState {
                 .await
                 .context("failed to query existing source_mods")?;
             let mut set = std::collections::HashSet::new();
-            while let Some(row) = rows.next().await.context("failed to read source_mods row")? {
+            while let Some(row) = rows
+                .next()
+                .await
+                .context("failed to read source_mods row")?
+            {
                 if let Ok(v) = row.get::<i64>(0) {
                     set.insert(v as u64);
                 }
@@ -390,7 +394,11 @@ impl SyncState {
             .await
             .context("failed to query desired_mod_ids")?;
         let mut ids = Vec::new();
-        while let Some(row) = rows.next().await.context("failed to read desired_mod_ids row")? {
+        while let Some(row) = rows
+            .next()
+            .await
+            .context("failed to read desired_mod_ids row")?
+        {
             if let Ok(v) = row.get::<i64>(0) {
                 ids.push(v as u64);
             }
