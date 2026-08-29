@@ -141,7 +141,13 @@ pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Inst
         args.push(format!("-name={arma_profile}"));
         args.push(format!("-profiles={SERVER_ROOT}/configs/profiles"));
         args.push(format!("-cfg={SERVER_ROOT}/configs/basic.cfg"));
-        args.push(format!("-mpmissions={SERVER_ROOT}/mpmissions"));
+        // The one flag here that an absolute path doesn't work for: Arma
+        // rejects it with "[-mpmissions=] Path must be relative to Arma3
+        // directory!" and falls back to the built-in mpmissions, so custom
+        // missions silently go missing. Relative to the process's cwd,
+        // which is `cfg.claim_path` (set above) -- SERVER_ROOT is a
+        // sibling of it, hence the `..`.
+        args.push("-mpmissions=../server/mpmissions".to_string());
         args.push(format!("-keysFolder={SERVER_ROOT}/keys"));
     }
 
