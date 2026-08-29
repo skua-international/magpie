@@ -141,6 +141,7 @@ pub async fn run(cfg: &Config, mods: Vec<String>, process_start: std::time::Inst
         args.push(format!("-name={arma_profile}"));
         args.push(format!("-profiles={SERVER_ROOT}/configs/profiles"));
         args.push(format!("-cfg={SERVER_ROOT}/configs/basic.cfg"));
+        args.push(format!("-mpmissions={SERVER_ROOT}/mpmissions"));
     }
 
     tracing::info!(
