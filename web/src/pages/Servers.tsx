@@ -297,6 +297,18 @@ function CreateServer({
 ///
 /// Name and port aren't editable because UpdateServer cannot change them
 /// -- a port move is a delete-and-recreate (the port range is checked for
+/// Selected mod source ids with no corresponding registered source.
+///
+/// Exported for its own test: this is the whole of the repair, and it is
+/// the kind of filter that is easy to get backwards.
+export function danglingSelection(
+  selected: string[],
+  sources: { id: string }[],
+): string[] {
+  const known = new Set(sources.map((s) => s.id));
+  return selected.filter((id) => !known.has(id));
+}
+
 /// conflicts at creation), and the name is the object's own identity.
 function EditServer({
   server,
@@ -316,6 +328,17 @@ function EditServer({
   const [selected, setSelected] = useState<string[]>(server.modSourceIds);
   const [metadata, setMetadata] = useState(toEntries(server.metadata));
 
+  // A server's spec can outlive the mod sources it names: deleting a
+  // ModSource doesn't rewrite the ArmaServers referencing it. Those ids
+  // seed `selected` above but have no checkbox to clear them with (the
+  // picker only renders sources that exist), so before this they were
+  // resubmitted verbatim and UpdateServer rejected the whole save with
+  // "no such mod source" -- leaving the server permanently uneditable
+  // through this form, including the edit that would have removed the
+  // dead reference.
+  const dangling = danglingSelection(selected, sources);
+  const live = selected.filter((id) => !dangling.includes(id));
+
   return (
     <form
       className="card"
@@ -326,7 +349,10 @@ function EditServer({
           // Both always sent: this form owns both fields, so submitting
           // means "these are the values now". Presence is what tells the
           // server to replace rather than leave alone.
-          modSources: { modSourceIds: selected },
+          //
+          // `live`, not `selected`: saving drops dead references rather
+          // than failing on them, so an ordinary edit repairs the spec.
+          modSources: { modSourceIds: live },
           metadata: { metadata: toRecord(metadata) },
         });
       }}
@@ -336,6 +362,15 @@ function EditServer({
         Saving also forces a resync of every Steam-backed source this server
         references, including any just attached.
       </p>
+      {dangling.length > 0 && (
+        <Banner kind="info">
+          {dangling.length === 1
+            ? "This server references a mod source that no longer exists"
+            : `This server references ${dangling.length} mod sources that no longer exist`}
+          {" "}({dangling.join(", ")}). Saving will drop{" "}
+          {dangling.length === 1 ? "it" : "them"}.
+        </Banner>
+      )}
       <Field label="Mod sources">
         <ModSourcePicker sources={sources} selected={selected} onChange={setSelected} />
       </Field>
