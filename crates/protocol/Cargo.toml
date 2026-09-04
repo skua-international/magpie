@@ -5,9 +5,9 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-connectrpc = "0.8"
+connectrpc = "0.9"
 buffa = "0.8"
 serde = "1"
 
 [build-dependencies]
-connectrpc-build = "0.8"
+connectrpc-build = "0.9"
