@@ -26,6 +26,13 @@ fn patch_mod_metadata(mod_dir: &Path, mod_id: u64, replace_app_id: bool) -> Resu
             tracing::info!("[{mod_id}] Updating {}", meta_cpp.display());
             std::fs::write(&meta_cpp, new_data)?;
         }
+    } else {
+        // Some workshop items (e.g. ArmaRadio, id 2172022102) ship without
+        // a meta.cpp at all, so there's nothing for the regexes above to
+        // patch -- write one from scratch instead of leaving publishedid
+        // undiscoverable.
+        tracing::info!("[{mod_id}] Creating missing {}", meta_cpp.display());
+        std::fs::write(&meta_cpp, format!("protocol = 1;\npublishedid = {mod_id};\n"))?;
     }
 
     let mod_cpp = mod_dir.join("mod.cpp");
