@@ -11,5 +11,8 @@
   "scripts": {
     "build:web": "npm run build --workspace @skua-international/magpie-web",
     "typecheck:web": "npm run typecheck --workspace @skua-international/magpie-web"
+  },
+  "dependencies": {
+    "@bufbuild/protoc-gen-es": "^2.14.1"
   }
 }
