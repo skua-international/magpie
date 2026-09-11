@@ -7,6 +7,6 @@ license.workspace = true
 [dependencies]
 anyhow = "1.0.103"
 buffa = "0.8.1"
-connectrpc = { version = "0.8.1", features = ["client"] }
+connectrpc = { version = "0.9.0", features = ["client"] }
 http = "1.4.2"
 protocol = { path = "../protocol" }
