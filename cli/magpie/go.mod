@@ -24,7 +24,7 @@ require (
 	github.com/mdp/qrterminal/v3 v3.2.1
 	github.com/skua-international/magpie/generated/go v0.0.0-00010101000000-000000000000
 	github.com/spf13/cobra v1.10.2
-	golang.org/x/term v0.45.0
+	golang.org/x/term v0.46.0
 	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af
 )
 
@@ -47,6 +47,6 @@ require (
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 	rsc.io/qr v0.2.0 // indirect
 )
