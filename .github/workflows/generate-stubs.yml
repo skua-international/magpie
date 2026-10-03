@@ -18,6 +18,10 @@ name: Generate proto stubs (manual)
 on:
   workflow_dispatch: {}
 
+env:
+  PROTOC_GEN_GO_VERSION: v1.36.12
+  PROTOC_GEN_CONNECT_GO_VERSION: v1.20.0
+
 jobs:
   generate:
     runs-on: ubuntu-latest
@@ -49,26 +53,25 @@ jobs:
           # nothing.
           cache: false
 
+      # Pinned to the same versions as release.yml's env block -- see the
+      # comment there for why @latest breaks its staleness check.
       - name: Install Go plugins
         run: |
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-          go install connectrpc.com/connect/cmd/protoc-gen-connect-go@latest
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@${PROTOC_GEN_GO_VERSION}
+          go install connectrpc.com/connect/cmd/protoc-gen-connect-go@${PROTOC_GEN_CONNECT_GO_VERSION}
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - uses: actions/setup-node@v7
         with:
           node-version: "22"
 
-      # Installed to a scratch prefix, not the repo root -- generated/ts
-      # has its own package.json (the *output* package's runtime deps,
-      # @bufbuild/protobuf + @connectrpc/connect), which is unrelated to
-      # this plugin install and shouldn't end up with a node_modules/
-      # lockfile dropped next to it.
+      # protoc-gen-es from the root package-lock.json. The workspace
+      # install hoists everything to the root node_modules/, so nothing
+      # lands next to generated/ts's own package.json.
       - name: Install TypeScript plugin
         run: |
-          mkdir -p /tmp/ts-plugin
-          npm install --prefix /tmp/ts-plugin @bufbuild/protoc-gen-es@latest
-          echo "/tmp/ts-plugin/node_modules/.bin" >> "$GITHUB_PATH"
+          npm ci
+          echo "$GITHUB_WORKSPACE/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Generate
         run: buf generate proto

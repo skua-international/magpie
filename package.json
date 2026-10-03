@@ -13,6 +13,6 @@
     "typecheck:web": "npm run typecheck --workspace @skua-international/magpie-web"
   },
   "dependencies": {
-    "@bufbuild/protoc-gen-es": "^2.14.1"
+    "@bufbuild/protoc-gen-es": "^2.15.0"
   }
 }

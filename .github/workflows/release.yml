@@ -45,6 +45,10 @@ concurrency:
   group: release
   cancel-in-progress: false
 
+env:
+  PROTOC_GEN_GO_VERSION: v1.36.12
+  PROTOC_GEN_CONNECT_GO_VERSION: v1.20.0
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -70,13 +74,6 @@ jobs:
           fetch-tags: true
           ref: ${{ inputs.ref || 'main' }}
           token: ${{ steps.app-token.outputs.token }}
-
-      # Cache key for the @latest plugin installs below -- ISO week, so
-      # the cache self-refreshes periodically instead of pinning forever
-      # to whatever was first cached.
-      - name: Compute cache week
-        id: week
-        run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
 
       - uses: bufbuild/buf-setup-action@v1
         with:
@@ -117,51 +114,40 @@ jobs:
           # go.mod to key setup-go's built-in cache off at all.
           cache: false
 
-      # Keyed by ISO week, not a fixed key: these are @latest installs
-      # (no version pin, matching buf.gen.yaml's own `local:` plugins), so
-      # the cache still self-refreshes periodically instead of pinning
-      # forever to whatever was first cached.
+      # Pinned, not @latest: the generators stamp their own version into
+      # every file header, so an unpinned install fails the staleness
+      # check below whenever upstream ships, with no proto change at all.
+      # Keep these in step with generate-stubs.yml's copy and with
+      # generated/go/go.mod's runtime versions.
       - name: Cache Go proto plugins
         id: cache-go-plugins
         uses: actions/cache@v6
         with:
           path: ~/go/bin
-          key: protoc-plugins-go-${{ runner.os }}-${{ steps.week.outputs.week }}
-          restore-keys: protoc-plugins-go-${{ runner.os }}-
+          key: protoc-plugins-go-${{ runner.os }}-${{ env.PROTOC_GEN_GO_VERSION }}-${{ env.PROTOC_GEN_CONNECT_GO_VERSION }}
 
       - name: Install Go plugins
         if: steps.cache-go-plugins.outputs.cache-hit != 'true'
         run: |
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-          go install connectrpc.com/connect/cmd/protoc-gen-connect-go@latest
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@${PROTOC_GEN_GO_VERSION}
+          go install connectrpc.com/connect/cmd/protoc-gen-connect-go@${PROTOC_GEN_CONNECT_GO_VERSION}
       - run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - uses: actions/setup-node@v7
         with:
           node-version: "22"
 
-      - name: Cache TypeScript proto plugin
-        id: cache-ts-plugin
-        uses: actions/cache@v6
-        with:
-          path: /tmp/ts-plugin
-          key: protoc-plugins-ts-${{ runner.os }}-${{ steps.week.outputs.week }}
-          restore-keys: protoc-plugins-ts-${{ runner.os }}-
-
-      - name: Install TypeScript plugin
-        if: steps.cache-ts-plugin.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p /tmp/ts-plugin
-          npm install --prefix /tmp/ts-plugin @bufbuild/protoc-gen-es@latest
-      - run: echo "/tmp/ts-plugin/node_modules/.bin" >> "$GITHUB_PATH"
+      # protoc-gen-es comes from the root package-lock.json, the same
+      # binary a local `npm ci && buf generate proto` uses, so CI and a
+      # local regen can't disagree on its version.
+      - run: npm ci
+      - run: echo "$GITHUB_WORKSPACE/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Regenerate proto stubs
         run: buf generate proto
 
       - name: Verify generated stubs are current
         run: git diff --exit-code -- generated/go generated/ts
-
-      - run: npm ci
 
       - name: Release
         env:
