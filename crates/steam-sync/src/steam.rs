@@ -396,15 +396,19 @@ impl CmPool {
                 self.authenticated[slot].store(is_auth, Ordering::SeqCst);
                 info!("pool slot {slot} reconnected after being marked bad");
                 self.idle.lock().unwrap().push((slot, conn));
+                drop(permit);
             }
             Err(e) => {
                 self.authenticated[slot].store(false, Ordering::SeqCst);
                 error!(
                     "pool slot {slot} failed to reconnect, including the anonymous fallback -- pool is now permanently short by one slot until process restart: {e:#}"
                 );
+                // Forget, not drop: there's no connection behind this
+                // permit anymore, and returning it to the semaphore would
+                // let a later acquire() win a permit with `idle` empty.
+                permit.forget();
             }
         }
-        drop(permit);
     }
 
     /// The (username, refresh_token) this pool is currently logged in
