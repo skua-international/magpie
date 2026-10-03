@@ -20,10 +20,11 @@ rules:
   # ArmaServer. Local (zip) sources are also fully resolved here (no Steam
   # session needed), so this is the one process besides
   # services/sync-daemon's own reconciler that ever writes ModSource
-  # status.
+  # status. patch is for SetModSourceMetadata, which writes operator
+  # metadata as annotations on the object itself.
   - apiGroups: ["arma.skua.io"]
     resources: ["modsources"]
-    verbs: ["get", "list", "create", "delete"]
+    verbs: ["get", "list", "create", "patch", "delete"]
   - apiGroups: ["arma.skua.io"]
     resources: ["modsources/status"]
     verbs: ["get", "patch"]
