@@ -27,6 +27,9 @@ fn required_scope(path: &str) -> Option<&'static str> {
         "/registry.v1.ModSourceService/SyncModSource" => Some("mod-sources:write"),
         "/registry.v1.ModSourceService/ListSyncedMods" => Some("mod-sources:read"),
         "/registry.v1.ModSourceService/GetSyncedMod" => Some("mod-sources:read"),
+        // Reads resolved state only -- the one Steam call it can make is a
+        // title lookup, nothing that acts as the cluster's account.
+        "/registry.v1.ModSourceService/ExportPreset" => Some("mod-sources:read"),
         // Deliberately its own scope, distinct from mod-sources:write --
         // even though it's non-destructive (cache-only, see the RPC's own
         // doc), it's still a "force everyone to re-verify this" lever
@@ -160,4 +163,41 @@ async fn main() -> Result<()> {
     axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::required_scope;
+
+    /// An RPC missing from `required_scope` is refused outright (404), so
+    /// forgetting one fails closed -- but also silently breaks it. Pinned
+    /// for the Workshop collection and preset export RPCs.
+    #[test]
+    fn collection_and_preset_rpcs_carry_their_scopes() {
+        for rpc in [
+            "ResolveWorkshopItems",
+            "ListWorkshopCollections",
+            "GetWorkshopCollection",
+            "PublishWorkshopCollection",
+            "DeleteWorkshopCollection",
+        ] {
+            assert_eq!(
+                required_scope(&format!("/registry.v1.AdminService/{rpc}")),
+                Some("admin:steam-auth"),
+                "{rpc}"
+            );
+        }
+        assert_eq!(
+            required_scope("/registry.v1.ModSourceService/ExportPreset"),
+            Some("mod-sources:read")
+        );
+    }
+
+    #[test]
+    fn the_removed_prototype_rpc_is_gone() {
+        assert_eq!(
+            required_scope("/registry.v1.AdminService/CreatePresetCollection"),
+            None
+        );
+    }
 }

@@ -4,18 +4,18 @@ use std::sync::{Arc, Mutex};
 
 use connectrpc::{ConnectError, RequestContext, Response, ServiceRequest, ServiceResult};
 use protocol::proto::sync::v1::{
-    BeginQrLoginRequest, BeginQrLoginResponse, DeregisterSourceRequest, DeregisterSourceResponse,
-    GetSourceModsRequest, GetSourceModsResponse, GetSyncStatsRequest, GetSyncStatsResponse,
-    CollectionSummary, DeleteCollectionRequest, DeleteCollectionResponse, GetCollectionRequest,
-    GetCollectionResponse, GetSyncStatusRequest, GetSyncStatusResponse, GetSyncedModRequest,
-    GetSyncedModResponse, ListOwnedCollectionsRequest, ListOwnedCollectionsResponse,
-    PublishCollectionRequest, PublishCollectionResponse, ResolveWorkshopItemsRequest,
-    ResolveWorkshopItemsResponse, WorkshopItem,
-    InvalidateModRequest, InvalidateModResponse, ListSyncedModsRequest, ListSyncedModsResponse,
-    PollQrLoginRequest, PollQrLoginResponse, RefreshSourceRequest, RefreshSourceResponse,
+    BeginQrLoginRequest, BeginQrLoginResponse, CollectionSummary, DeleteCollectionRequest,
+    DeleteCollectionResponse, DeregisterSourceRequest, DeregisterSourceResponse,
+    GetCollectionRequest, GetCollectionResponse, GetSourceModsRequest, GetSourceModsResponse,
+    GetSyncStatsRequest, GetSyncStatsResponse, GetSyncStatusRequest, GetSyncStatusResponse,
+    GetSyncedModRequest, GetSyncedModResponse, InvalidateModRequest, InvalidateModResponse,
+    ListOwnedCollectionsRequest, ListOwnedCollectionsResponse, ListSyncedModsRequest,
+    ListSyncedModsResponse, PollQrLoginRequest, PollQrLoginResponse, PublishCollectionRequest,
+    PublishCollectionResponse, RefreshSourceRequest, RefreshSourceResponse,
     RefreshSteamAuthRequest, RefreshSteamAuthResponse, RegisterSourceRequest,
-    RegisterSourceResponse, ResolvedMod as ProtoResolvedMod, SyncContentRequest,
-    SyncContentResponse, SyncService, SyncedMod,
+    RegisterSourceResponse, ResolveWorkshopItemsRequest, ResolveWorkshopItemsResponse,
+    ResolvedMod as ProtoResolvedMod, SyncContentRequest, SyncContentResponse, SyncService,
+    SyncedMod, WorkshopItem,
 };
 use steam_sync::cache::SyncState;
 use steam_sync::collection::{self, Visibility};
@@ -317,14 +317,12 @@ impl Shared {
                     // the collection renamed to describe a list it
                     // doesn't hold.
                     collection::set_collection_children(conn, id, &mod_ids).await?;
-                    collection::update_collection(conn, id, title, description, visibility)
-                        .await?;
+                    collection::update_collection(conn, id, title, description, visibility).await?;
                     (id, false)
                 }
                 None => {
-                    let id =
-                        collection::publish_collection(conn, title, description, visibility)
-                            .await?;
+                    let id = collection::publish_collection(conn, title, description, visibility)
+                        .await?;
                     if let Err(e) = collection::set_collection_children(conn, id, &mod_ids).await {
                         // Don't leave an empty collection behind under the
                         // account's name for a publish that, as far as the
@@ -1067,7 +1065,10 @@ mod tests {
         let err = ensure_owned(&details(CLUSTER + 1), CLUSTER).unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("another Steam account"), "{msg}");
-        assert!(msg.contains("copied"), "should say what *can* be done: {msg}");
+        assert!(
+            msg.contains("copied"),
+            "should say what *can* be done: {msg}"
+        );
     }
 
     #[test]
@@ -1111,7 +1112,10 @@ mod tests {
             },
         ]);
         assert_eq!(
-            items.iter().map(|i| (i.id, i.title.as_str(), i.file_size)).collect::<Vec<_>>(),
+            items
+                .iter()
+                .map(|i| (i.id, i.title.as_str(), i.file_size))
+                .collect::<Vec<_>>(),
             vec![(2, "b", 20), (1, "a", 10)]
         );
     }

@@ -2297,7 +2297,9 @@ mod tests {
     use super::*;
 
     fn mods(ids: &[u64]) -> HashMap<u64, (String, u64)> {
-        ids.iter().map(|&id| (id, (format!("mod {id}"), id * 10))).collect()
+        ids.iter()
+            .map(|&id| (id, (format!("mod {id}"), id * 10)))
+            .collect()
     }
 
     fn ids(resolved: &[ResolvedMod]) -> Vec<u64> {
@@ -2309,7 +2311,8 @@ mod tests {
         // The whole reason this exists: resolution used to come back in
         // HashMap order, which scrambled a preset's order on its way into
         // a published collection.
-        let (out, unresolved) = flatten_in_order(&[3, 1, 2], &HashMap::new(), &mut mods(&[1, 2, 3]));
+        let (out, unresolved) =
+            flatten_in_order(&[3, 1, 2], &HashMap::new(), &mut mods(&[1, 2, 3]));
         assert_eq!(ids(&out), vec![3, 1, 2]);
         assert!(unresolved.is_empty());
         assert_eq!(out[0].title, "mod 3");
@@ -2352,8 +2355,7 @@ mod tests {
         // 9 was a direct candidate, 8 a member of a collection; both are
         // reported, once each, in the order they were met.
         let children = HashMap::from([(100, vec![8, 2])]);
-        let (out, unresolved) =
-            flatten_in_order(&[1, 9, 100, 9], &children, &mut mods(&[1, 2]));
+        let (out, unresolved) = flatten_in_order(&[1, 9, 100, 9], &children, &mut mods(&[1, 2]));
         assert_eq!(ids(&out), vec![1, 2]);
         assert_eq!(unresolved, vec![9, 8]);
     }

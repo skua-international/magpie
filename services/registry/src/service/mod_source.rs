@@ -19,14 +19,16 @@ use kube::{Api, Client, ResourceExt};
 use protocol::proto::registry::v1::add_mod_source_request::SourceView;
 use protocol::proto::registry::v1::{
     AddModSourceRequest, AddModSourceResponse, DeleteModSourceRequest, DeleteModSourceResponse,
-    GetSyncedModRequest, GetSyncedModResponse, InvalidateModRequest, InvalidateModResponse,
-    ListModSourcesRequest, ListModSourcesResponse, ListSyncedModsRequest, ListSyncedModsResponse,
-    ModSourceInfo, ModSourceKind as ProtoKind, SetModSourceMetadataRequest, SyncModSourceRequest,
-    SyncModSourceResponse, SyncedMod as ProtoSyncedMod,
+    ExportPresetRequest, ExportPresetResponse, GetSyncedModRequest, GetSyncedModResponse,
+    InvalidateModRequest, InvalidateModResponse, ListModSourcesRequest, ListModSourcesResponse,
+    ListSyncedModsRequest, ListSyncedModsResponse, ModSourceInfo, ModSourceKind as ProtoKind,
+    SetModSourceMetadataRequest, SyncModSourceRequest, SyncModSourceResponse,
+    SyncedMod as ProtoSyncedMod,
 };
 use sync_client::SyncClient;
 use uuid::Uuid;
 
+use super::preset_export;
 use crate::storage;
 
 pub struct ModSourceServiceImpl {
@@ -333,6 +335,68 @@ impl protocol::proto::registry::v1::ModSourceService for ModSourceServiceImpl {
         Response::ok(SyncModSourceResponse::default())
     }
 
+    async fn export_preset<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        request: ServiceRequest<'_, ExportPresetRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<ExportPresetResponse> + Send + use<'a>> {
+        let requested: Vec<String> = request.source_ids.iter().map(|s| s.to_string()).collect();
+        if requested.is_empty() {
+            return Err(ConnectError::invalid_argument(
+                "source_ids must not be empty",
+            ));
+        }
+        let name = preset_export::preset_name(request.name);
+
+        let sources = self
+            .api()
+            .list(&ListParams::default())
+            .await
+            .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
+        let plan = preset_export::plan(&requested, &sources.items);
+        if plan.mod_ids.is_empty() {
+            return Err(ConnectError::failed_precondition(format!(
+                "nothing to export: {}",
+                nothing_to_export_reason(&plan)
+            )));
+        }
+
+        // Titles as recorded when the mods were synced; Steam is asked
+        // only about the rest, and an export goes ahead without them --
+        // a title is cosmetic here, the id is what the Launcher uses.
+        let mut known: std::collections::HashMap<u64, String> = self
+            .sync_client
+            .list_synced_mods()
+            .await
+            .map_err(|e| ConnectError::internal(format!("{e:#}")))?
+            .into_iter()
+            .map(|m| (m.mod_id, m.title))
+            .collect();
+        let untitled = preset_export::untitled(&plan.mod_ids, &known);
+        if !untitled.is_empty() {
+            match self.sync_client.resolve_workshop_items(&untitled).await {
+                Ok(resolved) => {
+                    known.extend(resolved.mods.into_iter().map(|m| (m.id, m.title)));
+                }
+                Err(e) => tracing::warn!(
+                    "couldn't look up titles for {} mod(s) in a preset export, using ids: {e}",
+                    untitled.len()
+                ),
+            }
+        }
+
+        let mods = preset_export::launcher_order(preset_export::titled(&plan.mod_ids, &known));
+        let rows: Vec<(u64, &str)> = mods.iter().map(|(id, t)| (*id, t.as_str())).collect();
+        Response::ok(ExportPresetResponse {
+            html: workshop_parse::render_preset_html(&name, &rows),
+            mod_count: rows.len() as u32,
+            skipped_local_sources: plan.skipped_local,
+            missing_sources: plan.missing,
+            unresolved_sources: plan.unresolved,
+            ..Default::default()
+        })
+    }
+
     async fn list_synced_mods<'a>(
         &'a self,
         _ctx: RequestContext,
@@ -399,5 +463,59 @@ impl protocol::proto::registry::v1::ModSourceService for ModSourceServiceImpl {
             .await
             .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
         Response::ok(InvalidateModResponse::default())
+    }
+}
+
+/// Why an export came out empty, in the caller's terms -- every source
+/// they picked was one of these.
+fn nothing_to_export_reason(plan: &preset_export::ExportPlan) -> String {
+    let mut parts = Vec::new();
+    if !plan.skipped_local.is_empty() {
+        parts.push(format!(
+            "local sources can't go in a preset ({})",
+            plan.skipped_local.join(", ")
+        ));
+    }
+    if !plan.unresolved.is_empty() {
+        parts.push(format!(
+            "not resolved from Steam yet ({})",
+            plan.unresolved.join(", ")
+        ));
+    }
+    if !plan.missing.is_empty() {
+        parts.push(format!("no such mod source ({})", plan.missing.join(", ")));
+    }
+    parts.join("; ")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_export_explains_every_cause() {
+        let plan = preset_export::ExportPlan {
+            mod_ids: vec![],
+            skipped_local: vec!["skua_custom".into()],
+            unresolved: vec!["pending".into()],
+            missing: vec!["gone".into()],
+        };
+        assert_eq!(
+            nothing_to_export_reason(&plan),
+            "local sources can't go in a preset (skua_custom); not resolved from Steam yet \
+             (pending); no such mod source (gone)"
+        );
+    }
+
+    #[test]
+    fn empty_export_names_only_the_causes_that_apply() {
+        let plan = preset_export::ExportPlan {
+            skipped_local: vec!["a".into(), "b".into()],
+            ..Default::default()
+        };
+        assert_eq!(
+            nothing_to_export_reason(&plan),
+            "local sources can't go in a preset (a, b)"
+        );
     }
 }

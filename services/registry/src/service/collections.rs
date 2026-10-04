@@ -212,7 +212,10 @@ mod tests {
 
     #[test]
     fn extracts_preset_ids_in_order() {
-        assert_eq!(candidate_ids(PRESET, &[]).unwrap(), vec![450814997, 623475643]);
+        assert_eq!(
+            candidate_ids(PRESET, &[]).unwrap(),
+            vec![450814997, 623475643]
+        );
     }
 
     #[test]
@@ -249,7 +252,10 @@ mod tests {
         let err = candidate_ids("<html><body>not a preset</body></html>", &[]).unwrap_err();
         assert_eq!(err.code, ErrorCode::InvalidArgument);
         assert!(
-            err.message.as_deref().unwrap_or("").contains("preset export"),
+            err.message
+                .as_deref()
+                .unwrap_or("")
+                .contains("preset export"),
             "{err:?}"
         );
     }
@@ -258,7 +264,12 @@ mod tests {
     fn rejects_empty_input() {
         let err = candidate_ids("", &[]).unwrap_err();
         assert_eq!(err.code, ErrorCode::InvalidArgument);
-        assert!(err.message.as_deref().unwrap_or("").contains("nothing to resolve"));
+        assert!(
+            err.message
+                .as_deref()
+                .unwrap_or("")
+                .contains("nothing to resolve")
+        );
     }
 
     #[test]
@@ -282,7 +293,10 @@ mod tests {
             ),
         ] {
             assert_eq!(to_sync_visibility(registry.to_i32()).unwrap(), sync);
-            assert_eq!(to_registry_visibility(sync.into()).to_i32(), registry.to_i32());
+            assert_eq!(
+                to_registry_visibility(sync.into()).to_i32(),
+                registry.to_i32()
+            );
         }
     }
 
@@ -303,9 +317,14 @@ mod tests {
 
     #[test]
     fn relay_keeps_request_errors_and_their_message() {
-        let err = relay(ConnectError::invalid_argument("candidate_ids must not be empty"));
+        let err = relay(ConnectError::invalid_argument(
+            "candidate_ids must not be empty",
+        ));
         assert_eq!(err.code, ErrorCode::InvalidArgument);
-        assert_eq!(err.message.as_deref(), Some("candidate_ids must not be empty"));
+        assert_eq!(
+            err.message.as_deref(),
+            Some("candidate_ids must not be empty")
+        );
     }
 
     #[test]

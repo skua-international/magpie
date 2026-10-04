@@ -266,14 +266,10 @@ pub async fn set_collection_children(
         publishedfileid: Some(collection_id),
         children: children.clone(),
     };
-    let _: steamdepot::proto::CPublishedFileSetCollectionChildrenResponse = call(
-        conn,
-        "PublishedFile.SetCollectionChildren#1",
-        &req,
-        true,
-    )
-    .await
-    .with_context(|| format!("failed to set children on collection {collection_id}"))?;
+    let _: steamdepot::proto::CPublishedFileSetCollectionChildrenResponse =
+        call(conn, "PublishedFile.SetCollectionChildren#1", &req, true)
+            .await
+            .with_context(|| format!("failed to set children on collection {collection_id}"))?;
 
     info!(
         "set {} members on collection {collection_id}",
@@ -383,7 +379,9 @@ pub async fn list_owned_collections(
         // Bounded by what Steam says it has, and by a short page -- either
         // alone could loop forever on a response that lies about the other.
         let total = resp.total.unwrap_or(0) as usize;
-        if got < USER_FILES_PAGE_SIZE as usize || page as usize * USER_FILES_PAGE_SIZE as usize >= total {
+        if got < USER_FILES_PAGE_SIZE as usize
+            || page as usize * USER_FILES_PAGE_SIZE as usize >= total
+        {
             break;
         }
         page += 1;

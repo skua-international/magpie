@@ -71,9 +71,21 @@ async fn exercise(conn: &mut steam::CmConnection, steam_id: u64, id: u64) -> Res
 
     let details = collection::get_collection_details(conn, id).await?;
     println!("read back: {details:?}");
-    ensure!(details.creator == steam_id, "creator {} != us", details.creator);
-    ensure!(details.children == MODS, "children {:?} != {MODS:?}", details.children);
-    ensure!(details.visibility == Some(Visibility::Private), "visibility {:?}", details.visibility);
+    ensure!(
+        details.creator == steam_id,
+        "creator {} != us",
+        details.creator
+    );
+    ensure!(
+        details.children == MODS,
+        "children {:?} != {MODS:?}",
+        details.children
+    );
+    ensure!(
+        details.visibility == Some(Visibility::Private),
+        "visibility {:?}",
+        details.visibility
+    );
 
     let resolved = steam::resolve_source_ids(conn, &details.children).await?;
     let titles: Vec<_> = resolved.mods.iter().map(|m| m.title.as_str()).collect();
@@ -107,8 +119,16 @@ async fn exercise(conn: &mut steam::CmConnection, steam_id: u64, id: u64) -> Res
     )
     .await?;
     let edited = collection::get_collection_details(conn, id).await?;
-    ensure!(edited.children == reversed, "reorder didn't stick: {:?}", edited.children);
-    ensure!(edited.title == "magpie collection probe (edited)", "title {:?}", edited.title);
+    ensure!(
+        edited.children == reversed,
+        "reorder didn't stick: {:?}",
+        edited.children
+    );
+    ensure!(
+        edited.title == "magpie collection probe (edited)",
+        "title {:?}",
+        edited.title
+    );
     println!("edit stuck: {:?} {:?}", edited.title, edited.children);
     Ok(())
 }

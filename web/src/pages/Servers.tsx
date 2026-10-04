@@ -23,6 +23,7 @@ import {
 } from "../components/ui";
 import { LogViewer } from "../components/LogViewer";
 import { ServerHealth } from "../components/ServerHealth";
+import { usePresetDownload } from "../components/presetDownload";
 import { useAction, useAsync } from "../components/useAsync";
 
 
@@ -64,6 +65,7 @@ export function Servers() {
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [logsFor, setLogsFor] = useState<{ id: string; name: string } | null>(null);
+  const preset = usePresetDownload();
 
   if (list.loading) return <Spinner label="Loading servers…" />;
   if (list.error) return <Banner kind="error">{list.error}</Banner>;
@@ -80,6 +82,7 @@ export function Servers() {
       </header>
 
       {action.error && <Banner kind="error">{action.error}</Banner>}
+      {preset.banner}
 
       {creating && (
         <CreateServer
@@ -193,6 +196,15 @@ export function Servers() {
                 </Button>
                 <Button size="compact" onClick={() => setLogsFor({ id: s.id, name: s.name })}>
                   Logs
+                </Button>
+                {/* Every source the server loads, combined into one
+                    Launcher preset -- what a player needs to join. */}
+                <Button
+                  size="compact"
+                  disabled={preset.busy || s.modSourceIds.length === 0}
+                  onClick={() => void preset.download(s.modSourceIds, s.name)}
+                >
+                  Preset
                 </Button>
                 <Button size="compact" onClick={() => setEditing(editing === s.id ? null : s.id)}>
                   {editing === s.id ? "Cancel" : "Edit"}

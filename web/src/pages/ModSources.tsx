@@ -20,6 +20,7 @@ import {
   formatBytes,
   formatTimestamp,
 } from "../components/ui";
+import { usePresetDownload } from "../components/presetDownload";
 import { useAction, useAsync } from "../components/useAsync";
 
 function kindLabel(kind: ModSourceKind): string {
@@ -44,6 +45,7 @@ export function ModSources() {
   const action = useAction(list.reload);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  const preset = usePresetDownload();
 
   if (list.loading) return <Spinner label="Loading mod sources…" />;
   if (list.error) return <Banner kind="error">{list.error}</Banner>;
@@ -58,6 +60,7 @@ export function ModSources() {
       </header>
 
       {action.error && <Banner kind="error">{action.error}</Banner>}
+      {preset.banner}
 
       {adding && (
         <AddSource
@@ -124,6 +127,17 @@ export function ModSources() {
                 >
                   {editing === s.id ? "Cancel" : "Metadata"}
                 </Button>
+                {/* Local mods have no Workshop item a preset could
+                    point at, so there's nothing to export. */}
+                {s.kind !== ModSourceKind.LOCAL && (
+                  <Button
+                    size="compact"
+                    disabled={preset.busy}
+                    onClick={() => void preset.download([s.id], s.displayName || s.id)}
+                  >
+                    Preset
+                  </Button>
+                )}
                 <Button
                   size="compact"
                   variant="danger"

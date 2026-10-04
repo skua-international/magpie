@@ -130,8 +130,8 @@ async fn resolve(obj: &ModSource, ctx: &Ctx) -> anyhow::Result<Action> {
     match ctx.shared.register_source_impl(&candidate_ids, &name).await {
         Ok(outcome) => {
             // Sorted, not left in outcome.mods' own order -- that order
-            // comes from a HashMap::into_iter() in resolve_source_ids,
-            // with no run-to-run stability guarantee. An unsorted Vec here
+            // follows the collection's order on Steam, which its owner can
+            // change without changing what's in it. An unsorted Vec here
             // would defeat set_status's unchanged-status guard on reorder
             // alone (PartialEq on Vec is order-sensitive), even when the
             // actual resolved set hasn't changed at all.

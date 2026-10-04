@@ -12,15 +12,15 @@ use kube::api::{Api, DeleteParams, ListParams, Patch, PatchParams};
 
 use protocol::proto::registry::v1::{
     AclSubject, BeginSteamQrLoginRequest, BeginSteamQrLoginResponse, DeleteSecretRequest,
-    DeleteSecretResponse, DeleteWorkshopCollectionRequest, DeleteWorkshopCollectionResponse, ExportStateRequest, ExportStateResponse, GetDiskUsageRequest,
-    GetDiskUsageResponse, ImportStateRequest, ImportStateResponse, LinkedAccountInfo,
-    GetWorkshopCollectionRequest, ListAclRequest, ListAclResponse, ListSecretsRequest,
-    ListSecretsResponse, ListWorkshopCollectionsRequest, ListWorkshopCollectionsResponse,
-    PollSteamQrLoginRequest, PollSteamQrLoginResponse, PublishWorkshopCollectionRequest,
-    PublishWorkshopCollectionResponse, PutSecretRequest, PutSecretResponse,
-    RefreshSteamAuthRequest, RefreshSteamAuthResponse, ResolveWorkshopItemsRequest,
-    ResolveWorkshopItemsResponse, SecretInfo, SetAclScopesRequest, SetAclScopesResponse,
-    WorkshopCollection,
+    DeleteSecretResponse, DeleteWorkshopCollectionRequest, DeleteWorkshopCollectionResponse,
+    ExportStateRequest, ExportStateResponse, GetDiskUsageRequest, GetDiskUsageResponse,
+    GetWorkshopCollectionRequest, ImportStateRequest, ImportStateResponse, LinkedAccountInfo,
+    ListAclRequest, ListAclResponse, ListSecretsRequest, ListSecretsResponse,
+    ListWorkshopCollectionsRequest, ListWorkshopCollectionsResponse, PollSteamQrLoginRequest,
+    PollSteamQrLoginResponse, PublishWorkshopCollectionRequest, PublishWorkshopCollectionResponse,
+    PutSecretRequest, PutSecretResponse, RefreshSteamAuthRequest, RefreshSteamAuthResponse,
+    ResolveWorkshopItemsRequest, ResolveWorkshopItemsResponse, SecretInfo, SetAclScopesRequest,
+    SetAclScopesResponse, WorkshopCollection,
 };
 use protocol::proto::sync::v1::PublishCollectionRequest;
 use sqlx::PgPool;
@@ -178,9 +178,8 @@ impl protocol::proto::registry::v1::AdminService for AdminServiceImpl {
         &'a self,
         _ctx: RequestContext,
         request: ServiceRequest<'_, PublishWorkshopCollectionRequest>,
-    ) -> ServiceResult<
-        impl connectrpc::Encodable<PublishWorkshopCollectionResponse> + Send + use<'a>,
-    > {
+    ) -> ServiceResult<impl connectrpc::Encodable<PublishWorkshopCollectionResponse> + Send + use<'a>>
+    {
         let title = request.title.trim();
         if title.is_empty() {
             return Err(ConnectError::invalid_argument("a collection needs a title"));

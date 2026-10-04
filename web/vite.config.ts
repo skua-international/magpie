@@ -16,6 +16,7 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     restoreMocks: true,
+    setupFiles: ["src/test/setup.ts"],
   },
   server: {
     // `npm run dev` serves the SPA itself but has no backend; point RPC

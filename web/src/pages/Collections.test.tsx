@@ -29,22 +29,6 @@ vi.mock("../api/clients", () => ({
 
 import { Collections } from "./Collections";
 
-// jsdom's File lacks Blob.text(), which every browser the UI targets has
-// (and which ModSources' preset upload relies on too). FileReader is the
-// part jsdom does implement.
-if (!("text" in File.prototype)) {
-  Object.defineProperty(Blob.prototype, "text", {
-    value(this: Blob) {
-      return new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(reader.error);
-        reader.readAsText(this);
-      });
-    },
-  });
-}
-
 const item = (id: bigint, title: string) => create(WorkshopItemSchema, { id, title });
 const CBA = item(450814997n, "CBA_A3");
 const EDEN = item(623475643n, "3den Enhanced");

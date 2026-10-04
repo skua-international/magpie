@@ -281,7 +281,9 @@ The Collections tab turns an Arma 3 Launcher preset export into a Steam Workshop
 
 This goes the opposite direction from mod sources and touches nothing in the cluster: publishing a collection doesn't sync it, and a collection only becomes a mod source if you add its link as one. Every collection RPC needs `admin:steam-auth`, the same scope as the Steam login itself, since they act as that account.
 
-The Steam calls behind it can be checked against a real account without deploying anything — this publishes a private collection, edits it, and deletes it again:
+Going the other way, any Steam-backed mod source — or a server, meaning every source it loads combined — downloads as a Launcher preset file (the **Preset** button on each row), so players can load exactly what a server runs with one import. It's built from what the cluster has already resolved, not a fresh Steam lookup; local (zip) mods are left out, since players can't get them from the Workshop, and the page says so when it happens.
+
+The Steam calls behind collections can be checked against a real account without deploying anything — this publishes a private collection, edits it, and deletes it again:
 
 ```bash
 STEAM_USER=... STEAM_REFRESH_TOKEN=... cargo run -p steam-sync --example collection_probe

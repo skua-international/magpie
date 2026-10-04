@@ -61,6 +61,9 @@ const (
 	// ModSourceServiceSetModSourceMetadataProcedure is the fully-qualified name of the
 	// ModSourceService's SetModSourceMetadata RPC.
 	ModSourceServiceSetModSourceMetadataProcedure = "/registry.v1.ModSourceService/SetModSourceMetadata"
+	// ModSourceServiceExportPresetProcedure is the fully-qualified name of the ModSourceService's
+	// ExportPreset RPC.
+	ModSourceServiceExportPresetProcedure = "/registry.v1.ModSourceService/ExportPreset"
 	// MissionServiceUploadMissionProcedure is the fully-qualified name of the MissionService's
 	// UploadMission RPC.
 	MissionServiceUploadMissionProcedure = "/registry.v1.MissionService/UploadMission"
@@ -158,6 +161,16 @@ type ModSourceServiceClient interface {
 	// not input. Same scope as AddModSource -- this writes an annotation
 	// and touches no content.
 	SetModSourceMetadata(context.Context, *connect.Request[v1.SetModSourceMetadataRequest]) (*connect.Response[v1.ModSourceInfo], error)
+	// Render mod sources as an Arma 3 Launcher preset export -- the same
+	// HTML file format AddModSource's preset kinds read -- so players can
+	// load exactly what a server runs with one import. Several sources
+	// (a server's whole list) combine into one preset, de-duplicated.
+	//
+	// Reads only what's already resolved and recorded: the sources'
+	// resolved mod lists and the titles synced mods were recorded with.
+	// Steam is asked only for the title of a mod nothing has recorded one
+	// for, and an export still succeeds without it.
+	ExportPreset(context.Context, *connect.Request[v1.ExportPresetRequest]) (*connect.Response[v1.ExportPresetResponse], error)
 }
 
 // NewModSourceServiceClient constructs a client for the registry.v1.ModSourceService service. By
@@ -219,6 +232,12 @@ func NewModSourceServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(modSourceServiceMethods.ByName("SetModSourceMetadata")),
 			connect.WithClientOptions(opts...),
 		),
+		exportPreset: connect.NewClient[v1.ExportPresetRequest, v1.ExportPresetResponse](
+			httpClient,
+			baseURL+ModSourceServiceExportPresetProcedure,
+			connect.WithSchema(modSourceServiceMethods.ByName("ExportPreset")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -232,6 +251,7 @@ type modSourceServiceClient struct {
 	invalidateMod        *connect.Client[v1.InvalidateModRequest, v1.InvalidateModResponse]
 	getSyncedMod         *connect.Client[v1.GetSyncedModRequest, v1.GetSyncedModResponse]
 	setModSourceMetadata *connect.Client[v1.SetModSourceMetadataRequest, v1.ModSourceInfo]
+	exportPreset         *connect.Client[v1.ExportPresetRequest, v1.ExportPresetResponse]
 }
 
 // AddModSource calls registry.v1.ModSourceService.AddModSource.
@@ -274,6 +294,11 @@ func (c *modSourceServiceClient) SetModSourceMetadata(ctx context.Context, req *
 	return c.setModSourceMetadata.CallUnary(ctx, req)
 }
 
+// ExportPreset calls registry.v1.ModSourceService.ExportPreset.
+func (c *modSourceServiceClient) ExportPreset(ctx context.Context, req *connect.Request[v1.ExportPresetRequest]) (*connect.Response[v1.ExportPresetResponse], error) {
+	return c.exportPreset.CallUnary(ctx, req)
+}
+
 // ModSourceServiceHandler is an implementation of the registry.v1.ModSourceService service.
 type ModSourceServiceHandler interface {
 	AddModSource(context.Context, *connect.Request[v1.AddModSourceRequest]) (*connect.Response[v1.AddModSourceResponse], error)
@@ -308,6 +333,16 @@ type ModSourceServiceHandler interface {
 	// not input. Same scope as AddModSource -- this writes an annotation
 	// and touches no content.
 	SetModSourceMetadata(context.Context, *connect.Request[v1.SetModSourceMetadataRequest]) (*connect.Response[v1.ModSourceInfo], error)
+	// Render mod sources as an Arma 3 Launcher preset export -- the same
+	// HTML file format AddModSource's preset kinds read -- so players can
+	// load exactly what a server runs with one import. Several sources
+	// (a server's whole list) combine into one preset, de-duplicated.
+	//
+	// Reads only what's already resolved and recorded: the sources'
+	// resolved mod lists and the titles synced mods were recorded with.
+	// Steam is asked only for the title of a mod nothing has recorded one
+	// for, and an export still succeeds without it.
+	ExportPreset(context.Context, *connect.Request[v1.ExportPresetRequest]) (*connect.Response[v1.ExportPresetResponse], error)
 }
 
 // NewModSourceServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -365,6 +400,12 @@ func NewModSourceServiceHandler(svc ModSourceServiceHandler, opts ...connect.Han
 		connect.WithSchema(modSourceServiceMethods.ByName("SetModSourceMetadata")),
 		connect.WithHandlerOptions(opts...),
 	)
+	modSourceServiceExportPresetHandler := connect.NewUnaryHandler(
+		ModSourceServiceExportPresetProcedure,
+		svc.ExportPreset,
+		connect.WithSchema(modSourceServiceMethods.ByName("ExportPreset")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/registry.v1.ModSourceService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ModSourceServiceAddModSourceProcedure:
@@ -383,6 +424,8 @@ func NewModSourceServiceHandler(svc ModSourceServiceHandler, opts ...connect.Han
 			modSourceServiceGetSyncedModHandler.ServeHTTP(w, r)
 		case ModSourceServiceSetModSourceMetadataProcedure:
 			modSourceServiceSetModSourceMetadataHandler.ServeHTTP(w, r)
+		case ModSourceServiceExportPresetProcedure:
+			modSourceServiceExportPresetHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -422,6 +465,10 @@ func (UnimplementedModSourceServiceHandler) GetSyncedMod(context.Context, *conne
 
 func (UnimplementedModSourceServiceHandler) SetModSourceMetadata(context.Context, *connect.Request[v1.SetModSourceMetadataRequest]) (*connect.Response[v1.ModSourceInfo], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.ModSourceService.SetModSourceMetadata is not implemented"))
+}
+
+func (UnimplementedModSourceServiceHandler) ExportPreset(context.Context, *connect.Request[v1.ExportPresetRequest]) (*connect.Response[v1.ExportPresetResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.ModSourceService.ExportPreset is not implemented"))
 }
 
 // MissionServiceClient is a client for the registry.v1.MissionService service.

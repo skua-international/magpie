@@ -52,6 +52,40 @@ service ModSourceService {
   // not input. Same scope as AddModSource -- this writes an annotation
   // and touches no content.
   rpc SetModSourceMetadata(SetModSourceMetadataRequest) returns (ModSourceInfo);
+
+  // Render mod sources as an Arma 3 Launcher preset export -- the same
+  // HTML file format AddModSource's preset kinds read -- so players can
+  // load exactly what a server runs with one import. Several sources
+  // (a server's whole list) combine into one preset, de-duplicated.
+  //
+  // Reads only what's already resolved and recorded: the sources'
+  // resolved mod lists and the titles synced mods were recorded with.
+  // Steam is asked only for the title of a mod nothing has recorded one
+  // for, and an export still succeeds without it.
+  rpc ExportPreset(ExportPresetRequest) returns (ExportPresetResponse);
+}
+
+message ExportPresetRequest {
+  // Combined in this order. An id with no ModSource behind it is skipped
+  // and reported rather than failing the export: a server's spec can
+  // still name a source that has since been deleted.
+  repeated string source_ids = 1;
+  // What the Launcher calls the preset once imported.
+  string name = 2;
+}
+
+message ExportPresetResponse {
+  string html = 1;
+  // Distinct mods in the preset.
+  uint32 mod_count = 2;
+  // Local (zip) sources: they have no Workshop item a preset could point
+  // a player's Launcher at, so they're left out, and named here so the
+  // caller can say so.
+  repeated string skipped_local_sources = 3;
+  // Requested ids with no ModSource behind them.
+  repeated string missing_sources = 4;
+  // Sources that haven't resolved yet, and so contributed nothing.
+  repeated string unresolved_sources = 5;
 }
 
 message SetModSourceMetadataRequest {
