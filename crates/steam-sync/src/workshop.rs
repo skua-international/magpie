@@ -32,7 +32,10 @@ fn patch_mod_metadata(mod_dir: &Path, mod_id: u64, replace_app_id: bool) -> Resu
         // patch -- write one from scratch instead of leaving publishedid
         // undiscoverable.
         tracing::info!("[{mod_id}] Creating missing {}", meta_cpp.display());
-        std::fs::write(&meta_cpp, format!("protocol = 1;\npublishedid = {mod_id};\n"))?;
+        std::fs::write(
+            &meta_cpp,
+            format!("protocol = 1;\npublishedid = {mod_id};\n"),
+        )?;
     }
 
     let mod_cpp = mod_dir.join("mod.cpp");
