@@ -7,6 +7,7 @@
 
 pub mod cache;
 pub mod capacity;
+pub mod collection;
 pub mod lowercase;
 pub mod metrics;
 pub mod steam;

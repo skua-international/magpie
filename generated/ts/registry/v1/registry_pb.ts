@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file registry/v1/registry.proto.
  */
 export const file_registry_v1_registry: GenFile = /*@__PURE__*/
-  fileDesc("ChpyZWdpc3RyeS92MS9yZWdpc3RyeS5wcm90bxILcmVnaXN0cnkudjEipAEKG1NldE1vZFNvdXJjZU1ldGFkYXRhUmVxdWVzdBIKCgJpZBgBIAEoCRJICghtZXRhZGF0YRgCIAMoCzI2LnJlZ2lzdHJ5LnYxLlNldE1vZFNvdXJjZU1ldGFkYXRhUmVxdWVzdC5NZXRhZGF0YUVudHJ5Gi8KDU1ldGFkYXRhRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASKFAgoTQWRkTW9kU291cmNlUmVxdWVzdBISCghodG1sX3VybBgBIAEoCUgAEhYKDGh0bWxfY29udGVudBgCIAEoCUgAEhMKCXN0ZWFtX3VybBgDIAEoCUgAEjAKCWxvY2FsX21vZBgEIAEoCzIbLnJlZ2lzdHJ5LnYxLkxvY2FsTW9kVXBsb2FkSAASQAoIbWV0YWRhdGEYBSADKAsyLi5yZWdpc3RyeS52MS5BZGRNb2RTb3VyY2VSZXF1ZXN0Lk1ldGFkYXRhRW50cnkaLwoNTWV0YWRhdGFFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBQggKBnNvdXJjZSI4Cg5Mb2NhbE1vZFVwbG9hZBIRCgl1bmlxdWVfaWQYASABKAkSEwoLemlwX2NvbnRlbnQYAiABKAwiIgoUQWRkTW9kU291cmNlUmVzcG9uc2USCgoCaWQYASABKAkiJAoWRGVsZXRlTW9kU291cmNlUmVxdWVzdBIKCgJpZBgBIAEoCSIZChdEZWxldGVNb2RTb3VyY2VSZXNwb25zZSIiChRTeW5jTW9kU291cmNlUmVxdWVzdBIKCgJpZBgBIAEoCSIXChVTeW5jTW9kU291cmNlUmVzcG9uc2UiFwoVTGlzdFN5bmNlZE1vZHNSZXF1ZXN0IlMKCVN5bmNlZE1vZBIOCgZtb2RfaWQYASABKAQSEwoLbWFuaWZlc3RfaWQYAiABKAQSEgoKc2l6ZV9ieXRlcxgDIAEoBBINCgV0aXRsZRgEIAEoCSI+ChZMaXN0U3luY2VkTW9kc1Jlc3BvbnNlEiQKBG1vZHMYASADKAsyFi5yZWdpc3RyeS52MS5TeW5jZWRNb2QiJgoUSW52YWxpZGF0ZU1vZFJlcXVlc3QSDgoGbW9kX2lkGAEgASgEIhcKFUludmFsaWRhdGVNb2RSZXNwb25zZSIlChNHZXRTeW5jZWRNb2RSZXF1ZXN0Eg4KBm1vZF9pZBgBIAEoBCJ5ChRHZXRTeW5jZWRNb2RSZXNwb25zZRIoCgNtb2QYASABKAsyFi5yZWdpc3RyeS52MS5TeW5jZWRNb2RIAIgBARIvCgttb2Rfc291cmNlcxgCIAMoCzIaLnJlZ2lzdHJ5LnYxLk1vZFNvdXJjZUluZm9CBgoEX21vZCKLAgoNTW9kU291cmNlSW5mbxIKCgJpZBgBIAEoCRIoCgRraW5kGAIgASgOMhoucmVnaXN0cnkudjEuTW9kU291cmNlS2luZBIRCglyZWZlcmVuY2UYAyABKAkSFAoMZGlzcGxheV9uYW1lGAQgASgJEhoKEmNyZWF0ZWRfYXRfdW5peF9tcxgFIAEoAxISCgpzaXplX2J5dGVzGAYgASgEEjoKCG1ldGFkYXRhGAcgAygLMigucmVnaXN0cnkudjEuTW9kU291cmNlSW5mby5NZXRhZGF0YUVudHJ5Gi8KDU1ldGFkYXRhRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASIXChVMaXN0TW9kU291cmNlc1JlcXVlc3QiRQoWTGlzdE1vZFNvdXJjZXNSZXNwb25zZRIrCgdzb3VyY2VzGAEgAygLMhoucmVnaXN0cnkudjEuTW9kU291cmNlSW5mbyKgAQoZU2V0TWlzc2lvbk1ldGFkYXRhUmVxdWVzdBIKCgJpZBgBIAEoCRJGCghtZXRhZGF0YRgCIAMoCzI0LnJlZ2lzdHJ5LnYxLlNldE1pc3Npb25NZXRhZGF0YVJlcXVlc3QuTWV0YWRhdGFFbnRyeRovCg1NZXRhZGF0YUVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEixQEKFFVwbG9hZE1pc3Npb25SZXF1ZXN0EgwKBG5hbWUYASABKAkSEwoLcGJvX2NvbnRlbnQYAiABKAwSDwoCaWQYAyABKAlIAIgBARJBCghtZXRhZGF0YRgEIAMoCzIvLnJlZ2lzdHJ5LnYxLlVwbG9hZE1pc3Npb25SZXF1ZXN0Lk1ldGFkYXRhRW50cnkaLwoNTWV0YWRhdGFFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBQgUKA19pZCLUAQoLTWlzc2lvbkluZm8SCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIQCghmaWxlc2l6ZRgDIAEoBBIaChJjcmVhdGVkX2F0X3VuaXhfbXMYBCABKAMSEgoKY3JlYXRlZF9ieRgFIAEoCRI4CghtZXRhZGF0YRgGIAMoCzImLnJlZ2lzdHJ5LnYxLk1pc3Npb25JbmZvLk1ldGFkYXRhRW50cnkaLwoNTWV0YWRhdGFFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIh8KEUdldE1pc3Npb25SZXF1ZXN0EgoKAmlkGAEgASgJIhUKE0xpc3RNaXNzaW9uc1JlcXVlc3QiQgoUTGlzdE1pc3Npb25zUmVzcG9uc2USKgoIbWlzc2lvbnMYASADKAsyGC5yZWdpc3RyeS52MS5NaXNzaW9uSW5mbyIaChhCZWdpblN0ZWFtUXJMb2dpblJlcXVlc3QiRgoZQmVnaW5TdGVhbVFyTG9naW5SZXNwb25zZRISCgpzZXNzaW9uX2lkGAEgASgJEhUKDWNoYWxsZW5nZV91cmwYAiABKAkiLQoXUG9sbFN0ZWFtUXJMb2dpblJlcXVlc3QSEgoKc2Vzc2lvbl9pZBgBIAEoCSI/ChhQb2xsU3RlYW1RckxvZ2luUmVzcG9uc2USEQoJY29uZmlybWVkGAEgASgIEhAKCHVzZXJuYW1lGAIgASgJIigKClNlY3JldEluZm8SDAoEbmFtZRgBIAEoCRIMCgRrZXlzGAIgAygJIhQKEkxpc3RTZWNyZXRzUmVxdWVzdCJSChNMaXN0U2VjcmV0c1Jlc3BvbnNlEigKB3NlY3JldHMYASADKAsyFy5yZWdpc3RyeS52MS5TZWNyZXRJbmZvEhEKCW5hbWVzcGFjZRgCIAEoCSKEAQoQUHV0U2VjcmV0UmVxdWVzdBIMCgRuYW1lGAEgASgJEjUKBGRhdGEYAiADKAsyJy5yZWdpc3RyeS52MS5QdXRTZWNyZXRSZXF1ZXN0LkRhdGFFbnRyeRorCglEYXRhRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASI8ChFQdXRTZWNyZXRSZXNwb25zZRInCgZzZWNyZXQYASABKAsyFy5yZWdpc3RyeS52MS5TZWNyZXRJbmZvIiMKE0RlbGV0ZVNlY3JldFJlcXVlc3QSDAoEbmFtZRgBIAEoCSIWChREZWxldGVTZWNyZXRSZXNwb25zZSJVChFMaW5rZWRBY2NvdW50SW5mbxIQCghwcm92aWRlchgBIAEoCRIYChBwcm92aWRlcl91c2VyX2lkGAIgASgJEhQKDGRpc3BsYXlfbmFtZRgDIAEoCSJfCgpBY2xTdWJqZWN0Eg8KB3N1YmplY3QYASABKAkSMAoIYWNjb3VudHMYAiADKAsyHi5yZWdpc3RyeS52MS5MaW5rZWRBY2NvdW50SW5mbxIOCgZzY29wZXMYAyADKAkiEAoOTGlzdEFjbFJlcXVlc3QiUgoPTGlzdEFjbFJlc3BvbnNlEikKCHN1YmplY3RzGAEgAygLMhcucmVnaXN0cnkudjEuQWNsU3ViamVjdBIUCgxrbm93bl9zY29wZXMYAiADKAkiNgoTU2V0QWNsU2NvcGVzUmVxdWVzdBIPCgdzdWJqZWN0GAEgASgJEg4KBnNjb3BlcxgCIAMoCSJAChRTZXRBY2xTY29wZXNSZXNwb25zZRIoCgdzdWJqZWN0GAEgASgLMhcucmVnaXN0cnkudjEuQWNsU3ViamVjdCKAAQoRRXhwb3J0ZWRNb2RTb3VyY2USKAoEa2luZBgBIAEoDjIaLnJlZ2lzdHJ5LnYxLk1vZFNvdXJjZUtpbmQSEQoJcmVmZXJlbmNlGAIgASgJEhQKDGRpc3BsYXlfbmFtZRgDIAEoCRIYChByZXNvbHZlZF9tb2RfaWRzGAQgAygEIoYBChFFeHBvcnRlZENvbmZpZ01hcBIMCgRuYW1lGAEgASgJEjYKBGRhdGEYAiADKAsyKC5yZWdpc3RyeS52MS5FeHBvcnRlZENvbmZpZ01hcC5EYXRhRW50cnkaKwoJRGF0YUVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEizgIKDkV4cG9ydGVkU2VydmVyEgwKBG5hbWUYASABKAkSDAoEcG9ydBgCIAEoDRIdChVtb2Rfc291cmNlX3JlZmVyZW5jZXMYAyADKAkSFwoKY29uZmlnX21hcBgEIAEoCUgAiAEBEgwKBGNkbGMYBSADKAkSEQoJcHJvZmlsaW5nGAYgASgIEjgKDWRlc2lyZWRfc3RhdGUYCCABKA4yIS5yZWdpc3RyeS52MS5FeHBvcnRlZERlc2lyZWRTdGF0ZRIZCgxtZXRyaWNzX3BvcnQYCSABKA1IAYgBARIZCgxtZXRyaWNzX3BhdGgYCiABKAlIAogBARIYChBoZWFkbGVzc19jbGllbnRzGAsgASgNQg0KC19jb25maWdfbWFwQg8KDV9tZXRyaWNzX3BvcnRCDwoNX21ldHJpY3NfcGF0aEoECAcQCFIGcGFyYW1zIhQKEkV4cG9ydFN0YXRlUmVxdWVzdCL0AQoTRXhwb3J0U3RhdGVSZXNwb25zZRIWCg5zY2hlbWFfdmVyc2lvbhgGIAEoDRIbChNleHBvcnRlZF9hdF9yZmMzMzM5GAEgASgJEjMKC21vZF9zb3VyY2VzGAIgAygLMh4ucmVnaXN0cnkudjEuRXhwb3J0ZWRNb2RTb3VyY2USMwoLY29uZmlnX21hcHMYAyADKAsyHi5yZWdpc3RyeS52MS5FeHBvcnRlZENvbmZpZ01hcBIsCgdzZXJ2ZXJzGAQgAygLMhsucmVnaXN0cnkudjEuRXhwb3J0ZWRTZXJ2ZXISEAoId2FybmluZ3MYBSADKAkirAEKEkltcG9ydFN0YXRlUmVxdWVzdBIzCgttb2Rfc291cmNlcxgBIAMoCzIeLnJlZ2lzdHJ5LnYxLkV4cG9ydGVkTW9kU291cmNlEjMKC2NvbmZpZ19tYXBzGAIgAygLMh4ucmVnaXN0cnkudjEuRXhwb3J0ZWRDb25maWdNYXASLAoHc2VydmVycxgDIAMoCzIbLnJlZ2lzdHJ5LnYxLkV4cG9ydGVkU2VydmVyIicKE0ltcG9ydFN0YXRlUmVzcG9uc2USEAoId2FybmluZ3MYASADKAkiFQoTR2V0RGlza1VzYWdlUmVxdWVzdCJxChRHZXREaXNrVXNhZ2VSZXNwb25zZRISCgptb2RzX2J5dGVzGAEgASgEEhYKDm1pc3Npb25zX2J5dGVzGAIgASgEEhgKEGdhbWVfZmlsZXNfYnl0ZXMYAyABKAQSEwoLdG90YWxfYnl0ZXMYBCABKAQiQgoXUmVmcmVzaFN0ZWFtQXV0aFJlcXVlc3QSEAoIdXNlcm5hbWUYASABKAkSFQoNcmVmcmVzaF90b2tlbhgCIAEoCSIaChhSZWZyZXNoU3RlYW1BdXRoUmVzcG9uc2UiIgoURGVsZXRlTWlzc2lvblJlcXVlc3QSCgoCaWQYASABKAkiFwoVRGVsZXRlTWlzc2lvblJlc3BvbnNlKqABCg1Nb2RTb3VyY2VLaW5kEh8KG01PRF9TT1VSQ0VfS0lORF9VTlNQRUNJRklFRBAAEhcKE01PRF9TT1VSQ0VfS0lORF9NT0QQARIeChpNT0RfU09VUkNFX0tJTkRfQ09MTEVDVElPThACEhkKFU1PRF9TT1VSQ0VfS0lORF9MT0NBTBADEhoKFk1PRF9TT1VSQ0VfS0lORF9QUkVTRVQQBCqGAQoURXhwb3J0ZWREZXNpcmVkU3RhdGUSJgoiRVhQT1JURURfREVTSVJFRF9TVEFURV9VTlNQRUNJRklFRBAAEiIKHkVYUE9SVEVEX0RFU0lSRURfU1RBVEVfUlVOTklORxABEiIKHkVYUE9SVEVEX0RFU0lSRURfU1RBVEVfU1RPUFBFRBACMt4FChBNb2RTb3VyY2VTZXJ2aWNlElMKDEFkZE1vZFNvdXJjZRIgLnJlZ2lzdHJ5LnYxLkFkZE1vZFNvdXJjZVJlcXVlc3QaIS5yZWdpc3RyeS52MS5BZGRNb2RTb3VyY2VSZXNwb25zZRJcCg9EZWxldGVNb2RTb3VyY2USIy5yZWdpc3RyeS52MS5EZWxldGVNb2RTb3VyY2VSZXF1ZXN0GiQucmVnaXN0cnkudjEuRGVsZXRlTW9kU291cmNlUmVzcG9uc2USWQoOTGlzdE1vZFNvdXJjZXMSIi5yZWdpc3RyeS52MS5MaXN0TW9kU291cmNlc1JlcXVlc3QaIy5yZWdpc3RyeS52MS5MaXN0TW9kU291cmNlc1Jlc3BvbnNlElYKDVN5bmNNb2RTb3VyY2USIS5yZWdpc3RyeS52MS5TeW5jTW9kU291cmNlUmVxdWVzdBoiLnJlZ2lzdHJ5LnYxLlN5bmNNb2RTb3VyY2VSZXNwb25zZRJZCg5MaXN0U3luY2VkTW9kcxIiLnJlZ2lzdHJ5LnYxLkxpc3RTeW5jZWRNb2RzUmVxdWVzdBojLnJlZ2lzdHJ5LnYxLkxpc3RTeW5jZWRNb2RzUmVzcG9uc2USVgoNSW52YWxpZGF0ZU1vZBIhLnJlZ2lzdHJ5LnYxLkludmFsaWRhdGVNb2RSZXF1ZXN0GiIucmVnaXN0cnkudjEuSW52YWxpZGF0ZU1vZFJlc3BvbnNlElMKDEdldFN5bmNlZE1vZBIgLnJlZ2lzdHJ5LnYxLkdldFN5bmNlZE1vZFJlcXVlc3QaIS5yZWdpc3RyeS52MS5HZXRTeW5jZWRNb2RSZXNwb25zZRJcChRTZXRNb2RTb3VyY2VNZXRhZGF0YRIoLnJlZ2lzdHJ5LnYxLlNldE1vZFNvdXJjZU1ldGFkYXRhUmVxdWVzdBoaLnJlZ2lzdHJ5LnYxLk1vZFNvdXJjZUluZm8yqwMKDk1pc3Npb25TZXJ2aWNlEkwKDVVwbG9hZE1pc3Npb24SIS5yZWdpc3RyeS52MS5VcGxvYWRNaXNzaW9uUmVxdWVzdBoYLnJlZ2lzdHJ5LnYxLk1pc3Npb25JbmZvEkYKCkdldE1pc3Npb24SHi5yZWdpc3RyeS52MS5HZXRNaXNzaW9uUmVxdWVzdBoYLnJlZ2lzdHJ5LnYxLk1pc3Npb25JbmZvElMKDExpc3RNaXNzaW9ucxIgLnJlZ2lzdHJ5LnYxLkxpc3RNaXNzaW9uc1JlcXVlc3QaIS5yZWdpc3RyeS52MS5MaXN0TWlzc2lvbnNSZXNwb25zZRJWCg1EZWxldGVNaXNzaW9uEiEucmVnaXN0cnkudjEuRGVsZXRlTWlzc2lvblJlcXVlc3QaIi5yZWdpc3RyeS52MS5EZWxldGVNaXNzaW9uUmVzcG9uc2USVgoSU2V0TWlzc2lvbk1ldGFkYXRhEiYucmVnaXN0cnkudjEuU2V0TWlzc2lvbk1ldGFkYXRhUmVxdWVzdBoYLnJlZ2lzdHJ5LnYxLk1pc3Npb25JbmZvMrsHCgxBZG1pblNlcnZpY2USUwoMR2V0RGlza1VzYWdlEiAucmVnaXN0cnkudjEuR2V0RGlza1VzYWdlUmVxdWVzdBohLnJlZ2lzdHJ5LnYxLkdldERpc2tVc2FnZVJlc3BvbnNlEl8KEFJlZnJlc2hTdGVhbUF1dGgSJC5yZWdpc3RyeS52MS5SZWZyZXNoU3RlYW1BdXRoUmVxdWVzdBolLnJlZ2lzdHJ5LnYxLlJlZnJlc2hTdGVhbUF1dGhSZXNwb25zZRJQCgtFeHBvcnRTdGF0ZRIfLnJlZ2lzdHJ5LnYxLkV4cG9ydFN0YXRlUmVxdWVzdBogLnJlZ2lzdHJ5LnYxLkV4cG9ydFN0YXRlUmVzcG9uc2USUAoLSW1wb3J0U3RhdGUSHy5yZWdpc3RyeS52MS5JbXBvcnRTdGF0ZVJlcXVlc3QaIC5yZWdpc3RyeS52MS5JbXBvcnRTdGF0ZVJlc3BvbnNlEkQKB0xpc3RBY2wSGy5yZWdpc3RyeS52MS5MaXN0QWNsUmVxdWVzdBocLnJlZ2lzdHJ5LnYxLkxpc3RBY2xSZXNwb25zZRJTCgxTZXRBY2xTY29wZXMSIC5yZWdpc3RyeS52MS5TZXRBY2xTY29wZXNSZXF1ZXN0GiEucmVnaXN0cnkudjEuU2V0QWNsU2NvcGVzUmVzcG9uc2USYgoRQmVnaW5TdGVhbVFyTG9naW4SJS5yZWdpc3RyeS52MS5CZWdpblN0ZWFtUXJMb2dpblJlcXVlc3QaJi5yZWdpc3RyeS52MS5CZWdpblN0ZWFtUXJMb2dpblJlc3BvbnNlEl8KEFBvbGxTdGVhbVFyTG9naW4SJC5yZWdpc3RyeS52MS5Qb2xsU3RlYW1RckxvZ2luUmVxdWVzdBolLnJlZ2lzdHJ5LnYxLlBvbGxTdGVhbVFyTG9naW5SZXNwb25zZRJQCgtMaXN0U2VjcmV0cxIfLnJlZ2lzdHJ5LnYxLkxpc3RTZWNyZXRzUmVxdWVzdBogLnJlZ2lzdHJ5LnYxLkxpc3RTZWNyZXRzUmVzcG9uc2USSgoJUHV0U2VjcmV0Eh0ucmVnaXN0cnkudjEuUHV0U2VjcmV0UmVxdWVzdBoeLnJlZ2lzdHJ5LnYxLlB1dFNlY3JldFJlc3BvbnNlElMKDERlbGV0ZVNlY3JldBIgLnJlZ2lzdHJ5LnYxLkRlbGV0ZVNlY3JldFJlcXVlc3QaIS5yZWdpc3RyeS52MS5EZWxldGVTZWNyZXRSZXNwb25zZUJKWkhnaXRodWIuY29tL3NrdWEtaW50ZXJuYXRpb25hbC9tYWdwaWUvZ2VuZXJhdGVkL2dvL3JlZ2lzdHJ5L3YxO3JlZ2lzdHJ5djFiBnByb3RvMw");
+  fileDesc("ChpyZWdpc3RyeS92MS9yZWdpc3RyeS5wcm90bxILcmVnaXN0cnkudjEipAEKG1NldE1vZFNvdXJjZU1ldGFkYXRhUmVxdWVzdBIKCgJpZBgBIAEoCRJICghtZXRhZGF0YRgCIAMoCzI2LnJlZ2lzdHJ5LnYxLlNldE1vZFNvdXJjZU1ldGFkYXRhUmVxdWVzdC5NZXRhZGF0YUVudHJ5Gi8KDU1ldGFkYXRhRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASKFAgoTQWRkTW9kU291cmNlUmVxdWVzdBISCghodG1sX3VybBgBIAEoCUgAEhYKDGh0bWxfY29udGVudBgCIAEoCUgAEhMKCXN0ZWFtX3VybBgDIAEoCUgAEjAKCWxvY2FsX21vZBgEIAEoCzIbLnJlZ2lzdHJ5LnYxLkxvY2FsTW9kVXBsb2FkSAASQAoIbWV0YWRhdGEYBSADKAsyLi5yZWdpc3RyeS52MS5BZGRNb2RTb3VyY2VSZXF1ZXN0Lk1ldGFkYXRhRW50cnkaLwoNTWV0YWRhdGFFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBQggKBnNvdXJjZSI4Cg5Mb2NhbE1vZFVwbG9hZBIRCgl1bmlxdWVfaWQYASABKAkSEwoLemlwX2NvbnRlbnQYAiABKAwiIgoUQWRkTW9kU291cmNlUmVzcG9uc2USCgoCaWQYASABKAkiJAoWRGVsZXRlTW9kU291cmNlUmVxdWVzdBIKCgJpZBgBIAEoCSIZChdEZWxldGVNb2RTb3VyY2VSZXNwb25zZSIiChRTeW5jTW9kU291cmNlUmVxdWVzdBIKCgJpZBgBIAEoCSIXChVTeW5jTW9kU291cmNlUmVzcG9uc2UiFwoVTGlzdFN5bmNlZE1vZHNSZXF1ZXN0IlMKCVN5bmNlZE1vZBIOCgZtb2RfaWQYASABKAQSEwoLbWFuaWZlc3RfaWQYAiABKAQSEgoKc2l6ZV9ieXRlcxgDIAEoBBINCgV0aXRsZRgEIAEoCSI+ChZMaXN0U3luY2VkTW9kc1Jlc3BvbnNlEiQKBG1vZHMYASADKAsyFi5yZWdpc3RyeS52MS5TeW5jZWRNb2QiJgoUSW52YWxpZGF0ZU1vZFJlcXVlc3QSDgoGbW9kX2lkGAEgASgEIhcKFUludmFsaWRhdGVNb2RSZXNwb25zZSIlChNHZXRTeW5jZWRNb2RSZXF1ZXN0Eg4KBm1vZF9pZBgBIAEoBCJ5ChRHZXRTeW5jZWRNb2RSZXNwb25zZRIoCgNtb2QYASABKAsyFi5yZWdpc3RyeS52MS5TeW5jZWRNb2RIAIgBARIvCgttb2Rfc291cmNlcxgCIAMoCzIaLnJlZ2lzdHJ5LnYxLk1vZFNvdXJjZUluZm9CBgoEX21vZCKLAgoNTW9kU291cmNlSW5mbxIKCgJpZBgBIAEoCRIoCgRraW5kGAIgASgOMhoucmVnaXN0cnkudjEuTW9kU291cmNlS2luZBIRCglyZWZlcmVuY2UYAyABKAkSFAoMZGlzcGxheV9uYW1lGAQgASgJEhoKEmNyZWF0ZWRfYXRfdW5peF9tcxgFIAEoAxISCgpzaXplX2J5dGVzGAYgASgEEjoKCG1ldGFkYXRhGAcgAygLMigucmVnaXN0cnkudjEuTW9kU291cmNlSW5mby5NZXRhZGF0YUVudHJ5Gi8KDU1ldGFkYXRhRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASIXChVMaXN0TW9kU291cmNlc1JlcXVlc3QiRQoWTGlzdE1vZFNvdXJjZXNSZXNwb25zZRIrCgdzb3VyY2VzGAEgAygLMhoucmVnaXN0cnkudjEuTW9kU291cmNlSW5mbyKgAQoZU2V0TWlzc2lvbk1ldGFkYXRhUmVxdWVzdBIKCgJpZBgBIAEoCRJGCghtZXRhZGF0YRgCIAMoCzI0LnJlZ2lzdHJ5LnYxLlNldE1pc3Npb25NZXRhZGF0YVJlcXVlc3QuTWV0YWRhdGFFbnRyeRovCg1NZXRhZGF0YUVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEixQEKFFVwbG9hZE1pc3Npb25SZXF1ZXN0EgwKBG5hbWUYASABKAkSEwoLcGJvX2NvbnRlbnQYAiABKAwSDwoCaWQYAyABKAlIAIgBARJBCghtZXRhZGF0YRgEIAMoCzIvLnJlZ2lzdHJ5LnYxLlVwbG9hZE1pc3Npb25SZXF1ZXN0Lk1ldGFkYXRhRW50cnkaLwoNTWV0YWRhdGFFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBQgUKA19pZCLUAQoLTWlzc2lvbkluZm8SCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIQCghmaWxlc2l6ZRgDIAEoBBIaChJjcmVhdGVkX2F0X3VuaXhfbXMYBCABKAMSEgoKY3JlYXRlZF9ieRgFIAEoCRI4CghtZXRhZGF0YRgGIAMoCzImLnJlZ2lzdHJ5LnYxLk1pc3Npb25JbmZvLk1ldGFkYXRhRW50cnkaLwoNTWV0YWRhdGFFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIh8KEUdldE1pc3Npb25SZXF1ZXN0EgoKAmlkGAEgASgJIhUKE0xpc3RNaXNzaW9uc1JlcXVlc3QiQgoUTGlzdE1pc3Npb25zUmVzcG9uc2USKgoIbWlzc2lvbnMYASADKAsyGC5yZWdpc3RyeS52MS5NaXNzaW9uSW5mbyI8CgxXb3Jrc2hvcEl0ZW0SCgoCaWQYASABKAQSDQoFdGl0bGUYAiABKAkSEQoJZmlsZV9zaXplGAMgASgEIj8KG1Jlc29sdmVXb3Jrc2hvcEl0ZW1zUmVxdWVzdBITCgtwcmVzZXRfaHRtbBgBIAEoCRILCgNpZHMYAiADKAQiWwocUmVzb2x2ZVdvcmtzaG9wSXRlbXNSZXNwb25zZRInCgRtb2RzGAEgAygLMhkucmVnaXN0cnkudjEuV29ya3Nob3BJdGVtEhIKCnVucmVzb2x2ZWQYAiADKAQiIAoeTGlzdFdvcmtzaG9wQ29sbGVjdGlvbnNSZXF1ZXN0IqoBChlXb3Jrc2hvcENvbGxlY3Rpb25TdW1tYXJ5EgoKAmlkGAEgASgEEg0KBXRpdGxlGAIgASgJEjUKCnZpc2liaWxpdHkYAyABKA4yIS5yZWdpc3RyeS52MS5Db2xsZWN0aW9uVmlzaWJpbGl0eRISCgppdGVtX2NvdW50GAQgASgNEhoKEnVwZGF0ZWRfYXRfdW5peF9tcxgFIAEoAxILCgN1cmwYBiABKAkiXgofTGlzdFdvcmtzaG9wQ29sbGVjdGlvbnNSZXNwb25zZRI7Cgtjb2xsZWN0aW9ucxgBIAMoCzImLnJlZ2lzdHJ5LnYxLldvcmtzaG9wQ29sbGVjdGlvblN1bW1hcnkiNQocR2V0V29ya3Nob3BDb2xsZWN0aW9uUmVxdWVzdBIVCg1jb2xsZWN0aW9uX2lkGAEgASgEIvABChJXb3Jrc2hvcENvbGxlY3Rpb24SCgoCaWQYASABKAQSDQoFdGl0bGUYAiABKAkSEwoLZGVzY3JpcHRpb24YAyABKAkSNQoKdmlzaWJpbGl0eRgEIAEoDjIhLnJlZ2lzdHJ5LnYxLkNvbGxlY3Rpb25WaXNpYmlsaXR5EgsKA3VybBgFIAEoCRINCgVvd25lZBgGIAEoCBIaChJ1cGRhdGVkX2F0X3VuaXhfbXMYByABKAMSJwoEbW9kcxgIIAMoCzIZLnJlZ2lzdHJ5LnYxLldvcmtzaG9wSXRlbRISCgp1bnJlc29sdmVkGAkgAygEIqUBCiBQdWJsaXNoV29ya3Nob3BDb2xsZWN0aW9uUmVxdWVzdBIVCg1jb2xsZWN0aW9uX2lkGAEgASgEEg0KBXRpdGxlGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEjUKCnZpc2liaWxpdHkYBCABKA4yIS5yZWdpc3RyeS52MS5Db2xsZWN0aW9uVmlzaWJpbGl0eRIPCgdtb2RfaWRzGAUgAygEIpUBCiFQdWJsaXNoV29ya3Nob3BDb2xsZWN0aW9uUmVzcG9uc2USFQoNY29sbGVjdGlvbl9pZBgBIAEoBBILCgN1cmwYAiABKAkSJwoEbW9kcxgDIAMoCzIZLnJlZ2lzdHJ5LnYxLldvcmtzaG9wSXRlbRISCgp1bnJlc29sdmVkGAQgAygEEg8KB2NyZWF0ZWQYBSABKAgiOAofRGVsZXRlV29ya3Nob3BDb2xsZWN0aW9uUmVxdWVzdBIVCg1jb2xsZWN0aW9uX2lkGAEgASgEIiIKIERlbGV0ZVdvcmtzaG9wQ29sbGVjdGlvblJlc3BvbnNlIhoKGEJlZ2luU3RlYW1RckxvZ2luUmVxdWVzdCJGChlCZWdpblN0ZWFtUXJMb2dpblJlc3BvbnNlEhIKCnNlc3Npb25faWQYASABKAkSFQoNY2hhbGxlbmdlX3VybBgCIAEoCSItChdQb2xsU3RlYW1RckxvZ2luUmVxdWVzdBISCgpzZXNzaW9uX2lkGAEgASgJIj8KGFBvbGxTdGVhbVFyTG9naW5SZXNwb25zZRIRCgljb25maXJtZWQYASABKAgSEAoIdXNlcm5hbWUYAiABKAkiKAoKU2VjcmV0SW5mbxIMCgRuYW1lGAEgASgJEgwKBGtleXMYAiADKAkiFAoSTGlzdFNlY3JldHNSZXF1ZXN0IlIKE0xpc3RTZWNyZXRzUmVzcG9uc2USKAoHc2VjcmV0cxgBIAMoCzIXLnJlZ2lzdHJ5LnYxLlNlY3JldEluZm8SEQoJbmFtZXNwYWNlGAIgASgJIoQBChBQdXRTZWNyZXRSZXF1ZXN0EgwKBG5hbWUYASABKAkSNQoEZGF0YRgCIAMoCzInLnJlZ2lzdHJ5LnYxLlB1dFNlY3JldFJlcXVlc3QuRGF0YUVudHJ5GisKCURhdGFFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIjwKEVB1dFNlY3JldFJlc3BvbnNlEicKBnNlY3JldBgBIAEoCzIXLnJlZ2lzdHJ5LnYxLlNlY3JldEluZm8iIwoTRGVsZXRlU2VjcmV0UmVxdWVzdBIMCgRuYW1lGAEgASgJIhYKFERlbGV0ZVNlY3JldFJlc3BvbnNlIlUKEUxpbmtlZEFjY291bnRJbmZvEhAKCHByb3ZpZGVyGAEgASgJEhgKEHByb3ZpZGVyX3VzZXJfaWQYAiABKAkSFAoMZGlzcGxheV9uYW1lGAMgASgJIl8KCkFjbFN1YmplY3QSDwoHc3ViamVjdBgBIAEoCRIwCghhY2NvdW50cxgCIAMoCzIeLnJlZ2lzdHJ5LnYxLkxpbmtlZEFjY291bnRJbmZvEg4KBnNjb3BlcxgDIAMoCSIQCg5MaXN0QWNsUmVxdWVzdCJSCg9MaXN0QWNsUmVzcG9uc2USKQoIc3ViamVjdHMYASADKAsyFy5yZWdpc3RyeS52MS5BY2xTdWJqZWN0EhQKDGtub3duX3Njb3BlcxgCIAMoCSI2ChNTZXRBY2xTY29wZXNSZXF1ZXN0Eg8KB3N1YmplY3QYASABKAkSDgoGc2NvcGVzGAIgAygJIkAKFFNldEFjbFNjb3Blc1Jlc3BvbnNlEigKB3N1YmplY3QYASABKAsyFy5yZWdpc3RyeS52MS5BY2xTdWJqZWN0IoABChFFeHBvcnRlZE1vZFNvdXJjZRIoCgRraW5kGAEgASgOMhoucmVnaXN0cnkudjEuTW9kU291cmNlS2luZBIRCglyZWZlcmVuY2UYAiABKAkSFAoMZGlzcGxheV9uYW1lGAMgASgJEhgKEHJlc29sdmVkX21vZF9pZHMYBCADKAQihgEKEUV4cG9ydGVkQ29uZmlnTWFwEgwKBG5hbWUYASABKAkSNgoEZGF0YRgCIAMoCzIoLnJlZ2lzdHJ5LnYxLkV4cG9ydGVkQ29uZmlnTWFwLkRhdGFFbnRyeRorCglEYXRhRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASLOAgoORXhwb3J0ZWRTZXJ2ZXISDAoEbmFtZRgBIAEoCRIMCgRwb3J0GAIgASgNEh0KFW1vZF9zb3VyY2VfcmVmZXJlbmNlcxgDIAMoCRIXCgpjb25maWdfbWFwGAQgASgJSACIAQESDAoEY2RsYxgFIAMoCRIRCglwcm9maWxpbmcYBiABKAgSOAoNZGVzaXJlZF9zdGF0ZRgIIAEoDjIhLnJlZ2lzdHJ5LnYxLkV4cG9ydGVkRGVzaXJlZFN0YXRlEhkKDG1ldHJpY3NfcG9ydBgJIAEoDUgBiAEBEhkKDG1ldHJpY3NfcGF0aBgKIAEoCUgCiAEBEhgKEGhlYWRsZXNzX2NsaWVudHMYCyABKA1CDQoLX2NvbmZpZ19tYXBCDwoNX21ldHJpY3NfcG9ydEIPCg1fbWV0cmljc19wYXRoSgQIBxAIUgZwYXJhbXMiFAoSRXhwb3J0U3RhdGVSZXF1ZXN0IvQBChNFeHBvcnRTdGF0ZVJlc3BvbnNlEhYKDnNjaGVtYV92ZXJzaW9uGAYgASgNEhsKE2V4cG9ydGVkX2F0X3JmYzMzMzkYASABKAkSMwoLbW9kX3NvdXJjZXMYAiADKAsyHi5yZWdpc3RyeS52MS5FeHBvcnRlZE1vZFNvdXJjZRIzCgtjb25maWdfbWFwcxgDIAMoCzIeLnJlZ2lzdHJ5LnYxLkV4cG9ydGVkQ29uZmlnTWFwEiwKB3NlcnZlcnMYBCADKAsyGy5yZWdpc3RyeS52MS5FeHBvcnRlZFNlcnZlchIQCgh3YXJuaW5ncxgFIAMoCSKsAQoSSW1wb3J0U3RhdGVSZXF1ZXN0EjMKC21vZF9zb3VyY2VzGAEgAygLMh4ucmVnaXN0cnkudjEuRXhwb3J0ZWRNb2RTb3VyY2USMwoLY29uZmlnX21hcHMYAiADKAsyHi5yZWdpc3RyeS52MS5FeHBvcnRlZENvbmZpZ01hcBIsCgdzZXJ2ZXJzGAMgAygLMhsucmVnaXN0cnkudjEuRXhwb3J0ZWRTZXJ2ZXIiJwoTSW1wb3J0U3RhdGVSZXNwb25zZRIQCgh3YXJuaW5ncxgBIAMoCSIVChNHZXREaXNrVXNhZ2VSZXF1ZXN0InEKFEdldERpc2tVc2FnZVJlc3BvbnNlEhIKCm1vZHNfYnl0ZXMYASABKAQSFgoObWlzc2lvbnNfYnl0ZXMYAiABKAQSGAoQZ2FtZV9maWxlc19ieXRlcxgDIAEoBBITCgt0b3RhbF9ieXRlcxgEIAEoBCJCChdSZWZyZXNoU3RlYW1BdXRoUmVxdWVzdBIQCgh1c2VybmFtZRgBIAEoCRIVCg1yZWZyZXNoX3Rva2VuGAIgASgJIhoKGFJlZnJlc2hTdGVhbUF1dGhSZXNwb25zZSIiChREZWxldGVNaXNzaW9uUmVxdWVzdBIKCgJpZBgBIAEoCSIXChVEZWxldGVNaXNzaW9uUmVzcG9uc2UqoAEKDU1vZFNvdXJjZUtpbmQSHwobTU9EX1NPVVJDRV9LSU5EX1VOU1BFQ0lGSUVEEAASFwoTTU9EX1NPVVJDRV9LSU5EX01PRBABEh4KGk1PRF9TT1VSQ0VfS0lORF9DT0xMRUNUSU9OEAISGQoVTU9EX1NPVVJDRV9LSU5EX0xPQ0FMEAMSGgoWTU9EX1NPVVJDRV9LSU5EX1BSRVNFVBAEKs4BChRDb2xsZWN0aW9uVmlzaWJpbGl0eRIlCiFDT0xMRUNUSU9OX1ZJU0lCSUxJVFlfVU5TUEVDSUZJRUQQABIgChxDT0xMRUNUSU9OX1ZJU0lCSUxJVFlfUFVCTElDEAESJgoiQ09MTEVDVElPTl9WSVNJQklMSVRZX0ZSSUVORFNfT05MWRACEiEKHUNPTExFQ1RJT05fVklTSUJJTElUWV9QUklWQVRFEAMSIgoeQ09MTEVDVElPTl9WSVNJQklMSVRZX1VOTElTVEVEEAQqhgEKFEV4cG9ydGVkRGVzaXJlZFN0YXRlEiYKIkVYUE9SVEVEX0RFU0lSRURfU1RBVEVfVU5TUEVDSUZJRUQQABIiCh5FWFBPUlRFRF9ERVNJUkVEX1NUQVRFX1JVTk5JTkcQARIiCh5FWFBPUlRFRF9ERVNJUkVEX1NUQVRFX1NUT1BQRUQQAjLeBQoQTW9kU291cmNlU2VydmljZRJTCgxBZGRNb2RTb3VyY2USIC5yZWdpc3RyeS52MS5BZGRNb2RTb3VyY2VSZXF1ZXN0GiEucmVnaXN0cnkudjEuQWRkTW9kU291cmNlUmVzcG9uc2USXAoPRGVsZXRlTW9kU291cmNlEiMucmVnaXN0cnkudjEuRGVsZXRlTW9kU291cmNlUmVxdWVzdBokLnJlZ2lzdHJ5LnYxLkRlbGV0ZU1vZFNvdXJjZVJlc3BvbnNlElkKDkxpc3RNb2RTb3VyY2VzEiIucmVnaXN0cnkudjEuTGlzdE1vZFNvdXJjZXNSZXF1ZXN0GiMucmVnaXN0cnkudjEuTGlzdE1vZFNvdXJjZXNSZXNwb25zZRJWCg1TeW5jTW9kU291cmNlEiEucmVnaXN0cnkudjEuU3luY01vZFNvdXJjZVJlcXVlc3QaIi5yZWdpc3RyeS52MS5TeW5jTW9kU291cmNlUmVzcG9uc2USWQoOTGlzdFN5bmNlZE1vZHMSIi5yZWdpc3RyeS52MS5MaXN0U3luY2VkTW9kc1JlcXVlc3QaIy5yZWdpc3RyeS52MS5MaXN0U3luY2VkTW9kc1Jlc3BvbnNlElYKDUludmFsaWRhdGVNb2QSIS5yZWdpc3RyeS52MS5JbnZhbGlkYXRlTW9kUmVxdWVzdBoiLnJlZ2lzdHJ5LnYxLkludmFsaWRhdGVNb2RSZXNwb25zZRJTCgxHZXRTeW5jZWRNb2QSIC5yZWdpc3RyeS52MS5HZXRTeW5jZWRNb2RSZXF1ZXN0GiEucmVnaXN0cnkudjEuR2V0U3luY2VkTW9kUmVzcG9uc2USXAoUU2V0TW9kU291cmNlTWV0YWRhdGESKC5yZWdpc3RyeS52MS5TZXRNb2RTb3VyY2VNZXRhZGF0YVJlcXVlc3QaGi5yZWdpc3RyeS52MS5Nb2RTb3VyY2VJbmZvMqsDCg5NaXNzaW9uU2VydmljZRJMCg1VcGxvYWRNaXNzaW9uEiEucmVnaXN0cnkudjEuVXBsb2FkTWlzc2lvblJlcXVlc3QaGC5yZWdpc3RyeS52MS5NaXNzaW9uSW5mbxJGCgpHZXRNaXNzaW9uEh4ucmVnaXN0cnkudjEuR2V0TWlzc2lvblJlcXVlc3QaGC5yZWdpc3RyeS52MS5NaXNzaW9uSW5mbxJTCgxMaXN0TWlzc2lvbnMSIC5yZWdpc3RyeS52MS5MaXN0TWlzc2lvbnNSZXF1ZXN0GiEucmVnaXN0cnkudjEuTGlzdE1pc3Npb25zUmVzcG9uc2USVgoNRGVsZXRlTWlzc2lvbhIhLnJlZ2lzdHJ5LnYxLkRlbGV0ZU1pc3Npb25SZXF1ZXN0GiIucmVnaXN0cnkudjEuRGVsZXRlTWlzc2lvblJlc3BvbnNlElYKElNldE1pc3Npb25NZXRhZGF0YRImLnJlZ2lzdHJ5LnYxLlNldE1pc3Npb25NZXRhZGF0YVJlcXVlc3QaGC5yZWdpc3RyeS52MS5NaXNzaW9uSW5mbzL4CwoMQWRtaW5TZXJ2aWNlElMKDEdldERpc2tVc2FnZRIgLnJlZ2lzdHJ5LnYxLkdldERpc2tVc2FnZVJlcXVlc3QaIS5yZWdpc3RyeS52MS5HZXREaXNrVXNhZ2VSZXNwb25zZRJfChBSZWZyZXNoU3RlYW1BdXRoEiQucmVnaXN0cnkudjEuUmVmcmVzaFN0ZWFtQXV0aFJlcXVlc3QaJS5yZWdpc3RyeS52MS5SZWZyZXNoU3RlYW1BdXRoUmVzcG9uc2USUAoLRXhwb3J0U3RhdGUSHy5yZWdpc3RyeS52MS5FeHBvcnRTdGF0ZVJlcXVlc3QaIC5yZWdpc3RyeS52MS5FeHBvcnRTdGF0ZVJlc3BvbnNlElAKC0ltcG9ydFN0YXRlEh8ucmVnaXN0cnkudjEuSW1wb3J0U3RhdGVSZXF1ZXN0GiAucmVnaXN0cnkudjEuSW1wb3J0U3RhdGVSZXNwb25zZRJECgdMaXN0QWNsEhsucmVnaXN0cnkudjEuTGlzdEFjbFJlcXVlc3QaHC5yZWdpc3RyeS52MS5MaXN0QWNsUmVzcG9uc2USUwoMU2V0QWNsU2NvcGVzEiAucmVnaXN0cnkudjEuU2V0QWNsU2NvcGVzUmVxdWVzdBohLnJlZ2lzdHJ5LnYxLlNldEFjbFNjb3Blc1Jlc3BvbnNlEmIKEUJlZ2luU3RlYW1RckxvZ2luEiUucmVnaXN0cnkudjEuQmVnaW5TdGVhbVFyTG9naW5SZXF1ZXN0GiYucmVnaXN0cnkudjEuQmVnaW5TdGVhbVFyTG9naW5SZXNwb25zZRJfChBQb2xsU3RlYW1RckxvZ2luEiQucmVnaXN0cnkudjEuUG9sbFN0ZWFtUXJMb2dpblJlcXVlc3QaJS5yZWdpc3RyeS52MS5Qb2xsU3RlYW1RckxvZ2luUmVzcG9uc2USUAoLTGlzdFNlY3JldHMSHy5yZWdpc3RyeS52MS5MaXN0U2VjcmV0c1JlcXVlc3QaIC5yZWdpc3RyeS52MS5MaXN0U2VjcmV0c1Jlc3BvbnNlEkoKCVB1dFNlY3JldBIdLnJlZ2lzdHJ5LnYxLlB1dFNlY3JldFJlcXVlc3QaHi5yZWdpc3RyeS52MS5QdXRTZWNyZXRSZXNwb25zZRJTCgxEZWxldGVTZWNyZXQSIC5yZWdpc3RyeS52MS5EZWxldGVTZWNyZXRSZXF1ZXN0GiEucmVnaXN0cnkudjEuRGVsZXRlU2VjcmV0UmVzcG9uc2USawoUUmVzb2x2ZVdvcmtzaG9wSXRlbXMSKC5yZWdpc3RyeS52MS5SZXNvbHZlV29ya3Nob3BJdGVtc1JlcXVlc3QaKS5yZWdpc3RyeS52MS5SZXNvbHZlV29ya3Nob3BJdGVtc1Jlc3BvbnNlEnQKF0xpc3RXb3Jrc2hvcENvbGxlY3Rpb25zEisucmVnaXN0cnkudjEuTGlzdFdvcmtzaG9wQ29sbGVjdGlvbnNSZXF1ZXN0GiwucmVnaXN0cnkudjEuTGlzdFdvcmtzaG9wQ29sbGVjdGlvbnNSZXNwb25zZRJjChVHZXRXb3Jrc2hvcENvbGxlY3Rpb24SKS5yZWdpc3RyeS52MS5HZXRXb3Jrc2hvcENvbGxlY3Rpb25SZXF1ZXN0Gh8ucmVnaXN0cnkudjEuV29ya3Nob3BDb2xsZWN0aW9uEnoKGVB1Ymxpc2hXb3Jrc2hvcENvbGxlY3Rpb24SLS5yZWdpc3RyeS52MS5QdWJsaXNoV29ya3Nob3BDb2xsZWN0aW9uUmVxdWVzdBouLnJlZ2lzdHJ5LnYxLlB1Ymxpc2hXb3Jrc2hvcENvbGxlY3Rpb25SZXNwb25zZRJ3ChhEZWxldGVXb3Jrc2hvcENvbGxlY3Rpb24SLC5yZWdpc3RyeS52MS5EZWxldGVXb3Jrc2hvcENvbGxlY3Rpb25SZXF1ZXN0Gi0ucmVnaXN0cnkudjEuRGVsZXRlV29ya3Nob3BDb2xsZWN0aW9uUmVzcG9uc2VCSlpIZ2l0aHViLmNvbS9za3VhLWludGVybmF0aW9uYWwvbWFncGllL2dlbmVyYXRlZC9nby9yZWdpc3RyeS92MTtyZWdpc3RyeXYxYgZwcm90bzM");
 
 /**
  * @generated from message registry.v1.SetModSourceMetadataRequest
@@ -596,6 +596,358 @@ export const ListMissionsResponseSchema: GenMessage<ListMissionsResponse> = /*@_
   messageDesc(file_registry_v1_registry, 23);
 
 /**
+ * @generated from message registry.v1.WorkshopItem
+ */
+export type WorkshopItem = Message<"registry.v1.WorkshopItem"> & {
+  /**
+   * @generated from field: uint64 id = 1;
+   */
+  id: bigint;
+
+  /**
+   * @generated from field: string title = 2;
+   */
+  title: string;
+
+  /**
+   * @generated from field: uint64 file_size = 3;
+   */
+  fileSize: bigint;
+};
+
+/**
+ * Describes the message registry.v1.WorkshopItem.
+ * Use `create(WorkshopItemSchema)` to create a new message.
+ */
+export const WorkshopItemSchema: GenMessage<WorkshopItem> = /*@__PURE__*/
+  messageDesc(file_registry_v1_registry, 24);
+
+/**
+ * @generated from message registry.v1.ResolveWorkshopItemsRequest
+ */
+export type ResolveWorkshopItemsRequest = Message<"registry.v1.ResolveWorkshopItemsRequest"> & {
+  /**
+   * An Arma 3 Launcher preset export, verbatim -- scanned for Workshop
+   * links and discarded, never stored. Optional.
+   *
+   * @generated from field: string preset_html = 1;
+   */
+  presetHtml: string;
+
+  /**
+   * Mods and/or collections. Optional; appended after the preset's own.
+   *
+   * @generated from field: repeated uint64 ids = 2;
+   */
+  ids: bigint[];
+};
+
+/**
+ * Describes the message registry.v1.ResolveWorkshopItemsRequest.
+ * Use `create(ResolveWorkshopItemsRequestSchema)` to create a new message.
+ */
+export const ResolveWorkshopItemsRequestSchema: GenMessage<ResolveWorkshopItemsRequest> = /*@__PURE__*/
+  messageDesc(file_registry_v1_registry, 25);
+
+/**
+ * @generated from message registry.v1.ResolveWorkshopItemsResponse
+ */
+export type ResolveWorkshopItemsResponse = Message<"registry.v1.ResolveWorkshopItemsResponse"> & {
+  /**
+   * Collections flattened into their members in place, duplicates
+   * dropped, otherwise in the order given.
+   *
+   * @generated from field: repeated registry.v1.WorkshopItem mods = 1;
+   */
+  mods: WorkshopItem[];
+
+  /**
+   * Requested IDs Steam returned nothing for -- private to another
+   * account, removed, or simply wrong. Reported rather than failed, so one
+   * dead link in a 115-mod preset doesn't block the rest.
+   *
+   * @generated from field: repeated uint64 unresolved = 2;
+   */
+  unresolved: bigint[];
+};
+
+/**
+ * Describes the message registry.v1.ResolveWorkshopItemsResponse.
+ * Use `create(ResolveWorkshopItemsResponseSchema)` to create a new message.
+ */
+export const ResolveWorkshopItemsResponseSchema: GenMessage<ResolveWorkshopItemsResponse> = /*@__PURE__*/
+  messageDesc(file_registry_v1_registry, 26);
+
+/**
+ * @generated from message registry.v1.ListWorkshopCollectionsRequest
+ */
+export type ListWorkshopCollectionsRequest = Message<"registry.v1.ListWorkshopCollectionsRequest"> & {
+};
+
+/**
+ * Describes the message registry.v1.ListWorkshopCollectionsRequest.
+ * Use `create(ListWorkshopCollectionsRequestSchema)` to create a new message.
+ */
+export const ListWorkshopCollectionsRequestSchema: GenMessage<ListWorkshopCollectionsRequest> = /*@__PURE__*/
+  messageDesc(file_registry_v1_registry, 27);
+
+/**
+ * @generated from message registry.v1.WorkshopCollectionSummary
+ */
+export type WorkshopCollectionSummary = Message<"registry.v1.WorkshopCollectionSummary"> & {
+  /**
+   * @generated from field: uint64 id = 1;
+   */
+  id: bigint;
+
+  /**
+   * @generated from field: string title = 2;
+   */
+  title: string;
+
+  /**
+   * @generated from field: registry.v1.CollectionVisibility visibility = 3;
+   */
+  visibility: CollectionVisibility;
+
+  /**
+   * @generated from field: uint32 item_count = 4;
+   */
+  itemCount: number;
+
+  /**
+   * @generated from field: int64 updated_at_unix_ms = 5;
+   */
+  updatedAtUnixMs: bigint;
+
+  /**
+   * @generated from field: string url = 6;
+   */
+  url: string;
+};
+
+/**
+ * Describes the message registry.v1.WorkshopCollectionSummary.
+ * Use `create(WorkshopCollectionSummarySchema)` to create a new message.
+ */
+export const WorkshopCollectionSummarySchema: GenMessage<WorkshopCollectionSummary> = /*@__PURE__*/
+  messageDesc(file_registry_v1_registry, 28);
+
+/**
+ * @generated from message registry.v1.ListWorkshopCollectionsResponse
+ */
+export type ListWorkshopCollectionsResponse = Message<"registry.v1.ListWorkshopCollectionsResponse"> & {
+  /**
+   * Most recently updated first.
+   *
+   * @generated from field: repeated registry.v1.WorkshopCollectionSummary collections = 1;
+   */
+  collections: WorkshopCollectionSummary[];
+};
+
+/**
+ * Describes the message registry.v1.ListWorkshopCollectionsResponse.
+ * Use `create(ListWorkshopCollectionsResponseSchema)` to create a new message.
+ */
+export const ListWorkshopCollectionsResponseSchema: GenMessage<ListWorkshopCollectionsResponse> = /*@__PURE__*/
+  messageDesc(file_registry_v1_registry, 29);
+
+/**
+ * @generated from message registry.v1.GetWorkshopCollectionRequest
+ */
+export type GetWorkshopCollectionRequest = Message<"registry.v1.GetWorkshopCollectionRequest"> & {
+  /**
+   * @generated from field: uint64 collection_id = 1;
+   */
+  collectionId: bigint;
+};
+
+/**
+ * Describes the message registry.v1.GetWorkshopCollectionRequest.
+ * Use `create(GetWorkshopCollectionRequestSchema)` to create a new message.
+ */
+export const GetWorkshopCollectionRequestSchema: GenMessage<GetWorkshopCollectionRequest> = /*@__PURE__*/
+  messageDesc(file_registry_v1_registry, 30);
+
+/**
+ * @generated from message registry.v1.WorkshopCollection
+ */
+export type WorkshopCollection = Message<"registry.v1.WorkshopCollection"> & {
+  /**
+   * @generated from field: uint64 id = 1;
+   */
+  id: bigint;
+
+  /**
+   * @generated from field: string title = 2;
+   */
+  title: string;
+
+  /**
+   * @generated from field: string description = 3;
+   */
+  description: string;
+
+  /**
+   * @generated from field: registry.v1.CollectionVisibility visibility = 4;
+   */
+  visibility: CollectionVisibility;
+
+  /**
+   * @generated from field: string url = 5;
+   */
+  url: string;
+
+  /**
+   * Whether the cluster's Steam account published it, i.e. whether
+   * PublishWorkshopCollection/DeleteWorkshopCollection will accept it.
+   *
+   * @generated from field: bool owned = 6;
+   */
+  owned: boolean;
+
+  /**
+   * @generated from field: int64 updated_at_unix_ms = 7;
+   */
+  updatedAtUnixMs: bigint;
+
+  /**
+   * @generated from field: repeated registry.v1.WorkshopItem mods = 8;
+   */
+  mods: WorkshopItem[];
+
+  /**
+   * Members Steam no longer resolves for this account (removed or made
+   * private since they were added). Saving the collection drops them.
+   *
+   * @generated from field: repeated uint64 unresolved = 9;
+   */
+  unresolved: bigint[];
+};
+
+/**
+ * Describes the message registry.v1.WorkshopCollection.
+ * Use `create(WorkshopCollectionSchema)` to create a new message.
+ */
+export const WorkshopCollectionSchema: GenMessage<WorkshopCollection> = /*@__PURE__*/
+  messageDesc(file_registry_v1_registry, 31);
+
+/**
+ * @generated from message registry.v1.PublishWorkshopCollectionRequest
+ */
+export type PublishWorkshopCollectionRequest = Message<"registry.v1.PublishWorkshopCollectionRequest"> & {
+  /**
+   * 0 publishes a new collection; anything else replaces that one, which
+   * must be owned by the cluster's Steam account.
+   *
+   * @generated from field: uint64 collection_id = 1;
+   */
+  collectionId: bigint;
+
+  /**
+   * @generated from field: string title = 2;
+   */
+  title: string;
+
+  /**
+   * @generated from field: string description = 3;
+   */
+  description: string;
+
+  /**
+   * @generated from field: registry.v1.CollectionVisibility visibility = 4;
+   */
+  visibility: CollectionVisibility;
+
+  /**
+   * Mods and/or collections, resolved and flattened before publishing
+   * exactly as ResolveWorkshopItems does. Order is kept.
+   *
+   * @generated from field: repeated uint64 mod_ids = 5;
+   */
+  modIds: bigint[];
+};
+
+/**
+ * Describes the message registry.v1.PublishWorkshopCollectionRequest.
+ * Use `create(PublishWorkshopCollectionRequestSchema)` to create a new message.
+ */
+export const PublishWorkshopCollectionRequestSchema: GenMessage<PublishWorkshopCollectionRequest> = /*@__PURE__*/
+  messageDesc(file_registry_v1_registry, 32);
+
+/**
+ * @generated from message registry.v1.PublishWorkshopCollectionResponse
+ */
+export type PublishWorkshopCollectionResponse = Message<"registry.v1.PublishWorkshopCollectionResponse"> & {
+  /**
+   * @generated from field: uint64 collection_id = 1;
+   */
+  collectionId: bigint;
+
+  /**
+   * @generated from field: string url = 2;
+   */
+  url: string;
+
+  /**
+   * What actually went in, after resolution.
+   *
+   * @generated from field: repeated registry.v1.WorkshopItem mods = 3;
+   */
+  mods: WorkshopItem[];
+
+  /**
+   * @generated from field: repeated uint64 unresolved = 4;
+   */
+  unresolved: bigint[];
+
+  /**
+   * True when this call published a new collection, false when it
+   * replaced an existing one.
+   *
+   * @generated from field: bool created = 5;
+   */
+  created: boolean;
+};
+
+/**
+ * Describes the message registry.v1.PublishWorkshopCollectionResponse.
+ * Use `create(PublishWorkshopCollectionResponseSchema)` to create a new message.
+ */
+export const PublishWorkshopCollectionResponseSchema: GenMessage<PublishWorkshopCollectionResponse> = /*@__PURE__*/
+  messageDesc(file_registry_v1_registry, 33);
+
+/**
+ * @generated from message registry.v1.DeleteWorkshopCollectionRequest
+ */
+export type DeleteWorkshopCollectionRequest = Message<"registry.v1.DeleteWorkshopCollectionRequest"> & {
+  /**
+   * @generated from field: uint64 collection_id = 1;
+   */
+  collectionId: bigint;
+};
+
+/**
+ * Describes the message registry.v1.DeleteWorkshopCollectionRequest.
+ * Use `create(DeleteWorkshopCollectionRequestSchema)` to create a new message.
+ */
+export const DeleteWorkshopCollectionRequestSchema: GenMessage<DeleteWorkshopCollectionRequest> = /*@__PURE__*/
+  messageDesc(file_registry_v1_registry, 34);
+
+/**
+ * @generated from message registry.v1.DeleteWorkshopCollectionResponse
+ */
+export type DeleteWorkshopCollectionResponse = Message<"registry.v1.DeleteWorkshopCollectionResponse"> & {
+};
+
+/**
+ * Describes the message registry.v1.DeleteWorkshopCollectionResponse.
+ * Use `create(DeleteWorkshopCollectionResponseSchema)` to create a new message.
+ */
+export const DeleteWorkshopCollectionResponseSchema: GenMessage<DeleteWorkshopCollectionResponse> = /*@__PURE__*/
+  messageDesc(file_registry_v1_registry, 35);
+
+/**
  * @generated from message registry.v1.BeginSteamQrLoginRequest
  */
 export type BeginSteamQrLoginRequest = Message<"registry.v1.BeginSteamQrLoginRequest"> & {
@@ -606,7 +958,7 @@ export type BeginSteamQrLoginRequest = Message<"registry.v1.BeginSteamQrLoginReq
  * Use `create(BeginSteamQrLoginRequestSchema)` to create a new message.
  */
 export const BeginSteamQrLoginRequestSchema: GenMessage<BeginSteamQrLoginRequest> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 24);
+  messageDesc(file_registry_v1_registry, 36);
 
 /**
  * @generated from message registry.v1.BeginSteamQrLoginResponse
@@ -635,7 +987,7 @@ export type BeginSteamQrLoginResponse = Message<"registry.v1.BeginSteamQrLoginRe
  * Use `create(BeginSteamQrLoginResponseSchema)` to create a new message.
  */
 export const BeginSteamQrLoginResponseSchema: GenMessage<BeginSteamQrLoginResponse> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 25);
+  messageDesc(file_registry_v1_registry, 37);
 
 /**
  * @generated from message registry.v1.PollSteamQrLoginRequest
@@ -652,7 +1004,7 @@ export type PollSteamQrLoginRequest = Message<"registry.v1.PollSteamQrLoginReque
  * Use `create(PollSteamQrLoginRequestSchema)` to create a new message.
  */
 export const PollSteamQrLoginRequestSchema: GenMessage<PollSteamQrLoginRequest> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 26);
+  messageDesc(file_registry_v1_registry, 38);
 
 /**
  * @generated from message registry.v1.PollSteamQrLoginResponse
@@ -679,7 +1031,7 @@ export type PollSteamQrLoginResponse = Message<"registry.v1.PollSteamQrLoginResp
  * Use `create(PollSteamQrLoginResponseSchema)` to create a new message.
  */
 export const PollSteamQrLoginResponseSchema: GenMessage<PollSteamQrLoginResponse> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 27);
+  messageDesc(file_registry_v1_registry, 39);
 
 /**
  * @generated from message registry.v1.SecretInfo
@@ -703,7 +1055,7 @@ export type SecretInfo = Message<"registry.v1.SecretInfo"> & {
  * Use `create(SecretInfoSchema)` to create a new message.
  */
 export const SecretInfoSchema: GenMessage<SecretInfo> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 28);
+  messageDesc(file_registry_v1_registry, 40);
 
 /**
  * @generated from message registry.v1.ListSecretsRequest
@@ -716,7 +1068,7 @@ export type ListSecretsRequest = Message<"registry.v1.ListSecretsRequest"> & {
  * Use `create(ListSecretsRequestSchema)` to create a new message.
  */
 export const ListSecretsRequestSchema: GenMessage<ListSecretsRequest> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 29);
+  messageDesc(file_registry_v1_registry, 41);
 
 /**
  * @generated from message registry.v1.ListSecretsResponse
@@ -741,7 +1093,7 @@ export type ListSecretsResponse = Message<"registry.v1.ListSecretsResponse"> & {
  * Use `create(ListSecretsResponseSchema)` to create a new message.
  */
 export const ListSecretsResponseSchema: GenMessage<ListSecretsResponse> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 30);
+  messageDesc(file_registry_v1_registry, 42);
 
 /**
  * @generated from message registry.v1.PutSecretRequest
@@ -765,7 +1117,7 @@ export type PutSecretRequest = Message<"registry.v1.PutSecretRequest"> & {
  * Use `create(PutSecretRequestSchema)` to create a new message.
  */
 export const PutSecretRequestSchema: GenMessage<PutSecretRequest> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 31);
+  messageDesc(file_registry_v1_registry, 43);
 
 /**
  * @generated from message registry.v1.PutSecretResponse
@@ -782,7 +1134,7 @@ export type PutSecretResponse = Message<"registry.v1.PutSecretResponse"> & {
  * Use `create(PutSecretResponseSchema)` to create a new message.
  */
 export const PutSecretResponseSchema: GenMessage<PutSecretResponse> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 32);
+  messageDesc(file_registry_v1_registry, 44);
 
 /**
  * @generated from message registry.v1.DeleteSecretRequest
@@ -799,7 +1151,7 @@ export type DeleteSecretRequest = Message<"registry.v1.DeleteSecretRequest"> & {
  * Use `create(DeleteSecretRequestSchema)` to create a new message.
  */
 export const DeleteSecretRequestSchema: GenMessage<DeleteSecretRequest> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 33);
+  messageDesc(file_registry_v1_registry, 45);
 
 /**
  * @generated from message registry.v1.DeleteSecretResponse
@@ -812,7 +1164,7 @@ export type DeleteSecretResponse = Message<"registry.v1.DeleteSecretResponse"> &
  * Use `create(DeleteSecretResponseSchema)` to create a new message.
  */
 export const DeleteSecretResponseSchema: GenMessage<DeleteSecretResponse> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 34);
+  messageDesc(file_registry_v1_registry, 46);
 
 /**
  * A provider login attached to a user -- what a human actually recognizes
@@ -842,7 +1194,7 @@ export type LinkedAccountInfo = Message<"registry.v1.LinkedAccountInfo"> & {
  * Use `create(LinkedAccountInfoSchema)` to create a new message.
  */
 export const LinkedAccountInfoSchema: GenMessage<LinkedAccountInfo> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 35);
+  messageDesc(file_registry_v1_registry, 47);
 
 /**
  * @generated from message registry.v1.AclSubject
@@ -875,7 +1227,7 @@ export type AclSubject = Message<"registry.v1.AclSubject"> & {
  * Use `create(AclSubjectSchema)` to create a new message.
  */
 export const AclSubjectSchema: GenMessage<AclSubject> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 36);
+  messageDesc(file_registry_v1_registry, 48);
 
 /**
  * @generated from message registry.v1.ListAclRequest
@@ -888,7 +1240,7 @@ export type ListAclRequest = Message<"registry.v1.ListAclRequest"> & {
  * Use `create(ListAclRequestSchema)` to create a new message.
  */
 export const ListAclRequestSchema: GenMessage<ListAclRequest> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 37);
+  messageDesc(file_registry_v1_registry, 49);
 
 /**
  * @generated from message registry.v1.ListAclResponse
@@ -915,7 +1267,7 @@ export type ListAclResponse = Message<"registry.v1.ListAclResponse"> & {
  * Use `create(ListAclResponseSchema)` to create a new message.
  */
 export const ListAclResponseSchema: GenMessage<ListAclResponse> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 38);
+  messageDesc(file_registry_v1_registry, 50);
 
 /**
  * @generated from message registry.v1.SetAclScopesRequest
@@ -937,7 +1289,7 @@ export type SetAclScopesRequest = Message<"registry.v1.SetAclScopesRequest"> & {
  * Use `create(SetAclScopesRequestSchema)` to create a new message.
  */
 export const SetAclScopesRequestSchema: GenMessage<SetAclScopesRequest> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 39);
+  messageDesc(file_registry_v1_registry, 51);
 
 /**
  * @generated from message registry.v1.SetAclScopesResponse
@@ -954,7 +1306,7 @@ export type SetAclScopesResponse = Message<"registry.v1.SetAclScopesResponse"> &
  * Use `create(SetAclScopesResponseSchema)` to create a new message.
  */
 export const SetAclScopesResponseSchema: GenMessage<SetAclScopesResponse> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 40);
+  messageDesc(file_registry_v1_registry, 52);
 
 /**
  * @generated from message registry.v1.ExportedModSource
@@ -1005,7 +1357,7 @@ export type ExportedModSource = Message<"registry.v1.ExportedModSource"> & {
  * Use `create(ExportedModSourceSchema)` to create a new message.
  */
 export const ExportedModSourceSchema: GenMessage<ExportedModSource> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 41);
+  messageDesc(file_registry_v1_registry, 53);
 
 /**
  * @generated from message registry.v1.ExportedConfigMap
@@ -1027,7 +1379,7 @@ export type ExportedConfigMap = Message<"registry.v1.ExportedConfigMap"> & {
  * Use `create(ExportedConfigMapSchema)` to create a new message.
  */
 export const ExportedConfigMapSchema: GenMessage<ExportedConfigMap> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 42);
+  messageDesc(file_registry_v1_registry, 54);
 
 /**
  * @generated from message registry.v1.ExportedServer
@@ -1097,7 +1449,7 @@ export type ExportedServer = Message<"registry.v1.ExportedServer"> & {
  * Use `create(ExportedServerSchema)` to create a new message.
  */
 export const ExportedServerSchema: GenMessage<ExportedServer> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 43);
+  messageDesc(file_registry_v1_registry, 55);
 
 /**
  * @generated from message registry.v1.ExportStateRequest
@@ -1110,7 +1462,7 @@ export type ExportStateRequest = Message<"registry.v1.ExportStateRequest"> & {
  * Use `create(ExportStateRequestSchema)` to create a new message.
  */
 export const ExportStateRequestSchema: GenMessage<ExportStateRequest> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 44);
+  messageDesc(file_registry_v1_registry, 56);
 
 /**
  * @generated from message registry.v1.ExportStateResponse
@@ -1176,7 +1528,7 @@ export type ExportStateResponse = Message<"registry.v1.ExportStateResponse"> & {
  * Use `create(ExportStateResponseSchema)` to create a new message.
  */
 export const ExportStateResponseSchema: GenMessage<ExportStateResponse> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 45);
+  messageDesc(file_registry_v1_registry, 57);
 
 /**
  * @generated from message registry.v1.ImportStateRequest
@@ -1203,7 +1555,7 @@ export type ImportStateRequest = Message<"registry.v1.ImportStateRequest"> & {
  * Use `create(ImportStateRequestSchema)` to create a new message.
  */
 export const ImportStateRequestSchema: GenMessage<ImportStateRequest> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 46);
+  messageDesc(file_registry_v1_registry, 58);
 
 /**
  * @generated from message registry.v1.ImportStateResponse
@@ -1220,7 +1572,7 @@ export type ImportStateResponse = Message<"registry.v1.ImportStateResponse"> & {
  * Use `create(ImportStateResponseSchema)` to create a new message.
  */
 export const ImportStateResponseSchema: GenMessage<ImportStateResponse> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 47);
+  messageDesc(file_registry_v1_registry, 59);
 
 /**
  * @generated from message registry.v1.GetDiskUsageRequest
@@ -1233,7 +1585,7 @@ export type GetDiskUsageRequest = Message<"registry.v1.GetDiskUsageRequest"> & {
  * Use `create(GetDiskUsageRequestSchema)` to create a new message.
  */
 export const GetDiskUsageRequestSchema: GenMessage<GetDiskUsageRequest> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 48);
+  messageDesc(file_registry_v1_registry, 60);
 
 /**
  * @generated from message registry.v1.GetDiskUsageResponse
@@ -1272,7 +1624,7 @@ export type GetDiskUsageResponse = Message<"registry.v1.GetDiskUsageResponse"> &
  * Use `create(GetDiskUsageResponseSchema)` to create a new message.
  */
 export const GetDiskUsageResponseSchema: GenMessage<GetDiskUsageResponse> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 49);
+  messageDesc(file_registry_v1_registry, 61);
 
 /**
  * @generated from message registry.v1.RefreshSteamAuthRequest
@@ -1294,7 +1646,7 @@ export type RefreshSteamAuthRequest = Message<"registry.v1.RefreshSteamAuthReque
  * Use `create(RefreshSteamAuthRequestSchema)` to create a new message.
  */
 export const RefreshSteamAuthRequestSchema: GenMessage<RefreshSteamAuthRequest> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 50);
+  messageDesc(file_registry_v1_registry, 62);
 
 /**
  * @generated from message registry.v1.RefreshSteamAuthResponse
@@ -1307,7 +1659,7 @@ export type RefreshSteamAuthResponse = Message<"registry.v1.RefreshSteamAuthResp
  * Use `create(RefreshSteamAuthResponseSchema)` to create a new message.
  */
 export const RefreshSteamAuthResponseSchema: GenMessage<RefreshSteamAuthResponse> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 51);
+  messageDesc(file_registry_v1_registry, 63);
 
 /**
  * @generated from message registry.v1.DeleteMissionRequest
@@ -1324,7 +1676,7 @@ export type DeleteMissionRequest = Message<"registry.v1.DeleteMissionRequest"> &
  * Use `create(DeleteMissionRequestSchema)` to create a new message.
  */
 export const DeleteMissionRequestSchema: GenMessage<DeleteMissionRequest> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 52);
+  messageDesc(file_registry_v1_registry, 64);
 
 /**
  * @generated from message registry.v1.DeleteMissionResponse
@@ -1337,7 +1689,7 @@ export type DeleteMissionResponse = Message<"registry.v1.DeleteMissionResponse">
  * Use `create(DeleteMissionResponseSchema)` to create a new message.
  */
 export const DeleteMissionResponseSchema: GenMessage<DeleteMissionResponse> = /*@__PURE__*/
-  messageDesc(file_registry_v1_registry, 53);
+  messageDesc(file_registry_v1_registry, 65);
 
 /**
  * @generated from enum registry.v1.ModSourceKind
@@ -1380,6 +1732,48 @@ export const ModSourceKindSchema: GenEnum<ModSourceKind> = /*@__PURE__*/
   enumDesc(file_registry_v1_registry, 0);
 
 /**
+ * Mirrors sync.v1.CollectionVisibility -- registry does not import
+ * sync's protos, and the two are converted explicitly where they meet.
+ * Steam's own numbering shifted by one, so UNSPECIFIED occupies proto3's
+ * zero rather than PUBLIC doing so: an unset field must never be able to
+ * publish publicly, and is refused rather than defaulted.
+ *
+ * @generated from enum registry.v1.CollectionVisibility
+ */
+export enum CollectionVisibility {
+  /**
+   * @generated from enum value: COLLECTION_VISIBILITY_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: COLLECTION_VISIBILITY_PUBLIC = 1;
+   */
+  PUBLIC = 1,
+
+  /**
+   * @generated from enum value: COLLECTION_VISIBILITY_FRIENDS_ONLY = 2;
+   */
+  FRIENDS_ONLY = 2,
+
+  /**
+   * @generated from enum value: COLLECTION_VISIBILITY_PRIVATE = 3;
+   */
+  PRIVATE = 3,
+
+  /**
+   * @generated from enum value: COLLECTION_VISIBILITY_UNLISTED = 4;
+   */
+  UNLISTED = 4,
+}
+
+/**
+ * Describes the enum registry.v1.CollectionVisibility.
+ */
+export const CollectionVisibilitySchema: GenEnum<CollectionVisibility> = /*@__PURE__*/
+  enumDesc(file_registry_v1_registry, 1);
+
+/**
  * @generated from enum registry.v1.ExportedDesiredState
  */
 export enum ExportedDesiredState {
@@ -1403,7 +1797,7 @@ export enum ExportedDesiredState {
  * Describes the enum registry.v1.ExportedDesiredState.
  */
 export const ExportedDesiredStateSchema: GenEnum<ExportedDesiredState> = /*@__PURE__*/
-  enumDesc(file_registry_v1_registry, 1);
+  enumDesc(file_registry_v1_registry, 2);
 
 /**
  * Registers and tracks *sources* of mods -- a single Workshop mod, a
@@ -1740,6 +2134,59 @@ export const AdminService: GenService<{
     methodKind: "unary";
     input: typeof DeleteSecretRequestSchema;
     output: typeof DeleteSecretResponseSchema;
+  },
+  /**
+   * Turn preset HTML and/or Workshop IDs into the flat, titled mod list a
+   * collection would hold -- the preview step before PublishWorkshopCollection,
+   * and how an editor looks up a mod being added. Read-only on Steam.
+   *
+   * @generated from rpc registry.v1.AdminService.ResolveWorkshopItems
+   */
+  resolveWorkshopItems: {
+    methodKind: "unary";
+    input: typeof ResolveWorkshopItemsRequestSchema;
+    output: typeof ResolveWorkshopItemsResponseSchema;
+  },
+  /**
+   * Collections the cluster's Steam account has published for Arma 3.
+   *
+   * @generated from rpc registry.v1.AdminService.ListWorkshopCollections
+   */
+  listWorkshopCollections: {
+    methodKind: "unary";
+    input: typeof ListWorkshopCollectionsRequestSchema;
+    output: typeof ListWorkshopCollectionsResponseSchema;
+  },
+  /**
+   * One collection and its (flattened) members. Not limited to the
+   * cluster's own: reading someone else's is how an editor starts a new
+   * collection from an existing one. `owned` says which it is.
+   *
+   * @generated from rpc registry.v1.AdminService.GetWorkshopCollection
+   */
+  getWorkshopCollection: {
+    methodKind: "unary";
+    input: typeof GetWorkshopCollectionRequestSchema;
+    output: typeof WorkshopCollectionSchema;
+  },
+  /**
+   * Publish a new collection, or replace an owned one's title,
+   * description, visibility and membership wholesale.
+   *
+   * @generated from rpc registry.v1.AdminService.PublishWorkshopCollection
+   */
+  publishWorkshopCollection: {
+    methodKind: "unary";
+    input: typeof PublishWorkshopCollectionRequestSchema;
+    output: typeof PublishWorkshopCollectionResponseSchema;
+  },
+  /**
+   * @generated from rpc registry.v1.AdminService.DeleteWorkshopCollection
+   */
+  deleteWorkshopCollection: {
+    methodKind: "unary";
+    input: typeof DeleteWorkshopCollectionRequestSchema;
+    output: typeof DeleteWorkshopCollectionResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_registry_v1_registry, 2);

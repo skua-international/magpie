@@ -42,6 +42,13 @@ pub fn extract_single_id(url: &str) -> Option<u64> {
         .and_then(|c| c[1].parse().ok())
 }
 
+/// The Workshop page for `id` -- the inverse of [`extract_single_id`].
+/// One place for it, so every service hands out the same link for the
+/// same item rather than each rebuilding it.
+pub fn workshop_url(id: u64) -> String {
+    format!("https://steamcommunity.com/sharedfiles/filedetails/?id={id}")
+}
+
 /// Scan `html` for every `filedetails/?id=` link (a preset export's usual
 /// shape -- one row per mod). Public for callers that already have preset
 /// HTML content in hand (e.g. uploaded directly rather than fetched from a
@@ -85,6 +92,16 @@ mod tests {
             extract_single_id("https://steamcommunity.com/workshop/filedetails/?id=843770737"),
             Some(843770737)
         );
+    }
+
+    #[test]
+    fn workshop_url_round_trips_through_extract() {
+        let url = workshop_url(3792213005);
+        assert_eq!(
+            url,
+            "https://steamcommunity.com/sharedfiles/filedetails/?id=3792213005"
+        );
+        assert_eq!(extract_single_id(&url), Some(3792213005));
     }
 
     #[test]

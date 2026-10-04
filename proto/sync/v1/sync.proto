@@ -113,6 +113,27 @@ service SyncService {
   // currently touching them, this reports the one boolean the controller
   // actually needs to gate on.
   rpc GetSyncStatus(GetSyncStatusRequest) returns (GetSyncStatusResponse);
+
+  // Steam Workshop collections owned by this cluster's own Steam
+  // account.
+  //
+  // The reverse direction from everything else here: these push content
+  // *to* Steam rather than pulling it down, and deliberately touch
+  // neither the golden content tree nor the source registry -- a
+  // collection published this way is not thereby a registered mod source,
+  // and nothing starts syncing because of it. Registering one is a
+  // separate, explicit RegisterSource call.
+  //
+  // Resolution reuses the same authenticated expansion RegisterSource
+  // does, so a candidate that is itself a collection is flattened into
+  // its members rather than nested -- Arma cares about the mod list, and
+  // a collection-of-collections resolves differently for a subscriber
+  // than the preset it came from did.
+  rpc ResolveWorkshopItems(ResolveWorkshopItemsRequest) returns (ResolveWorkshopItemsResponse);
+  rpc ListOwnedCollections(ListOwnedCollectionsRequest) returns (ListOwnedCollectionsResponse);
+  rpc GetCollection(GetCollectionRequest) returns (GetCollectionResponse);
+  rpc PublishCollection(PublishCollectionRequest) returns (PublishCollectionResponse);
+  rpc DeleteCollection(DeleteCollectionRequest) returns (DeleteCollectionResponse);
 }
 
 message ListSyncedModsRequest {}
@@ -249,3 +270,95 @@ message PollQrLoginResponse {
   bool confirmed = 1;
   string username = 2;
 }
+
+// ERemoteStoragePublishedFileVisibility, shifted by one so UNSPECIFIED
+// occupies proto3's zero rather than PUBLIC doing so -- an unset field
+// must not be able to publish publicly. Unset is rejected rather than
+// defaulted server-side; callers choose explicitly.
+enum CollectionVisibility {
+  COLLECTION_VISIBILITY_UNSPECIFIED = 0;
+  COLLECTION_VISIBILITY_PUBLIC = 1;
+  COLLECTION_VISIBILITY_FRIENDS_ONLY = 2;
+  COLLECTION_VISIBILITY_PRIVATE = 3;
+  COLLECTION_VISIBILITY_UNLISTED = 4;
+}
+
+message WorkshopItem {
+  uint64 id = 1;
+  string title = 2;
+  uint64 file_size = 3;
+}
+
+message ResolveWorkshopItemsRequest {
+  // Mods and/or collections, exactly as RegisterSource takes them.
+  repeated uint64 candidate_ids = 1;
+}
+
+message ResolveWorkshopItemsResponse {
+  // Collections flattened into their members in place, duplicates
+  // dropped, otherwise in candidate order.
+  repeated WorkshopItem mods = 1;
+  // Candidates (or collection members) Steam returned nothing for.
+  repeated uint64 unresolved = 2;
+}
+
+message ListOwnedCollectionsRequest {}
+
+message CollectionSummary {
+  uint64 id = 1;
+  string title = 2;
+  CollectionVisibility visibility = 3;
+  uint32 item_count = 4;
+  int64 updated_at_unix_ms = 5;
+}
+
+message ListOwnedCollectionsResponse {
+  // Most recently updated first.
+  repeated CollectionSummary collections = 1;
+}
+
+message GetCollectionRequest {
+  uint64 collection_id = 1;
+}
+
+message GetCollectionResponse {
+  uint64 id = 1;
+  string title = 2;
+  string description = 3;
+  CollectionVisibility visibility = 4;
+  // Published by this cluster's own Steam account.
+  bool owned = 5;
+  int64 updated_at_unix_ms = 6;
+  // Flattened, in the collection's own order.
+  repeated WorkshopItem mods = 7;
+  repeated uint64 unresolved = 8;
+}
+
+message PublishCollectionRequest {
+  // 0 publishes a new collection; anything else replaces that one's
+  // title, description, visibility and membership, and must be owned by
+  // this cluster's Steam account.
+  uint64 collection_id = 1;
+  string title = 2;
+  string description = 3;
+  CollectionVisibility visibility = 4;
+  // Resolved and flattened before publishing, order kept.
+  repeated uint64 candidate_ids = 5;
+}
+
+message PublishCollectionResponse {
+  uint64 collection_id = 1;
+  // The collection's public page -- built server-side so every caller
+  // (web UI, magpiectl) shows the same link without rebuilding it from
+  // the ID.
+  string url = 2;
+  repeated WorkshopItem mods = 3;
+  repeated uint64 unresolved = 4;
+  bool created = 5;
+}
+
+message DeleteCollectionRequest {
+  uint64 collection_id = 1;
+}
+
+message DeleteCollectionResponse {}

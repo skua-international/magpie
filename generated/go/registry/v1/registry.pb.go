@@ -79,6 +79,66 @@ func (ModSourceKind) EnumDescriptor() ([]byte, []int) {
 	return file_registry_v1_registry_proto_rawDescGZIP(), []int{0}
 }
 
+// Mirrors sync.v1.CollectionVisibility -- registry does not import
+// sync's protos, and the two are converted explicitly where they meet.
+// Steam's own numbering shifted by one, so UNSPECIFIED occupies proto3's
+// zero rather than PUBLIC doing so: an unset field must never be able to
+// publish publicly, and is refused rather than defaulted.
+type CollectionVisibility int32
+
+const (
+	CollectionVisibility_COLLECTION_VISIBILITY_UNSPECIFIED  CollectionVisibility = 0
+	CollectionVisibility_COLLECTION_VISIBILITY_PUBLIC       CollectionVisibility = 1
+	CollectionVisibility_COLLECTION_VISIBILITY_FRIENDS_ONLY CollectionVisibility = 2
+	CollectionVisibility_COLLECTION_VISIBILITY_PRIVATE      CollectionVisibility = 3
+	CollectionVisibility_COLLECTION_VISIBILITY_UNLISTED     CollectionVisibility = 4
+)
+
+// Enum value maps for CollectionVisibility.
+var (
+	CollectionVisibility_name = map[int32]string{
+		0: "COLLECTION_VISIBILITY_UNSPECIFIED",
+		1: "COLLECTION_VISIBILITY_PUBLIC",
+		2: "COLLECTION_VISIBILITY_FRIENDS_ONLY",
+		3: "COLLECTION_VISIBILITY_PRIVATE",
+		4: "COLLECTION_VISIBILITY_UNLISTED",
+	}
+	CollectionVisibility_value = map[string]int32{
+		"COLLECTION_VISIBILITY_UNSPECIFIED":  0,
+		"COLLECTION_VISIBILITY_PUBLIC":       1,
+		"COLLECTION_VISIBILITY_FRIENDS_ONLY": 2,
+		"COLLECTION_VISIBILITY_PRIVATE":      3,
+		"COLLECTION_VISIBILITY_UNLISTED":     4,
+	}
+)
+
+func (x CollectionVisibility) Enum() *CollectionVisibility {
+	p := new(CollectionVisibility)
+	*p = x
+	return p
+}
+
+func (x CollectionVisibility) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (CollectionVisibility) Descriptor() protoreflect.EnumDescriptor {
+	return file_registry_v1_registry_proto_enumTypes[1].Descriptor()
+}
+
+func (CollectionVisibility) Type() protoreflect.EnumType {
+	return &file_registry_v1_registry_proto_enumTypes[1]
+}
+
+func (x CollectionVisibility) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use CollectionVisibility.Descriptor instead.
+func (CollectionVisibility) EnumDescriptor() ([]byte, []int) {
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{1}
+}
+
 type ExportedDesiredState int32
 
 const (
@@ -112,11 +172,11 @@ func (x ExportedDesiredState) String() string {
 }
 
 func (ExportedDesiredState) Descriptor() protoreflect.EnumDescriptor {
-	return file_registry_v1_registry_proto_enumTypes[1].Descriptor()
+	return file_registry_v1_registry_proto_enumTypes[2].Descriptor()
 }
 
 func (ExportedDesiredState) Type() protoreflect.EnumType {
-	return &file_registry_v1_registry_proto_enumTypes[1]
+	return &file_registry_v1_registry_proto_enumTypes[2]
 }
 
 func (x ExportedDesiredState) Number() protoreflect.EnumNumber {
@@ -125,7 +185,7 @@ func (x ExportedDesiredState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ExportedDesiredState.Descriptor instead.
 func (ExportedDesiredState) EnumDescriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{1}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{2}
 }
 
 type SetModSourceMetadataRequest struct {
@@ -1429,6 +1489,738 @@ func (x *ListMissionsResponse) GetMissions() []*MissionInfo {
 	return nil
 }
 
+type WorkshopItem struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	FileSize      uint64                 `protobuf:"varint,3,opt,name=file_size,json=fileSize,proto3" json:"file_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WorkshopItem) Reset() {
+	*x = WorkshopItem{}
+	mi := &file_registry_v1_registry_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WorkshopItem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WorkshopItem) ProtoMessage() {}
+
+func (x *WorkshopItem) ProtoReflect() protoreflect.Message {
+	mi := &file_registry_v1_registry_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WorkshopItem.ProtoReflect.Descriptor instead.
+func (*WorkshopItem) Descriptor() ([]byte, []int) {
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *WorkshopItem) GetId() uint64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *WorkshopItem) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *WorkshopItem) GetFileSize() uint64 {
+	if x != nil {
+		return x.FileSize
+	}
+	return 0
+}
+
+type ResolveWorkshopItemsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// An Arma 3 Launcher preset export, verbatim -- scanned for Workshop
+	// links and discarded, never stored. Optional.
+	PresetHtml string `protobuf:"bytes,1,opt,name=preset_html,json=presetHtml,proto3" json:"preset_html,omitempty"`
+	// Mods and/or collections. Optional; appended after the preset's own.
+	Ids           []uint64 `protobuf:"varint,2,rep,packed,name=ids,proto3" json:"ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveWorkshopItemsRequest) Reset() {
+	*x = ResolveWorkshopItemsRequest{}
+	mi := &file_registry_v1_registry_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveWorkshopItemsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveWorkshopItemsRequest) ProtoMessage() {}
+
+func (x *ResolveWorkshopItemsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_registry_v1_registry_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveWorkshopItemsRequest.ProtoReflect.Descriptor instead.
+func (*ResolveWorkshopItemsRequest) Descriptor() ([]byte, []int) {
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *ResolveWorkshopItemsRequest) GetPresetHtml() string {
+	if x != nil {
+		return x.PresetHtml
+	}
+	return ""
+}
+
+func (x *ResolveWorkshopItemsRequest) GetIds() []uint64 {
+	if x != nil {
+		return x.Ids
+	}
+	return nil
+}
+
+type ResolveWorkshopItemsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Collections flattened into their members in place, duplicates
+	// dropped, otherwise in the order given.
+	Mods []*WorkshopItem `protobuf:"bytes,1,rep,name=mods,proto3" json:"mods,omitempty"`
+	// Requested IDs Steam returned nothing for -- private to another
+	// account, removed, or simply wrong. Reported rather than failed, so one
+	// dead link in a 115-mod preset doesn't block the rest.
+	Unresolved    []uint64 `protobuf:"varint,2,rep,packed,name=unresolved,proto3" json:"unresolved,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveWorkshopItemsResponse) Reset() {
+	*x = ResolveWorkshopItemsResponse{}
+	mi := &file_registry_v1_registry_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveWorkshopItemsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveWorkshopItemsResponse) ProtoMessage() {}
+
+func (x *ResolveWorkshopItemsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_registry_v1_registry_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveWorkshopItemsResponse.ProtoReflect.Descriptor instead.
+func (*ResolveWorkshopItemsResponse) Descriptor() ([]byte, []int) {
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *ResolveWorkshopItemsResponse) GetMods() []*WorkshopItem {
+	if x != nil {
+		return x.Mods
+	}
+	return nil
+}
+
+func (x *ResolveWorkshopItemsResponse) GetUnresolved() []uint64 {
+	if x != nil {
+		return x.Unresolved
+	}
+	return nil
+}
+
+type ListWorkshopCollectionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListWorkshopCollectionsRequest) Reset() {
+	*x = ListWorkshopCollectionsRequest{}
+	mi := &file_registry_v1_registry_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListWorkshopCollectionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListWorkshopCollectionsRequest) ProtoMessage() {}
+
+func (x *ListWorkshopCollectionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_registry_v1_registry_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListWorkshopCollectionsRequest.ProtoReflect.Descriptor instead.
+func (*ListWorkshopCollectionsRequest) Descriptor() ([]byte, []int) {
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{27}
+}
+
+type WorkshopCollectionSummary struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Id              uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Title           string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Visibility      CollectionVisibility   `protobuf:"varint,3,opt,name=visibility,proto3,enum=registry.v1.CollectionVisibility" json:"visibility,omitempty"`
+	ItemCount       uint32                 `protobuf:"varint,4,opt,name=item_count,json=itemCount,proto3" json:"item_count,omitempty"`
+	UpdatedAtUnixMs int64                  `protobuf:"varint,5,opt,name=updated_at_unix_ms,json=updatedAtUnixMs,proto3" json:"updated_at_unix_ms,omitempty"`
+	Url             string                 `protobuf:"bytes,6,opt,name=url,proto3" json:"url,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *WorkshopCollectionSummary) Reset() {
+	*x = WorkshopCollectionSummary{}
+	mi := &file_registry_v1_registry_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WorkshopCollectionSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WorkshopCollectionSummary) ProtoMessage() {}
+
+func (x *WorkshopCollectionSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_registry_v1_registry_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WorkshopCollectionSummary.ProtoReflect.Descriptor instead.
+func (*WorkshopCollectionSummary) Descriptor() ([]byte, []int) {
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *WorkshopCollectionSummary) GetId() uint64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *WorkshopCollectionSummary) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *WorkshopCollectionSummary) GetVisibility() CollectionVisibility {
+	if x != nil {
+		return x.Visibility
+	}
+	return CollectionVisibility_COLLECTION_VISIBILITY_UNSPECIFIED
+}
+
+func (x *WorkshopCollectionSummary) GetItemCount() uint32 {
+	if x != nil {
+		return x.ItemCount
+	}
+	return 0
+}
+
+func (x *WorkshopCollectionSummary) GetUpdatedAtUnixMs() int64 {
+	if x != nil {
+		return x.UpdatedAtUnixMs
+	}
+	return 0
+}
+
+func (x *WorkshopCollectionSummary) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+type ListWorkshopCollectionsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Most recently updated first.
+	Collections   []*WorkshopCollectionSummary `protobuf:"bytes,1,rep,name=collections,proto3" json:"collections,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListWorkshopCollectionsResponse) Reset() {
+	*x = ListWorkshopCollectionsResponse{}
+	mi := &file_registry_v1_registry_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListWorkshopCollectionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListWorkshopCollectionsResponse) ProtoMessage() {}
+
+func (x *ListWorkshopCollectionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_registry_v1_registry_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListWorkshopCollectionsResponse.ProtoReflect.Descriptor instead.
+func (*ListWorkshopCollectionsResponse) Descriptor() ([]byte, []int) {
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *ListWorkshopCollectionsResponse) GetCollections() []*WorkshopCollectionSummary {
+	if x != nil {
+		return x.Collections
+	}
+	return nil
+}
+
+type GetWorkshopCollectionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CollectionId  uint64                 `protobuf:"varint,1,opt,name=collection_id,json=collectionId,proto3" json:"collection_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetWorkshopCollectionRequest) Reset() {
+	*x = GetWorkshopCollectionRequest{}
+	mi := &file_registry_v1_registry_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetWorkshopCollectionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetWorkshopCollectionRequest) ProtoMessage() {}
+
+func (x *GetWorkshopCollectionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_registry_v1_registry_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetWorkshopCollectionRequest.ProtoReflect.Descriptor instead.
+func (*GetWorkshopCollectionRequest) Descriptor() ([]byte, []int) {
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *GetWorkshopCollectionRequest) GetCollectionId() uint64 {
+	if x != nil {
+		return x.CollectionId
+	}
+	return 0
+}
+
+type WorkshopCollection struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Id          uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Title       string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Description string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	Visibility  CollectionVisibility   `protobuf:"varint,4,opt,name=visibility,proto3,enum=registry.v1.CollectionVisibility" json:"visibility,omitempty"`
+	Url         string                 `protobuf:"bytes,5,opt,name=url,proto3" json:"url,omitempty"`
+	// Whether the cluster's Steam account published it, i.e. whether
+	// PublishWorkshopCollection/DeleteWorkshopCollection will accept it.
+	Owned           bool            `protobuf:"varint,6,opt,name=owned,proto3" json:"owned,omitempty"`
+	UpdatedAtUnixMs int64           `protobuf:"varint,7,opt,name=updated_at_unix_ms,json=updatedAtUnixMs,proto3" json:"updated_at_unix_ms,omitempty"`
+	Mods            []*WorkshopItem `protobuf:"bytes,8,rep,name=mods,proto3" json:"mods,omitempty"`
+	// Members Steam no longer resolves for this account (removed or made
+	// private since they were added). Saving the collection drops them.
+	Unresolved    []uint64 `protobuf:"varint,9,rep,packed,name=unresolved,proto3" json:"unresolved,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WorkshopCollection) Reset() {
+	*x = WorkshopCollection{}
+	mi := &file_registry_v1_registry_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WorkshopCollection) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WorkshopCollection) ProtoMessage() {}
+
+func (x *WorkshopCollection) ProtoReflect() protoreflect.Message {
+	mi := &file_registry_v1_registry_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WorkshopCollection.ProtoReflect.Descriptor instead.
+func (*WorkshopCollection) Descriptor() ([]byte, []int) {
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *WorkshopCollection) GetId() uint64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *WorkshopCollection) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *WorkshopCollection) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *WorkshopCollection) GetVisibility() CollectionVisibility {
+	if x != nil {
+		return x.Visibility
+	}
+	return CollectionVisibility_COLLECTION_VISIBILITY_UNSPECIFIED
+}
+
+func (x *WorkshopCollection) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *WorkshopCollection) GetOwned() bool {
+	if x != nil {
+		return x.Owned
+	}
+	return false
+}
+
+func (x *WorkshopCollection) GetUpdatedAtUnixMs() int64 {
+	if x != nil {
+		return x.UpdatedAtUnixMs
+	}
+	return 0
+}
+
+func (x *WorkshopCollection) GetMods() []*WorkshopItem {
+	if x != nil {
+		return x.Mods
+	}
+	return nil
+}
+
+func (x *WorkshopCollection) GetUnresolved() []uint64 {
+	if x != nil {
+		return x.Unresolved
+	}
+	return nil
+}
+
+type PublishWorkshopCollectionRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 0 publishes a new collection; anything else replaces that one, which
+	// must be owned by the cluster's Steam account.
+	CollectionId uint64               `protobuf:"varint,1,opt,name=collection_id,json=collectionId,proto3" json:"collection_id,omitempty"`
+	Title        string               `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Description  string               `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	Visibility   CollectionVisibility `protobuf:"varint,4,opt,name=visibility,proto3,enum=registry.v1.CollectionVisibility" json:"visibility,omitempty"`
+	// Mods and/or collections, resolved and flattened before publishing
+	// exactly as ResolveWorkshopItems does. Order is kept.
+	ModIds        []uint64 `protobuf:"varint,5,rep,packed,name=mod_ids,json=modIds,proto3" json:"mod_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PublishWorkshopCollectionRequest) Reset() {
+	*x = PublishWorkshopCollectionRequest{}
+	mi := &file_registry_v1_registry_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublishWorkshopCollectionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublishWorkshopCollectionRequest) ProtoMessage() {}
+
+func (x *PublishWorkshopCollectionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_registry_v1_registry_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublishWorkshopCollectionRequest.ProtoReflect.Descriptor instead.
+func (*PublishWorkshopCollectionRequest) Descriptor() ([]byte, []int) {
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *PublishWorkshopCollectionRequest) GetCollectionId() uint64 {
+	if x != nil {
+		return x.CollectionId
+	}
+	return 0
+}
+
+func (x *PublishWorkshopCollectionRequest) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *PublishWorkshopCollectionRequest) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *PublishWorkshopCollectionRequest) GetVisibility() CollectionVisibility {
+	if x != nil {
+		return x.Visibility
+	}
+	return CollectionVisibility_COLLECTION_VISIBILITY_UNSPECIFIED
+}
+
+func (x *PublishWorkshopCollectionRequest) GetModIds() []uint64 {
+	if x != nil {
+		return x.ModIds
+	}
+	return nil
+}
+
+type PublishWorkshopCollectionResponse struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	CollectionId uint64                 `protobuf:"varint,1,opt,name=collection_id,json=collectionId,proto3" json:"collection_id,omitempty"`
+	Url          string                 `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
+	// What actually went in, after resolution.
+	Mods       []*WorkshopItem `protobuf:"bytes,3,rep,name=mods,proto3" json:"mods,omitempty"`
+	Unresolved []uint64        `protobuf:"varint,4,rep,packed,name=unresolved,proto3" json:"unresolved,omitempty"`
+	// True when this call published a new collection, false when it
+	// replaced an existing one.
+	Created       bool `protobuf:"varint,5,opt,name=created,proto3" json:"created,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PublishWorkshopCollectionResponse) Reset() {
+	*x = PublishWorkshopCollectionResponse{}
+	mi := &file_registry_v1_registry_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublishWorkshopCollectionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublishWorkshopCollectionResponse) ProtoMessage() {}
+
+func (x *PublishWorkshopCollectionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_registry_v1_registry_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublishWorkshopCollectionResponse.ProtoReflect.Descriptor instead.
+func (*PublishWorkshopCollectionResponse) Descriptor() ([]byte, []int) {
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *PublishWorkshopCollectionResponse) GetCollectionId() uint64 {
+	if x != nil {
+		return x.CollectionId
+	}
+	return 0
+}
+
+func (x *PublishWorkshopCollectionResponse) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *PublishWorkshopCollectionResponse) GetMods() []*WorkshopItem {
+	if x != nil {
+		return x.Mods
+	}
+	return nil
+}
+
+func (x *PublishWorkshopCollectionResponse) GetUnresolved() []uint64 {
+	if x != nil {
+		return x.Unresolved
+	}
+	return nil
+}
+
+func (x *PublishWorkshopCollectionResponse) GetCreated() bool {
+	if x != nil {
+		return x.Created
+	}
+	return false
+}
+
+type DeleteWorkshopCollectionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CollectionId  uint64                 `protobuf:"varint,1,opt,name=collection_id,json=collectionId,proto3" json:"collection_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteWorkshopCollectionRequest) Reset() {
+	*x = DeleteWorkshopCollectionRequest{}
+	mi := &file_registry_v1_registry_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteWorkshopCollectionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteWorkshopCollectionRequest) ProtoMessage() {}
+
+func (x *DeleteWorkshopCollectionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_registry_v1_registry_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteWorkshopCollectionRequest.ProtoReflect.Descriptor instead.
+func (*DeleteWorkshopCollectionRequest) Descriptor() ([]byte, []int) {
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *DeleteWorkshopCollectionRequest) GetCollectionId() uint64 {
+	if x != nil {
+		return x.CollectionId
+	}
+	return 0
+}
+
+type DeleteWorkshopCollectionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteWorkshopCollectionResponse) Reset() {
+	*x = DeleteWorkshopCollectionResponse{}
+	mi := &file_registry_v1_registry_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteWorkshopCollectionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteWorkshopCollectionResponse) ProtoMessage() {}
+
+func (x *DeleteWorkshopCollectionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_registry_v1_registry_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteWorkshopCollectionResponse.ProtoReflect.Descriptor instead.
+func (*DeleteWorkshopCollectionResponse) Descriptor() ([]byte, []int) {
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{35}
+}
+
 type BeginSteamQrLoginRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -1437,7 +2229,7 @@ type BeginSteamQrLoginRequest struct {
 
 func (x *BeginSteamQrLoginRequest) Reset() {
 	*x = BeginSteamQrLoginRequest{}
-	mi := &file_registry_v1_registry_proto_msgTypes[24]
+	mi := &file_registry_v1_registry_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1449,7 +2241,7 @@ func (x *BeginSteamQrLoginRequest) String() string {
 func (*BeginSteamQrLoginRequest) ProtoMessage() {}
 
 func (x *BeginSteamQrLoginRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[24]
+	mi := &file_registry_v1_registry_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1462,7 +2254,7 @@ func (x *BeginSteamQrLoginRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeginSteamQrLoginRequest.ProtoReflect.Descriptor instead.
 func (*BeginSteamQrLoginRequest) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{24}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{36}
 }
 
 type BeginSteamQrLoginResponse struct {
@@ -1480,7 +2272,7 @@ type BeginSteamQrLoginResponse struct {
 
 func (x *BeginSteamQrLoginResponse) Reset() {
 	*x = BeginSteamQrLoginResponse{}
-	mi := &file_registry_v1_registry_proto_msgTypes[25]
+	mi := &file_registry_v1_registry_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1492,7 +2284,7 @@ func (x *BeginSteamQrLoginResponse) String() string {
 func (*BeginSteamQrLoginResponse) ProtoMessage() {}
 
 func (x *BeginSteamQrLoginResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[25]
+	mi := &file_registry_v1_registry_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1505,7 +2297,7 @@ func (x *BeginSteamQrLoginResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeginSteamQrLoginResponse.ProtoReflect.Descriptor instead.
 func (*BeginSteamQrLoginResponse) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{25}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *BeginSteamQrLoginResponse) GetSessionId() string {
@@ -1531,7 +2323,7 @@ type PollSteamQrLoginRequest struct {
 
 func (x *PollSteamQrLoginRequest) Reset() {
 	*x = PollSteamQrLoginRequest{}
-	mi := &file_registry_v1_registry_proto_msgTypes[26]
+	mi := &file_registry_v1_registry_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1543,7 +2335,7 @@ func (x *PollSteamQrLoginRequest) String() string {
 func (*PollSteamQrLoginRequest) ProtoMessage() {}
 
 func (x *PollSteamQrLoginRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[26]
+	mi := &file_registry_v1_registry_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1556,7 +2348,7 @@ func (x *PollSteamQrLoginRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PollSteamQrLoginRequest.ProtoReflect.Descriptor instead.
 func (*PollSteamQrLoginRequest) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{26}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *PollSteamQrLoginRequest) GetSessionId() string {
@@ -1579,7 +2371,7 @@ type PollSteamQrLoginResponse struct {
 
 func (x *PollSteamQrLoginResponse) Reset() {
 	*x = PollSteamQrLoginResponse{}
-	mi := &file_registry_v1_registry_proto_msgTypes[27]
+	mi := &file_registry_v1_registry_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1591,7 +2383,7 @@ func (x *PollSteamQrLoginResponse) String() string {
 func (*PollSteamQrLoginResponse) ProtoMessage() {}
 
 func (x *PollSteamQrLoginResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[27]
+	mi := &file_registry_v1_registry_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1604,7 +2396,7 @@ func (x *PollSteamQrLoginResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PollSteamQrLoginResponse.ProtoReflect.Descriptor instead.
 func (*PollSteamQrLoginResponse) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{27}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *PollSteamQrLoginResponse) GetConfirmed() bool {
@@ -1632,7 +2424,7 @@ type SecretInfo struct {
 
 func (x *SecretInfo) Reset() {
 	*x = SecretInfo{}
-	mi := &file_registry_v1_registry_proto_msgTypes[28]
+	mi := &file_registry_v1_registry_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1644,7 +2436,7 @@ func (x *SecretInfo) String() string {
 func (*SecretInfo) ProtoMessage() {}
 
 func (x *SecretInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[28]
+	mi := &file_registry_v1_registry_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1657,7 +2449,7 @@ func (x *SecretInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SecretInfo.ProtoReflect.Descriptor instead.
 func (*SecretInfo) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{28}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *SecretInfo) GetName() string {
@@ -1682,7 +2474,7 @@ type ListSecretsRequest struct {
 
 func (x *ListSecretsRequest) Reset() {
 	*x = ListSecretsRequest{}
-	mi := &file_registry_v1_registry_proto_msgTypes[29]
+	mi := &file_registry_v1_registry_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1694,7 +2486,7 @@ func (x *ListSecretsRequest) String() string {
 func (*ListSecretsRequest) ProtoMessage() {}
 
 func (x *ListSecretsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[29]
+	mi := &file_registry_v1_registry_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1707,7 +2499,7 @@ func (x *ListSecretsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSecretsRequest.ProtoReflect.Descriptor instead.
 func (*ListSecretsRequest) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{29}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{41}
 }
 
 type ListSecretsResponse struct {
@@ -1722,7 +2514,7 @@ type ListSecretsResponse struct {
 
 func (x *ListSecretsResponse) Reset() {
 	*x = ListSecretsResponse{}
-	mi := &file_registry_v1_registry_proto_msgTypes[30]
+	mi := &file_registry_v1_registry_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1734,7 +2526,7 @@ func (x *ListSecretsResponse) String() string {
 func (*ListSecretsResponse) ProtoMessage() {}
 
 func (x *ListSecretsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[30]
+	mi := &file_registry_v1_registry_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1747,7 +2539,7 @@ func (x *ListSecretsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSecretsResponse.ProtoReflect.Descriptor instead.
 func (*ListSecretsResponse) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{30}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *ListSecretsResponse) GetSecrets() []*SecretInfo {
@@ -1775,7 +2567,7 @@ type PutSecretRequest struct {
 
 func (x *PutSecretRequest) Reset() {
 	*x = PutSecretRequest{}
-	mi := &file_registry_v1_registry_proto_msgTypes[31]
+	mi := &file_registry_v1_registry_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1787,7 +2579,7 @@ func (x *PutSecretRequest) String() string {
 func (*PutSecretRequest) ProtoMessage() {}
 
 func (x *PutSecretRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[31]
+	mi := &file_registry_v1_registry_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1800,7 +2592,7 @@ func (x *PutSecretRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PutSecretRequest.ProtoReflect.Descriptor instead.
 func (*PutSecretRequest) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{31}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *PutSecretRequest) GetName() string {
@@ -1826,7 +2618,7 @@ type PutSecretResponse struct {
 
 func (x *PutSecretResponse) Reset() {
 	*x = PutSecretResponse{}
-	mi := &file_registry_v1_registry_proto_msgTypes[32]
+	mi := &file_registry_v1_registry_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1838,7 +2630,7 @@ func (x *PutSecretResponse) String() string {
 func (*PutSecretResponse) ProtoMessage() {}
 
 func (x *PutSecretResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[32]
+	mi := &file_registry_v1_registry_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1851,7 +2643,7 @@ func (x *PutSecretResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PutSecretResponse.ProtoReflect.Descriptor instead.
 func (*PutSecretResponse) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{32}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *PutSecretResponse) GetSecret() *SecretInfo {
@@ -1870,7 +2662,7 @@ type DeleteSecretRequest struct {
 
 func (x *DeleteSecretRequest) Reset() {
 	*x = DeleteSecretRequest{}
-	mi := &file_registry_v1_registry_proto_msgTypes[33]
+	mi := &file_registry_v1_registry_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1882,7 +2674,7 @@ func (x *DeleteSecretRequest) String() string {
 func (*DeleteSecretRequest) ProtoMessage() {}
 
 func (x *DeleteSecretRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[33]
+	mi := &file_registry_v1_registry_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1895,7 +2687,7 @@ func (x *DeleteSecretRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteSecretRequest.ProtoReflect.Descriptor instead.
 func (*DeleteSecretRequest) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{33}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *DeleteSecretRequest) GetName() string {
@@ -1913,7 +2705,7 @@ type DeleteSecretResponse struct {
 
 func (x *DeleteSecretResponse) Reset() {
 	*x = DeleteSecretResponse{}
-	mi := &file_registry_v1_registry_proto_msgTypes[34]
+	mi := &file_registry_v1_registry_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1925,7 +2717,7 @@ func (x *DeleteSecretResponse) String() string {
 func (*DeleteSecretResponse) ProtoMessage() {}
 
 func (x *DeleteSecretResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[34]
+	mi := &file_registry_v1_registry_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1938,7 +2730,7 @@ func (x *DeleteSecretResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteSecretResponse.ProtoReflect.Descriptor instead.
 func (*DeleteSecretResponse) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{34}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{46}
 }
 
 // A provider login attached to a user -- what a human actually recognizes
@@ -1954,7 +2746,7 @@ type LinkedAccountInfo struct {
 
 func (x *LinkedAccountInfo) Reset() {
 	*x = LinkedAccountInfo{}
-	mi := &file_registry_v1_registry_proto_msgTypes[35]
+	mi := &file_registry_v1_registry_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1966,7 +2758,7 @@ func (x *LinkedAccountInfo) String() string {
 func (*LinkedAccountInfo) ProtoMessage() {}
 
 func (x *LinkedAccountInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[35]
+	mi := &file_registry_v1_registry_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1979,7 +2771,7 @@ func (x *LinkedAccountInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LinkedAccountInfo.ProtoReflect.Descriptor instead.
 func (*LinkedAccountInfo) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{35}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *LinkedAccountInfo) GetProvider() string {
@@ -2018,7 +2810,7 @@ type AclSubject struct {
 
 func (x *AclSubject) Reset() {
 	*x = AclSubject{}
-	mi := &file_registry_v1_registry_proto_msgTypes[36]
+	mi := &file_registry_v1_registry_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2030,7 +2822,7 @@ func (x *AclSubject) String() string {
 func (*AclSubject) ProtoMessage() {}
 
 func (x *AclSubject) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[36]
+	mi := &file_registry_v1_registry_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2043,7 +2835,7 @@ func (x *AclSubject) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AclSubject.ProtoReflect.Descriptor instead.
 func (*AclSubject) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{36}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *AclSubject) GetSubject() string {
@@ -2075,7 +2867,7 @@ type ListAclRequest struct {
 
 func (x *ListAclRequest) Reset() {
 	*x = ListAclRequest{}
-	mi := &file_registry_v1_registry_proto_msgTypes[37]
+	mi := &file_registry_v1_registry_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2087,7 +2879,7 @@ func (x *ListAclRequest) String() string {
 func (*ListAclRequest) ProtoMessage() {}
 
 func (x *ListAclRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[37]
+	mi := &file_registry_v1_registry_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2100,7 +2892,7 @@ func (x *ListAclRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAclRequest.ProtoReflect.Descriptor instead.
 func (*ListAclRequest) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{37}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{49}
 }
 
 type ListAclResponse struct {
@@ -2117,7 +2909,7 @@ type ListAclResponse struct {
 
 func (x *ListAclResponse) Reset() {
 	*x = ListAclResponse{}
-	mi := &file_registry_v1_registry_proto_msgTypes[38]
+	mi := &file_registry_v1_registry_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2129,7 +2921,7 @@ func (x *ListAclResponse) String() string {
 func (*ListAclResponse) ProtoMessage() {}
 
 func (x *ListAclResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[38]
+	mi := &file_registry_v1_registry_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2142,7 +2934,7 @@ func (x *ListAclResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAclResponse.ProtoReflect.Descriptor instead.
 func (*ListAclResponse) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{38}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *ListAclResponse) GetSubjects() []*AclSubject {
@@ -2169,7 +2961,7 @@ type SetAclScopesRequest struct {
 
 func (x *SetAclScopesRequest) Reset() {
 	*x = SetAclScopesRequest{}
-	mi := &file_registry_v1_registry_proto_msgTypes[39]
+	mi := &file_registry_v1_registry_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2181,7 +2973,7 @@ func (x *SetAclScopesRequest) String() string {
 func (*SetAclScopesRequest) ProtoMessage() {}
 
 func (x *SetAclScopesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[39]
+	mi := &file_registry_v1_registry_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2194,7 +2986,7 @@ func (x *SetAclScopesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetAclScopesRequest.ProtoReflect.Descriptor instead.
 func (*SetAclScopesRequest) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{39}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *SetAclScopesRequest) GetSubject() string {
@@ -2220,7 +3012,7 @@ type SetAclScopesResponse struct {
 
 func (x *SetAclScopesResponse) Reset() {
 	*x = SetAclScopesResponse{}
-	mi := &file_registry_v1_registry_proto_msgTypes[40]
+	mi := &file_registry_v1_registry_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2232,7 +3024,7 @@ func (x *SetAclScopesResponse) String() string {
 func (*SetAclScopesResponse) ProtoMessage() {}
 
 func (x *SetAclScopesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[40]
+	mi := &file_registry_v1_registry_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2245,7 +3037,7 @@ func (x *SetAclScopesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetAclScopesResponse.ProtoReflect.Descriptor instead.
 func (*SetAclScopesResponse) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{40}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *SetAclScopesResponse) GetSubject() *AclSubject {
@@ -2284,7 +3076,7 @@ type ExportedModSource struct {
 
 func (x *ExportedModSource) Reset() {
 	*x = ExportedModSource{}
-	mi := &file_registry_v1_registry_proto_msgTypes[41]
+	mi := &file_registry_v1_registry_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2296,7 +3088,7 @@ func (x *ExportedModSource) String() string {
 func (*ExportedModSource) ProtoMessage() {}
 
 func (x *ExportedModSource) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[41]
+	mi := &file_registry_v1_registry_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2309,7 +3101,7 @@ func (x *ExportedModSource) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportedModSource.ProtoReflect.Descriptor instead.
 func (*ExportedModSource) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{41}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *ExportedModSource) GetKind() ModSourceKind {
@@ -2350,7 +3142,7 @@ type ExportedConfigMap struct {
 
 func (x *ExportedConfigMap) Reset() {
 	*x = ExportedConfigMap{}
-	mi := &file_registry_v1_registry_proto_msgTypes[42]
+	mi := &file_registry_v1_registry_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2362,7 +3154,7 @@ func (x *ExportedConfigMap) String() string {
 func (*ExportedConfigMap) ProtoMessage() {}
 
 func (x *ExportedConfigMap) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[42]
+	mi := &file_registry_v1_registry_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2375,7 +3167,7 @@ func (x *ExportedConfigMap) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportedConfigMap.ProtoReflect.Descriptor instead.
 func (*ExportedConfigMap) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{42}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *ExportedConfigMap) GetName() string {
@@ -2415,7 +3207,7 @@ type ExportedServer struct {
 
 func (x *ExportedServer) Reset() {
 	*x = ExportedServer{}
-	mi := &file_registry_v1_registry_proto_msgTypes[43]
+	mi := &file_registry_v1_registry_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2427,7 +3219,7 @@ func (x *ExportedServer) String() string {
 func (*ExportedServer) ProtoMessage() {}
 
 func (x *ExportedServer) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[43]
+	mi := &file_registry_v1_registry_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2440,7 +3232,7 @@ func (x *ExportedServer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportedServer.ProtoReflect.Descriptor instead.
 func (*ExportedServer) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{43}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *ExportedServer) GetName() string {
@@ -2521,7 +3313,7 @@ type ExportStateRequest struct {
 
 func (x *ExportStateRequest) Reset() {
 	*x = ExportStateRequest{}
-	mi := &file_registry_v1_registry_proto_msgTypes[44]
+	mi := &file_registry_v1_registry_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2533,7 +3325,7 @@ func (x *ExportStateRequest) String() string {
 func (*ExportStateRequest) ProtoMessage() {}
 
 func (x *ExportStateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[44]
+	mi := &file_registry_v1_registry_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2546,7 +3338,7 @@ func (x *ExportStateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportStateRequest.ProtoReflect.Descriptor instead.
 func (*ExportStateRequest) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{44}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{56}
 }
 
 type ExportStateResponse struct {
@@ -2585,7 +3377,7 @@ type ExportStateResponse struct {
 
 func (x *ExportStateResponse) Reset() {
 	*x = ExportStateResponse{}
-	mi := &file_registry_v1_registry_proto_msgTypes[45]
+	mi := &file_registry_v1_registry_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2597,7 +3389,7 @@ func (x *ExportStateResponse) String() string {
 func (*ExportStateResponse) ProtoMessage() {}
 
 func (x *ExportStateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[45]
+	mi := &file_registry_v1_registry_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2610,7 +3402,7 @@ func (x *ExportStateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportStateResponse.ProtoReflect.Descriptor instead.
 func (*ExportStateResponse) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{45}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *ExportStateResponse) GetSchemaVersion() uint32 {
@@ -2666,7 +3458,7 @@ type ImportStateRequest struct {
 
 func (x *ImportStateRequest) Reset() {
 	*x = ImportStateRequest{}
-	mi := &file_registry_v1_registry_proto_msgTypes[46]
+	mi := &file_registry_v1_registry_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2678,7 +3470,7 @@ func (x *ImportStateRequest) String() string {
 func (*ImportStateRequest) ProtoMessage() {}
 
 func (x *ImportStateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[46]
+	mi := &file_registry_v1_registry_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2691,7 +3483,7 @@ func (x *ImportStateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ImportStateRequest.ProtoReflect.Descriptor instead.
 func (*ImportStateRequest) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{46}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *ImportStateRequest) GetModSources() []*ExportedModSource {
@@ -2724,7 +3516,7 @@ type ImportStateResponse struct {
 
 func (x *ImportStateResponse) Reset() {
 	*x = ImportStateResponse{}
-	mi := &file_registry_v1_registry_proto_msgTypes[47]
+	mi := &file_registry_v1_registry_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2736,7 +3528,7 @@ func (x *ImportStateResponse) String() string {
 func (*ImportStateResponse) ProtoMessage() {}
 
 func (x *ImportStateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[47]
+	mi := &file_registry_v1_registry_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2749,7 +3541,7 @@ func (x *ImportStateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ImportStateResponse.ProtoReflect.Descriptor instead.
 func (*ImportStateResponse) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{47}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{59}
 }
 
 func (x *ImportStateResponse) GetWarnings() []string {
@@ -2767,7 +3559,7 @@ type GetDiskUsageRequest struct {
 
 func (x *GetDiskUsageRequest) Reset() {
 	*x = GetDiskUsageRequest{}
-	mi := &file_registry_v1_registry_proto_msgTypes[48]
+	mi := &file_registry_v1_registry_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2779,7 +3571,7 @@ func (x *GetDiskUsageRequest) String() string {
 func (*GetDiskUsageRequest) ProtoMessage() {}
 
 func (x *GetDiskUsageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[48]
+	mi := &file_registry_v1_registry_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2792,7 +3584,7 @@ func (x *GetDiskUsageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDiskUsageRequest.ProtoReflect.Descriptor instead.
 func (*GetDiskUsageRequest) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{48}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{60}
 }
 
 type GetDiskUsageResponse struct {
@@ -2811,7 +3603,7 @@ type GetDiskUsageResponse struct {
 
 func (x *GetDiskUsageResponse) Reset() {
 	*x = GetDiskUsageResponse{}
-	mi := &file_registry_v1_registry_proto_msgTypes[49]
+	mi := &file_registry_v1_registry_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2823,7 +3615,7 @@ func (x *GetDiskUsageResponse) String() string {
 func (*GetDiskUsageResponse) ProtoMessage() {}
 
 func (x *GetDiskUsageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[49]
+	mi := &file_registry_v1_registry_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2836,7 +3628,7 @@ func (x *GetDiskUsageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDiskUsageResponse.ProtoReflect.Descriptor instead.
 func (*GetDiskUsageResponse) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{49}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *GetDiskUsageResponse) GetModsBytes() uint64 {
@@ -2877,7 +3669,7 @@ type RefreshSteamAuthRequest struct {
 
 func (x *RefreshSteamAuthRequest) Reset() {
 	*x = RefreshSteamAuthRequest{}
-	mi := &file_registry_v1_registry_proto_msgTypes[50]
+	mi := &file_registry_v1_registry_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2889,7 +3681,7 @@ func (x *RefreshSteamAuthRequest) String() string {
 func (*RefreshSteamAuthRequest) ProtoMessage() {}
 
 func (x *RefreshSteamAuthRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[50]
+	mi := &file_registry_v1_registry_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2902,7 +3694,7 @@ func (x *RefreshSteamAuthRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshSteamAuthRequest.ProtoReflect.Descriptor instead.
 func (*RefreshSteamAuthRequest) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{50}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *RefreshSteamAuthRequest) GetUsername() string {
@@ -2927,7 +3719,7 @@ type RefreshSteamAuthResponse struct {
 
 func (x *RefreshSteamAuthResponse) Reset() {
 	*x = RefreshSteamAuthResponse{}
-	mi := &file_registry_v1_registry_proto_msgTypes[51]
+	mi := &file_registry_v1_registry_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2939,7 +3731,7 @@ func (x *RefreshSteamAuthResponse) String() string {
 func (*RefreshSteamAuthResponse) ProtoMessage() {}
 
 func (x *RefreshSteamAuthResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[51]
+	mi := &file_registry_v1_registry_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2952,7 +3744,7 @@ func (x *RefreshSteamAuthResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshSteamAuthResponse.ProtoReflect.Descriptor instead.
 func (*RefreshSteamAuthResponse) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{51}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{63}
 }
 
 type DeleteMissionRequest struct {
@@ -2964,7 +3756,7 @@ type DeleteMissionRequest struct {
 
 func (x *DeleteMissionRequest) Reset() {
 	*x = DeleteMissionRequest{}
-	mi := &file_registry_v1_registry_proto_msgTypes[52]
+	mi := &file_registry_v1_registry_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2976,7 +3768,7 @@ func (x *DeleteMissionRequest) String() string {
 func (*DeleteMissionRequest) ProtoMessage() {}
 
 func (x *DeleteMissionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[52]
+	mi := &file_registry_v1_registry_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2989,7 +3781,7 @@ func (x *DeleteMissionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteMissionRequest.ProtoReflect.Descriptor instead.
 func (*DeleteMissionRequest) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{52}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *DeleteMissionRequest) GetId() string {
@@ -3007,7 +3799,7 @@ type DeleteMissionResponse struct {
 
 func (x *DeleteMissionResponse) Reset() {
 	*x = DeleteMissionResponse{}
-	mi := &file_registry_v1_registry_proto_msgTypes[53]
+	mi := &file_registry_v1_registry_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3019,7 +3811,7 @@ func (x *DeleteMissionResponse) String() string {
 func (*DeleteMissionResponse) ProtoMessage() {}
 
 func (x *DeleteMissionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_registry_v1_registry_proto_msgTypes[53]
+	mi := &file_registry_v1_registry_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3032,7 +3824,7 @@ func (x *DeleteMissionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteMissionResponse.ProtoReflect.Descriptor instead.
 func (*DeleteMissionResponse) Descriptor() ([]byte, []int) {
-	return file_registry_v1_registry_proto_rawDescGZIP(), []int{53}
+	return file_registry_v1_registry_proto_rawDescGZIP(), []int{65}
 }
 
 var File_registry_v1_registry_proto protoreflect.FileDescriptor
@@ -3134,7 +3926,68 @@ const file_registry_v1_registry_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x15\n" +
 	"\x13ListMissionsRequest\"L\n" +
 	"\x14ListMissionsResponse\x124\n" +
-	"\bmissions\x18\x01 \x03(\v2\x18.registry.v1.MissionInfoR\bmissions\"\x1a\n" +
+	"\bmissions\x18\x01 \x03(\v2\x18.registry.v1.MissionInfoR\bmissions\"Q\n" +
+	"\fWorkshopItem\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x14\n" +
+	"\x05title\x18\x02 \x01(\tR\x05title\x12\x1b\n" +
+	"\tfile_size\x18\x03 \x01(\x04R\bfileSize\"P\n" +
+	"\x1bResolveWorkshopItemsRequest\x12\x1f\n" +
+	"\vpreset_html\x18\x01 \x01(\tR\n" +
+	"presetHtml\x12\x10\n" +
+	"\x03ids\x18\x02 \x03(\x04R\x03ids\"m\n" +
+	"\x1cResolveWorkshopItemsResponse\x12-\n" +
+	"\x04mods\x18\x01 \x03(\v2\x19.registry.v1.WorkshopItemR\x04mods\x12\x1e\n" +
+	"\n" +
+	"unresolved\x18\x02 \x03(\x04R\n" +
+	"unresolved\" \n" +
+	"\x1eListWorkshopCollectionsRequest\"\xe2\x01\n" +
+	"\x19WorkshopCollectionSummary\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x14\n" +
+	"\x05title\x18\x02 \x01(\tR\x05title\x12A\n" +
+	"\n" +
+	"visibility\x18\x03 \x01(\x0e2!.registry.v1.CollectionVisibilityR\n" +
+	"visibility\x12\x1d\n" +
+	"\n" +
+	"item_count\x18\x04 \x01(\rR\titemCount\x12+\n" +
+	"\x12updated_at_unix_ms\x18\x05 \x01(\x03R\x0fupdatedAtUnixMs\x12\x10\n" +
+	"\x03url\x18\x06 \x01(\tR\x03url\"k\n" +
+	"\x1fListWorkshopCollectionsResponse\x12H\n" +
+	"\vcollections\x18\x01 \x03(\v2&.registry.v1.WorkshopCollectionSummaryR\vcollections\"C\n" +
+	"\x1cGetWorkshopCollectionRequest\x12#\n" +
+	"\rcollection_id\x18\x01 \x01(\x04R\fcollectionId\"\xc3\x02\n" +
+	"\x12WorkshopCollection\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x14\n" +
+	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12A\n" +
+	"\n" +
+	"visibility\x18\x04 \x01(\x0e2!.registry.v1.CollectionVisibilityR\n" +
+	"visibility\x12\x10\n" +
+	"\x03url\x18\x05 \x01(\tR\x03url\x12\x14\n" +
+	"\x05owned\x18\x06 \x01(\bR\x05owned\x12+\n" +
+	"\x12updated_at_unix_ms\x18\a \x01(\x03R\x0fupdatedAtUnixMs\x12-\n" +
+	"\x04mods\x18\b \x03(\v2\x19.registry.v1.WorkshopItemR\x04mods\x12\x1e\n" +
+	"\n" +
+	"unresolved\x18\t \x03(\x04R\n" +
+	"unresolved\"\xdb\x01\n" +
+	" PublishWorkshopCollectionRequest\x12#\n" +
+	"\rcollection_id\x18\x01 \x01(\x04R\fcollectionId\x12\x14\n" +
+	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12A\n" +
+	"\n" +
+	"visibility\x18\x04 \x01(\x0e2!.registry.v1.CollectionVisibilityR\n" +
+	"visibility\x12\x17\n" +
+	"\amod_ids\x18\x05 \x03(\x04R\x06modIds\"\xc3\x01\n" +
+	"!PublishWorkshopCollectionResponse\x12#\n" +
+	"\rcollection_id\x18\x01 \x01(\x04R\fcollectionId\x12\x10\n" +
+	"\x03url\x18\x02 \x01(\tR\x03url\x12-\n" +
+	"\x04mods\x18\x03 \x03(\v2\x19.registry.v1.WorkshopItemR\x04mods\x12\x1e\n" +
+	"\n" +
+	"unresolved\x18\x04 \x03(\x04R\n" +
+	"unresolved\x12\x18\n" +
+	"\acreated\x18\x05 \x01(\bR\acreated\"F\n" +
+	"\x1fDeleteWorkshopCollectionRequest\x12#\n" +
+	"\rcollection_id\x18\x01 \x01(\x04R\fcollectionId\"\"\n" +
+	" DeleteWorkshopCollectionResponse\"\x1a\n" +
 	"\x18BeginSteamQrLoginRequest\"_\n" +
 	"\x19BeginSteamQrLoginResponse\x12\x1d\n" +
 	"\n" +
@@ -3248,7 +4101,13 @@ const file_registry_v1_registry_proto_rawDesc = "" +
 	"\x13MOD_SOURCE_KIND_MOD\x10\x01\x12\x1e\n" +
 	"\x1aMOD_SOURCE_KIND_COLLECTION\x10\x02\x12\x19\n" +
 	"\x15MOD_SOURCE_KIND_LOCAL\x10\x03\x12\x1a\n" +
-	"\x16MOD_SOURCE_KIND_PRESET\x10\x04*\x86\x01\n" +
+	"\x16MOD_SOURCE_KIND_PRESET\x10\x04*\xce\x01\n" +
+	"\x14CollectionVisibility\x12%\n" +
+	"!COLLECTION_VISIBILITY_UNSPECIFIED\x10\x00\x12 \n" +
+	"\x1cCOLLECTION_VISIBILITY_PUBLIC\x10\x01\x12&\n" +
+	"\"COLLECTION_VISIBILITY_FRIENDS_ONLY\x10\x02\x12!\n" +
+	"\x1dCOLLECTION_VISIBILITY_PRIVATE\x10\x03\x12\"\n" +
+	"\x1eCOLLECTION_VISIBILITY_UNLISTED\x10\x04*\x86\x01\n" +
 	"\x14ExportedDesiredState\x12&\n" +
 	"\"EXPORTED_DESIRED_STATE_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1eEXPORTED_DESIRED_STATE_RUNNING\x10\x01\x12\"\n" +
@@ -3268,7 +4127,7 @@ const file_registry_v1_registry_proto_rawDesc = "" +
 	"GetMission\x12\x1e.registry.v1.GetMissionRequest\x1a\x18.registry.v1.MissionInfo\x12S\n" +
 	"\fListMissions\x12 .registry.v1.ListMissionsRequest\x1a!.registry.v1.ListMissionsResponse\x12V\n" +
 	"\rDeleteMission\x12!.registry.v1.DeleteMissionRequest\x1a\".registry.v1.DeleteMissionResponse\x12V\n" +
-	"\x12SetMissionMetadata\x12&.registry.v1.SetMissionMetadataRequest\x1a\x18.registry.v1.MissionInfo2\xbb\a\n" +
+	"\x12SetMissionMetadata\x12&.registry.v1.SetMissionMetadataRequest\x1a\x18.registry.v1.MissionInfo2\xf8\v\n" +
 	"\fAdminService\x12S\n" +
 	"\fGetDiskUsage\x12 .registry.v1.GetDiskUsageRequest\x1a!.registry.v1.GetDiskUsageResponse\x12_\n" +
 	"\x10RefreshSteamAuth\x12$.registry.v1.RefreshSteamAuthRequest\x1a%.registry.v1.RefreshSteamAuthResponse\x12P\n" +
@@ -3280,7 +4139,12 @@ const file_registry_v1_registry_proto_rawDesc = "" +
 	"\x10PollSteamQrLogin\x12$.registry.v1.PollSteamQrLoginRequest\x1a%.registry.v1.PollSteamQrLoginResponse\x12P\n" +
 	"\vListSecrets\x12\x1f.registry.v1.ListSecretsRequest\x1a .registry.v1.ListSecretsResponse\x12J\n" +
 	"\tPutSecret\x12\x1d.registry.v1.PutSecretRequest\x1a\x1e.registry.v1.PutSecretResponse\x12S\n" +
-	"\fDeleteSecret\x12 .registry.v1.DeleteSecretRequest\x1a!.registry.v1.DeleteSecretResponseBJZHgithub.com/skua-international/magpie/generated/go/registry/v1;registryv1b\x06proto3"
+	"\fDeleteSecret\x12 .registry.v1.DeleteSecretRequest\x1a!.registry.v1.DeleteSecretResponse\x12k\n" +
+	"\x14ResolveWorkshopItems\x12(.registry.v1.ResolveWorkshopItemsRequest\x1a).registry.v1.ResolveWorkshopItemsResponse\x12t\n" +
+	"\x17ListWorkshopCollections\x12+.registry.v1.ListWorkshopCollectionsRequest\x1a,.registry.v1.ListWorkshopCollectionsResponse\x12c\n" +
+	"\x15GetWorkshopCollection\x12).registry.v1.GetWorkshopCollectionRequest\x1a\x1f.registry.v1.WorkshopCollection\x12z\n" +
+	"\x19PublishWorkshopCollection\x12-.registry.v1.PublishWorkshopCollectionRequest\x1a..registry.v1.PublishWorkshopCollectionResponse\x12w\n" +
+	"\x18DeleteWorkshopCollection\x12,.registry.v1.DeleteWorkshopCollectionRequest\x1a-.registry.v1.DeleteWorkshopCollectionResponseBJZHgithub.com/skua-international/magpie/generated/go/registry/v1;registryv1b\x06proto3"
 
 var (
 	file_registry_v1_registry_proto_rawDescOnce sync.Once
@@ -3294,156 +4158,186 @@ func file_registry_v1_registry_proto_rawDescGZIP() []byte {
 	return file_registry_v1_registry_proto_rawDescData
 }
 
-var file_registry_v1_registry_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_registry_v1_registry_proto_msgTypes = make([]protoimpl.MessageInfo, 62)
+var file_registry_v1_registry_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_registry_v1_registry_proto_msgTypes = make([]protoimpl.MessageInfo, 74)
 var file_registry_v1_registry_proto_goTypes = []any{
-	(ModSourceKind)(0),                  // 0: registry.v1.ModSourceKind
-	(ExportedDesiredState)(0),           // 1: registry.v1.ExportedDesiredState
-	(*SetModSourceMetadataRequest)(nil), // 2: registry.v1.SetModSourceMetadataRequest
-	(*AddModSourceRequest)(nil),         // 3: registry.v1.AddModSourceRequest
-	(*LocalModUpload)(nil),              // 4: registry.v1.LocalModUpload
-	(*AddModSourceResponse)(nil),        // 5: registry.v1.AddModSourceResponse
-	(*DeleteModSourceRequest)(nil),      // 6: registry.v1.DeleteModSourceRequest
-	(*DeleteModSourceResponse)(nil),     // 7: registry.v1.DeleteModSourceResponse
-	(*SyncModSourceRequest)(nil),        // 8: registry.v1.SyncModSourceRequest
-	(*SyncModSourceResponse)(nil),       // 9: registry.v1.SyncModSourceResponse
-	(*ListSyncedModsRequest)(nil),       // 10: registry.v1.ListSyncedModsRequest
-	(*SyncedMod)(nil),                   // 11: registry.v1.SyncedMod
-	(*ListSyncedModsResponse)(nil),      // 12: registry.v1.ListSyncedModsResponse
-	(*InvalidateModRequest)(nil),        // 13: registry.v1.InvalidateModRequest
-	(*InvalidateModResponse)(nil),       // 14: registry.v1.InvalidateModResponse
-	(*GetSyncedModRequest)(nil),         // 15: registry.v1.GetSyncedModRequest
-	(*GetSyncedModResponse)(nil),        // 16: registry.v1.GetSyncedModResponse
-	(*ModSourceInfo)(nil),               // 17: registry.v1.ModSourceInfo
-	(*ListModSourcesRequest)(nil),       // 18: registry.v1.ListModSourcesRequest
-	(*ListModSourcesResponse)(nil),      // 19: registry.v1.ListModSourcesResponse
-	(*SetMissionMetadataRequest)(nil),   // 20: registry.v1.SetMissionMetadataRequest
-	(*UploadMissionRequest)(nil),        // 21: registry.v1.UploadMissionRequest
-	(*MissionInfo)(nil),                 // 22: registry.v1.MissionInfo
-	(*GetMissionRequest)(nil),           // 23: registry.v1.GetMissionRequest
-	(*ListMissionsRequest)(nil),         // 24: registry.v1.ListMissionsRequest
-	(*ListMissionsResponse)(nil),        // 25: registry.v1.ListMissionsResponse
-	(*BeginSteamQrLoginRequest)(nil),    // 26: registry.v1.BeginSteamQrLoginRequest
-	(*BeginSteamQrLoginResponse)(nil),   // 27: registry.v1.BeginSteamQrLoginResponse
-	(*PollSteamQrLoginRequest)(nil),     // 28: registry.v1.PollSteamQrLoginRequest
-	(*PollSteamQrLoginResponse)(nil),    // 29: registry.v1.PollSteamQrLoginResponse
-	(*SecretInfo)(nil),                  // 30: registry.v1.SecretInfo
-	(*ListSecretsRequest)(nil),          // 31: registry.v1.ListSecretsRequest
-	(*ListSecretsResponse)(nil),         // 32: registry.v1.ListSecretsResponse
-	(*PutSecretRequest)(nil),            // 33: registry.v1.PutSecretRequest
-	(*PutSecretResponse)(nil),           // 34: registry.v1.PutSecretResponse
-	(*DeleteSecretRequest)(nil),         // 35: registry.v1.DeleteSecretRequest
-	(*DeleteSecretResponse)(nil),        // 36: registry.v1.DeleteSecretResponse
-	(*LinkedAccountInfo)(nil),           // 37: registry.v1.LinkedAccountInfo
-	(*AclSubject)(nil),                  // 38: registry.v1.AclSubject
-	(*ListAclRequest)(nil),              // 39: registry.v1.ListAclRequest
-	(*ListAclResponse)(nil),             // 40: registry.v1.ListAclResponse
-	(*SetAclScopesRequest)(nil),         // 41: registry.v1.SetAclScopesRequest
-	(*SetAclScopesResponse)(nil),        // 42: registry.v1.SetAclScopesResponse
-	(*ExportedModSource)(nil),           // 43: registry.v1.ExportedModSource
-	(*ExportedConfigMap)(nil),           // 44: registry.v1.ExportedConfigMap
-	(*ExportedServer)(nil),              // 45: registry.v1.ExportedServer
-	(*ExportStateRequest)(nil),          // 46: registry.v1.ExportStateRequest
-	(*ExportStateResponse)(nil),         // 47: registry.v1.ExportStateResponse
-	(*ImportStateRequest)(nil),          // 48: registry.v1.ImportStateRequest
-	(*ImportStateResponse)(nil),         // 49: registry.v1.ImportStateResponse
-	(*GetDiskUsageRequest)(nil),         // 50: registry.v1.GetDiskUsageRequest
-	(*GetDiskUsageResponse)(nil),        // 51: registry.v1.GetDiskUsageResponse
-	(*RefreshSteamAuthRequest)(nil),     // 52: registry.v1.RefreshSteamAuthRequest
-	(*RefreshSteamAuthResponse)(nil),    // 53: registry.v1.RefreshSteamAuthResponse
-	(*DeleteMissionRequest)(nil),        // 54: registry.v1.DeleteMissionRequest
-	(*DeleteMissionResponse)(nil),       // 55: registry.v1.DeleteMissionResponse
-	nil,                                 // 56: registry.v1.SetModSourceMetadataRequest.MetadataEntry
-	nil,                                 // 57: registry.v1.AddModSourceRequest.MetadataEntry
-	nil,                                 // 58: registry.v1.ModSourceInfo.MetadataEntry
-	nil,                                 // 59: registry.v1.SetMissionMetadataRequest.MetadataEntry
-	nil,                                 // 60: registry.v1.UploadMissionRequest.MetadataEntry
-	nil,                                 // 61: registry.v1.MissionInfo.MetadataEntry
-	nil,                                 // 62: registry.v1.PutSecretRequest.DataEntry
-	nil,                                 // 63: registry.v1.ExportedConfigMap.DataEntry
+	(ModSourceKind)(0),                        // 0: registry.v1.ModSourceKind
+	(CollectionVisibility)(0),                 // 1: registry.v1.CollectionVisibility
+	(ExportedDesiredState)(0),                 // 2: registry.v1.ExportedDesiredState
+	(*SetModSourceMetadataRequest)(nil),       // 3: registry.v1.SetModSourceMetadataRequest
+	(*AddModSourceRequest)(nil),               // 4: registry.v1.AddModSourceRequest
+	(*LocalModUpload)(nil),                    // 5: registry.v1.LocalModUpload
+	(*AddModSourceResponse)(nil),              // 6: registry.v1.AddModSourceResponse
+	(*DeleteModSourceRequest)(nil),            // 7: registry.v1.DeleteModSourceRequest
+	(*DeleteModSourceResponse)(nil),           // 8: registry.v1.DeleteModSourceResponse
+	(*SyncModSourceRequest)(nil),              // 9: registry.v1.SyncModSourceRequest
+	(*SyncModSourceResponse)(nil),             // 10: registry.v1.SyncModSourceResponse
+	(*ListSyncedModsRequest)(nil),             // 11: registry.v1.ListSyncedModsRequest
+	(*SyncedMod)(nil),                         // 12: registry.v1.SyncedMod
+	(*ListSyncedModsResponse)(nil),            // 13: registry.v1.ListSyncedModsResponse
+	(*InvalidateModRequest)(nil),              // 14: registry.v1.InvalidateModRequest
+	(*InvalidateModResponse)(nil),             // 15: registry.v1.InvalidateModResponse
+	(*GetSyncedModRequest)(nil),               // 16: registry.v1.GetSyncedModRequest
+	(*GetSyncedModResponse)(nil),              // 17: registry.v1.GetSyncedModResponse
+	(*ModSourceInfo)(nil),                     // 18: registry.v1.ModSourceInfo
+	(*ListModSourcesRequest)(nil),             // 19: registry.v1.ListModSourcesRequest
+	(*ListModSourcesResponse)(nil),            // 20: registry.v1.ListModSourcesResponse
+	(*SetMissionMetadataRequest)(nil),         // 21: registry.v1.SetMissionMetadataRequest
+	(*UploadMissionRequest)(nil),              // 22: registry.v1.UploadMissionRequest
+	(*MissionInfo)(nil),                       // 23: registry.v1.MissionInfo
+	(*GetMissionRequest)(nil),                 // 24: registry.v1.GetMissionRequest
+	(*ListMissionsRequest)(nil),               // 25: registry.v1.ListMissionsRequest
+	(*ListMissionsResponse)(nil),              // 26: registry.v1.ListMissionsResponse
+	(*WorkshopItem)(nil),                      // 27: registry.v1.WorkshopItem
+	(*ResolveWorkshopItemsRequest)(nil),       // 28: registry.v1.ResolveWorkshopItemsRequest
+	(*ResolveWorkshopItemsResponse)(nil),      // 29: registry.v1.ResolveWorkshopItemsResponse
+	(*ListWorkshopCollectionsRequest)(nil),    // 30: registry.v1.ListWorkshopCollectionsRequest
+	(*WorkshopCollectionSummary)(nil),         // 31: registry.v1.WorkshopCollectionSummary
+	(*ListWorkshopCollectionsResponse)(nil),   // 32: registry.v1.ListWorkshopCollectionsResponse
+	(*GetWorkshopCollectionRequest)(nil),      // 33: registry.v1.GetWorkshopCollectionRequest
+	(*WorkshopCollection)(nil),                // 34: registry.v1.WorkshopCollection
+	(*PublishWorkshopCollectionRequest)(nil),  // 35: registry.v1.PublishWorkshopCollectionRequest
+	(*PublishWorkshopCollectionResponse)(nil), // 36: registry.v1.PublishWorkshopCollectionResponse
+	(*DeleteWorkshopCollectionRequest)(nil),   // 37: registry.v1.DeleteWorkshopCollectionRequest
+	(*DeleteWorkshopCollectionResponse)(nil),  // 38: registry.v1.DeleteWorkshopCollectionResponse
+	(*BeginSteamQrLoginRequest)(nil),          // 39: registry.v1.BeginSteamQrLoginRequest
+	(*BeginSteamQrLoginResponse)(nil),         // 40: registry.v1.BeginSteamQrLoginResponse
+	(*PollSteamQrLoginRequest)(nil),           // 41: registry.v1.PollSteamQrLoginRequest
+	(*PollSteamQrLoginResponse)(nil),          // 42: registry.v1.PollSteamQrLoginResponse
+	(*SecretInfo)(nil),                        // 43: registry.v1.SecretInfo
+	(*ListSecretsRequest)(nil),                // 44: registry.v1.ListSecretsRequest
+	(*ListSecretsResponse)(nil),               // 45: registry.v1.ListSecretsResponse
+	(*PutSecretRequest)(nil),                  // 46: registry.v1.PutSecretRequest
+	(*PutSecretResponse)(nil),                 // 47: registry.v1.PutSecretResponse
+	(*DeleteSecretRequest)(nil),               // 48: registry.v1.DeleteSecretRequest
+	(*DeleteSecretResponse)(nil),              // 49: registry.v1.DeleteSecretResponse
+	(*LinkedAccountInfo)(nil),                 // 50: registry.v1.LinkedAccountInfo
+	(*AclSubject)(nil),                        // 51: registry.v1.AclSubject
+	(*ListAclRequest)(nil),                    // 52: registry.v1.ListAclRequest
+	(*ListAclResponse)(nil),                   // 53: registry.v1.ListAclResponse
+	(*SetAclScopesRequest)(nil),               // 54: registry.v1.SetAclScopesRequest
+	(*SetAclScopesResponse)(nil),              // 55: registry.v1.SetAclScopesResponse
+	(*ExportedModSource)(nil),                 // 56: registry.v1.ExportedModSource
+	(*ExportedConfigMap)(nil),                 // 57: registry.v1.ExportedConfigMap
+	(*ExportedServer)(nil),                    // 58: registry.v1.ExportedServer
+	(*ExportStateRequest)(nil),                // 59: registry.v1.ExportStateRequest
+	(*ExportStateResponse)(nil),               // 60: registry.v1.ExportStateResponse
+	(*ImportStateRequest)(nil),                // 61: registry.v1.ImportStateRequest
+	(*ImportStateResponse)(nil),               // 62: registry.v1.ImportStateResponse
+	(*GetDiskUsageRequest)(nil),               // 63: registry.v1.GetDiskUsageRequest
+	(*GetDiskUsageResponse)(nil),              // 64: registry.v1.GetDiskUsageResponse
+	(*RefreshSteamAuthRequest)(nil),           // 65: registry.v1.RefreshSteamAuthRequest
+	(*RefreshSteamAuthResponse)(nil),          // 66: registry.v1.RefreshSteamAuthResponse
+	(*DeleteMissionRequest)(nil),              // 67: registry.v1.DeleteMissionRequest
+	(*DeleteMissionResponse)(nil),             // 68: registry.v1.DeleteMissionResponse
+	nil,                                       // 69: registry.v1.SetModSourceMetadataRequest.MetadataEntry
+	nil,                                       // 70: registry.v1.AddModSourceRequest.MetadataEntry
+	nil,                                       // 71: registry.v1.ModSourceInfo.MetadataEntry
+	nil,                                       // 72: registry.v1.SetMissionMetadataRequest.MetadataEntry
+	nil,                                       // 73: registry.v1.UploadMissionRequest.MetadataEntry
+	nil,                                       // 74: registry.v1.MissionInfo.MetadataEntry
+	nil,                                       // 75: registry.v1.PutSecretRequest.DataEntry
+	nil,                                       // 76: registry.v1.ExportedConfigMap.DataEntry
 }
 var file_registry_v1_registry_proto_depIdxs = []int32{
-	56, // 0: registry.v1.SetModSourceMetadataRequest.metadata:type_name -> registry.v1.SetModSourceMetadataRequest.MetadataEntry
-	4,  // 1: registry.v1.AddModSourceRequest.local_mod:type_name -> registry.v1.LocalModUpload
-	57, // 2: registry.v1.AddModSourceRequest.metadata:type_name -> registry.v1.AddModSourceRequest.MetadataEntry
-	11, // 3: registry.v1.ListSyncedModsResponse.mods:type_name -> registry.v1.SyncedMod
-	11, // 4: registry.v1.GetSyncedModResponse.mod:type_name -> registry.v1.SyncedMod
-	17, // 5: registry.v1.GetSyncedModResponse.mod_sources:type_name -> registry.v1.ModSourceInfo
+	69, // 0: registry.v1.SetModSourceMetadataRequest.metadata:type_name -> registry.v1.SetModSourceMetadataRequest.MetadataEntry
+	5,  // 1: registry.v1.AddModSourceRequest.local_mod:type_name -> registry.v1.LocalModUpload
+	70, // 2: registry.v1.AddModSourceRequest.metadata:type_name -> registry.v1.AddModSourceRequest.MetadataEntry
+	12, // 3: registry.v1.ListSyncedModsResponse.mods:type_name -> registry.v1.SyncedMod
+	12, // 4: registry.v1.GetSyncedModResponse.mod:type_name -> registry.v1.SyncedMod
+	18, // 5: registry.v1.GetSyncedModResponse.mod_sources:type_name -> registry.v1.ModSourceInfo
 	0,  // 6: registry.v1.ModSourceInfo.kind:type_name -> registry.v1.ModSourceKind
-	58, // 7: registry.v1.ModSourceInfo.metadata:type_name -> registry.v1.ModSourceInfo.MetadataEntry
-	17, // 8: registry.v1.ListModSourcesResponse.sources:type_name -> registry.v1.ModSourceInfo
-	59, // 9: registry.v1.SetMissionMetadataRequest.metadata:type_name -> registry.v1.SetMissionMetadataRequest.MetadataEntry
-	60, // 10: registry.v1.UploadMissionRequest.metadata:type_name -> registry.v1.UploadMissionRequest.MetadataEntry
-	61, // 11: registry.v1.MissionInfo.metadata:type_name -> registry.v1.MissionInfo.MetadataEntry
-	22, // 12: registry.v1.ListMissionsResponse.missions:type_name -> registry.v1.MissionInfo
-	30, // 13: registry.v1.ListSecretsResponse.secrets:type_name -> registry.v1.SecretInfo
-	62, // 14: registry.v1.PutSecretRequest.data:type_name -> registry.v1.PutSecretRequest.DataEntry
-	30, // 15: registry.v1.PutSecretResponse.secret:type_name -> registry.v1.SecretInfo
-	37, // 16: registry.v1.AclSubject.accounts:type_name -> registry.v1.LinkedAccountInfo
-	38, // 17: registry.v1.ListAclResponse.subjects:type_name -> registry.v1.AclSubject
-	38, // 18: registry.v1.SetAclScopesResponse.subject:type_name -> registry.v1.AclSubject
-	0,  // 19: registry.v1.ExportedModSource.kind:type_name -> registry.v1.ModSourceKind
-	63, // 20: registry.v1.ExportedConfigMap.data:type_name -> registry.v1.ExportedConfigMap.DataEntry
-	1,  // 21: registry.v1.ExportedServer.desired_state:type_name -> registry.v1.ExportedDesiredState
-	43, // 22: registry.v1.ExportStateResponse.mod_sources:type_name -> registry.v1.ExportedModSource
-	44, // 23: registry.v1.ExportStateResponse.config_maps:type_name -> registry.v1.ExportedConfigMap
-	45, // 24: registry.v1.ExportStateResponse.servers:type_name -> registry.v1.ExportedServer
-	43, // 25: registry.v1.ImportStateRequest.mod_sources:type_name -> registry.v1.ExportedModSource
-	44, // 26: registry.v1.ImportStateRequest.config_maps:type_name -> registry.v1.ExportedConfigMap
-	45, // 27: registry.v1.ImportStateRequest.servers:type_name -> registry.v1.ExportedServer
-	3,  // 28: registry.v1.ModSourceService.AddModSource:input_type -> registry.v1.AddModSourceRequest
-	6,  // 29: registry.v1.ModSourceService.DeleteModSource:input_type -> registry.v1.DeleteModSourceRequest
-	18, // 30: registry.v1.ModSourceService.ListModSources:input_type -> registry.v1.ListModSourcesRequest
-	8,  // 31: registry.v1.ModSourceService.SyncModSource:input_type -> registry.v1.SyncModSourceRequest
-	10, // 32: registry.v1.ModSourceService.ListSyncedMods:input_type -> registry.v1.ListSyncedModsRequest
-	13, // 33: registry.v1.ModSourceService.InvalidateMod:input_type -> registry.v1.InvalidateModRequest
-	15, // 34: registry.v1.ModSourceService.GetSyncedMod:input_type -> registry.v1.GetSyncedModRequest
-	2,  // 35: registry.v1.ModSourceService.SetModSourceMetadata:input_type -> registry.v1.SetModSourceMetadataRequest
-	21, // 36: registry.v1.MissionService.UploadMission:input_type -> registry.v1.UploadMissionRequest
-	23, // 37: registry.v1.MissionService.GetMission:input_type -> registry.v1.GetMissionRequest
-	24, // 38: registry.v1.MissionService.ListMissions:input_type -> registry.v1.ListMissionsRequest
-	54, // 39: registry.v1.MissionService.DeleteMission:input_type -> registry.v1.DeleteMissionRequest
-	20, // 40: registry.v1.MissionService.SetMissionMetadata:input_type -> registry.v1.SetMissionMetadataRequest
-	50, // 41: registry.v1.AdminService.GetDiskUsage:input_type -> registry.v1.GetDiskUsageRequest
-	52, // 42: registry.v1.AdminService.RefreshSteamAuth:input_type -> registry.v1.RefreshSteamAuthRequest
-	46, // 43: registry.v1.AdminService.ExportState:input_type -> registry.v1.ExportStateRequest
-	48, // 44: registry.v1.AdminService.ImportState:input_type -> registry.v1.ImportStateRequest
-	39, // 45: registry.v1.AdminService.ListAcl:input_type -> registry.v1.ListAclRequest
-	41, // 46: registry.v1.AdminService.SetAclScopes:input_type -> registry.v1.SetAclScopesRequest
-	26, // 47: registry.v1.AdminService.BeginSteamQrLogin:input_type -> registry.v1.BeginSteamQrLoginRequest
-	28, // 48: registry.v1.AdminService.PollSteamQrLogin:input_type -> registry.v1.PollSteamQrLoginRequest
-	31, // 49: registry.v1.AdminService.ListSecrets:input_type -> registry.v1.ListSecretsRequest
-	33, // 50: registry.v1.AdminService.PutSecret:input_type -> registry.v1.PutSecretRequest
-	35, // 51: registry.v1.AdminService.DeleteSecret:input_type -> registry.v1.DeleteSecretRequest
-	5,  // 52: registry.v1.ModSourceService.AddModSource:output_type -> registry.v1.AddModSourceResponse
-	7,  // 53: registry.v1.ModSourceService.DeleteModSource:output_type -> registry.v1.DeleteModSourceResponse
-	19, // 54: registry.v1.ModSourceService.ListModSources:output_type -> registry.v1.ListModSourcesResponse
-	9,  // 55: registry.v1.ModSourceService.SyncModSource:output_type -> registry.v1.SyncModSourceResponse
-	12, // 56: registry.v1.ModSourceService.ListSyncedMods:output_type -> registry.v1.ListSyncedModsResponse
-	14, // 57: registry.v1.ModSourceService.InvalidateMod:output_type -> registry.v1.InvalidateModResponse
-	16, // 58: registry.v1.ModSourceService.GetSyncedMod:output_type -> registry.v1.GetSyncedModResponse
-	17, // 59: registry.v1.ModSourceService.SetModSourceMetadata:output_type -> registry.v1.ModSourceInfo
-	22, // 60: registry.v1.MissionService.UploadMission:output_type -> registry.v1.MissionInfo
-	22, // 61: registry.v1.MissionService.GetMission:output_type -> registry.v1.MissionInfo
-	25, // 62: registry.v1.MissionService.ListMissions:output_type -> registry.v1.ListMissionsResponse
-	55, // 63: registry.v1.MissionService.DeleteMission:output_type -> registry.v1.DeleteMissionResponse
-	22, // 64: registry.v1.MissionService.SetMissionMetadata:output_type -> registry.v1.MissionInfo
-	51, // 65: registry.v1.AdminService.GetDiskUsage:output_type -> registry.v1.GetDiskUsageResponse
-	53, // 66: registry.v1.AdminService.RefreshSteamAuth:output_type -> registry.v1.RefreshSteamAuthResponse
-	47, // 67: registry.v1.AdminService.ExportState:output_type -> registry.v1.ExportStateResponse
-	49, // 68: registry.v1.AdminService.ImportState:output_type -> registry.v1.ImportStateResponse
-	40, // 69: registry.v1.AdminService.ListAcl:output_type -> registry.v1.ListAclResponse
-	42, // 70: registry.v1.AdminService.SetAclScopes:output_type -> registry.v1.SetAclScopesResponse
-	27, // 71: registry.v1.AdminService.BeginSteamQrLogin:output_type -> registry.v1.BeginSteamQrLoginResponse
-	29, // 72: registry.v1.AdminService.PollSteamQrLogin:output_type -> registry.v1.PollSteamQrLoginResponse
-	32, // 73: registry.v1.AdminService.ListSecrets:output_type -> registry.v1.ListSecretsResponse
-	34, // 74: registry.v1.AdminService.PutSecret:output_type -> registry.v1.PutSecretResponse
-	36, // 75: registry.v1.AdminService.DeleteSecret:output_type -> registry.v1.DeleteSecretResponse
-	52, // [52:76] is the sub-list for method output_type
-	28, // [28:52] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	71, // 7: registry.v1.ModSourceInfo.metadata:type_name -> registry.v1.ModSourceInfo.MetadataEntry
+	18, // 8: registry.v1.ListModSourcesResponse.sources:type_name -> registry.v1.ModSourceInfo
+	72, // 9: registry.v1.SetMissionMetadataRequest.metadata:type_name -> registry.v1.SetMissionMetadataRequest.MetadataEntry
+	73, // 10: registry.v1.UploadMissionRequest.metadata:type_name -> registry.v1.UploadMissionRequest.MetadataEntry
+	74, // 11: registry.v1.MissionInfo.metadata:type_name -> registry.v1.MissionInfo.MetadataEntry
+	23, // 12: registry.v1.ListMissionsResponse.missions:type_name -> registry.v1.MissionInfo
+	27, // 13: registry.v1.ResolveWorkshopItemsResponse.mods:type_name -> registry.v1.WorkshopItem
+	1,  // 14: registry.v1.WorkshopCollectionSummary.visibility:type_name -> registry.v1.CollectionVisibility
+	31, // 15: registry.v1.ListWorkshopCollectionsResponse.collections:type_name -> registry.v1.WorkshopCollectionSummary
+	1,  // 16: registry.v1.WorkshopCollection.visibility:type_name -> registry.v1.CollectionVisibility
+	27, // 17: registry.v1.WorkshopCollection.mods:type_name -> registry.v1.WorkshopItem
+	1,  // 18: registry.v1.PublishWorkshopCollectionRequest.visibility:type_name -> registry.v1.CollectionVisibility
+	27, // 19: registry.v1.PublishWorkshopCollectionResponse.mods:type_name -> registry.v1.WorkshopItem
+	43, // 20: registry.v1.ListSecretsResponse.secrets:type_name -> registry.v1.SecretInfo
+	75, // 21: registry.v1.PutSecretRequest.data:type_name -> registry.v1.PutSecretRequest.DataEntry
+	43, // 22: registry.v1.PutSecretResponse.secret:type_name -> registry.v1.SecretInfo
+	50, // 23: registry.v1.AclSubject.accounts:type_name -> registry.v1.LinkedAccountInfo
+	51, // 24: registry.v1.ListAclResponse.subjects:type_name -> registry.v1.AclSubject
+	51, // 25: registry.v1.SetAclScopesResponse.subject:type_name -> registry.v1.AclSubject
+	0,  // 26: registry.v1.ExportedModSource.kind:type_name -> registry.v1.ModSourceKind
+	76, // 27: registry.v1.ExportedConfigMap.data:type_name -> registry.v1.ExportedConfigMap.DataEntry
+	2,  // 28: registry.v1.ExportedServer.desired_state:type_name -> registry.v1.ExportedDesiredState
+	56, // 29: registry.v1.ExportStateResponse.mod_sources:type_name -> registry.v1.ExportedModSource
+	57, // 30: registry.v1.ExportStateResponse.config_maps:type_name -> registry.v1.ExportedConfigMap
+	58, // 31: registry.v1.ExportStateResponse.servers:type_name -> registry.v1.ExportedServer
+	56, // 32: registry.v1.ImportStateRequest.mod_sources:type_name -> registry.v1.ExportedModSource
+	57, // 33: registry.v1.ImportStateRequest.config_maps:type_name -> registry.v1.ExportedConfigMap
+	58, // 34: registry.v1.ImportStateRequest.servers:type_name -> registry.v1.ExportedServer
+	4,  // 35: registry.v1.ModSourceService.AddModSource:input_type -> registry.v1.AddModSourceRequest
+	7,  // 36: registry.v1.ModSourceService.DeleteModSource:input_type -> registry.v1.DeleteModSourceRequest
+	19, // 37: registry.v1.ModSourceService.ListModSources:input_type -> registry.v1.ListModSourcesRequest
+	9,  // 38: registry.v1.ModSourceService.SyncModSource:input_type -> registry.v1.SyncModSourceRequest
+	11, // 39: registry.v1.ModSourceService.ListSyncedMods:input_type -> registry.v1.ListSyncedModsRequest
+	14, // 40: registry.v1.ModSourceService.InvalidateMod:input_type -> registry.v1.InvalidateModRequest
+	16, // 41: registry.v1.ModSourceService.GetSyncedMod:input_type -> registry.v1.GetSyncedModRequest
+	3,  // 42: registry.v1.ModSourceService.SetModSourceMetadata:input_type -> registry.v1.SetModSourceMetadataRequest
+	22, // 43: registry.v1.MissionService.UploadMission:input_type -> registry.v1.UploadMissionRequest
+	24, // 44: registry.v1.MissionService.GetMission:input_type -> registry.v1.GetMissionRequest
+	25, // 45: registry.v1.MissionService.ListMissions:input_type -> registry.v1.ListMissionsRequest
+	67, // 46: registry.v1.MissionService.DeleteMission:input_type -> registry.v1.DeleteMissionRequest
+	21, // 47: registry.v1.MissionService.SetMissionMetadata:input_type -> registry.v1.SetMissionMetadataRequest
+	63, // 48: registry.v1.AdminService.GetDiskUsage:input_type -> registry.v1.GetDiskUsageRequest
+	65, // 49: registry.v1.AdminService.RefreshSteamAuth:input_type -> registry.v1.RefreshSteamAuthRequest
+	59, // 50: registry.v1.AdminService.ExportState:input_type -> registry.v1.ExportStateRequest
+	61, // 51: registry.v1.AdminService.ImportState:input_type -> registry.v1.ImportStateRequest
+	52, // 52: registry.v1.AdminService.ListAcl:input_type -> registry.v1.ListAclRequest
+	54, // 53: registry.v1.AdminService.SetAclScopes:input_type -> registry.v1.SetAclScopesRequest
+	39, // 54: registry.v1.AdminService.BeginSteamQrLogin:input_type -> registry.v1.BeginSteamQrLoginRequest
+	41, // 55: registry.v1.AdminService.PollSteamQrLogin:input_type -> registry.v1.PollSteamQrLoginRequest
+	44, // 56: registry.v1.AdminService.ListSecrets:input_type -> registry.v1.ListSecretsRequest
+	46, // 57: registry.v1.AdminService.PutSecret:input_type -> registry.v1.PutSecretRequest
+	48, // 58: registry.v1.AdminService.DeleteSecret:input_type -> registry.v1.DeleteSecretRequest
+	28, // 59: registry.v1.AdminService.ResolveWorkshopItems:input_type -> registry.v1.ResolveWorkshopItemsRequest
+	30, // 60: registry.v1.AdminService.ListWorkshopCollections:input_type -> registry.v1.ListWorkshopCollectionsRequest
+	33, // 61: registry.v1.AdminService.GetWorkshopCollection:input_type -> registry.v1.GetWorkshopCollectionRequest
+	35, // 62: registry.v1.AdminService.PublishWorkshopCollection:input_type -> registry.v1.PublishWorkshopCollectionRequest
+	37, // 63: registry.v1.AdminService.DeleteWorkshopCollection:input_type -> registry.v1.DeleteWorkshopCollectionRequest
+	6,  // 64: registry.v1.ModSourceService.AddModSource:output_type -> registry.v1.AddModSourceResponse
+	8,  // 65: registry.v1.ModSourceService.DeleteModSource:output_type -> registry.v1.DeleteModSourceResponse
+	20, // 66: registry.v1.ModSourceService.ListModSources:output_type -> registry.v1.ListModSourcesResponse
+	10, // 67: registry.v1.ModSourceService.SyncModSource:output_type -> registry.v1.SyncModSourceResponse
+	13, // 68: registry.v1.ModSourceService.ListSyncedMods:output_type -> registry.v1.ListSyncedModsResponse
+	15, // 69: registry.v1.ModSourceService.InvalidateMod:output_type -> registry.v1.InvalidateModResponse
+	17, // 70: registry.v1.ModSourceService.GetSyncedMod:output_type -> registry.v1.GetSyncedModResponse
+	18, // 71: registry.v1.ModSourceService.SetModSourceMetadata:output_type -> registry.v1.ModSourceInfo
+	23, // 72: registry.v1.MissionService.UploadMission:output_type -> registry.v1.MissionInfo
+	23, // 73: registry.v1.MissionService.GetMission:output_type -> registry.v1.MissionInfo
+	26, // 74: registry.v1.MissionService.ListMissions:output_type -> registry.v1.ListMissionsResponse
+	68, // 75: registry.v1.MissionService.DeleteMission:output_type -> registry.v1.DeleteMissionResponse
+	23, // 76: registry.v1.MissionService.SetMissionMetadata:output_type -> registry.v1.MissionInfo
+	64, // 77: registry.v1.AdminService.GetDiskUsage:output_type -> registry.v1.GetDiskUsageResponse
+	66, // 78: registry.v1.AdminService.RefreshSteamAuth:output_type -> registry.v1.RefreshSteamAuthResponse
+	60, // 79: registry.v1.AdminService.ExportState:output_type -> registry.v1.ExportStateResponse
+	62, // 80: registry.v1.AdminService.ImportState:output_type -> registry.v1.ImportStateResponse
+	53, // 81: registry.v1.AdminService.ListAcl:output_type -> registry.v1.ListAclResponse
+	55, // 82: registry.v1.AdminService.SetAclScopes:output_type -> registry.v1.SetAclScopesResponse
+	40, // 83: registry.v1.AdminService.BeginSteamQrLogin:output_type -> registry.v1.BeginSteamQrLoginResponse
+	42, // 84: registry.v1.AdminService.PollSteamQrLogin:output_type -> registry.v1.PollSteamQrLoginResponse
+	45, // 85: registry.v1.AdminService.ListSecrets:output_type -> registry.v1.ListSecretsResponse
+	47, // 86: registry.v1.AdminService.PutSecret:output_type -> registry.v1.PutSecretResponse
+	49, // 87: registry.v1.AdminService.DeleteSecret:output_type -> registry.v1.DeleteSecretResponse
+	29, // 88: registry.v1.AdminService.ResolveWorkshopItems:output_type -> registry.v1.ResolveWorkshopItemsResponse
+	32, // 89: registry.v1.AdminService.ListWorkshopCollections:output_type -> registry.v1.ListWorkshopCollectionsResponse
+	34, // 90: registry.v1.AdminService.GetWorkshopCollection:output_type -> registry.v1.WorkshopCollection
+	36, // 91: registry.v1.AdminService.PublishWorkshopCollection:output_type -> registry.v1.PublishWorkshopCollectionResponse
+	38, // 92: registry.v1.AdminService.DeleteWorkshopCollection:output_type -> registry.v1.DeleteWorkshopCollectionResponse
+	64, // [64:93] is the sub-list for method output_type
+	35, // [35:64] is the sub-list for method input_type
+	35, // [35:35] is the sub-list for extension type_name
+	35, // [35:35] is the sub-list for extension extendee
+	0,  // [0:35] is the sub-list for field type_name
 }
 
 func init() { file_registry_v1_registry_proto_init() }
@@ -3459,14 +4353,14 @@ func file_registry_v1_registry_proto_init() {
 	}
 	file_registry_v1_registry_proto_msgTypes[14].OneofWrappers = []any{}
 	file_registry_v1_registry_proto_msgTypes[19].OneofWrappers = []any{}
-	file_registry_v1_registry_proto_msgTypes[43].OneofWrappers = []any{}
+	file_registry_v1_registry_proto_msgTypes[55].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_registry_v1_registry_proto_rawDesc), len(file_registry_v1_registry_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   62,
+			NumEnums:      3,
+			NumMessages:   74,
 			NumExtensions: 0,
 			NumServices:   3,
 		},

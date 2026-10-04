@@ -141,3 +141,11 @@ a { color: var(--accent); }
 .health { display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
 .qr { background: #fff; padding: 0.5rem; border-radius: 6px; align-self: flex-start; }
 .key-chip { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 0.05rem 0.35rem; margin-right: 0.25rem; }
+
+/* The Collections editor's member list: capped and scrolled on its own,
+   so the form's save button stays near the fields above it. */
+.member-list {
+  max-height: 28rem;
+  overflow-y: auto;
+  margin-bottom: 0.5rem;
+}

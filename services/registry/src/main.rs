@@ -54,6 +54,16 @@ fn required_scope(path: &str) -> Option<&'static str> {
         // cluster can authenticate as.
         "/registry.v1.AdminService/BeginSteamQrLogin" => Some("admin:steam-auth"),
         "/registry.v1.AdminService/PollSteamQrLogin" => Some("admin:steam-auth"),
+        // Same scope again, and deliberately not mod-sources:*: these act
+        // *as* the cluster's Steam account -- the writes publish content
+        // under its identity, the reads see whatever it can see, private
+        // items included -- which is the property this scope tracks.
+        // Registering a mod source only ever pulls content in.
+        "/registry.v1.AdminService/ResolveWorkshopItems" => Some("admin:steam-auth"),
+        "/registry.v1.AdminService/ListWorkshopCollections" => Some("admin:steam-auth"),
+        "/registry.v1.AdminService/GetWorkshopCollection" => Some("admin:steam-auth"),
+        "/registry.v1.AdminService/PublishWorkshopCollection" => Some("admin:steam-auth"),
+        "/registry.v1.AdminService/DeleteWorkshopCollection" => Some("admin:steam-auth"),
         // Its own scope: these read and write credential material, even
         // though List deliberately returns key names only.
         "/registry.v1.AdminService/ListSecrets" => Some("admin:secrets"),

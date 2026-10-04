@@ -11,7 +11,7 @@ use anyhow::{Context, Result, bail};
 use futures::stream::{FuturesUnordered, StreamExt};
 use steamdepot::auth;
 use steamdepot::cdn::CdnPool;
-use steamdepot::connection::CmConnection;
+pub use steamdepot::connection::CmConnection;
 use steamdepot::depot::{self, DepotPlan, DownloadPlan};
 use steamdepot::download::{self, decrypt_manifest_filenames};
 use steamdepot::error::Error as SteamError;
@@ -110,7 +110,7 @@ pub const SYNC_CONCURRENCY: usize = 128;
 /// error instead of the whole process silently going quiet.
 const CM_CALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
-async fn with_timeout<T, E>(
+pub(crate) async fn with_timeout<T, E>(
     label: impl std::fmt::Display,
     fut: impl Future<Output = std::result::Result<T, E>>,
 ) -> Result<T>
@@ -559,7 +559,7 @@ pub fn is_transient(e: &anyhow::Error) -> bool {
     }
 }
 
-const DEFAULT_RETRY_ATTEMPTS: usize = 3;
+pub(crate) const DEFAULT_RETRY_ATTEMPTS: usize = 3;
 
 /// Retry `f` up to `attempts` times total, but only on a transient failure
 /// (see [`is_transient`]) -- a non-transient error returns immediately
@@ -585,7 +585,7 @@ const DEFAULT_RETRY_ATTEMPTS: usize = 3;
 /// local variable. Taking the resource as a genuine argument ties the
 /// future's borrow to the *caller's* value (this loop, which lives across
 /// the `.await`), not to anything created inside `f` itself.
-async fn with_retry<T, R>(
+pub(crate) async fn with_retry<T, R>(
     label: impl std::fmt::Display,
     attempts: usize,
     resource: &mut R,
@@ -2054,12 +2054,27 @@ const WORKSHOP_FILE_TYPE_COLLECTION: u32 = 2;
 /// one instead (e.g. a custom CBA_A3 build) for anything that declares it
 /// as required. A dependency an operator actually wants synced has to be
 /// registered as its own separate mod source, same as any other mod.
+///
+/// `mods` comes back in candidate order, with each collection's members
+/// spliced in where the collection itself was listed (in the collection's
+/// own sort order) and later duplicates dropped -- see
+/// [`flatten_in_order`]. Order doesn't matter to syncing, but it does to a
+/// collection being published from a preset, whose order is the
+/// operator's own.
 pub async fn resolve_source_ids(
     conn: &mut CmConnection,
     candidate_ids: &[u64],
 ) -> Result<ResolveOutcome> {
     let mut resolved: std::collections::HashMap<u64, (String, u64)> =
         std::collections::HashMap::new();
+    // Each expanded collection's members, in its own sortorder -- kept
+    // (rather than only pushed onto the next frontier) so the final list
+    // can be rebuilt in order once every round is in.
+    let mut children_of: std::collections::HashMap<u64, Vec<u64>> =
+        std::collections::HashMap::new();
+    // Everything Steam actually answered for, so anything else asked
+    // about can be reported back as unresolved.
+    let mut answered: std::collections::HashSet<u64> = std::collections::HashSet::new();
     // The originally-requested candidates' own titles (a mod's own title,
     // or a collection's -- collections carry their own `title` even though
     // `children` is what actually gets expanded). Only ever populated from
@@ -2124,6 +2139,7 @@ pub async fn resolve_source_ids(
                 );
                 continue;
             }
+            answered.insert(id);
             let title = details.title.clone().unwrap_or_default();
             let file_type = details.file_type.unwrap_or(0);
             if depth == 1 {
@@ -2140,11 +2156,17 @@ pub async fn resolve_source_ids(
                 // fork/specific version instead -- a dependency an
                 // operator actually wants has to be registered as its
                 // own separate mod source now, same as any other mod.
-                for child in details.children {
-                    if let Some(child_id) = child.publishedfileid {
+                let members = ordered_children(&details.children);
+                for &child_id in &members {
+                    // A collection already expanded (listed twice, or
+                    // nested in a cycle) isn't asked about again -- the
+                    // depth guard above would stop a cycle eventually,
+                    // but only after re-fetching it up to that depth.
+                    if !answered.contains(&child_id) && !next_frontier.contains(&child_id) {
                         next_frontier.push(child_id);
                     }
                 }
+                children_of.insert(id, members);
             } else {
                 // 0 (not just missing) for a collection's own entry, which
                 // never reaches here anyway -- only genuinely unset for a
@@ -2157,18 +2179,84 @@ pub async fn resolve_source_ids(
         frontier = next_frontier;
     }
 
+    let (mods, unresolved) = flatten_in_order(candidate_ids, &children_of, &mut resolved);
     Ok(ResolveOutcome {
-        mods: resolved
-            .into_iter()
-            .map(|(mod_id, (title, file_size))| ResolvedMod {
-                mod_id,
-                title,
-                file_size,
-            })
-            .collect(),
+        mods,
+        unresolved,
         candidate_titles,
         candidate_is_collection,
     })
+}
+
+/// A collection's member IDs in the collection's own display order.
+///
+/// Sorted by `sortorder` explicitly rather than trusting the response's
+/// order, which nothing documents; a stable sort keeps the response order
+/// for any members sharing a sortorder (or carrying none).
+pub(crate) fn ordered_children(
+    children: &[steamdepot::proto::published_file_details::Child],
+) -> Vec<u64> {
+    let mut children: Vec<_> = children
+        .iter()
+        .filter_map(|c| Some((c.sortorder.unwrap_or(u32::MAX), c.publishedfileid?)))
+        .collect();
+    children.sort_by_key(|(order, _)| *order);
+    children.into_iter().map(|(_, id)| id).collect()
+}
+
+/// Rebuild the flat mod list in order from one resolution's pieces:
+/// `candidates` walked depth-first, each collection (a key in
+/// `children_of`) replaced by its members, each mod (a key in `mods`)
+/// taken at its first appearance only.
+///
+/// Anything that is neither -- Steam returned nothing for it, or nesting
+/// hit [`MAX_COLLECTION_DEPTH`] before it was fetched -- is collected
+/// into the second list instead, also in first-appearance order. A
+/// collection seen a second time (directly, or by containing itself) is
+/// skipped rather than expanded again.
+pub(crate) fn flatten_in_order(
+    candidates: &[u64],
+    children_of: &std::collections::HashMap<u64, Vec<u64>>,
+    mods: &mut std::collections::HashMap<u64, (String, u64)>,
+) -> (Vec<ResolvedMod>, Vec<u64>) {
+    fn walk(
+        ids: &[u64],
+        children_of: &std::collections::HashMap<u64, Vec<u64>>,
+        mods: &mut std::collections::HashMap<u64, (String, u64)>,
+        seen: &mut std::collections::HashSet<u64>,
+        out: &mut Vec<ResolvedMod>,
+        unresolved: &mut Vec<u64>,
+    ) {
+        for &id in ids {
+            if !seen.insert(id) {
+                continue;
+            }
+            if let Some(members) = children_of.get(&id) {
+                walk(members, children_of, mods, seen, out, unresolved);
+            } else if let Some((title, file_size)) = mods.remove(&id) {
+                out.push(ResolvedMod {
+                    mod_id: id,
+                    title,
+                    file_size,
+                });
+            } else {
+                unresolved.push(id);
+            }
+        }
+    }
+
+    let mut seen = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    let mut unresolved = Vec::new();
+    walk(
+        candidates,
+        children_of,
+        mods,
+        &mut seen,
+        &mut out,
+        &mut unresolved,
+    );
+    (out, unresolved)
 }
 
 pub struct ResolvedMod {
@@ -2180,7 +2268,13 @@ pub struct ResolvedMod {
 }
 
 pub struct ResolveOutcome {
+    /// In order -- see [`resolve_source_ids`].
     pub mods: Vec<ResolvedMod>,
+    /// IDs asked about (directly, or as a collection's member) that Steam
+    /// returned nothing for: private to another account, removed, or not
+    /// a real Workshop ID. Dropped from `mods` with a warning rather than
+    /// failing the whole resolution; this is so a caller can say so.
+    pub unresolved: Vec<u64>,
     pub candidate_titles: std::collections::HashMap<u64, String>,
     /// Which of the originally-requested `candidate_ids` are themselves a
     /// *pure* Steam Workshop collection (`file_type ==
@@ -2192,4 +2286,109 @@ pub struct ResolveOutcome {
     /// CBA_A3), which populates `children` (and so changes the resolved
     /// set) without the candidate itself being a collection at all.
     pub candidate_is_collection: std::collections::HashMap<u64, bool>,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use steamdepot::proto::published_file_details::Child;
+
+    use super::*;
+
+    fn mods(ids: &[u64]) -> HashMap<u64, (String, u64)> {
+        ids.iter().map(|&id| (id, (format!("mod {id}"), id * 10))).collect()
+    }
+
+    fn ids(resolved: &[ResolvedMod]) -> Vec<u64> {
+        resolved.iter().map(|m| m.mod_id).collect()
+    }
+
+    #[test]
+    fn flatten_keeps_candidate_order() {
+        // The whole reason this exists: resolution used to come back in
+        // HashMap order, which scrambled a preset's order on its way into
+        // a published collection.
+        let (out, unresolved) = flatten_in_order(&[3, 1, 2], &HashMap::new(), &mut mods(&[1, 2, 3]));
+        assert_eq!(ids(&out), vec![3, 1, 2]);
+        assert!(unresolved.is_empty());
+        assert_eq!(out[0].title, "mod 3");
+        assert_eq!(out[0].file_size, 30);
+    }
+
+    #[test]
+    fn flatten_splices_collection_members_in_place() {
+        let children = HashMap::from([(100, vec![2, 3])]);
+        let (out, _) = flatten_in_order(&[1, 100, 4], &children, &mut mods(&[1, 2, 3, 4]));
+        assert_eq!(ids(&out), vec![1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn flatten_expands_nested_collections_depth_first() {
+        let children = HashMap::from([(100, vec![1, 200, 4]), (200, vec![2, 3])]);
+        let (out, _) = flatten_in_order(&[100], &children, &mut mods(&[1, 2, 3, 4]));
+        assert_eq!(ids(&out), vec![1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn flatten_keeps_first_occurrence_of_duplicates() {
+        // A mod both listed directly and inside a collection lands where
+        // it first appears, once.
+        let children = HashMap::from([(100, vec![2, 1])]);
+        let (out, _) = flatten_in_order(&[1, 100, 2], &children, &mut mods(&[1, 2]));
+        assert_eq!(ids(&out), vec![1, 2]);
+    }
+
+    #[test]
+    fn flatten_survives_a_collection_containing_itself() {
+        let children = HashMap::from([(100, vec![1, 200]), (200, vec![100, 2])]);
+        let (out, unresolved) = flatten_in_order(&[100], &children, &mut mods(&[1, 2]));
+        assert_eq!(ids(&out), vec![1, 2]);
+        assert!(unresolved.is_empty());
+    }
+
+    #[test]
+    fn flatten_reports_what_steam_returned_nothing_for() {
+        // 9 was a direct candidate, 8 a member of a collection; both are
+        // reported, once each, in the order they were met.
+        let children = HashMap::from([(100, vec![8, 2])]);
+        let (out, unresolved) =
+            flatten_in_order(&[1, 9, 100, 9], &children, &mut mods(&[1, 2]));
+        assert_eq!(ids(&out), vec![1, 2]);
+        assert_eq!(unresolved, vec![9, 8]);
+    }
+
+    #[test]
+    fn ordered_children_follow_sortorder() {
+        let child = |id, sortorder| Child {
+            publishedfileid: Some(id),
+            sortorder,
+            file_type: None,
+        };
+        let children = vec![
+            child(30, Some(2)),
+            child(10, Some(0)),
+            // No sortorder at all sorts last rather than first.
+            child(40, None),
+            child(20, Some(1)),
+        ];
+        assert_eq!(ordered_children(&children), vec![10, 20, 30, 40]);
+    }
+
+    #[test]
+    fn ordered_children_skip_entries_without_an_id() {
+        let children = vec![
+            Child {
+                publishedfileid: None,
+                sortorder: Some(0),
+                file_type: None,
+            },
+            Child {
+                publishedfileid: Some(5),
+                sortorder: Some(1),
+                file_type: None,
+            },
+        ];
+        assert_eq!(ordered_children(&children), vec![5]);
+    }
 }

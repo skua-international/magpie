@@ -2,15 +2,15 @@
 // @generated from file sync/v1/sync.proto (package sync.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file sync/v1/sync.proto.
  */
 export const file_sync_v1_sync: GenFile = /*@__PURE__*/
-  fileDesc("ChJzeW5jL3YxL3N5bmMucHJvdG8SB3N5bmMudjEiFwoVTGlzdFN5bmNlZE1vZHNSZXF1ZXN0IlMKCVN5bmNlZE1vZBIOCgZtb2RfaWQYASABKAQSEwoLbWFuaWZlc3RfaWQYAiABKAQSEgoKc2l6ZV9ieXRlcxgDIAEoBBINCgV0aXRsZRgEIAEoCSI6ChZMaXN0U3luY2VkTW9kc1Jlc3BvbnNlEiAKBG1vZHMYASADKAsyEi5zeW5jLnYxLlN5bmNlZE1vZCIlChNHZXRTeW5jZWRNb2RSZXF1ZXN0Eg4KBm1vZF9pZBgBIAEoBCJYChRHZXRTeW5jZWRNb2RSZXNwb25zZRIkCgNtb2QYASABKAsyEi5zeW5jLnYxLlN5bmNlZE1vZEgAiAEBEhIKCnNvdXJjZV9pZHMYAiADKAlCBgoEX21vZCIVChNHZXRTeW5jU3RhdHNSZXF1ZXN0IkQKFEdldFN5bmNTdGF0c1Jlc3BvbnNlEhIKCm1vZHNfYnl0ZXMYASABKAQSGAoQZ2FtZV9maWxlc19ieXRlcxgCIAEoBCJCChdSZWZyZXNoU3RlYW1BdXRoUmVxdWVzdBIQCgh1c2VybmFtZRgBIAEoCRIVCg1yZWZyZXNoX3Rva2VuGAIgASgJIhoKGFJlZnJlc2hTdGVhbUF1dGhSZXNwb25zZSImChRJbnZhbGlkYXRlTW9kUmVxdWVzdBIOCgZtb2RfaWQYASABKAQiFwoVSW52YWxpZGF0ZU1vZFJlc3BvbnNlIikKFFJlZnJlc2hTb3VyY2VSZXF1ZXN0EhEKCXNvdXJjZV9pZBgBIAEoCSI7ChVSZWZyZXNoU291cmNlUmVzcG9uc2USIgoEbW9kcxgBIAMoCzIULnN5bmMudjEuUmVzb2x2ZWRNb2QiKQoUR2V0U291cmNlTW9kc1JlcXVlc3QSEQoJc291cmNlX2lkGAEgASgJIigKFUdldFNvdXJjZU1vZHNSZXNwb25zZRIPCgdtb2RfaWRzGAEgAygEIkEKFVJlZ2lzdGVyU291cmNlUmVxdWVzdBIVCg1jYW5kaWRhdGVfaWRzGAEgAygEEhEKCXNvdXJjZV9pZBgCIAEoCSIsCgtSZXNvbHZlZE1vZBIOCgZtb2RfaWQYASABKAQSDQoFdGl0bGUYAiABKAkiUAoWUmVnaXN0ZXJTb3VyY2VSZXNwb25zZRIiCgRtb2RzGAEgAygLMhQuc3luYy52MS5SZXNvbHZlZE1vZBISCgpyb290X3RpdGxlGAIgASgJIiwKF0RlcmVnaXN0ZXJTb3VyY2VSZXF1ZXN0EhEKCXNvdXJjZV9pZBgBIAEoCSIaChhEZXJlZ2lzdGVyU291cmNlUmVzcG9uc2UiFAoSU3luY0NvbnRlbnRSZXF1ZXN0IhUKE1N5bmNDb250ZW50UmVzcG9uc2UiFgoUR2V0U3luY1N0YXR1c1JlcXVlc3QiQgoVR2V0U3luY1N0YXR1c1Jlc3BvbnNlEg8KB3N5bmNpbmcYASABKAgSGAoQZ2FtZV9maWxlc19yZWFkeRgCIAEoCCIVChNCZWdpblFyTG9naW5SZXF1ZXN0IkEKFEJlZ2luUXJMb2dpblJlc3BvbnNlEhIKCnNlc3Npb25faWQYASABKAkSFQoNY2hhbGxlbmdlX3VybBgCIAEoCSIoChJQb2xsUXJMb2dpblJlcXVlc3QSEgoKc2Vzc2lvbl9pZBgBIAEoCSI6ChNQb2xsUXJMb2dpblJlc3BvbnNlEhEKCWNvbmZpcm1lZBgBIAEoCBIQCgh1c2VybmFtZRgCIAEoCTKgCAoLU3luY1NlcnZpY2USUQoOUmVnaXN0ZXJTb3VyY2USHi5zeW5jLnYxLlJlZ2lzdGVyU291cmNlUmVxdWVzdBofLnN5bmMudjEuUmVnaXN0ZXJTb3VyY2VSZXNwb25zZRJXChBEZXJlZ2lzdGVyU291cmNlEiAuc3luYy52MS5EZXJlZ2lzdGVyU291cmNlUmVxdWVzdBohLnN5bmMudjEuRGVyZWdpc3RlclNvdXJjZVJlc3BvbnNlEkgKC1N5bmNDb250ZW50Ehsuc3luYy52MS5TeW5jQ29udGVudFJlcXVlc3QaHC5zeW5jLnYxLlN5bmNDb250ZW50UmVzcG9uc2USTgoNR2V0U291cmNlTW9kcxIdLnN5bmMudjEuR2V0U291cmNlTW9kc1JlcXVlc3QaHi5zeW5jLnYxLkdldFNvdXJjZU1vZHNSZXNwb25zZRJOCg1SZWZyZXNoU291cmNlEh0uc3luYy52MS5SZWZyZXNoU291cmNlUmVxdWVzdBoeLnN5bmMudjEuUmVmcmVzaFNvdXJjZVJlc3BvbnNlElEKDkxpc3RTeW5jZWRNb2RzEh4uc3luYy52MS5MaXN0U3luY2VkTW9kc1JlcXVlc3QaHy5zeW5jLnYxLkxpc3RTeW5jZWRNb2RzUmVzcG9uc2USTgoNSW52YWxpZGF0ZU1vZBIdLnN5bmMudjEuSW52YWxpZGF0ZU1vZFJlcXVlc3QaHi5zeW5jLnYxLkludmFsaWRhdGVNb2RSZXNwb25zZRJLCgxHZXRTeW5jZWRNb2QSHC5zeW5jLnYxLkdldFN5bmNlZE1vZFJlcXVlc3QaHS5zeW5jLnYxLkdldFN5bmNlZE1vZFJlc3BvbnNlEksKDEdldFN5bmNTdGF0cxIcLnN5bmMudjEuR2V0U3luY1N0YXRzUmVxdWVzdBodLnN5bmMudjEuR2V0U3luY1N0YXRzUmVzcG9uc2USVwoQUmVmcmVzaFN0ZWFtQXV0aBIgLnN5bmMudjEuUmVmcmVzaFN0ZWFtQXV0aFJlcXVlc3QaIS5zeW5jLnYxLlJlZnJlc2hTdGVhbUF1dGhSZXNwb25zZRJLCgxCZWdpblFyTG9naW4SHC5zeW5jLnYxLkJlZ2luUXJMb2dpblJlcXVlc3QaHS5zeW5jLnYxLkJlZ2luUXJMb2dpblJlc3BvbnNlEkgKC1BvbGxRckxvZ2luEhsuc3luYy52MS5Qb2xsUXJMb2dpblJlcXVlc3QaHC5zeW5jLnYxLlBvbGxRckxvZ2luUmVzcG9uc2USTgoNR2V0U3luY1N0YXR1cxIdLnN5bmMudjEuR2V0U3luY1N0YXR1c1JlcXVlc3QaHi5zeW5jLnYxLkdldFN5bmNTdGF0dXNSZXNwb25zZUJCWkBnaXRodWIuY29tL3NrdWEtaW50ZXJuYXRpb25hbC9tYWdwaWUvZ2VuZXJhdGVkL2dvL3N5bmMvdjE7c3luY3YxYgZwcm90bzM");
+  fileDesc("ChJzeW5jL3YxL3N5bmMucHJvdG8SB3N5bmMudjEiFwoVTGlzdFN5bmNlZE1vZHNSZXF1ZXN0IlMKCVN5bmNlZE1vZBIOCgZtb2RfaWQYASABKAQSEwoLbWFuaWZlc3RfaWQYAiABKAQSEgoKc2l6ZV9ieXRlcxgDIAEoBBINCgV0aXRsZRgEIAEoCSI6ChZMaXN0U3luY2VkTW9kc1Jlc3BvbnNlEiAKBG1vZHMYASADKAsyEi5zeW5jLnYxLlN5bmNlZE1vZCIlChNHZXRTeW5jZWRNb2RSZXF1ZXN0Eg4KBm1vZF9pZBgBIAEoBCJYChRHZXRTeW5jZWRNb2RSZXNwb25zZRIkCgNtb2QYASABKAsyEi5zeW5jLnYxLlN5bmNlZE1vZEgAiAEBEhIKCnNvdXJjZV9pZHMYAiADKAlCBgoEX21vZCIVChNHZXRTeW5jU3RhdHNSZXF1ZXN0IkQKFEdldFN5bmNTdGF0c1Jlc3BvbnNlEhIKCm1vZHNfYnl0ZXMYASABKAQSGAoQZ2FtZV9maWxlc19ieXRlcxgCIAEoBCJCChdSZWZyZXNoU3RlYW1BdXRoUmVxdWVzdBIQCgh1c2VybmFtZRgBIAEoCRIVCg1yZWZyZXNoX3Rva2VuGAIgASgJIhoKGFJlZnJlc2hTdGVhbUF1dGhSZXNwb25zZSImChRJbnZhbGlkYXRlTW9kUmVxdWVzdBIOCgZtb2RfaWQYASABKAQiFwoVSW52YWxpZGF0ZU1vZFJlc3BvbnNlIikKFFJlZnJlc2hTb3VyY2VSZXF1ZXN0EhEKCXNvdXJjZV9pZBgBIAEoCSI7ChVSZWZyZXNoU291cmNlUmVzcG9uc2USIgoEbW9kcxgBIAMoCzIULnN5bmMudjEuUmVzb2x2ZWRNb2QiKQoUR2V0U291cmNlTW9kc1JlcXVlc3QSEQoJc291cmNlX2lkGAEgASgJIigKFUdldFNvdXJjZU1vZHNSZXNwb25zZRIPCgdtb2RfaWRzGAEgAygEIkEKFVJlZ2lzdGVyU291cmNlUmVxdWVzdBIVCg1jYW5kaWRhdGVfaWRzGAEgAygEEhEKCXNvdXJjZV9pZBgCIAEoCSIsCgtSZXNvbHZlZE1vZBIOCgZtb2RfaWQYASABKAQSDQoFdGl0bGUYAiABKAkiUAoWUmVnaXN0ZXJTb3VyY2VSZXNwb25zZRIiCgRtb2RzGAEgAygLMhQuc3luYy52MS5SZXNvbHZlZE1vZBISCgpyb290X3RpdGxlGAIgASgJIiwKF0RlcmVnaXN0ZXJTb3VyY2VSZXF1ZXN0EhEKCXNvdXJjZV9pZBgBIAEoCSIaChhEZXJlZ2lzdGVyU291cmNlUmVzcG9uc2UiFAoSU3luY0NvbnRlbnRSZXF1ZXN0IhUKE1N5bmNDb250ZW50UmVzcG9uc2UiFgoUR2V0U3luY1N0YXR1c1JlcXVlc3QiQgoVR2V0U3luY1N0YXR1c1Jlc3BvbnNlEg8KB3N5bmNpbmcYASABKAgSGAoQZ2FtZV9maWxlc19yZWFkeRgCIAEoCCIVChNCZWdpblFyTG9naW5SZXF1ZXN0IkEKFEJlZ2luUXJMb2dpblJlc3BvbnNlEhIKCnNlc3Npb25faWQYASABKAkSFQoNY2hhbGxlbmdlX3VybBgCIAEoCSIoChJQb2xsUXJMb2dpblJlcXVlc3QSEgoKc2Vzc2lvbl9pZBgBIAEoCSI6ChNQb2xsUXJMb2dpblJlc3BvbnNlEhEKCWNvbmZpcm1lZBgBIAEoCBIQCgh1c2VybmFtZRgCIAEoCSI8CgxXb3Jrc2hvcEl0ZW0SCgoCaWQYASABKAQSDQoFdGl0bGUYAiABKAkSEQoJZmlsZV9zaXplGAMgASgEIjQKG1Jlc29sdmVXb3Jrc2hvcEl0ZW1zUmVxdWVzdBIVCg1jYW5kaWRhdGVfaWRzGAEgAygEIlcKHFJlc29sdmVXb3Jrc2hvcEl0ZW1zUmVzcG9uc2USIwoEbW9kcxgBIAMoCzIVLnN5bmMudjEuV29ya3Nob3BJdGVtEhIKCnVucmVzb2x2ZWQYAiADKAQiHQobTGlzdE93bmVkQ29sbGVjdGlvbnNSZXF1ZXN0IpEBChFDb2xsZWN0aW9uU3VtbWFyeRIKCgJpZBgBIAEoBBINCgV0aXRsZRgCIAEoCRIxCgp2aXNpYmlsaXR5GAMgASgOMh0uc3luYy52MS5Db2xsZWN0aW9uVmlzaWJpbGl0eRISCgppdGVtX2NvdW50GAQgASgNEhoKEnVwZGF0ZWRfYXRfdW5peF9tcxgFIAEoAyJPChxMaXN0T3duZWRDb2xsZWN0aW9uc1Jlc3BvbnNlEi8KC2NvbGxlY3Rpb25zGAEgAygLMhouc3luYy52MS5Db2xsZWN0aW9uU3VtbWFyeSItChRHZXRDb2xsZWN0aW9uUmVxdWVzdBIVCg1jb2xsZWN0aW9uX2lkGAEgASgEIt4BChVHZXRDb2xsZWN0aW9uUmVzcG9uc2USCgoCaWQYASABKAQSDQoFdGl0bGUYAiABKAkSEwoLZGVzY3JpcHRpb24YAyABKAkSMQoKdmlzaWJpbGl0eRgEIAEoDjIdLnN5bmMudjEuQ29sbGVjdGlvblZpc2liaWxpdHkSDQoFb3duZWQYBSABKAgSGgoSdXBkYXRlZF9hdF91bml4X21zGAYgASgDEiMKBG1vZHMYByADKAsyFS5zeW5jLnYxLldvcmtzaG9wSXRlbRISCgp1bnJlc29sdmVkGAggAygEIp8BChhQdWJsaXNoQ29sbGVjdGlvblJlcXVlc3QSFQoNY29sbGVjdGlvbl9pZBgBIAEoBBINCgV0aXRsZRgCIAEoCRITCgtkZXNjcmlwdGlvbhgDIAEoCRIxCgp2aXNpYmlsaXR5GAQgASgOMh0uc3luYy52MS5Db2xsZWN0aW9uVmlzaWJpbGl0eRIVCg1jYW5kaWRhdGVfaWRzGAUgAygEIokBChlQdWJsaXNoQ29sbGVjdGlvblJlc3BvbnNlEhUKDWNvbGxlY3Rpb25faWQYASABKAQSCwoDdXJsGAIgASgJEiMKBG1vZHMYAyADKAsyFS5zeW5jLnYxLldvcmtzaG9wSXRlbRISCgp1bnJlc29sdmVkGAQgAygEEg8KB2NyZWF0ZWQYBSABKAgiMAoXRGVsZXRlQ29sbGVjdGlvblJlcXVlc3QSFQoNY29sbGVjdGlvbl9pZBgBIAEoBCIaChhEZWxldGVDb2xsZWN0aW9uUmVzcG9uc2UqzgEKFENvbGxlY3Rpb25WaXNpYmlsaXR5EiUKIUNPTExFQ1RJT05fVklTSUJJTElUWV9VTlNQRUNJRklFRBAAEiAKHENPTExFQ1RJT05fVklTSUJJTElUWV9QVUJMSUMQARImCiJDT0xMRUNUSU9OX1ZJU0lCSUxJVFlfRlJJRU5EU19PTkxZEAISIQodQ09MTEVDVElPTl9WSVNJQklMSVRZX1BSSVZBVEUQAxIiCh5DT0xMRUNUSU9OX1ZJU0lCSUxJVFlfVU5MSVNURUQQBDLvCwoLU3luY1NlcnZpY2USUQoOUmVnaXN0ZXJTb3VyY2USHi5zeW5jLnYxLlJlZ2lzdGVyU291cmNlUmVxdWVzdBofLnN5bmMudjEuUmVnaXN0ZXJTb3VyY2VSZXNwb25zZRJXChBEZXJlZ2lzdGVyU291cmNlEiAuc3luYy52MS5EZXJlZ2lzdGVyU291cmNlUmVxdWVzdBohLnN5bmMudjEuRGVyZWdpc3RlclNvdXJjZVJlc3BvbnNlEkgKC1N5bmNDb250ZW50Ehsuc3luYy52MS5TeW5jQ29udGVudFJlcXVlc3QaHC5zeW5jLnYxLlN5bmNDb250ZW50UmVzcG9uc2USTgoNR2V0U291cmNlTW9kcxIdLnN5bmMudjEuR2V0U291cmNlTW9kc1JlcXVlc3QaHi5zeW5jLnYxLkdldFNvdXJjZU1vZHNSZXNwb25zZRJOCg1SZWZyZXNoU291cmNlEh0uc3luYy52MS5SZWZyZXNoU291cmNlUmVxdWVzdBoeLnN5bmMudjEuUmVmcmVzaFNvdXJjZVJlc3BvbnNlElEKDkxpc3RTeW5jZWRNb2RzEh4uc3luYy52MS5MaXN0U3luY2VkTW9kc1JlcXVlc3QaHy5zeW5jLnYxLkxpc3RTeW5jZWRNb2RzUmVzcG9uc2USTgoNSW52YWxpZGF0ZU1vZBIdLnN5bmMudjEuSW52YWxpZGF0ZU1vZFJlcXVlc3QaHi5zeW5jLnYxLkludmFsaWRhdGVNb2RSZXNwb25zZRJLCgxHZXRTeW5jZWRNb2QSHC5zeW5jLnYxLkdldFN5bmNlZE1vZFJlcXVlc3QaHS5zeW5jLnYxLkdldFN5bmNlZE1vZFJlc3BvbnNlEksKDEdldFN5bmNTdGF0cxIcLnN5bmMudjEuR2V0U3luY1N0YXRzUmVxdWVzdBodLnN5bmMudjEuR2V0U3luY1N0YXRzUmVzcG9uc2USVwoQUmVmcmVzaFN0ZWFtQXV0aBIgLnN5bmMudjEuUmVmcmVzaFN0ZWFtQXV0aFJlcXVlc3QaIS5zeW5jLnYxLlJlZnJlc2hTdGVhbUF1dGhSZXNwb25zZRJLCgxCZWdpblFyTG9naW4SHC5zeW5jLnYxLkJlZ2luUXJMb2dpblJlcXVlc3QaHS5zeW5jLnYxLkJlZ2luUXJMb2dpblJlc3BvbnNlEkgKC1BvbGxRckxvZ2luEhsuc3luYy52MS5Qb2xsUXJMb2dpblJlcXVlc3QaHC5zeW5jLnYxLlBvbGxRckxvZ2luUmVzcG9uc2USTgoNR2V0U3luY1N0YXR1cxIdLnN5bmMudjEuR2V0U3luY1N0YXR1c1JlcXVlc3QaHi5zeW5jLnYxLkdldFN5bmNTdGF0dXNSZXNwb25zZRJjChRSZXNvbHZlV29ya3Nob3BJdGVtcxIkLnN5bmMudjEuUmVzb2x2ZVdvcmtzaG9wSXRlbXNSZXF1ZXN0GiUuc3luYy52MS5SZXNvbHZlV29ya3Nob3BJdGVtc1Jlc3BvbnNlEmMKFExpc3RPd25lZENvbGxlY3Rpb25zEiQuc3luYy52MS5MaXN0T3duZWRDb2xsZWN0aW9uc1JlcXVlc3QaJS5zeW5jLnYxLkxpc3RPd25lZENvbGxlY3Rpb25zUmVzcG9uc2USTgoNR2V0Q29sbGVjdGlvbhIdLnN5bmMudjEuR2V0Q29sbGVjdGlvblJlcXVlc3QaHi5zeW5jLnYxLkdldENvbGxlY3Rpb25SZXNwb25zZRJaChFQdWJsaXNoQ29sbGVjdGlvbhIhLnN5bmMudjEuUHVibGlzaENvbGxlY3Rpb25SZXF1ZXN0GiIuc3luYy52MS5QdWJsaXNoQ29sbGVjdGlvblJlc3BvbnNlElcKEERlbGV0ZUNvbGxlY3Rpb24SIC5zeW5jLnYxLkRlbGV0ZUNvbGxlY3Rpb25SZXF1ZXN0GiEuc3luYy52MS5EZWxldGVDb2xsZWN0aW9uUmVzcG9uc2VCQlpAZ2l0aHViLmNvbS9za3VhLWludGVybmF0aW9uYWwvbWFncGllL2dlbmVyYXRlZC9nby9zeW5jL3YxO3N5bmN2MWIGcHJvdG8z");
 
 /**
  * @generated from message sync.v1.ListSyncedModsRequest
@@ -552,6 +552,376 @@ export const PollQrLoginResponseSchema: GenMessage<PollQrLoginResponse> = /*@__P
   messageDesc(file_sync_v1_sync, 27);
 
 /**
+ * @generated from message sync.v1.WorkshopItem
+ */
+export type WorkshopItem = Message<"sync.v1.WorkshopItem"> & {
+  /**
+   * @generated from field: uint64 id = 1;
+   */
+  id: bigint;
+
+  /**
+   * @generated from field: string title = 2;
+   */
+  title: string;
+
+  /**
+   * @generated from field: uint64 file_size = 3;
+   */
+  fileSize: bigint;
+};
+
+/**
+ * Describes the message sync.v1.WorkshopItem.
+ * Use `create(WorkshopItemSchema)` to create a new message.
+ */
+export const WorkshopItemSchema: GenMessage<WorkshopItem> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 28);
+
+/**
+ * @generated from message sync.v1.ResolveWorkshopItemsRequest
+ */
+export type ResolveWorkshopItemsRequest = Message<"sync.v1.ResolveWorkshopItemsRequest"> & {
+  /**
+   * Mods and/or collections, exactly as RegisterSource takes them.
+   *
+   * @generated from field: repeated uint64 candidate_ids = 1;
+   */
+  candidateIds: bigint[];
+};
+
+/**
+ * Describes the message sync.v1.ResolveWorkshopItemsRequest.
+ * Use `create(ResolveWorkshopItemsRequestSchema)` to create a new message.
+ */
+export const ResolveWorkshopItemsRequestSchema: GenMessage<ResolveWorkshopItemsRequest> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 29);
+
+/**
+ * @generated from message sync.v1.ResolveWorkshopItemsResponse
+ */
+export type ResolveWorkshopItemsResponse = Message<"sync.v1.ResolveWorkshopItemsResponse"> & {
+  /**
+   * Collections flattened into their members in place, duplicates
+   * dropped, otherwise in candidate order.
+   *
+   * @generated from field: repeated sync.v1.WorkshopItem mods = 1;
+   */
+  mods: WorkshopItem[];
+
+  /**
+   * Candidates (or collection members) Steam returned nothing for.
+   *
+   * @generated from field: repeated uint64 unresolved = 2;
+   */
+  unresolved: bigint[];
+};
+
+/**
+ * Describes the message sync.v1.ResolveWorkshopItemsResponse.
+ * Use `create(ResolveWorkshopItemsResponseSchema)` to create a new message.
+ */
+export const ResolveWorkshopItemsResponseSchema: GenMessage<ResolveWorkshopItemsResponse> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 30);
+
+/**
+ * @generated from message sync.v1.ListOwnedCollectionsRequest
+ */
+export type ListOwnedCollectionsRequest = Message<"sync.v1.ListOwnedCollectionsRequest"> & {
+};
+
+/**
+ * Describes the message sync.v1.ListOwnedCollectionsRequest.
+ * Use `create(ListOwnedCollectionsRequestSchema)` to create a new message.
+ */
+export const ListOwnedCollectionsRequestSchema: GenMessage<ListOwnedCollectionsRequest> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 31);
+
+/**
+ * @generated from message sync.v1.CollectionSummary
+ */
+export type CollectionSummary = Message<"sync.v1.CollectionSummary"> & {
+  /**
+   * @generated from field: uint64 id = 1;
+   */
+  id: bigint;
+
+  /**
+   * @generated from field: string title = 2;
+   */
+  title: string;
+
+  /**
+   * @generated from field: sync.v1.CollectionVisibility visibility = 3;
+   */
+  visibility: CollectionVisibility;
+
+  /**
+   * @generated from field: uint32 item_count = 4;
+   */
+  itemCount: number;
+
+  /**
+   * @generated from field: int64 updated_at_unix_ms = 5;
+   */
+  updatedAtUnixMs: bigint;
+};
+
+/**
+ * Describes the message sync.v1.CollectionSummary.
+ * Use `create(CollectionSummarySchema)` to create a new message.
+ */
+export const CollectionSummarySchema: GenMessage<CollectionSummary> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 32);
+
+/**
+ * @generated from message sync.v1.ListOwnedCollectionsResponse
+ */
+export type ListOwnedCollectionsResponse = Message<"sync.v1.ListOwnedCollectionsResponse"> & {
+  /**
+   * Most recently updated first.
+   *
+   * @generated from field: repeated sync.v1.CollectionSummary collections = 1;
+   */
+  collections: CollectionSummary[];
+};
+
+/**
+ * Describes the message sync.v1.ListOwnedCollectionsResponse.
+ * Use `create(ListOwnedCollectionsResponseSchema)` to create a new message.
+ */
+export const ListOwnedCollectionsResponseSchema: GenMessage<ListOwnedCollectionsResponse> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 33);
+
+/**
+ * @generated from message sync.v1.GetCollectionRequest
+ */
+export type GetCollectionRequest = Message<"sync.v1.GetCollectionRequest"> & {
+  /**
+   * @generated from field: uint64 collection_id = 1;
+   */
+  collectionId: bigint;
+};
+
+/**
+ * Describes the message sync.v1.GetCollectionRequest.
+ * Use `create(GetCollectionRequestSchema)` to create a new message.
+ */
+export const GetCollectionRequestSchema: GenMessage<GetCollectionRequest> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 34);
+
+/**
+ * @generated from message sync.v1.GetCollectionResponse
+ */
+export type GetCollectionResponse = Message<"sync.v1.GetCollectionResponse"> & {
+  /**
+   * @generated from field: uint64 id = 1;
+   */
+  id: bigint;
+
+  /**
+   * @generated from field: string title = 2;
+   */
+  title: string;
+
+  /**
+   * @generated from field: string description = 3;
+   */
+  description: string;
+
+  /**
+   * @generated from field: sync.v1.CollectionVisibility visibility = 4;
+   */
+  visibility: CollectionVisibility;
+
+  /**
+   * Published by this cluster's own Steam account.
+   *
+   * @generated from field: bool owned = 5;
+   */
+  owned: boolean;
+
+  /**
+   * @generated from field: int64 updated_at_unix_ms = 6;
+   */
+  updatedAtUnixMs: bigint;
+
+  /**
+   * Flattened, in the collection's own order.
+   *
+   * @generated from field: repeated sync.v1.WorkshopItem mods = 7;
+   */
+  mods: WorkshopItem[];
+
+  /**
+   * @generated from field: repeated uint64 unresolved = 8;
+   */
+  unresolved: bigint[];
+};
+
+/**
+ * Describes the message sync.v1.GetCollectionResponse.
+ * Use `create(GetCollectionResponseSchema)` to create a new message.
+ */
+export const GetCollectionResponseSchema: GenMessage<GetCollectionResponse> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 35);
+
+/**
+ * @generated from message sync.v1.PublishCollectionRequest
+ */
+export type PublishCollectionRequest = Message<"sync.v1.PublishCollectionRequest"> & {
+  /**
+   * 0 publishes a new collection; anything else replaces that one's
+   * title, description, visibility and membership, and must be owned by
+   * this cluster's Steam account.
+   *
+   * @generated from field: uint64 collection_id = 1;
+   */
+  collectionId: bigint;
+
+  /**
+   * @generated from field: string title = 2;
+   */
+  title: string;
+
+  /**
+   * @generated from field: string description = 3;
+   */
+  description: string;
+
+  /**
+   * @generated from field: sync.v1.CollectionVisibility visibility = 4;
+   */
+  visibility: CollectionVisibility;
+
+  /**
+   * Resolved and flattened before publishing, order kept.
+   *
+   * @generated from field: repeated uint64 candidate_ids = 5;
+   */
+  candidateIds: bigint[];
+};
+
+/**
+ * Describes the message sync.v1.PublishCollectionRequest.
+ * Use `create(PublishCollectionRequestSchema)` to create a new message.
+ */
+export const PublishCollectionRequestSchema: GenMessage<PublishCollectionRequest> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 36);
+
+/**
+ * @generated from message sync.v1.PublishCollectionResponse
+ */
+export type PublishCollectionResponse = Message<"sync.v1.PublishCollectionResponse"> & {
+  /**
+   * @generated from field: uint64 collection_id = 1;
+   */
+  collectionId: bigint;
+
+  /**
+   * The collection's public page -- built server-side so every caller
+   * (web UI, magpiectl) shows the same link without rebuilding it from
+   * the ID.
+   *
+   * @generated from field: string url = 2;
+   */
+  url: string;
+
+  /**
+   * @generated from field: repeated sync.v1.WorkshopItem mods = 3;
+   */
+  mods: WorkshopItem[];
+
+  /**
+   * @generated from field: repeated uint64 unresolved = 4;
+   */
+  unresolved: bigint[];
+
+  /**
+   * @generated from field: bool created = 5;
+   */
+  created: boolean;
+};
+
+/**
+ * Describes the message sync.v1.PublishCollectionResponse.
+ * Use `create(PublishCollectionResponseSchema)` to create a new message.
+ */
+export const PublishCollectionResponseSchema: GenMessage<PublishCollectionResponse> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 37);
+
+/**
+ * @generated from message sync.v1.DeleteCollectionRequest
+ */
+export type DeleteCollectionRequest = Message<"sync.v1.DeleteCollectionRequest"> & {
+  /**
+   * @generated from field: uint64 collection_id = 1;
+   */
+  collectionId: bigint;
+};
+
+/**
+ * Describes the message sync.v1.DeleteCollectionRequest.
+ * Use `create(DeleteCollectionRequestSchema)` to create a new message.
+ */
+export const DeleteCollectionRequestSchema: GenMessage<DeleteCollectionRequest> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 38);
+
+/**
+ * @generated from message sync.v1.DeleteCollectionResponse
+ */
+export type DeleteCollectionResponse = Message<"sync.v1.DeleteCollectionResponse"> & {
+};
+
+/**
+ * Describes the message sync.v1.DeleteCollectionResponse.
+ * Use `create(DeleteCollectionResponseSchema)` to create a new message.
+ */
+export const DeleteCollectionResponseSchema: GenMessage<DeleteCollectionResponse> = /*@__PURE__*/
+  messageDesc(file_sync_v1_sync, 39);
+
+/**
+ * ERemoteStoragePublishedFileVisibility, shifted by one so UNSPECIFIED
+ * occupies proto3's zero rather than PUBLIC doing so -- an unset field
+ * must not be able to publish publicly. Unset is rejected rather than
+ * defaulted server-side; callers choose explicitly.
+ *
+ * @generated from enum sync.v1.CollectionVisibility
+ */
+export enum CollectionVisibility {
+  /**
+   * @generated from enum value: COLLECTION_VISIBILITY_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: COLLECTION_VISIBILITY_PUBLIC = 1;
+   */
+  PUBLIC = 1,
+
+  /**
+   * @generated from enum value: COLLECTION_VISIBILITY_FRIENDS_ONLY = 2;
+   */
+  FRIENDS_ONLY = 2,
+
+  /**
+   * @generated from enum value: COLLECTION_VISIBILITY_PRIVATE = 3;
+   */
+  PRIVATE = 3,
+
+  /**
+   * @generated from enum value: COLLECTION_VISIBILITY_UNLISTED = 4;
+   */
+  UNLISTED = 4,
+}
+
+/**
+ * Describes the enum sync.v1.CollectionVisibility.
+ */
+export const CollectionVisibilitySchema: GenEnum<CollectionVisibility> = /*@__PURE__*/
+  enumDesc(file_sync_v1_sync, 0);
+
+/**
  * Mod/collection sync registry and content-claim service. Owns all Steam
  * depot/workshop mechanics -- callers (the controller) never talk to Steam
  * directly, only in terms of candidate IDs and resolved mod IDs.
@@ -756,6 +1126,62 @@ export const SyncService: GenService<{
     methodKind: "unary";
     input: typeof GetSyncStatusRequestSchema;
     output: typeof GetSyncStatusResponseSchema;
+  },
+  /**
+   * Steam Workshop collections owned by this cluster's own Steam
+   * account.
+   *
+   * The reverse direction from everything else here: these push content
+   * *to* Steam rather than pulling it down, and deliberately touch
+   * neither the golden content tree nor the source registry -- a
+   * collection published this way is not thereby a registered mod source,
+   * and nothing starts syncing because of it. Registering one is a
+   * separate, explicit RegisterSource call.
+   *
+   * Resolution reuses the same authenticated expansion RegisterSource
+   * does, so a candidate that is itself a collection is flattened into
+   * its members rather than nested -- Arma cares about the mod list, and
+   * a collection-of-collections resolves differently for a subscriber
+   * than the preset it came from did.
+   *
+   * @generated from rpc sync.v1.SyncService.ResolveWorkshopItems
+   */
+  resolveWorkshopItems: {
+    methodKind: "unary";
+    input: typeof ResolveWorkshopItemsRequestSchema;
+    output: typeof ResolveWorkshopItemsResponseSchema;
+  },
+  /**
+   * @generated from rpc sync.v1.SyncService.ListOwnedCollections
+   */
+  listOwnedCollections: {
+    methodKind: "unary";
+    input: typeof ListOwnedCollectionsRequestSchema;
+    output: typeof ListOwnedCollectionsResponseSchema;
+  },
+  /**
+   * @generated from rpc sync.v1.SyncService.GetCollection
+   */
+  getCollection: {
+    methodKind: "unary";
+    input: typeof GetCollectionRequestSchema;
+    output: typeof GetCollectionResponseSchema;
+  },
+  /**
+   * @generated from rpc sync.v1.SyncService.PublishCollection
+   */
+  publishCollection: {
+    methodKind: "unary";
+    input: typeof PublishCollectionRequestSchema;
+    output: typeof PublishCollectionResponseSchema;
+  },
+  /**
+   * @generated from rpc sync.v1.SyncService.DeleteCollection
+   */
+  deleteCollection: {
+    methodKind: "unary";
+    input: typeof DeleteCollectionRequestSchema;
+    output: typeof DeleteCollectionResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_sync_v1_sync, 0);

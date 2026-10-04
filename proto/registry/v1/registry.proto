@@ -332,7 +332,141 @@ service AdminService {
   rpc ListSecrets(ListSecretsRequest) returns (ListSecretsResponse);
   rpc PutSecret(PutSecretRequest) returns (PutSecretResponse);
   rpc DeleteSecret(DeleteSecretRequest) returns (DeleteSecretResponse);
+
+  // Steam Workshop collections owned by this cluster's Steam account.
+  //
+  // A standalone tool, deliberately separate from mod source import:
+  // nothing here registers, syncs, or stores anything in the cluster. The
+  // output is a Steam link to hand to players (whose own launchers can
+  // subscribe to it) -- the opposite direction from every preset upload
+  // in ModSourceService, which brings content *into* the cluster. A
+  // collection made here becomes a mod source only if someone separately
+  // adds its URL as one.
+  //
+  // Every one of these carries admin:steam-auth rather than
+  // mod-sources:*, the same scope as RefreshSteamAuth and the QR login
+  // pair: they act *as* the cluster's Steam identity (the writes publish
+  // public-facing content under its name; the reads see whatever that
+  // account can see, private items included), which is a different kind
+  // of act from registering something to sync.
+
+  // Turn preset HTML and/or Workshop IDs into the flat, titled mod list a
+  // collection would hold -- the preview step before PublishWorkshopCollection,
+  // and how an editor looks up a mod being added. Read-only on Steam.
+  rpc ResolveWorkshopItems(ResolveWorkshopItemsRequest) returns (ResolveWorkshopItemsResponse);
+  // Collections the cluster's Steam account has published for Arma 3.
+  rpc ListWorkshopCollections(ListWorkshopCollectionsRequest) returns (ListWorkshopCollectionsResponse);
+  // One collection and its (flattened) members. Not limited to the
+  // cluster's own: reading someone else's is how an editor starts a new
+  // collection from an existing one. `owned` says which it is.
+  rpc GetWorkshopCollection(GetWorkshopCollectionRequest) returns (WorkshopCollection);
+  // Publish a new collection, or replace an owned one's title,
+  // description, visibility and membership wholesale.
+  rpc PublishWorkshopCollection(PublishWorkshopCollectionRequest) returns (PublishWorkshopCollectionResponse);
+  rpc DeleteWorkshopCollection(DeleteWorkshopCollectionRequest) returns (DeleteWorkshopCollectionResponse);
 }
+
+// Mirrors sync.v1.CollectionVisibility -- registry does not import
+// sync's protos, and the two are converted explicitly where they meet.
+// Steam's own numbering shifted by one, so UNSPECIFIED occupies proto3's
+// zero rather than PUBLIC doing so: an unset field must never be able to
+// publish publicly, and is refused rather than defaulted.
+enum CollectionVisibility {
+  COLLECTION_VISIBILITY_UNSPECIFIED = 0;
+  COLLECTION_VISIBILITY_PUBLIC = 1;
+  COLLECTION_VISIBILITY_FRIENDS_ONLY = 2;
+  COLLECTION_VISIBILITY_PRIVATE = 3;
+  COLLECTION_VISIBILITY_UNLISTED = 4;
+}
+
+message WorkshopItem {
+  uint64 id = 1;
+  string title = 2;
+  uint64 file_size = 3;
+}
+
+message ResolveWorkshopItemsRequest {
+  // An Arma 3 Launcher preset export, verbatim -- scanned for Workshop
+  // links and discarded, never stored. Optional.
+  string preset_html = 1;
+  // Mods and/or collections. Optional; appended after the preset's own.
+  repeated uint64 ids = 2;
+}
+
+message ResolveWorkshopItemsResponse {
+  // Collections flattened into their members in place, duplicates
+  // dropped, otherwise in the order given.
+  repeated WorkshopItem mods = 1;
+  // Requested IDs Steam returned nothing for -- private to another
+  // account, removed, or simply wrong. Reported rather than failed, so one
+  // dead link in a 115-mod preset doesn't block the rest.
+  repeated uint64 unresolved = 2;
+}
+
+message ListWorkshopCollectionsRequest {}
+
+message WorkshopCollectionSummary {
+  uint64 id = 1;
+  string title = 2;
+  CollectionVisibility visibility = 3;
+  uint32 item_count = 4;
+  int64 updated_at_unix_ms = 5;
+  string url = 6;
+}
+
+message ListWorkshopCollectionsResponse {
+  // Most recently updated first.
+  repeated WorkshopCollectionSummary collections = 1;
+}
+
+message GetWorkshopCollectionRequest {
+  uint64 collection_id = 1;
+}
+
+message WorkshopCollection {
+  uint64 id = 1;
+  string title = 2;
+  string description = 3;
+  CollectionVisibility visibility = 4;
+  string url = 5;
+  // Whether the cluster's Steam account published it, i.e. whether
+  // PublishWorkshopCollection/DeleteWorkshopCollection will accept it.
+  bool owned = 6;
+  int64 updated_at_unix_ms = 7;
+  repeated WorkshopItem mods = 8;
+  // Members Steam no longer resolves for this account (removed or made
+  // private since they were added). Saving the collection drops them.
+  repeated uint64 unresolved = 9;
+}
+
+message PublishWorkshopCollectionRequest {
+  // 0 publishes a new collection; anything else replaces that one, which
+  // must be owned by the cluster's Steam account.
+  uint64 collection_id = 1;
+  string title = 2;
+  string description = 3;
+  CollectionVisibility visibility = 4;
+  // Mods and/or collections, resolved and flattened before publishing
+  // exactly as ResolveWorkshopItems does. Order is kept.
+  repeated uint64 mod_ids = 5;
+}
+
+message PublishWorkshopCollectionResponse {
+  uint64 collection_id = 1;
+  string url = 2;
+  // What actually went in, after resolution.
+  repeated WorkshopItem mods = 3;
+  repeated uint64 unresolved = 4;
+  // True when this call published a new collection, false when it
+  // replaced an existing one.
+  bool created = 5;
+}
+
+message DeleteWorkshopCollectionRequest {
+  uint64 collection_id = 1;
+}
+
+message DeleteWorkshopCollectionResponse {}
 
 message BeginSteamQrLoginRequest {}
 

@@ -21,6 +21,65 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// ERemoteStoragePublishedFileVisibility, shifted by one so UNSPECIFIED
+// occupies proto3's zero rather than PUBLIC doing so -- an unset field
+// must not be able to publish publicly. Unset is rejected rather than
+// defaulted server-side; callers choose explicitly.
+type CollectionVisibility int32
+
+const (
+	CollectionVisibility_COLLECTION_VISIBILITY_UNSPECIFIED  CollectionVisibility = 0
+	CollectionVisibility_COLLECTION_VISIBILITY_PUBLIC       CollectionVisibility = 1
+	CollectionVisibility_COLLECTION_VISIBILITY_FRIENDS_ONLY CollectionVisibility = 2
+	CollectionVisibility_COLLECTION_VISIBILITY_PRIVATE      CollectionVisibility = 3
+	CollectionVisibility_COLLECTION_VISIBILITY_UNLISTED     CollectionVisibility = 4
+)
+
+// Enum value maps for CollectionVisibility.
+var (
+	CollectionVisibility_name = map[int32]string{
+		0: "COLLECTION_VISIBILITY_UNSPECIFIED",
+		1: "COLLECTION_VISIBILITY_PUBLIC",
+		2: "COLLECTION_VISIBILITY_FRIENDS_ONLY",
+		3: "COLLECTION_VISIBILITY_PRIVATE",
+		4: "COLLECTION_VISIBILITY_UNLISTED",
+	}
+	CollectionVisibility_value = map[string]int32{
+		"COLLECTION_VISIBILITY_UNSPECIFIED":  0,
+		"COLLECTION_VISIBILITY_PUBLIC":       1,
+		"COLLECTION_VISIBILITY_FRIENDS_ONLY": 2,
+		"COLLECTION_VISIBILITY_PRIVATE":      3,
+		"COLLECTION_VISIBILITY_UNLISTED":     4,
+	}
+)
+
+func (x CollectionVisibility) Enum() *CollectionVisibility {
+	p := new(CollectionVisibility)
+	*p = x
+	return p
+}
+
+func (x CollectionVisibility) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (CollectionVisibility) Descriptor() protoreflect.EnumDescriptor {
+	return file_sync_v1_sync_proto_enumTypes[0].Descriptor()
+}
+
+func (CollectionVisibility) Type() protoreflect.EnumType {
+	return &file_sync_v1_sync_proto_enumTypes[0]
+}
+
+func (x CollectionVisibility) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use CollectionVisibility.Descriptor instead.
+func (CollectionVisibility) EnumDescriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{0}
+}
+
 type ListSyncedModsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -1306,6 +1365,708 @@ func (x *PollQrLoginResponse) GetUsername() string {
 	return ""
 }
 
+type WorkshopItem struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	FileSize      uint64                 `protobuf:"varint,3,opt,name=file_size,json=fileSize,proto3" json:"file_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WorkshopItem) Reset() {
+	*x = WorkshopItem{}
+	mi := &file_sync_v1_sync_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WorkshopItem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WorkshopItem) ProtoMessage() {}
+
+func (x *WorkshopItem) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WorkshopItem.ProtoReflect.Descriptor instead.
+func (*WorkshopItem) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *WorkshopItem) GetId() uint64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *WorkshopItem) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *WorkshopItem) GetFileSize() uint64 {
+	if x != nil {
+		return x.FileSize
+	}
+	return 0
+}
+
+type ResolveWorkshopItemsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Mods and/or collections, exactly as RegisterSource takes them.
+	CandidateIds  []uint64 `protobuf:"varint,1,rep,packed,name=candidate_ids,json=candidateIds,proto3" json:"candidate_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveWorkshopItemsRequest) Reset() {
+	*x = ResolveWorkshopItemsRequest{}
+	mi := &file_sync_v1_sync_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveWorkshopItemsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveWorkshopItemsRequest) ProtoMessage() {}
+
+func (x *ResolveWorkshopItemsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveWorkshopItemsRequest.ProtoReflect.Descriptor instead.
+func (*ResolveWorkshopItemsRequest) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *ResolveWorkshopItemsRequest) GetCandidateIds() []uint64 {
+	if x != nil {
+		return x.CandidateIds
+	}
+	return nil
+}
+
+type ResolveWorkshopItemsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Collections flattened into their members in place, duplicates
+	// dropped, otherwise in candidate order.
+	Mods []*WorkshopItem `protobuf:"bytes,1,rep,name=mods,proto3" json:"mods,omitempty"`
+	// Candidates (or collection members) Steam returned nothing for.
+	Unresolved    []uint64 `protobuf:"varint,2,rep,packed,name=unresolved,proto3" json:"unresolved,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveWorkshopItemsResponse) Reset() {
+	*x = ResolveWorkshopItemsResponse{}
+	mi := &file_sync_v1_sync_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveWorkshopItemsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveWorkshopItemsResponse) ProtoMessage() {}
+
+func (x *ResolveWorkshopItemsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveWorkshopItemsResponse.ProtoReflect.Descriptor instead.
+func (*ResolveWorkshopItemsResponse) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *ResolveWorkshopItemsResponse) GetMods() []*WorkshopItem {
+	if x != nil {
+		return x.Mods
+	}
+	return nil
+}
+
+func (x *ResolveWorkshopItemsResponse) GetUnresolved() []uint64 {
+	if x != nil {
+		return x.Unresolved
+	}
+	return nil
+}
+
+type ListOwnedCollectionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListOwnedCollectionsRequest) Reset() {
+	*x = ListOwnedCollectionsRequest{}
+	mi := &file_sync_v1_sync_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListOwnedCollectionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListOwnedCollectionsRequest) ProtoMessage() {}
+
+func (x *ListOwnedCollectionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListOwnedCollectionsRequest.ProtoReflect.Descriptor instead.
+func (*ListOwnedCollectionsRequest) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{31}
+}
+
+type CollectionSummary struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Id              uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Title           string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Visibility      CollectionVisibility   `protobuf:"varint,3,opt,name=visibility,proto3,enum=sync.v1.CollectionVisibility" json:"visibility,omitempty"`
+	ItemCount       uint32                 `protobuf:"varint,4,opt,name=item_count,json=itemCount,proto3" json:"item_count,omitempty"`
+	UpdatedAtUnixMs int64                  `protobuf:"varint,5,opt,name=updated_at_unix_ms,json=updatedAtUnixMs,proto3" json:"updated_at_unix_ms,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *CollectionSummary) Reset() {
+	*x = CollectionSummary{}
+	mi := &file_sync_v1_sync_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CollectionSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CollectionSummary) ProtoMessage() {}
+
+func (x *CollectionSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CollectionSummary.ProtoReflect.Descriptor instead.
+func (*CollectionSummary) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *CollectionSummary) GetId() uint64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *CollectionSummary) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *CollectionSummary) GetVisibility() CollectionVisibility {
+	if x != nil {
+		return x.Visibility
+	}
+	return CollectionVisibility_COLLECTION_VISIBILITY_UNSPECIFIED
+}
+
+func (x *CollectionSummary) GetItemCount() uint32 {
+	if x != nil {
+		return x.ItemCount
+	}
+	return 0
+}
+
+func (x *CollectionSummary) GetUpdatedAtUnixMs() int64 {
+	if x != nil {
+		return x.UpdatedAtUnixMs
+	}
+	return 0
+}
+
+type ListOwnedCollectionsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Most recently updated first.
+	Collections   []*CollectionSummary `protobuf:"bytes,1,rep,name=collections,proto3" json:"collections,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListOwnedCollectionsResponse) Reset() {
+	*x = ListOwnedCollectionsResponse{}
+	mi := &file_sync_v1_sync_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListOwnedCollectionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListOwnedCollectionsResponse) ProtoMessage() {}
+
+func (x *ListOwnedCollectionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListOwnedCollectionsResponse.ProtoReflect.Descriptor instead.
+func (*ListOwnedCollectionsResponse) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *ListOwnedCollectionsResponse) GetCollections() []*CollectionSummary {
+	if x != nil {
+		return x.Collections
+	}
+	return nil
+}
+
+type GetCollectionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CollectionId  uint64                 `protobuf:"varint,1,opt,name=collection_id,json=collectionId,proto3" json:"collection_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCollectionRequest) Reset() {
+	*x = GetCollectionRequest{}
+	mi := &file_sync_v1_sync_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCollectionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCollectionRequest) ProtoMessage() {}
+
+func (x *GetCollectionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCollectionRequest.ProtoReflect.Descriptor instead.
+func (*GetCollectionRequest) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *GetCollectionRequest) GetCollectionId() uint64 {
+	if x != nil {
+		return x.CollectionId
+	}
+	return 0
+}
+
+type GetCollectionResponse struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Id          uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Title       string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Description string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	Visibility  CollectionVisibility   `protobuf:"varint,4,opt,name=visibility,proto3,enum=sync.v1.CollectionVisibility" json:"visibility,omitempty"`
+	// Published by this cluster's own Steam account.
+	Owned           bool  `protobuf:"varint,5,opt,name=owned,proto3" json:"owned,omitempty"`
+	UpdatedAtUnixMs int64 `protobuf:"varint,6,opt,name=updated_at_unix_ms,json=updatedAtUnixMs,proto3" json:"updated_at_unix_ms,omitempty"`
+	// Flattened, in the collection's own order.
+	Mods          []*WorkshopItem `protobuf:"bytes,7,rep,name=mods,proto3" json:"mods,omitempty"`
+	Unresolved    []uint64        `protobuf:"varint,8,rep,packed,name=unresolved,proto3" json:"unresolved,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCollectionResponse) Reset() {
+	*x = GetCollectionResponse{}
+	mi := &file_sync_v1_sync_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCollectionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCollectionResponse) ProtoMessage() {}
+
+func (x *GetCollectionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCollectionResponse.ProtoReflect.Descriptor instead.
+func (*GetCollectionResponse) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *GetCollectionResponse) GetId() uint64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *GetCollectionResponse) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *GetCollectionResponse) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *GetCollectionResponse) GetVisibility() CollectionVisibility {
+	if x != nil {
+		return x.Visibility
+	}
+	return CollectionVisibility_COLLECTION_VISIBILITY_UNSPECIFIED
+}
+
+func (x *GetCollectionResponse) GetOwned() bool {
+	if x != nil {
+		return x.Owned
+	}
+	return false
+}
+
+func (x *GetCollectionResponse) GetUpdatedAtUnixMs() int64 {
+	if x != nil {
+		return x.UpdatedAtUnixMs
+	}
+	return 0
+}
+
+func (x *GetCollectionResponse) GetMods() []*WorkshopItem {
+	if x != nil {
+		return x.Mods
+	}
+	return nil
+}
+
+func (x *GetCollectionResponse) GetUnresolved() []uint64 {
+	if x != nil {
+		return x.Unresolved
+	}
+	return nil
+}
+
+type PublishCollectionRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 0 publishes a new collection; anything else replaces that one's
+	// title, description, visibility and membership, and must be owned by
+	// this cluster's Steam account.
+	CollectionId uint64               `protobuf:"varint,1,opt,name=collection_id,json=collectionId,proto3" json:"collection_id,omitempty"`
+	Title        string               `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Description  string               `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	Visibility   CollectionVisibility `protobuf:"varint,4,opt,name=visibility,proto3,enum=sync.v1.CollectionVisibility" json:"visibility,omitempty"`
+	// Resolved and flattened before publishing, order kept.
+	CandidateIds  []uint64 `protobuf:"varint,5,rep,packed,name=candidate_ids,json=candidateIds,proto3" json:"candidate_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PublishCollectionRequest) Reset() {
+	*x = PublishCollectionRequest{}
+	mi := &file_sync_v1_sync_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublishCollectionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublishCollectionRequest) ProtoMessage() {}
+
+func (x *PublishCollectionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublishCollectionRequest.ProtoReflect.Descriptor instead.
+func (*PublishCollectionRequest) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *PublishCollectionRequest) GetCollectionId() uint64 {
+	if x != nil {
+		return x.CollectionId
+	}
+	return 0
+}
+
+func (x *PublishCollectionRequest) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *PublishCollectionRequest) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *PublishCollectionRequest) GetVisibility() CollectionVisibility {
+	if x != nil {
+		return x.Visibility
+	}
+	return CollectionVisibility_COLLECTION_VISIBILITY_UNSPECIFIED
+}
+
+func (x *PublishCollectionRequest) GetCandidateIds() []uint64 {
+	if x != nil {
+		return x.CandidateIds
+	}
+	return nil
+}
+
+type PublishCollectionResponse struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	CollectionId uint64                 `protobuf:"varint,1,opt,name=collection_id,json=collectionId,proto3" json:"collection_id,omitempty"`
+	// The collection's public page -- built server-side so every caller
+	// (web UI, magpiectl) shows the same link without rebuilding it from
+	// the ID.
+	Url           string          `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
+	Mods          []*WorkshopItem `protobuf:"bytes,3,rep,name=mods,proto3" json:"mods,omitempty"`
+	Unresolved    []uint64        `protobuf:"varint,4,rep,packed,name=unresolved,proto3" json:"unresolved,omitempty"`
+	Created       bool            `protobuf:"varint,5,opt,name=created,proto3" json:"created,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PublishCollectionResponse) Reset() {
+	*x = PublishCollectionResponse{}
+	mi := &file_sync_v1_sync_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublishCollectionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublishCollectionResponse) ProtoMessage() {}
+
+func (x *PublishCollectionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublishCollectionResponse.ProtoReflect.Descriptor instead.
+func (*PublishCollectionResponse) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *PublishCollectionResponse) GetCollectionId() uint64 {
+	if x != nil {
+		return x.CollectionId
+	}
+	return 0
+}
+
+func (x *PublishCollectionResponse) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *PublishCollectionResponse) GetMods() []*WorkshopItem {
+	if x != nil {
+		return x.Mods
+	}
+	return nil
+}
+
+func (x *PublishCollectionResponse) GetUnresolved() []uint64 {
+	if x != nil {
+		return x.Unresolved
+	}
+	return nil
+}
+
+func (x *PublishCollectionResponse) GetCreated() bool {
+	if x != nil {
+		return x.Created
+	}
+	return false
+}
+
+type DeleteCollectionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CollectionId  uint64                 `protobuf:"varint,1,opt,name=collection_id,json=collectionId,proto3" json:"collection_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteCollectionRequest) Reset() {
+	*x = DeleteCollectionRequest{}
+	mi := &file_sync_v1_sync_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteCollectionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteCollectionRequest) ProtoMessage() {}
+
+func (x *DeleteCollectionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteCollectionRequest.ProtoReflect.Descriptor instead.
+func (*DeleteCollectionRequest) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *DeleteCollectionRequest) GetCollectionId() uint64 {
+	if x != nil {
+		return x.CollectionId
+	}
+	return 0
+}
+
+type DeleteCollectionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteCollectionResponse) Reset() {
+	*x = DeleteCollectionResponse{}
+	mi := &file_sync_v1_sync_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteCollectionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteCollectionResponse) ProtoMessage() {}
+
+func (x *DeleteCollectionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_v1_sync_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteCollectionResponse.ProtoReflect.Descriptor instead.
+func (*DeleteCollectionResponse) Descriptor() ([]byte, []int) {
+	return file_sync_v1_sync_proto_rawDescGZIP(), []int{39}
+}
+
 var File_sync_v1_sync_proto protoreflect.FileDescriptor
 
 const file_sync_v1_sync_proto_rawDesc = "" +
@@ -1377,7 +2138,70 @@ const file_sync_v1_sync_proto_rawDesc = "" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\"O\n" +
 	"\x13PollQrLoginResponse\x12\x1c\n" +
 	"\tconfirmed\x18\x01 \x01(\bR\tconfirmed\x12\x1a\n" +
-	"\busername\x18\x02 \x01(\tR\busername2\xa0\b\n" +
+	"\busername\x18\x02 \x01(\tR\busername\"Q\n" +
+	"\fWorkshopItem\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x14\n" +
+	"\x05title\x18\x02 \x01(\tR\x05title\x12\x1b\n" +
+	"\tfile_size\x18\x03 \x01(\x04R\bfileSize\"B\n" +
+	"\x1bResolveWorkshopItemsRequest\x12#\n" +
+	"\rcandidate_ids\x18\x01 \x03(\x04R\fcandidateIds\"i\n" +
+	"\x1cResolveWorkshopItemsResponse\x12)\n" +
+	"\x04mods\x18\x01 \x03(\v2\x15.sync.v1.WorkshopItemR\x04mods\x12\x1e\n" +
+	"\n" +
+	"unresolved\x18\x02 \x03(\x04R\n" +
+	"unresolved\"\x1d\n" +
+	"\x1bListOwnedCollectionsRequest\"\xc4\x01\n" +
+	"\x11CollectionSummary\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x14\n" +
+	"\x05title\x18\x02 \x01(\tR\x05title\x12=\n" +
+	"\n" +
+	"visibility\x18\x03 \x01(\x0e2\x1d.sync.v1.CollectionVisibilityR\n" +
+	"visibility\x12\x1d\n" +
+	"\n" +
+	"item_count\x18\x04 \x01(\rR\titemCount\x12+\n" +
+	"\x12updated_at_unix_ms\x18\x05 \x01(\x03R\x0fupdatedAtUnixMs\"\\\n" +
+	"\x1cListOwnedCollectionsResponse\x12<\n" +
+	"\vcollections\x18\x01 \x03(\v2\x1a.sync.v1.CollectionSummaryR\vcollections\";\n" +
+	"\x14GetCollectionRequest\x12#\n" +
+	"\rcollection_id\x18\x01 \x01(\x04R\fcollectionId\"\xac\x02\n" +
+	"\x15GetCollectionResponse\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x14\n" +
+	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12=\n" +
+	"\n" +
+	"visibility\x18\x04 \x01(\x0e2\x1d.sync.v1.CollectionVisibilityR\n" +
+	"visibility\x12\x14\n" +
+	"\x05owned\x18\x05 \x01(\bR\x05owned\x12+\n" +
+	"\x12updated_at_unix_ms\x18\x06 \x01(\x03R\x0fupdatedAtUnixMs\x12)\n" +
+	"\x04mods\x18\a \x03(\v2\x15.sync.v1.WorkshopItemR\x04mods\x12\x1e\n" +
+	"\n" +
+	"unresolved\x18\b \x03(\x04R\n" +
+	"unresolved\"\xdb\x01\n" +
+	"\x18PublishCollectionRequest\x12#\n" +
+	"\rcollection_id\x18\x01 \x01(\x04R\fcollectionId\x12\x14\n" +
+	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12=\n" +
+	"\n" +
+	"visibility\x18\x04 \x01(\x0e2\x1d.sync.v1.CollectionVisibilityR\n" +
+	"visibility\x12#\n" +
+	"\rcandidate_ids\x18\x05 \x03(\x04R\fcandidateIds\"\xb7\x01\n" +
+	"\x19PublishCollectionResponse\x12#\n" +
+	"\rcollection_id\x18\x01 \x01(\x04R\fcollectionId\x12\x10\n" +
+	"\x03url\x18\x02 \x01(\tR\x03url\x12)\n" +
+	"\x04mods\x18\x03 \x03(\v2\x15.sync.v1.WorkshopItemR\x04mods\x12\x1e\n" +
+	"\n" +
+	"unresolved\x18\x04 \x03(\x04R\n" +
+	"unresolved\x12\x18\n" +
+	"\acreated\x18\x05 \x01(\bR\acreated\">\n" +
+	"\x17DeleteCollectionRequest\x12#\n" +
+	"\rcollection_id\x18\x01 \x01(\x04R\fcollectionId\"\x1a\n" +
+	"\x18DeleteCollectionResponse*\xce\x01\n" +
+	"\x14CollectionVisibility\x12%\n" +
+	"!COLLECTION_VISIBILITY_UNSPECIFIED\x10\x00\x12 \n" +
+	"\x1cCOLLECTION_VISIBILITY_PUBLIC\x10\x01\x12&\n" +
+	"\"COLLECTION_VISIBILITY_FRIENDS_ONLY\x10\x02\x12!\n" +
+	"\x1dCOLLECTION_VISIBILITY_PRIVATE\x10\x03\x12\"\n" +
+	"\x1eCOLLECTION_VISIBILITY_UNLISTED\x10\x042\xef\v\n" +
 	"\vSyncService\x12Q\n" +
 	"\x0eRegisterSource\x12\x1e.sync.v1.RegisterSourceRequest\x1a\x1f.sync.v1.RegisterSourceResponse\x12W\n" +
 	"\x10DeregisterSource\x12 .sync.v1.DeregisterSourceRequest\x1a!.sync.v1.DeregisterSourceResponse\x12H\n" +
@@ -1391,7 +2215,12 @@ const file_sync_v1_sync_proto_rawDesc = "" +
 	"\x10RefreshSteamAuth\x12 .sync.v1.RefreshSteamAuthRequest\x1a!.sync.v1.RefreshSteamAuthResponse\x12K\n" +
 	"\fBeginQrLogin\x12\x1c.sync.v1.BeginQrLoginRequest\x1a\x1d.sync.v1.BeginQrLoginResponse\x12H\n" +
 	"\vPollQrLogin\x12\x1b.sync.v1.PollQrLoginRequest\x1a\x1c.sync.v1.PollQrLoginResponse\x12N\n" +
-	"\rGetSyncStatus\x12\x1d.sync.v1.GetSyncStatusRequest\x1a\x1e.sync.v1.GetSyncStatusResponseBBZ@github.com/skua-international/magpie/generated/go/sync/v1;syncv1b\x06proto3"
+	"\rGetSyncStatus\x12\x1d.sync.v1.GetSyncStatusRequest\x1a\x1e.sync.v1.GetSyncStatusResponse\x12c\n" +
+	"\x14ResolveWorkshopItems\x12$.sync.v1.ResolveWorkshopItemsRequest\x1a%.sync.v1.ResolveWorkshopItemsResponse\x12c\n" +
+	"\x14ListOwnedCollections\x12$.sync.v1.ListOwnedCollectionsRequest\x1a%.sync.v1.ListOwnedCollectionsResponse\x12N\n" +
+	"\rGetCollection\x12\x1d.sync.v1.GetCollectionRequest\x1a\x1e.sync.v1.GetCollectionResponse\x12Z\n" +
+	"\x11PublishCollection\x12!.sync.v1.PublishCollectionRequest\x1a\".sync.v1.PublishCollectionResponse\x12W\n" +
+	"\x10DeleteCollection\x12 .sync.v1.DeleteCollectionRequest\x1a!.sync.v1.DeleteCollectionResponseBBZ@github.com/skua-international/magpie/generated/go/sync/v1;syncv1b\x06proto3"
 
 var (
 	file_sync_v1_sync_proto_rawDescOnce sync.Once
@@ -1405,73 +2234,104 @@ func file_sync_v1_sync_proto_rawDescGZIP() []byte {
 	return file_sync_v1_sync_proto_rawDescData
 }
 
-var file_sync_v1_sync_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
+var file_sync_v1_sync_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_sync_v1_sync_proto_msgTypes = make([]protoimpl.MessageInfo, 40)
 var file_sync_v1_sync_proto_goTypes = []any{
-	(*ListSyncedModsRequest)(nil),    // 0: sync.v1.ListSyncedModsRequest
-	(*SyncedMod)(nil),                // 1: sync.v1.SyncedMod
-	(*ListSyncedModsResponse)(nil),   // 2: sync.v1.ListSyncedModsResponse
-	(*GetSyncedModRequest)(nil),      // 3: sync.v1.GetSyncedModRequest
-	(*GetSyncedModResponse)(nil),     // 4: sync.v1.GetSyncedModResponse
-	(*GetSyncStatsRequest)(nil),      // 5: sync.v1.GetSyncStatsRequest
-	(*GetSyncStatsResponse)(nil),     // 6: sync.v1.GetSyncStatsResponse
-	(*RefreshSteamAuthRequest)(nil),  // 7: sync.v1.RefreshSteamAuthRequest
-	(*RefreshSteamAuthResponse)(nil), // 8: sync.v1.RefreshSteamAuthResponse
-	(*InvalidateModRequest)(nil),     // 9: sync.v1.InvalidateModRequest
-	(*InvalidateModResponse)(nil),    // 10: sync.v1.InvalidateModResponse
-	(*RefreshSourceRequest)(nil),     // 11: sync.v1.RefreshSourceRequest
-	(*RefreshSourceResponse)(nil),    // 12: sync.v1.RefreshSourceResponse
-	(*GetSourceModsRequest)(nil),     // 13: sync.v1.GetSourceModsRequest
-	(*GetSourceModsResponse)(nil),    // 14: sync.v1.GetSourceModsResponse
-	(*RegisterSourceRequest)(nil),    // 15: sync.v1.RegisterSourceRequest
-	(*ResolvedMod)(nil),              // 16: sync.v1.ResolvedMod
-	(*RegisterSourceResponse)(nil),   // 17: sync.v1.RegisterSourceResponse
-	(*DeregisterSourceRequest)(nil),  // 18: sync.v1.DeregisterSourceRequest
-	(*DeregisterSourceResponse)(nil), // 19: sync.v1.DeregisterSourceResponse
-	(*SyncContentRequest)(nil),       // 20: sync.v1.SyncContentRequest
-	(*SyncContentResponse)(nil),      // 21: sync.v1.SyncContentResponse
-	(*GetSyncStatusRequest)(nil),     // 22: sync.v1.GetSyncStatusRequest
-	(*GetSyncStatusResponse)(nil),    // 23: sync.v1.GetSyncStatusResponse
-	(*BeginQrLoginRequest)(nil),      // 24: sync.v1.BeginQrLoginRequest
-	(*BeginQrLoginResponse)(nil),     // 25: sync.v1.BeginQrLoginResponse
-	(*PollQrLoginRequest)(nil),       // 26: sync.v1.PollQrLoginRequest
-	(*PollQrLoginResponse)(nil),      // 27: sync.v1.PollQrLoginResponse
+	(CollectionVisibility)(0),            // 0: sync.v1.CollectionVisibility
+	(*ListSyncedModsRequest)(nil),        // 1: sync.v1.ListSyncedModsRequest
+	(*SyncedMod)(nil),                    // 2: sync.v1.SyncedMod
+	(*ListSyncedModsResponse)(nil),       // 3: sync.v1.ListSyncedModsResponse
+	(*GetSyncedModRequest)(nil),          // 4: sync.v1.GetSyncedModRequest
+	(*GetSyncedModResponse)(nil),         // 5: sync.v1.GetSyncedModResponse
+	(*GetSyncStatsRequest)(nil),          // 6: sync.v1.GetSyncStatsRequest
+	(*GetSyncStatsResponse)(nil),         // 7: sync.v1.GetSyncStatsResponse
+	(*RefreshSteamAuthRequest)(nil),      // 8: sync.v1.RefreshSteamAuthRequest
+	(*RefreshSteamAuthResponse)(nil),     // 9: sync.v1.RefreshSteamAuthResponse
+	(*InvalidateModRequest)(nil),         // 10: sync.v1.InvalidateModRequest
+	(*InvalidateModResponse)(nil),        // 11: sync.v1.InvalidateModResponse
+	(*RefreshSourceRequest)(nil),         // 12: sync.v1.RefreshSourceRequest
+	(*RefreshSourceResponse)(nil),        // 13: sync.v1.RefreshSourceResponse
+	(*GetSourceModsRequest)(nil),         // 14: sync.v1.GetSourceModsRequest
+	(*GetSourceModsResponse)(nil),        // 15: sync.v1.GetSourceModsResponse
+	(*RegisterSourceRequest)(nil),        // 16: sync.v1.RegisterSourceRequest
+	(*ResolvedMod)(nil),                  // 17: sync.v1.ResolvedMod
+	(*RegisterSourceResponse)(nil),       // 18: sync.v1.RegisterSourceResponse
+	(*DeregisterSourceRequest)(nil),      // 19: sync.v1.DeregisterSourceRequest
+	(*DeregisterSourceResponse)(nil),     // 20: sync.v1.DeregisterSourceResponse
+	(*SyncContentRequest)(nil),           // 21: sync.v1.SyncContentRequest
+	(*SyncContentResponse)(nil),          // 22: sync.v1.SyncContentResponse
+	(*GetSyncStatusRequest)(nil),         // 23: sync.v1.GetSyncStatusRequest
+	(*GetSyncStatusResponse)(nil),        // 24: sync.v1.GetSyncStatusResponse
+	(*BeginQrLoginRequest)(nil),          // 25: sync.v1.BeginQrLoginRequest
+	(*BeginQrLoginResponse)(nil),         // 26: sync.v1.BeginQrLoginResponse
+	(*PollQrLoginRequest)(nil),           // 27: sync.v1.PollQrLoginRequest
+	(*PollQrLoginResponse)(nil),          // 28: sync.v1.PollQrLoginResponse
+	(*WorkshopItem)(nil),                 // 29: sync.v1.WorkshopItem
+	(*ResolveWorkshopItemsRequest)(nil),  // 30: sync.v1.ResolveWorkshopItemsRequest
+	(*ResolveWorkshopItemsResponse)(nil), // 31: sync.v1.ResolveWorkshopItemsResponse
+	(*ListOwnedCollectionsRequest)(nil),  // 32: sync.v1.ListOwnedCollectionsRequest
+	(*CollectionSummary)(nil),            // 33: sync.v1.CollectionSummary
+	(*ListOwnedCollectionsResponse)(nil), // 34: sync.v1.ListOwnedCollectionsResponse
+	(*GetCollectionRequest)(nil),         // 35: sync.v1.GetCollectionRequest
+	(*GetCollectionResponse)(nil),        // 36: sync.v1.GetCollectionResponse
+	(*PublishCollectionRequest)(nil),     // 37: sync.v1.PublishCollectionRequest
+	(*PublishCollectionResponse)(nil),    // 38: sync.v1.PublishCollectionResponse
+	(*DeleteCollectionRequest)(nil),      // 39: sync.v1.DeleteCollectionRequest
+	(*DeleteCollectionResponse)(nil),     // 40: sync.v1.DeleteCollectionResponse
 }
 var file_sync_v1_sync_proto_depIdxs = []int32{
-	1,  // 0: sync.v1.ListSyncedModsResponse.mods:type_name -> sync.v1.SyncedMod
-	1,  // 1: sync.v1.GetSyncedModResponse.mod:type_name -> sync.v1.SyncedMod
-	16, // 2: sync.v1.RefreshSourceResponse.mods:type_name -> sync.v1.ResolvedMod
-	16, // 3: sync.v1.RegisterSourceResponse.mods:type_name -> sync.v1.ResolvedMod
-	15, // 4: sync.v1.SyncService.RegisterSource:input_type -> sync.v1.RegisterSourceRequest
-	18, // 5: sync.v1.SyncService.DeregisterSource:input_type -> sync.v1.DeregisterSourceRequest
-	20, // 6: sync.v1.SyncService.SyncContent:input_type -> sync.v1.SyncContentRequest
-	13, // 7: sync.v1.SyncService.GetSourceMods:input_type -> sync.v1.GetSourceModsRequest
-	11, // 8: sync.v1.SyncService.RefreshSource:input_type -> sync.v1.RefreshSourceRequest
-	0,  // 9: sync.v1.SyncService.ListSyncedMods:input_type -> sync.v1.ListSyncedModsRequest
-	9,  // 10: sync.v1.SyncService.InvalidateMod:input_type -> sync.v1.InvalidateModRequest
-	3,  // 11: sync.v1.SyncService.GetSyncedMod:input_type -> sync.v1.GetSyncedModRequest
-	5,  // 12: sync.v1.SyncService.GetSyncStats:input_type -> sync.v1.GetSyncStatsRequest
-	7,  // 13: sync.v1.SyncService.RefreshSteamAuth:input_type -> sync.v1.RefreshSteamAuthRequest
-	24, // 14: sync.v1.SyncService.BeginQrLogin:input_type -> sync.v1.BeginQrLoginRequest
-	26, // 15: sync.v1.SyncService.PollQrLogin:input_type -> sync.v1.PollQrLoginRequest
-	22, // 16: sync.v1.SyncService.GetSyncStatus:input_type -> sync.v1.GetSyncStatusRequest
-	17, // 17: sync.v1.SyncService.RegisterSource:output_type -> sync.v1.RegisterSourceResponse
-	19, // 18: sync.v1.SyncService.DeregisterSource:output_type -> sync.v1.DeregisterSourceResponse
-	21, // 19: sync.v1.SyncService.SyncContent:output_type -> sync.v1.SyncContentResponse
-	14, // 20: sync.v1.SyncService.GetSourceMods:output_type -> sync.v1.GetSourceModsResponse
-	12, // 21: sync.v1.SyncService.RefreshSource:output_type -> sync.v1.RefreshSourceResponse
-	2,  // 22: sync.v1.SyncService.ListSyncedMods:output_type -> sync.v1.ListSyncedModsResponse
-	10, // 23: sync.v1.SyncService.InvalidateMod:output_type -> sync.v1.InvalidateModResponse
-	4,  // 24: sync.v1.SyncService.GetSyncedMod:output_type -> sync.v1.GetSyncedModResponse
-	6,  // 25: sync.v1.SyncService.GetSyncStats:output_type -> sync.v1.GetSyncStatsResponse
-	8,  // 26: sync.v1.SyncService.RefreshSteamAuth:output_type -> sync.v1.RefreshSteamAuthResponse
-	25, // 27: sync.v1.SyncService.BeginQrLogin:output_type -> sync.v1.BeginQrLoginResponse
-	27, // 28: sync.v1.SyncService.PollQrLogin:output_type -> sync.v1.PollQrLoginResponse
-	23, // 29: sync.v1.SyncService.GetSyncStatus:output_type -> sync.v1.GetSyncStatusResponse
-	17, // [17:30] is the sub-list for method output_type
-	4,  // [4:17] is the sub-list for method input_type
-	4,  // [4:4] is the sub-list for extension type_name
-	4,  // [4:4] is the sub-list for extension extendee
-	0,  // [0:4] is the sub-list for field type_name
+	2,  // 0: sync.v1.ListSyncedModsResponse.mods:type_name -> sync.v1.SyncedMod
+	2,  // 1: sync.v1.GetSyncedModResponse.mod:type_name -> sync.v1.SyncedMod
+	17, // 2: sync.v1.RefreshSourceResponse.mods:type_name -> sync.v1.ResolvedMod
+	17, // 3: sync.v1.RegisterSourceResponse.mods:type_name -> sync.v1.ResolvedMod
+	29, // 4: sync.v1.ResolveWorkshopItemsResponse.mods:type_name -> sync.v1.WorkshopItem
+	0,  // 5: sync.v1.CollectionSummary.visibility:type_name -> sync.v1.CollectionVisibility
+	33, // 6: sync.v1.ListOwnedCollectionsResponse.collections:type_name -> sync.v1.CollectionSummary
+	0,  // 7: sync.v1.GetCollectionResponse.visibility:type_name -> sync.v1.CollectionVisibility
+	29, // 8: sync.v1.GetCollectionResponse.mods:type_name -> sync.v1.WorkshopItem
+	0,  // 9: sync.v1.PublishCollectionRequest.visibility:type_name -> sync.v1.CollectionVisibility
+	29, // 10: sync.v1.PublishCollectionResponse.mods:type_name -> sync.v1.WorkshopItem
+	16, // 11: sync.v1.SyncService.RegisterSource:input_type -> sync.v1.RegisterSourceRequest
+	19, // 12: sync.v1.SyncService.DeregisterSource:input_type -> sync.v1.DeregisterSourceRequest
+	21, // 13: sync.v1.SyncService.SyncContent:input_type -> sync.v1.SyncContentRequest
+	14, // 14: sync.v1.SyncService.GetSourceMods:input_type -> sync.v1.GetSourceModsRequest
+	12, // 15: sync.v1.SyncService.RefreshSource:input_type -> sync.v1.RefreshSourceRequest
+	1,  // 16: sync.v1.SyncService.ListSyncedMods:input_type -> sync.v1.ListSyncedModsRequest
+	10, // 17: sync.v1.SyncService.InvalidateMod:input_type -> sync.v1.InvalidateModRequest
+	4,  // 18: sync.v1.SyncService.GetSyncedMod:input_type -> sync.v1.GetSyncedModRequest
+	6,  // 19: sync.v1.SyncService.GetSyncStats:input_type -> sync.v1.GetSyncStatsRequest
+	8,  // 20: sync.v1.SyncService.RefreshSteamAuth:input_type -> sync.v1.RefreshSteamAuthRequest
+	25, // 21: sync.v1.SyncService.BeginQrLogin:input_type -> sync.v1.BeginQrLoginRequest
+	27, // 22: sync.v1.SyncService.PollQrLogin:input_type -> sync.v1.PollQrLoginRequest
+	23, // 23: sync.v1.SyncService.GetSyncStatus:input_type -> sync.v1.GetSyncStatusRequest
+	30, // 24: sync.v1.SyncService.ResolveWorkshopItems:input_type -> sync.v1.ResolveWorkshopItemsRequest
+	32, // 25: sync.v1.SyncService.ListOwnedCollections:input_type -> sync.v1.ListOwnedCollectionsRequest
+	35, // 26: sync.v1.SyncService.GetCollection:input_type -> sync.v1.GetCollectionRequest
+	37, // 27: sync.v1.SyncService.PublishCollection:input_type -> sync.v1.PublishCollectionRequest
+	39, // 28: sync.v1.SyncService.DeleteCollection:input_type -> sync.v1.DeleteCollectionRequest
+	18, // 29: sync.v1.SyncService.RegisterSource:output_type -> sync.v1.RegisterSourceResponse
+	20, // 30: sync.v1.SyncService.DeregisterSource:output_type -> sync.v1.DeregisterSourceResponse
+	22, // 31: sync.v1.SyncService.SyncContent:output_type -> sync.v1.SyncContentResponse
+	15, // 32: sync.v1.SyncService.GetSourceMods:output_type -> sync.v1.GetSourceModsResponse
+	13, // 33: sync.v1.SyncService.RefreshSource:output_type -> sync.v1.RefreshSourceResponse
+	3,  // 34: sync.v1.SyncService.ListSyncedMods:output_type -> sync.v1.ListSyncedModsResponse
+	11, // 35: sync.v1.SyncService.InvalidateMod:output_type -> sync.v1.InvalidateModResponse
+	5,  // 36: sync.v1.SyncService.GetSyncedMod:output_type -> sync.v1.GetSyncedModResponse
+	7,  // 37: sync.v1.SyncService.GetSyncStats:output_type -> sync.v1.GetSyncStatsResponse
+	9,  // 38: sync.v1.SyncService.RefreshSteamAuth:output_type -> sync.v1.RefreshSteamAuthResponse
+	26, // 39: sync.v1.SyncService.BeginQrLogin:output_type -> sync.v1.BeginQrLoginResponse
+	28, // 40: sync.v1.SyncService.PollQrLogin:output_type -> sync.v1.PollQrLoginResponse
+	24, // 41: sync.v1.SyncService.GetSyncStatus:output_type -> sync.v1.GetSyncStatusResponse
+	31, // 42: sync.v1.SyncService.ResolveWorkshopItems:output_type -> sync.v1.ResolveWorkshopItemsResponse
+	34, // 43: sync.v1.SyncService.ListOwnedCollections:output_type -> sync.v1.ListOwnedCollectionsResponse
+	36, // 44: sync.v1.SyncService.GetCollection:output_type -> sync.v1.GetCollectionResponse
+	38, // 45: sync.v1.SyncService.PublishCollection:output_type -> sync.v1.PublishCollectionResponse
+	40, // 46: sync.v1.SyncService.DeleteCollection:output_type -> sync.v1.DeleteCollectionResponse
+	29, // [29:47] is the sub-list for method output_type
+	11, // [11:29] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_sync_v1_sync_proto_init() }
@@ -1485,13 +2345,14 @@ func file_sync_v1_sync_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sync_v1_sync_proto_rawDesc), len(file_sync_v1_sync_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   28,
+			NumEnums:      1,
+			NumMessages:   40,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_sync_v1_sync_proto_goTypes,
 		DependencyIndexes: file_sync_v1_sync_proto_depIdxs,
+		EnumInfos:         file_sync_v1_sync_proto_enumTypes,
 		MessageInfos:      file_sync_v1_sync_proto_msgTypes,
 	}.Build()
 	File_sync_v1_sync_proto = out.File

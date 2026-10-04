@@ -2,12 +2,16 @@
 //! `SyncService`, used only by the reconciler -- the controller never talks
 //! to Steam itself, only in terms of candidate/resolved mod IDs.
 
+use connectrpc::ConnectError;
 use connectrpc::client::{ClientConfig, HttpClient};
 use protocol::proto::sync::v1::{
-    BeginQrLoginRequest, DeregisterSourceRequest, GetSourceModsRequest, GetSyncStatsRequest,
-    GetSyncStatusRequest, GetSyncedModRequest, InvalidateModRequest, ListSyncedModsRequest,
-    PollQrLoginRequest, RefreshSourceRequest, RefreshSteamAuthRequest, RegisterSourceRequest,
-    SyncContentRequest, SyncServiceClient,
+    BeginQrLoginRequest, DeleteCollectionRequest, DeregisterSourceRequest, GetCollectionRequest,
+    GetCollectionResponse, GetSourceModsRequest, GetSyncStatsRequest, GetSyncStatusRequest,
+    GetSyncedModRequest, InvalidateModRequest, ListOwnedCollectionsRequest,
+    ListOwnedCollectionsResponse, ListSyncedModsRequest, PollQrLoginRequest,
+    PublishCollectionRequest, PublishCollectionResponse, RefreshSourceRequest,
+    RefreshSteamAuthRequest, RegisterSourceRequest, ResolveWorkshopItemsRequest,
+    ResolveWorkshopItemsResponse, SyncContentRequest, SyncServiceClient,
 };
 
 pub struct SyncClient {
@@ -69,6 +73,75 @@ impl SyncClient {
             mod_ids: view.mods.iter().map(|m| m.mod_id).collect(),
             root_title: view.root_title.to_string(),
         })
+    }
+
+    // Workshop collections. Unlike the rest of this client these hand
+    // back sync-daemon's own response messages and keep its ConnectError
+    // as-is: registry relays them nearly field for field, and keeping the
+    // error code is what lets an invalid_argument from sync-daemon reach
+    // the browser as one rather than as a generic internal error.
+
+    /// Resolve `candidate_ids` into the flat, ordered list a collection
+    /// would hold. Registers nothing.
+    pub async fn resolve_workshop_items(
+        &self,
+        candidate_ids: &[u64],
+    ) -> Result<ResolveWorkshopItemsResponse, ConnectError> {
+        Ok(self
+            .inner
+            .resolve_workshop_items(ResolveWorkshopItemsRequest {
+                candidate_ids: candidate_ids.to_vec(),
+                ..Default::default()
+            })
+            .await?
+            .into_owned())
+    }
+
+    pub async fn list_owned_collections(
+        &self,
+    ) -> Result<ListOwnedCollectionsResponse, ConnectError> {
+        Ok(self
+            .inner
+            .list_owned_collections(ListOwnedCollectionsRequest::default())
+            .await?
+            .into_owned())
+    }
+
+    pub async fn get_collection(
+        &self,
+        collection_id: u64,
+    ) -> Result<GetCollectionResponse, ConnectError> {
+        Ok(self
+            .inner
+            .get_collection(GetCollectionRequest {
+                collection_id,
+                ..Default::default()
+            })
+            .await?
+            .into_owned())
+    }
+
+    /// Publish a new collection (`request.collection_id == 0`) or replace
+    /// an owned one. Taken as the request message itself: every field is
+    /// the caller's to choose, visibility included -- sync-daemon rejects
+    /// UNSPECIFIED rather than defaulting it. Registers nothing: a
+    /// collection made here is not a mod source until someone calls
+    /// `register_source` for it.
+    pub async fn publish_collection(
+        &self,
+        request: PublishCollectionRequest,
+    ) -> Result<PublishCollectionResponse, ConnectError> {
+        Ok(self.inner.publish_collection(request).await?.into_owned())
+    }
+
+    pub async fn delete_collection(&self, collection_id: u64) -> Result<(), ConnectError> {
+        self.inner
+            .delete_collection(DeleteCollectionRequest {
+                collection_id,
+                ..Default::default()
+            })
+            .await?;
+        Ok(())
     }
 
     /// Read `source_id`'s currently resolved mod list, no Steam calls

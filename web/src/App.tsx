@@ -12,6 +12,7 @@ import { Banner, Button } from "./components/ui";
 import { Access } from "./pages/Access";
 import { Account } from "./pages/Account";
 import { Cluster } from "./pages/Cluster";
+import { Collections } from "./pages/Collections";
 import { Missions } from "./pages/Missions";
 import { Secrets } from "./pages/Secrets";
 import { ModSources } from "./pages/ModSources";
@@ -26,6 +27,7 @@ import { Servers } from "./pages/Servers";
 const TABS = {
   servers: { label: "Servers", render: () => <Servers /> },
   mods: { label: "Mod sources", render: () => <ModSources /> },
+  collections: { label: "Collections", render: () => <Collections /> },
   missions: { label: "Missions", render: () => <Missions /> },
   access: { label: "Access", render: () => <Access /> },
   secrets: { label: "Secrets", render: () => <Secrets /> },

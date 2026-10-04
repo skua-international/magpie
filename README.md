@@ -273,7 +273,19 @@ magpie_servers_total{phase=~"failed|pending"} > 0
 
 `gateway` serves a browser UI at `https://<ingress.host>.<ingress.baseDomain>/ui` — the same single public host everything else uses, so there's no extra hostname, DNS record or certificate to arrange. It ships inside the `gateway` image; nothing to install or enable.
 
-It covers what `magpiectl` does — servers (create, start/stop, resync, edit mod sources, logs, health), mod sources (Steam URL, preset HTML, local zip upload), missions, the Steam session — plus two things the CLI has no equivalent for: **access control**, assigning scopes per person, and **secrets** in the user-secrets namespace.
+It covers what `magpiectl` does — servers (create, start/stop, resync, edit mod sources, logs, health), mod sources (Steam URL, preset HTML, local zip upload), missions, the Steam session — plus three things the CLI has no equivalent for: **access control**, assigning scopes per person, **secrets** in the user-secrets namespace, and **Workshop collections**.
+
+### Workshop collections
+
+The Collections tab turns an Arma 3 Launcher preset export into a Steam Workshop collection published by the cluster's own Steam account (the one `refresh-steam-auth` signed in), so players get one link to subscribe to instead of a file to import. Import the preset, remove or add mods by Workshop link, pick a visibility (unlisted by default — shareable by link, not in public search), and publish. Collections the account has published are listed there to edit or delete later; a collection pasted in by link is flattened into its mods, so copying someone else's collection into a new one works the same way.
+
+This goes the opposite direction from mod sources and touches nothing in the cluster: publishing a collection doesn't sync it, and a collection only becomes a mod source if you add its link as one. Every collection RPC needs `admin:steam-auth`, the same scope as the Steam login itself, since they act as that account.
+
+The Steam calls behind it can be checked against a real account without deploying anything — this publishes a private collection, edits it, and deletes it again:
+
+```bash
+STEAM_USER=... STEAM_REFRESH_TOKEN=... cargo run -p steam-sync --example collection_probe
+```
 
 Sign in with the same providers `magpiectl` uses. Only providers you've actually configured are offered (Steam always is — it needs no app registration), so the buttons match what will really work.
 

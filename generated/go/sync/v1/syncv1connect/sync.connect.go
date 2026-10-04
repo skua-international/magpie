@@ -70,6 +70,21 @@ const (
 	// SyncServiceGetSyncStatusProcedure is the fully-qualified name of the SyncService's GetSyncStatus
 	// RPC.
 	SyncServiceGetSyncStatusProcedure = "/sync.v1.SyncService/GetSyncStatus"
+	// SyncServiceResolveWorkshopItemsProcedure is the fully-qualified name of the SyncService's
+	// ResolveWorkshopItems RPC.
+	SyncServiceResolveWorkshopItemsProcedure = "/sync.v1.SyncService/ResolveWorkshopItems"
+	// SyncServiceListOwnedCollectionsProcedure is the fully-qualified name of the SyncService's
+	// ListOwnedCollections RPC.
+	SyncServiceListOwnedCollectionsProcedure = "/sync.v1.SyncService/ListOwnedCollections"
+	// SyncServiceGetCollectionProcedure is the fully-qualified name of the SyncService's GetCollection
+	// RPC.
+	SyncServiceGetCollectionProcedure = "/sync.v1.SyncService/GetCollection"
+	// SyncServicePublishCollectionProcedure is the fully-qualified name of the SyncService's
+	// PublishCollection RPC.
+	SyncServicePublishCollectionProcedure = "/sync.v1.SyncService/PublishCollection"
+	// SyncServiceDeleteCollectionProcedure is the fully-qualified name of the SyncService's
+	// DeleteCollection RPC.
+	SyncServiceDeleteCollectionProcedure = "/sync.v1.SyncService/DeleteCollection"
 )
 
 // SyncServiceClient is a client for the sync.v1.SyncService service.
@@ -169,6 +184,26 @@ type SyncServiceClient interface {
 	// currently touching them, this reports the one boolean the controller
 	// actually needs to gate on.
 	GetSyncStatus(context.Context, *connect.Request[v1.GetSyncStatusRequest]) (*connect.Response[v1.GetSyncStatusResponse], error)
+	// Steam Workshop collections owned by this cluster's own Steam
+	// account.
+	//
+	// The reverse direction from everything else here: these push content
+	// *to* Steam rather than pulling it down, and deliberately touch
+	// neither the golden content tree nor the source registry -- a
+	// collection published this way is not thereby a registered mod source,
+	// and nothing starts syncing because of it. Registering one is a
+	// separate, explicit RegisterSource call.
+	//
+	// Resolution reuses the same authenticated expansion RegisterSource
+	// does, so a candidate that is itself a collection is flattened into
+	// its members rather than nested -- Arma cares about the mod list, and
+	// a collection-of-collections resolves differently for a subscriber
+	// than the preset it came from did.
+	ResolveWorkshopItems(context.Context, *connect.Request[v1.ResolveWorkshopItemsRequest]) (*connect.Response[v1.ResolveWorkshopItemsResponse], error)
+	ListOwnedCollections(context.Context, *connect.Request[v1.ListOwnedCollectionsRequest]) (*connect.Response[v1.ListOwnedCollectionsResponse], error)
+	GetCollection(context.Context, *connect.Request[v1.GetCollectionRequest]) (*connect.Response[v1.GetCollectionResponse], error)
+	PublishCollection(context.Context, *connect.Request[v1.PublishCollectionRequest]) (*connect.Response[v1.PublishCollectionResponse], error)
+	DeleteCollection(context.Context, *connect.Request[v1.DeleteCollectionRequest]) (*connect.Response[v1.DeleteCollectionResponse], error)
 }
 
 // NewSyncServiceClient constructs a client for the sync.v1.SyncService service. By default, it uses
@@ -260,24 +295,59 @@ func NewSyncServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(syncServiceMethods.ByName("GetSyncStatus")),
 			connect.WithClientOptions(opts...),
 		),
+		resolveWorkshopItems: connect.NewClient[v1.ResolveWorkshopItemsRequest, v1.ResolveWorkshopItemsResponse](
+			httpClient,
+			baseURL+SyncServiceResolveWorkshopItemsProcedure,
+			connect.WithSchema(syncServiceMethods.ByName("ResolveWorkshopItems")),
+			connect.WithClientOptions(opts...),
+		),
+		listOwnedCollections: connect.NewClient[v1.ListOwnedCollectionsRequest, v1.ListOwnedCollectionsResponse](
+			httpClient,
+			baseURL+SyncServiceListOwnedCollectionsProcedure,
+			connect.WithSchema(syncServiceMethods.ByName("ListOwnedCollections")),
+			connect.WithClientOptions(opts...),
+		),
+		getCollection: connect.NewClient[v1.GetCollectionRequest, v1.GetCollectionResponse](
+			httpClient,
+			baseURL+SyncServiceGetCollectionProcedure,
+			connect.WithSchema(syncServiceMethods.ByName("GetCollection")),
+			connect.WithClientOptions(opts...),
+		),
+		publishCollection: connect.NewClient[v1.PublishCollectionRequest, v1.PublishCollectionResponse](
+			httpClient,
+			baseURL+SyncServicePublishCollectionProcedure,
+			connect.WithSchema(syncServiceMethods.ByName("PublishCollection")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteCollection: connect.NewClient[v1.DeleteCollectionRequest, v1.DeleteCollectionResponse](
+			httpClient,
+			baseURL+SyncServiceDeleteCollectionProcedure,
+			connect.WithSchema(syncServiceMethods.ByName("DeleteCollection")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // syncServiceClient implements SyncServiceClient.
 type syncServiceClient struct {
-	registerSource   *connect.Client[v1.RegisterSourceRequest, v1.RegisterSourceResponse]
-	deregisterSource *connect.Client[v1.DeregisterSourceRequest, v1.DeregisterSourceResponse]
-	syncContent      *connect.Client[v1.SyncContentRequest, v1.SyncContentResponse]
-	getSourceMods    *connect.Client[v1.GetSourceModsRequest, v1.GetSourceModsResponse]
-	refreshSource    *connect.Client[v1.RefreshSourceRequest, v1.RefreshSourceResponse]
-	listSyncedMods   *connect.Client[v1.ListSyncedModsRequest, v1.ListSyncedModsResponse]
-	invalidateMod    *connect.Client[v1.InvalidateModRequest, v1.InvalidateModResponse]
-	getSyncedMod     *connect.Client[v1.GetSyncedModRequest, v1.GetSyncedModResponse]
-	getSyncStats     *connect.Client[v1.GetSyncStatsRequest, v1.GetSyncStatsResponse]
-	refreshSteamAuth *connect.Client[v1.RefreshSteamAuthRequest, v1.RefreshSteamAuthResponse]
-	beginQrLogin     *connect.Client[v1.BeginQrLoginRequest, v1.BeginQrLoginResponse]
-	pollQrLogin      *connect.Client[v1.PollQrLoginRequest, v1.PollQrLoginResponse]
-	getSyncStatus    *connect.Client[v1.GetSyncStatusRequest, v1.GetSyncStatusResponse]
+	registerSource       *connect.Client[v1.RegisterSourceRequest, v1.RegisterSourceResponse]
+	deregisterSource     *connect.Client[v1.DeregisterSourceRequest, v1.DeregisterSourceResponse]
+	syncContent          *connect.Client[v1.SyncContentRequest, v1.SyncContentResponse]
+	getSourceMods        *connect.Client[v1.GetSourceModsRequest, v1.GetSourceModsResponse]
+	refreshSource        *connect.Client[v1.RefreshSourceRequest, v1.RefreshSourceResponse]
+	listSyncedMods       *connect.Client[v1.ListSyncedModsRequest, v1.ListSyncedModsResponse]
+	invalidateMod        *connect.Client[v1.InvalidateModRequest, v1.InvalidateModResponse]
+	getSyncedMod         *connect.Client[v1.GetSyncedModRequest, v1.GetSyncedModResponse]
+	getSyncStats         *connect.Client[v1.GetSyncStatsRequest, v1.GetSyncStatsResponse]
+	refreshSteamAuth     *connect.Client[v1.RefreshSteamAuthRequest, v1.RefreshSteamAuthResponse]
+	beginQrLogin         *connect.Client[v1.BeginQrLoginRequest, v1.BeginQrLoginResponse]
+	pollQrLogin          *connect.Client[v1.PollQrLoginRequest, v1.PollQrLoginResponse]
+	getSyncStatus        *connect.Client[v1.GetSyncStatusRequest, v1.GetSyncStatusResponse]
+	resolveWorkshopItems *connect.Client[v1.ResolveWorkshopItemsRequest, v1.ResolveWorkshopItemsResponse]
+	listOwnedCollections *connect.Client[v1.ListOwnedCollectionsRequest, v1.ListOwnedCollectionsResponse]
+	getCollection        *connect.Client[v1.GetCollectionRequest, v1.GetCollectionResponse]
+	publishCollection    *connect.Client[v1.PublishCollectionRequest, v1.PublishCollectionResponse]
+	deleteCollection     *connect.Client[v1.DeleteCollectionRequest, v1.DeleteCollectionResponse]
 }
 
 // RegisterSource calls sync.v1.SyncService.RegisterSource.
@@ -343,6 +413,31 @@ func (c *syncServiceClient) PollQrLogin(ctx context.Context, req *connect.Reques
 // GetSyncStatus calls sync.v1.SyncService.GetSyncStatus.
 func (c *syncServiceClient) GetSyncStatus(ctx context.Context, req *connect.Request[v1.GetSyncStatusRequest]) (*connect.Response[v1.GetSyncStatusResponse], error) {
 	return c.getSyncStatus.CallUnary(ctx, req)
+}
+
+// ResolveWorkshopItems calls sync.v1.SyncService.ResolveWorkshopItems.
+func (c *syncServiceClient) ResolveWorkshopItems(ctx context.Context, req *connect.Request[v1.ResolveWorkshopItemsRequest]) (*connect.Response[v1.ResolveWorkshopItemsResponse], error) {
+	return c.resolveWorkshopItems.CallUnary(ctx, req)
+}
+
+// ListOwnedCollections calls sync.v1.SyncService.ListOwnedCollections.
+func (c *syncServiceClient) ListOwnedCollections(ctx context.Context, req *connect.Request[v1.ListOwnedCollectionsRequest]) (*connect.Response[v1.ListOwnedCollectionsResponse], error) {
+	return c.listOwnedCollections.CallUnary(ctx, req)
+}
+
+// GetCollection calls sync.v1.SyncService.GetCollection.
+func (c *syncServiceClient) GetCollection(ctx context.Context, req *connect.Request[v1.GetCollectionRequest]) (*connect.Response[v1.GetCollectionResponse], error) {
+	return c.getCollection.CallUnary(ctx, req)
+}
+
+// PublishCollection calls sync.v1.SyncService.PublishCollection.
+func (c *syncServiceClient) PublishCollection(ctx context.Context, req *connect.Request[v1.PublishCollectionRequest]) (*connect.Response[v1.PublishCollectionResponse], error) {
+	return c.publishCollection.CallUnary(ctx, req)
+}
+
+// DeleteCollection calls sync.v1.SyncService.DeleteCollection.
+func (c *syncServiceClient) DeleteCollection(ctx context.Context, req *connect.Request[v1.DeleteCollectionRequest]) (*connect.Response[v1.DeleteCollectionResponse], error) {
+	return c.deleteCollection.CallUnary(ctx, req)
 }
 
 // SyncServiceHandler is an implementation of the sync.v1.SyncService service.
@@ -442,6 +537,26 @@ type SyncServiceHandler interface {
 	// currently touching them, this reports the one boolean the controller
 	// actually needs to gate on.
 	GetSyncStatus(context.Context, *connect.Request[v1.GetSyncStatusRequest]) (*connect.Response[v1.GetSyncStatusResponse], error)
+	// Steam Workshop collections owned by this cluster's own Steam
+	// account.
+	//
+	// The reverse direction from everything else here: these push content
+	// *to* Steam rather than pulling it down, and deliberately touch
+	// neither the golden content tree nor the source registry -- a
+	// collection published this way is not thereby a registered mod source,
+	// and nothing starts syncing because of it. Registering one is a
+	// separate, explicit RegisterSource call.
+	//
+	// Resolution reuses the same authenticated expansion RegisterSource
+	// does, so a candidate that is itself a collection is flattened into
+	// its members rather than nested -- Arma cares about the mod list, and
+	// a collection-of-collections resolves differently for a subscriber
+	// than the preset it came from did.
+	ResolveWorkshopItems(context.Context, *connect.Request[v1.ResolveWorkshopItemsRequest]) (*connect.Response[v1.ResolveWorkshopItemsResponse], error)
+	ListOwnedCollections(context.Context, *connect.Request[v1.ListOwnedCollectionsRequest]) (*connect.Response[v1.ListOwnedCollectionsResponse], error)
+	GetCollection(context.Context, *connect.Request[v1.GetCollectionRequest]) (*connect.Response[v1.GetCollectionResponse], error)
+	PublishCollection(context.Context, *connect.Request[v1.PublishCollectionRequest]) (*connect.Response[v1.PublishCollectionResponse], error)
+	DeleteCollection(context.Context, *connect.Request[v1.DeleteCollectionRequest]) (*connect.Response[v1.DeleteCollectionResponse], error)
 }
 
 // NewSyncServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -529,6 +644,36 @@ func NewSyncServiceHandler(svc SyncServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(syncServiceMethods.ByName("GetSyncStatus")),
 		connect.WithHandlerOptions(opts...),
 	)
+	syncServiceResolveWorkshopItemsHandler := connect.NewUnaryHandler(
+		SyncServiceResolveWorkshopItemsProcedure,
+		svc.ResolveWorkshopItems,
+		connect.WithSchema(syncServiceMethods.ByName("ResolveWorkshopItems")),
+		connect.WithHandlerOptions(opts...),
+	)
+	syncServiceListOwnedCollectionsHandler := connect.NewUnaryHandler(
+		SyncServiceListOwnedCollectionsProcedure,
+		svc.ListOwnedCollections,
+		connect.WithSchema(syncServiceMethods.ByName("ListOwnedCollections")),
+		connect.WithHandlerOptions(opts...),
+	)
+	syncServiceGetCollectionHandler := connect.NewUnaryHandler(
+		SyncServiceGetCollectionProcedure,
+		svc.GetCollection,
+		connect.WithSchema(syncServiceMethods.ByName("GetCollection")),
+		connect.WithHandlerOptions(opts...),
+	)
+	syncServicePublishCollectionHandler := connect.NewUnaryHandler(
+		SyncServicePublishCollectionProcedure,
+		svc.PublishCollection,
+		connect.WithSchema(syncServiceMethods.ByName("PublishCollection")),
+		connect.WithHandlerOptions(opts...),
+	)
+	syncServiceDeleteCollectionHandler := connect.NewUnaryHandler(
+		SyncServiceDeleteCollectionProcedure,
+		svc.DeleteCollection,
+		connect.WithSchema(syncServiceMethods.ByName("DeleteCollection")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/sync.v1.SyncService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SyncServiceRegisterSourceProcedure:
@@ -557,6 +702,16 @@ func NewSyncServiceHandler(svc SyncServiceHandler, opts ...connect.HandlerOption
 			syncServicePollQrLoginHandler.ServeHTTP(w, r)
 		case SyncServiceGetSyncStatusProcedure:
 			syncServiceGetSyncStatusHandler.ServeHTTP(w, r)
+		case SyncServiceResolveWorkshopItemsProcedure:
+			syncServiceResolveWorkshopItemsHandler.ServeHTTP(w, r)
+		case SyncServiceListOwnedCollectionsProcedure:
+			syncServiceListOwnedCollectionsHandler.ServeHTTP(w, r)
+		case SyncServiceGetCollectionProcedure:
+			syncServiceGetCollectionHandler.ServeHTTP(w, r)
+		case SyncServicePublishCollectionProcedure:
+			syncServicePublishCollectionHandler.ServeHTTP(w, r)
+		case SyncServiceDeleteCollectionProcedure:
+			syncServiceDeleteCollectionHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -616,4 +771,24 @@ func (UnimplementedSyncServiceHandler) PollQrLogin(context.Context, *connect.Req
 
 func (UnimplementedSyncServiceHandler) GetSyncStatus(context.Context, *connect.Request[v1.GetSyncStatusRequest]) (*connect.Response[v1.GetSyncStatusResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sync.v1.SyncService.GetSyncStatus is not implemented"))
+}
+
+func (UnimplementedSyncServiceHandler) ResolveWorkshopItems(context.Context, *connect.Request[v1.ResolveWorkshopItemsRequest]) (*connect.Response[v1.ResolveWorkshopItemsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sync.v1.SyncService.ResolveWorkshopItems is not implemented"))
+}
+
+func (UnimplementedSyncServiceHandler) ListOwnedCollections(context.Context, *connect.Request[v1.ListOwnedCollectionsRequest]) (*connect.Response[v1.ListOwnedCollectionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sync.v1.SyncService.ListOwnedCollections is not implemented"))
+}
+
+func (UnimplementedSyncServiceHandler) GetCollection(context.Context, *connect.Request[v1.GetCollectionRequest]) (*connect.Response[v1.GetCollectionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sync.v1.SyncService.GetCollection is not implemented"))
+}
+
+func (UnimplementedSyncServiceHandler) PublishCollection(context.Context, *connect.Request[v1.PublishCollectionRequest]) (*connect.Response[v1.PublishCollectionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sync.v1.SyncService.PublishCollection is not implemented"))
+}
+
+func (UnimplementedSyncServiceHandler) DeleteCollection(context.Context, *connect.Request[v1.DeleteCollectionRequest]) (*connect.Response[v1.DeleteCollectionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sync.v1.SyncService.DeleteCollection is not implemented"))
 }

@@ -107,6 +107,21 @@ const (
 	// AdminServiceDeleteSecretProcedure is the fully-qualified name of the AdminService's DeleteSecret
 	// RPC.
 	AdminServiceDeleteSecretProcedure = "/registry.v1.AdminService/DeleteSecret"
+	// AdminServiceResolveWorkshopItemsProcedure is the fully-qualified name of the AdminService's
+	// ResolveWorkshopItems RPC.
+	AdminServiceResolveWorkshopItemsProcedure = "/registry.v1.AdminService/ResolveWorkshopItems"
+	// AdminServiceListWorkshopCollectionsProcedure is the fully-qualified name of the AdminService's
+	// ListWorkshopCollections RPC.
+	AdminServiceListWorkshopCollectionsProcedure = "/registry.v1.AdminService/ListWorkshopCollections"
+	// AdminServiceGetWorkshopCollectionProcedure is the fully-qualified name of the AdminService's
+	// GetWorkshopCollection RPC.
+	AdminServiceGetWorkshopCollectionProcedure = "/registry.v1.AdminService/GetWorkshopCollection"
+	// AdminServicePublishWorkshopCollectionProcedure is the fully-qualified name of the AdminService's
+	// PublishWorkshopCollection RPC.
+	AdminServicePublishWorkshopCollectionProcedure = "/registry.v1.AdminService/PublishWorkshopCollection"
+	// AdminServiceDeleteWorkshopCollectionProcedure is the fully-qualified name of the AdminService's
+	// DeleteWorkshopCollection RPC.
+	AdminServiceDeleteWorkshopCollectionProcedure = "/registry.v1.AdminService/DeleteWorkshopCollection"
 )
 
 // ModSourceServiceClient is a client for the registry.v1.ModSourceService service.
@@ -672,6 +687,20 @@ type AdminServiceClient interface {
 	ListSecrets(context.Context, *connect.Request[v1.ListSecretsRequest]) (*connect.Response[v1.ListSecretsResponse], error)
 	PutSecret(context.Context, *connect.Request[v1.PutSecretRequest]) (*connect.Response[v1.PutSecretResponse], error)
 	DeleteSecret(context.Context, *connect.Request[v1.DeleteSecretRequest]) (*connect.Response[v1.DeleteSecretResponse], error)
+	// Turn preset HTML and/or Workshop IDs into the flat, titled mod list a
+	// collection would hold -- the preview step before PublishWorkshopCollection,
+	// and how an editor looks up a mod being added. Read-only on Steam.
+	ResolveWorkshopItems(context.Context, *connect.Request[v1.ResolveWorkshopItemsRequest]) (*connect.Response[v1.ResolveWorkshopItemsResponse], error)
+	// Collections the cluster's Steam account has published for Arma 3.
+	ListWorkshopCollections(context.Context, *connect.Request[v1.ListWorkshopCollectionsRequest]) (*connect.Response[v1.ListWorkshopCollectionsResponse], error)
+	// One collection and its (flattened) members. Not limited to the
+	// cluster's own: reading someone else's is how an editor starts a new
+	// collection from an existing one. `owned` says which it is.
+	GetWorkshopCollection(context.Context, *connect.Request[v1.GetWorkshopCollectionRequest]) (*connect.Response[v1.WorkshopCollection], error)
+	// Publish a new collection, or replace an owned one's title,
+	// description, visibility and membership wholesale.
+	PublishWorkshopCollection(context.Context, *connect.Request[v1.PublishWorkshopCollectionRequest]) (*connect.Response[v1.PublishWorkshopCollectionResponse], error)
+	DeleteWorkshopCollection(context.Context, *connect.Request[v1.DeleteWorkshopCollectionRequest]) (*connect.Response[v1.DeleteWorkshopCollectionResponse], error)
 }
 
 // NewAdminServiceClient constructs a client for the registry.v1.AdminService service. By default,
@@ -751,22 +780,57 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("DeleteSecret")),
 			connect.WithClientOptions(opts...),
 		),
+		resolveWorkshopItems: connect.NewClient[v1.ResolveWorkshopItemsRequest, v1.ResolveWorkshopItemsResponse](
+			httpClient,
+			baseURL+AdminServiceResolveWorkshopItemsProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ResolveWorkshopItems")),
+			connect.WithClientOptions(opts...),
+		),
+		listWorkshopCollections: connect.NewClient[v1.ListWorkshopCollectionsRequest, v1.ListWorkshopCollectionsResponse](
+			httpClient,
+			baseURL+AdminServiceListWorkshopCollectionsProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListWorkshopCollections")),
+			connect.WithClientOptions(opts...),
+		),
+		getWorkshopCollection: connect.NewClient[v1.GetWorkshopCollectionRequest, v1.WorkshopCollection](
+			httpClient,
+			baseURL+AdminServiceGetWorkshopCollectionProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("GetWorkshopCollection")),
+			connect.WithClientOptions(opts...),
+		),
+		publishWorkshopCollection: connect.NewClient[v1.PublishWorkshopCollectionRequest, v1.PublishWorkshopCollectionResponse](
+			httpClient,
+			baseURL+AdminServicePublishWorkshopCollectionProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("PublishWorkshopCollection")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteWorkshopCollection: connect.NewClient[v1.DeleteWorkshopCollectionRequest, v1.DeleteWorkshopCollectionResponse](
+			httpClient,
+			baseURL+AdminServiceDeleteWorkshopCollectionProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("DeleteWorkshopCollection")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // adminServiceClient implements AdminServiceClient.
 type adminServiceClient struct {
-	getDiskUsage      *connect.Client[v1.GetDiskUsageRequest, v1.GetDiskUsageResponse]
-	refreshSteamAuth  *connect.Client[v1.RefreshSteamAuthRequest, v1.RefreshSteamAuthResponse]
-	exportState       *connect.Client[v1.ExportStateRequest, v1.ExportStateResponse]
-	importState       *connect.Client[v1.ImportStateRequest, v1.ImportStateResponse]
-	listAcl           *connect.Client[v1.ListAclRequest, v1.ListAclResponse]
-	setAclScopes      *connect.Client[v1.SetAclScopesRequest, v1.SetAclScopesResponse]
-	beginSteamQrLogin *connect.Client[v1.BeginSteamQrLoginRequest, v1.BeginSteamQrLoginResponse]
-	pollSteamQrLogin  *connect.Client[v1.PollSteamQrLoginRequest, v1.PollSteamQrLoginResponse]
-	listSecrets       *connect.Client[v1.ListSecretsRequest, v1.ListSecretsResponse]
-	putSecret         *connect.Client[v1.PutSecretRequest, v1.PutSecretResponse]
-	deleteSecret      *connect.Client[v1.DeleteSecretRequest, v1.DeleteSecretResponse]
+	getDiskUsage              *connect.Client[v1.GetDiskUsageRequest, v1.GetDiskUsageResponse]
+	refreshSteamAuth          *connect.Client[v1.RefreshSteamAuthRequest, v1.RefreshSteamAuthResponse]
+	exportState               *connect.Client[v1.ExportStateRequest, v1.ExportStateResponse]
+	importState               *connect.Client[v1.ImportStateRequest, v1.ImportStateResponse]
+	listAcl                   *connect.Client[v1.ListAclRequest, v1.ListAclResponse]
+	setAclScopes              *connect.Client[v1.SetAclScopesRequest, v1.SetAclScopesResponse]
+	beginSteamQrLogin         *connect.Client[v1.BeginSteamQrLoginRequest, v1.BeginSteamQrLoginResponse]
+	pollSteamQrLogin          *connect.Client[v1.PollSteamQrLoginRequest, v1.PollSteamQrLoginResponse]
+	listSecrets               *connect.Client[v1.ListSecretsRequest, v1.ListSecretsResponse]
+	putSecret                 *connect.Client[v1.PutSecretRequest, v1.PutSecretResponse]
+	deleteSecret              *connect.Client[v1.DeleteSecretRequest, v1.DeleteSecretResponse]
+	resolveWorkshopItems      *connect.Client[v1.ResolveWorkshopItemsRequest, v1.ResolveWorkshopItemsResponse]
+	listWorkshopCollections   *connect.Client[v1.ListWorkshopCollectionsRequest, v1.ListWorkshopCollectionsResponse]
+	getWorkshopCollection     *connect.Client[v1.GetWorkshopCollectionRequest, v1.WorkshopCollection]
+	publishWorkshopCollection *connect.Client[v1.PublishWorkshopCollectionRequest, v1.PublishWorkshopCollectionResponse]
+	deleteWorkshopCollection  *connect.Client[v1.DeleteWorkshopCollectionRequest, v1.DeleteWorkshopCollectionResponse]
 }
 
 // GetDiskUsage calls registry.v1.AdminService.GetDiskUsage.
@@ -822,6 +886,31 @@ func (c *adminServiceClient) PutSecret(ctx context.Context, req *connect.Request
 // DeleteSecret calls registry.v1.AdminService.DeleteSecret.
 func (c *adminServiceClient) DeleteSecret(ctx context.Context, req *connect.Request[v1.DeleteSecretRequest]) (*connect.Response[v1.DeleteSecretResponse], error) {
 	return c.deleteSecret.CallUnary(ctx, req)
+}
+
+// ResolveWorkshopItems calls registry.v1.AdminService.ResolveWorkshopItems.
+func (c *adminServiceClient) ResolveWorkshopItems(ctx context.Context, req *connect.Request[v1.ResolveWorkshopItemsRequest]) (*connect.Response[v1.ResolveWorkshopItemsResponse], error) {
+	return c.resolveWorkshopItems.CallUnary(ctx, req)
+}
+
+// ListWorkshopCollections calls registry.v1.AdminService.ListWorkshopCollections.
+func (c *adminServiceClient) ListWorkshopCollections(ctx context.Context, req *connect.Request[v1.ListWorkshopCollectionsRequest]) (*connect.Response[v1.ListWorkshopCollectionsResponse], error) {
+	return c.listWorkshopCollections.CallUnary(ctx, req)
+}
+
+// GetWorkshopCollection calls registry.v1.AdminService.GetWorkshopCollection.
+func (c *adminServiceClient) GetWorkshopCollection(ctx context.Context, req *connect.Request[v1.GetWorkshopCollectionRequest]) (*connect.Response[v1.WorkshopCollection], error) {
+	return c.getWorkshopCollection.CallUnary(ctx, req)
+}
+
+// PublishWorkshopCollection calls registry.v1.AdminService.PublishWorkshopCollection.
+func (c *adminServiceClient) PublishWorkshopCollection(ctx context.Context, req *connect.Request[v1.PublishWorkshopCollectionRequest]) (*connect.Response[v1.PublishWorkshopCollectionResponse], error) {
+	return c.publishWorkshopCollection.CallUnary(ctx, req)
+}
+
+// DeleteWorkshopCollection calls registry.v1.AdminService.DeleteWorkshopCollection.
+func (c *adminServiceClient) DeleteWorkshopCollection(ctx context.Context, req *connect.Request[v1.DeleteWorkshopCollectionRequest]) (*connect.Response[v1.DeleteWorkshopCollectionResponse], error) {
+	return c.deleteWorkshopCollection.CallUnary(ctx, req)
 }
 
 // AdminServiceHandler is an implementation of the registry.v1.AdminService service.
@@ -903,6 +992,20 @@ type AdminServiceHandler interface {
 	ListSecrets(context.Context, *connect.Request[v1.ListSecretsRequest]) (*connect.Response[v1.ListSecretsResponse], error)
 	PutSecret(context.Context, *connect.Request[v1.PutSecretRequest]) (*connect.Response[v1.PutSecretResponse], error)
 	DeleteSecret(context.Context, *connect.Request[v1.DeleteSecretRequest]) (*connect.Response[v1.DeleteSecretResponse], error)
+	// Turn preset HTML and/or Workshop IDs into the flat, titled mod list a
+	// collection would hold -- the preview step before PublishWorkshopCollection,
+	// and how an editor looks up a mod being added. Read-only on Steam.
+	ResolveWorkshopItems(context.Context, *connect.Request[v1.ResolveWorkshopItemsRequest]) (*connect.Response[v1.ResolveWorkshopItemsResponse], error)
+	// Collections the cluster's Steam account has published for Arma 3.
+	ListWorkshopCollections(context.Context, *connect.Request[v1.ListWorkshopCollectionsRequest]) (*connect.Response[v1.ListWorkshopCollectionsResponse], error)
+	// One collection and its (flattened) members. Not limited to the
+	// cluster's own: reading someone else's is how an editor starts a new
+	// collection from an existing one. `owned` says which it is.
+	GetWorkshopCollection(context.Context, *connect.Request[v1.GetWorkshopCollectionRequest]) (*connect.Response[v1.WorkshopCollection], error)
+	// Publish a new collection, or replace an owned one's title,
+	// description, visibility and membership wholesale.
+	PublishWorkshopCollection(context.Context, *connect.Request[v1.PublishWorkshopCollectionRequest]) (*connect.Response[v1.PublishWorkshopCollectionResponse], error)
+	DeleteWorkshopCollection(context.Context, *connect.Request[v1.DeleteWorkshopCollectionRequest]) (*connect.Response[v1.DeleteWorkshopCollectionResponse], error)
 }
 
 // NewAdminServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -978,6 +1081,36 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(adminServiceMethods.ByName("DeleteSecret")),
 		connect.WithHandlerOptions(opts...),
 	)
+	adminServiceResolveWorkshopItemsHandler := connect.NewUnaryHandler(
+		AdminServiceResolveWorkshopItemsProcedure,
+		svc.ResolveWorkshopItems,
+		connect.WithSchema(adminServiceMethods.ByName("ResolveWorkshopItems")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceListWorkshopCollectionsHandler := connect.NewUnaryHandler(
+		AdminServiceListWorkshopCollectionsProcedure,
+		svc.ListWorkshopCollections,
+		connect.WithSchema(adminServiceMethods.ByName("ListWorkshopCollections")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceGetWorkshopCollectionHandler := connect.NewUnaryHandler(
+		AdminServiceGetWorkshopCollectionProcedure,
+		svc.GetWorkshopCollection,
+		connect.WithSchema(adminServiceMethods.ByName("GetWorkshopCollection")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServicePublishWorkshopCollectionHandler := connect.NewUnaryHandler(
+		AdminServicePublishWorkshopCollectionProcedure,
+		svc.PublishWorkshopCollection,
+		connect.WithSchema(adminServiceMethods.ByName("PublishWorkshopCollection")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceDeleteWorkshopCollectionHandler := connect.NewUnaryHandler(
+		AdminServiceDeleteWorkshopCollectionProcedure,
+		svc.DeleteWorkshopCollection,
+		connect.WithSchema(adminServiceMethods.ByName("DeleteWorkshopCollection")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/registry.v1.AdminService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AdminServiceGetDiskUsageProcedure:
@@ -1002,6 +1135,16 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServicePutSecretHandler.ServeHTTP(w, r)
 		case AdminServiceDeleteSecretProcedure:
 			adminServiceDeleteSecretHandler.ServeHTTP(w, r)
+		case AdminServiceResolveWorkshopItemsProcedure:
+			adminServiceResolveWorkshopItemsHandler.ServeHTTP(w, r)
+		case AdminServiceListWorkshopCollectionsProcedure:
+			adminServiceListWorkshopCollectionsHandler.ServeHTTP(w, r)
+		case AdminServiceGetWorkshopCollectionProcedure:
+			adminServiceGetWorkshopCollectionHandler.ServeHTTP(w, r)
+		case AdminServicePublishWorkshopCollectionProcedure:
+			adminServicePublishWorkshopCollectionHandler.ServeHTTP(w, r)
+		case AdminServiceDeleteWorkshopCollectionProcedure:
+			adminServiceDeleteWorkshopCollectionHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1053,4 +1196,24 @@ func (UnimplementedAdminServiceHandler) PutSecret(context.Context, *connect.Requ
 
 func (UnimplementedAdminServiceHandler) DeleteSecret(context.Context, *connect.Request[v1.DeleteSecretRequest]) (*connect.Response[v1.DeleteSecretResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.DeleteSecret is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ResolveWorkshopItems(context.Context, *connect.Request[v1.ResolveWorkshopItemsRequest]) (*connect.Response[v1.ResolveWorkshopItemsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.ResolveWorkshopItems is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListWorkshopCollections(context.Context, *connect.Request[v1.ListWorkshopCollectionsRequest]) (*connect.Response[v1.ListWorkshopCollectionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.ListWorkshopCollections is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) GetWorkshopCollection(context.Context, *connect.Request[v1.GetWorkshopCollectionRequest]) (*connect.Response[v1.WorkshopCollection], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.GetWorkshopCollection is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) PublishWorkshopCollection(context.Context, *connect.Request[v1.PublishWorkshopCollectionRequest]) (*connect.Response[v1.PublishWorkshopCollectionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.PublishWorkshopCollection is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) DeleteWorkshopCollection(context.Context, *connect.Request[v1.DeleteWorkshopCollectionRequest]) (*connect.Response[v1.DeleteWorkshopCollectionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AdminService.DeleteWorkshopCollection is not implemented"))
 }

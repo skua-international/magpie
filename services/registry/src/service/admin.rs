@@ -1,5 +1,7 @@
 //! `AdminService`: cluster-wide storage accounting, Steam session
-//! refresh, and (see state.rs) declarative cluster state export/import.
+//! refresh, Workshop collections published as the cluster's Steam account
+//! (see collections.rs), and (see state.rs) declarative cluster state
+//! export/import.
 
 use std::sync::Arc;
 
@@ -10,15 +12,21 @@ use kube::api::{Api, DeleteParams, ListParams, Patch, PatchParams};
 
 use protocol::proto::registry::v1::{
     AclSubject, BeginSteamQrLoginRequest, BeginSteamQrLoginResponse, DeleteSecretRequest,
-    DeleteSecretResponse, ExportStateRequest, ExportStateResponse, GetDiskUsageRequest,
+    DeleteSecretResponse, DeleteWorkshopCollectionRequest, DeleteWorkshopCollectionResponse, ExportStateRequest, ExportStateResponse, GetDiskUsageRequest,
     GetDiskUsageResponse, ImportStateRequest, ImportStateResponse, LinkedAccountInfo,
-    ListAclRequest, ListAclResponse, ListSecretsRequest, ListSecretsResponse,
-    PollSteamQrLoginRequest, PollSteamQrLoginResponse, PutSecretRequest, PutSecretResponse,
-    RefreshSteamAuthRequest, RefreshSteamAuthResponse, SecretInfo, SetAclScopesRequest,
-    SetAclScopesResponse,
+    GetWorkshopCollectionRequest, ListAclRequest, ListAclResponse, ListSecretsRequest,
+    ListSecretsResponse, ListWorkshopCollectionsRequest, ListWorkshopCollectionsResponse,
+    PollSteamQrLoginRequest, PollSteamQrLoginResponse, PublishWorkshopCollectionRequest,
+    PublishWorkshopCollectionResponse, PutSecretRequest, PutSecretResponse,
+    RefreshSteamAuthRequest, RefreshSteamAuthResponse, ResolveWorkshopItemsRequest,
+    ResolveWorkshopItemsResponse, SecretInfo, SetAclScopesRequest, SetAclScopesResponse,
+    WorkshopCollection,
 };
+use protocol::proto::sync::v1::PublishCollectionRequest;
 use sqlx::PgPool;
 use sync_client::SyncClient;
+
+use super::collections;
 
 pub struct AdminServiceImpl {
     pool: PgPool,
@@ -114,6 +122,99 @@ impl protocol::proto::registry::v1::AdminService for AdminServiceImpl {
             .await
             .map_err(|e| ConnectError::internal(format!("{e:#}")))?;
         Response::ok(RefreshSteamAuthResponse::default())
+    }
+
+    async fn resolve_workshop_items<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        request: ServiceRequest<'_, ResolveWorkshopItemsRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<ResolveWorkshopItemsResponse> + Send + use<'a>>
+    {
+        let ids: Vec<u64> = request.ids.iter().copied().collect();
+        let candidates = collections::candidate_ids(request.preset_html, &ids)?;
+        let resolved = self
+            .sync_client
+            .resolve_workshop_items(&candidates)
+            .await
+            .map_err(collections::relay)?;
+        Response::ok(collections::resolution(resolved))
+    }
+
+    async fn list_workshop_collections<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        _request: ServiceRequest<'_, ListWorkshopCollectionsRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<ListWorkshopCollectionsResponse> + Send + use<'a>>
+    {
+        let listed = self
+            .sync_client
+            .list_owned_collections()
+            .await
+            .map_err(collections::relay)?;
+        Response::ok(ListWorkshopCollectionsResponse {
+            collections: listed
+                .collections
+                .into_iter()
+                .map(collections::summary)
+                .collect(),
+            ..Default::default()
+        })
+    }
+
+    async fn get_workshop_collection<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        request: ServiceRequest<'_, GetWorkshopCollectionRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<WorkshopCollection> + Send + use<'a>> {
+        let collection = self
+            .sync_client
+            .get_collection(request.collection_id)
+            .await
+            .map_err(collections::relay)?;
+        Response::ok(collections::collection(collection))
+    }
+
+    async fn publish_workshop_collection<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        request: ServiceRequest<'_, PublishWorkshopCollectionRequest>,
+    ) -> ServiceResult<
+        impl connectrpc::Encodable<PublishWorkshopCollectionResponse> + Send + use<'a>,
+    > {
+        let title = request.title.trim();
+        if title.is_empty() {
+            return Err(ConnectError::invalid_argument("a collection needs a title"));
+        }
+        let visibility = collections::to_sync_visibility(request.visibility.to_i32())?;
+        let ids: Vec<u64> = request.mod_ids.iter().copied().collect();
+        let candidates = collections::candidate_ids("", &ids)?;
+
+        let published = self
+            .sync_client
+            .publish_collection(PublishCollectionRequest {
+                collection_id: request.collection_id,
+                title: title.to_string(),
+                description: request.description.to_string(),
+                visibility: visibility.into(),
+                candidate_ids: candidates,
+                ..Default::default()
+            })
+            .await
+            .map_err(collections::relay)?;
+        Response::ok(collections::published(published))
+    }
+
+    async fn delete_workshop_collection<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        request: ServiceRequest<'_, DeleteWorkshopCollectionRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<DeleteWorkshopCollectionResponse> + Send + use<'a>>
+    {
+        self.sync_client
+            .delete_collection(request.collection_id)
+            .await
+            .map_err(collections::relay)?;
+        Response::ok(DeleteWorkshopCollectionResponse::default())
     }
 
     async fn list_acl<'a>(
