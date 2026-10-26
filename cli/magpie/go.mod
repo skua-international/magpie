@@ -19,7 +19,7 @@ replace github.com/0xAozora/go-steam => github.com/LinkIsGrim/go-steam v0.0.0-20
 require (
 	charm.land/bubbletea/v2 v2.0.8
 	charm.land/lipgloss/v2 v2.0.5
-	connectrpc.com/connect v1.20.0
+	connectrpc.com/connect v1.21.0
 	github.com/0xAozora/go-steam v0.0.0-20250414150026-b27aac88f1b8
 	github.com/mdp/qrterminal/v3 v3.2.1
 	github.com/skua-international/magpie/generated/go v0.0.0-00010101000000-000000000000
