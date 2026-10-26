@@ -25,7 +25,7 @@ require (
 	github.com/skua-international/magpie/generated/go v0.0.0-00010101000000-000000000000
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/term v0.45.0
-	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af
+	google.golang.org/protobuf v1.36.12
 )
 
 require (
