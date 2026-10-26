@@ -3,7 +3,7 @@ module github.com/skua-international/magpie/services/magpie-csi
 go 1.26.5
 
 require (
-	github.com/container-storage-interface/spec v1.12.0
+	github.com/container-storage-interface/spec v1.13.0
 	google.golang.org/grpc v1.82.1
 )
 
